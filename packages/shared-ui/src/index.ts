@@ -5,3 +5,5 @@ export * from './components/Modal';
 export * from './components/DataTable';
 export * from './components/Badge';
 export * from './components/Toast';
+export * from './components/Tabs';
+export * from './lib/utils';

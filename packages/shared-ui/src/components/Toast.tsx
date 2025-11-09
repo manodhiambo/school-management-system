@@ -1,59 +1,76 @@
-import * as React from 'react';
-import { X, CheckCircle, AlertCircle } from 'lucide-react';
-import { cn } from '../lib/utils';
+import React from 'react';
+import { cn } from '../utils';
 
-type ToastType = 'success' | 'error' | 'info';
-
-interface ToastProps {
-  type: ToastType;
-  message: string;
-  onClose: () => void;
+interface Toast {
+  id: string;
+  title?: string;
+  description?: string;
+  variant?: 'default' | 'success' | 'error' | 'warning';
 }
 
-export const Toast: React.FC<ToastProps> = ({ type, message, onClose }) => {
-  const icon = {
-    success: <CheckCircle className="text-green-500" />,
-    error: <AlertCircle className="text-red-500" />,
-    info: <AlertCircle className="text-blue-500" />,
+interface ToastProps {
+  toast: Toast;
+  onDismiss: (id: string) => void;
+}
+
+export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
+  const baseClasses = "pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5";
+  
+  const variants = {
+    default: "border-l-4 border-blue-500",
+    success: "border-l-4 border-green-500",
+    warning: "border-l-4 border-yellow-500",
+    error: "border-l-4 border-red-500",
   };
 
   return (
-    <div className={cn(
-      'flex items-center gap-3 p-4 rounded-lg shadow-lg bg-white min-w-[300px]',
-      'border-l-4',
-      type === 'success' && 'border-green-500',
-      type === 'error' && 'border-red-500',
-      type === 'info' && 'border-blue-500'
-    )}>
-      {icon[type]}
-      <span className="flex-1 text-sm">{message}</span>
-      <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-        <X size={16} />
-      </button>
+    <div className={cn(baseClasses, variants[toast.variant || 'default'])}>
+      <div className="p-4">
+        <div className="flex items-start">
+          <div className="flex-1">
+            {toast.title && <p className="text-sm font-medium text-gray-900">{toast.title}</p>}
+            {toast.description && <p className="mt-1 text-sm text-gray-500">{toast.description}</p>}
+          </div>
+          <button
+            className="ml-4 inline-flex text-gray-400 hover:text-gray-600"
+            onClick={() => onDismiss(toast.id)}
+          >
+            <span className="sr-only">Close</span>
+            ✕
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
-export const useToast = () => {
-  const [toasts, setToasts] = React.useState<Array<ToastProps & { id: number }>>([]);
+export const Toaster: React.FC = () => {
+  const [toasts, setToasts] = React.useState<Toast[]>([]);
 
-  const addToast = (type: ToastType, message: string) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, type, message, onClose: () => removeToast(id) }]);
-    setTimeout(() => removeToast(id), 5000);
-  };
+  // Simple toast manager - in real app you'd use context
+  React.useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const toast = e.detail as Toast;
+      setToasts(prev => [...prev, toast]);
+      
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== toast.id));
+      }, 5000);
+    };
 
-  const removeToast = (id: number) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+    window.addEventListener('show-toast' as any, handler);
+    return () => window.removeEventListener('show-toast' as any, handler);
+  }, []);
 
-  const ToastContainer = () => (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2">
-      {toasts.map((toast) => (
-        <Toast key={toast.id} {...toast} />
+  if (toasts.length === 0) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-50 space-y-2">
+      {toasts.map(toast => (
+        <Toast key={toast.id} toast={toast} onDismiss={(id) => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }} />
       ))}
     </div>
   );
-
-  return { addToast, ToastContainer };
 };

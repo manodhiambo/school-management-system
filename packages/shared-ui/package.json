@@ -1,19 +1,18 @@
 {
   "name": "@school/shared-ui",
   "version": "1.0.0",
-  "main": "src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@school/shared-types": "*",
-    "lucide-react": "^0.312.0",
+    "@school/shared-types": "workspace:*",
+    "clsx": "^2.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.0.0",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

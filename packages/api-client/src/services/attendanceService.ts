@@ -1,23 +1,14 @@
-import { apiClient } from '../client';
-import type { Attendance, CreateAttendanceDto } from '@sms/shared-types';
+import { apiClient } from '../index';
+import type { Attendance, CreateAttendanceDto, ApiResponse } from '@school/shared-types';
 
 export const attendanceService = {
-  async getAttendanceById(id: string): Promise<Attendance> {
-    const response = await apiClient.get<Attendance>(`/attendance/${id}`);
+  markAttendance: async (data: CreateAttendanceDto): Promise<ApiResponse<Attendance>> => {
+    const response = await apiClient.post('/api/v1/attendance/mark', data);
     return response.data;
   },
-
-  async createAttendance(data: CreateAttendanceDto): Promise<Attendance> {
-    const response = await apiClient.post<Attendance>('/attendance', data);
+  
+  getStudentAttendance: async (studentId: string, date: string): Promise<ApiResponse<Attendance[]>> => {
+    const response = await apiClient.get(`/api/v1/attendance/student/${studentId}/date/${date}`);
     return response.data;
-  },
-
-  async updateAttendance(id: string, data: Partial<CreateAttendanceDto>): Promise<Attendance> {
-    const response = await apiClient.put<Attendance>(`/attendance/${id}`, data);
-    return response.data;
-  },
-
-  async deleteAttendance(id: string): Promise<void> {
-    await apiClient.delete(`/attendance/${id}`);
   },
 };

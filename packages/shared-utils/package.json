@@ -1,5 +1,5 @@
 {
-  "name": "@sms/shared-utils",
+  "name": "@school/shared-utils",
   "version": "1.0.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,9 +9,10 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
-    "@sms/shared-types": "workspace:*"
+    "@school/shared-types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
   }
 }
+

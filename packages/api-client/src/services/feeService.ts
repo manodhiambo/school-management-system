@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { FeeStructure, FeeInvoice } from '@sms/shared-types';
+import type { FeeStructure, FeeInvoice } from '@school/shared-types';
 
 export const feeService = {
   async getFeeStructures(): Promise<FeeStructure[]> {

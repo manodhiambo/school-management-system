@@ -10,9 +10,9 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@school/shared-types": "*",
-    "@school/shared-ui": "*",
-    "@school/api-client": "*",
+    "@school/shared-types": "workspace:*",
+    "@school/shared-ui": "workspace:*",
+    "@school/api-client": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0",

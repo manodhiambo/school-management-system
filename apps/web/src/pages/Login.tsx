@@ -3,17 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '@school/shared-ui';
 import { useToast } from '@school/shared-ui';
 
-export default function Login() {
+interface LoginProps {
+  onLogin: (email: string) => void;
+}
+
+export default function Login({ onLogin }: LoginProps) {
   const navigate = useNavigate();
-  const { showToast } = useToast(); // FIXED: Changed from addToast to showToast
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Mock login
+      // Mock login - set token and user
       localStorage.setItem('accessToken', 'mock-token');
+      onLogin(email); // Call the auth login method
       showToast({ title: 'Success', description: 'Logged in successfully', variant: 'success' });
       navigate('/');
     } catch (error) {

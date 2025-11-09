@@ -14,23 +14,36 @@ import Reports from './pages/reports/Reports';
 import Settings from './pages/admin/Settings';
 import { Toaster } from '@school/shared-ui';
 
-// Simple auth hook for now
+// Auth context
 function useAuth() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<{ id: string; email: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate auth check
-    setTimeout(() => {
-      // setUser({ id: '1', email: 'admin@school.com', role: 'admin' }); // Uncomment to simulate logged in
-      setLoading(false);
-    }, 500);
+    // Check for token on mount
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      // Decode token or set mock user
+      setUser({ id: '1', email: 'admin@school.com', role: 'admin' });
+    }
+    setLoading(false);
   }, []);
 
-  return { user, loading };
+  const login = (email: string) => {
+    setUser({ id: '1', email, role: 'admin' });
+  };
+
+  const logout = () => {
+    localStorage.removeItem('accessToken');
+    setUser(null);
+  };
+
+  return { user, loading, login, logout };
 }
 
 function Layout() {
+  const { logout } = useAuth();
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm border-b">
@@ -44,10 +57,7 @@ function Layout() {
               <a href="/students" className="text-gray-600 hover:text-gray-900">Students</a>
               <a href="/teachers" className="text-gray-600 hover:text-gray-900">Teachers</a>
               <button 
-                onClick={() => {
-                  localStorage.removeItem('accessToken');
-                  window.location.href = '/login';
-                }} 
+                onClick={logout}
                 className="text-gray-600 hover:text-gray-900"
               >
                 Logout
@@ -63,7 +73,7 @@ function Layout() {
   );
 }
 
-function App() {
+export default function App() {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -77,7 +87,7 @@ function App() {
   return (
     <>
       <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
           <Route index element={<Dashboard />} />
           <Route path="/students" element={<StudentList />} />
@@ -97,4 +107,8 @@ function App() {
   );
 }
 
-export default App;
+// Login wrapper to pass auth methods
+function LoginPage() {
+  const { login } = useAuth();
+  return <Login onLogin={login} />;
+}

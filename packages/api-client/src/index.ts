@@ -1,8 +1,10 @@
+export { default as apiClient } from './client';
+
 export * from './services/attendanceService';
 export * from './services/studentService';
 export * from './services/teacherService';
 export * from './services/feeService';
-export { apiClient } from './client';
+export * from './services/authService';
 
 // React hook
 import { useState, useEffect } from 'react';

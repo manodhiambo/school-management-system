@@ -25,9 +25,24 @@ export default function TeacherList() {
 
   const loadTeachers = async () => {
     try {
+      setLoading(true);
       const response = await teacherService.getTeachers();
-      setTeachers(response.data?.data || []);
+      console.log('Teachers response:', response); // Debug
+      
+      // Handle different response structures
+      if (response.data && response.data.data) {
+        setTeachers(response.data.data);
+      } else if (response.data) {
+        setTeachers(response.data);
+      } else if (Array.isArray(response)) {
+        setTeachers(response);
+      } else {
+        setTeachers([]);
+      }
+      
+      showToast({ title: 'Success', description: 'Teachers loaded', variant: 'success' });
     } catch (error) {
+      console.error('Error loading teachers:', error);
       showToast({ title: 'Error', description: 'Failed to load teachers', variant: 'error' });
     } finally {
       setLoading(false);
@@ -42,6 +57,14 @@ export default function TeacherList() {
     { key: 'designation' as keyof Teacher, header: 'Designation' },
     { key: 'status' as keyof Teacher, header: 'Status' },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">

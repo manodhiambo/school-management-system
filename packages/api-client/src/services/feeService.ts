@@ -1,4 +1,4 @@
-import { apiClient } from '../client';
+import apiClient from '../client';
 import type { FeeStructure, FeeInvoice } from '@school/shared-types';
 
 export const feeService = {
@@ -6,7 +6,7 @@ export const feeService = {
     const response = await apiClient.get<FeeStructure[]>('/fees/structures');
     return response.data;
   },
-
+  
   async getStudentInvoices(studentId: string): Promise<FeeInvoice[]> {
     const response = await apiClient.get<FeeInvoice[]>(`/fees/invoices/${studentId}`);
     return response.data;

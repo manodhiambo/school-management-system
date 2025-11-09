@@ -1,4 +1,4 @@
-import { apiClient } from '../index';
+import apiClient from '../client';
 import type { Attendance, CreateAttendanceDto, ApiResponse } from '@school/shared-types';
 
 export const attendanceService = {

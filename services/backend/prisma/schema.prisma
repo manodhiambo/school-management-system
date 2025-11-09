@@ -1,0 +1,109 @@
+// prisma/schema.prisma
+
+// Datasource - connects to your MySQL database
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Prisma Client generator
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Users of the system
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(STUDENT)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Student   Student?
+  Teacher   Teacher?
+}
+
+// Enum for user roles
+enum Role {
+  ADMIN
+  STUDENT
+  TEACHER
+}
+
+// Students
+model Student {
+  id          Int         @id @default(autoincrement())
+  user        User        @relation(fields: [userId], references: [id])
+  userId      Int         @unique
+  rollNo      String      @unique
+  courses     Course[]    @relation("StudentCourses")
+  attendances Attendance[]
+  fees        Fee[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Teachers
+model Teacher {
+  id        Int        @id @default(autoincrement())
+  user      User       @relation(fields: [userId], references: [id])
+  userId    Int        @unique
+  courses   Course[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+// Courses
+model Course {
+  id         Int         @id @default(autoincrement())
+  name       String
+  code       String      @unique
+  students   Student[]   @relation("StudentCourses")
+  teacher    Teacher?    @relation(fields: [teacherId], references: [id])
+  teacherId  Int?
+  attendances Attendance[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// Attendance records
+model Attendance {
+  id         Int             @id @default(autoincrement())
+  student    Student         @relation(fields: [studentId], references: [id])
+  studentId  Int
+  course     Course          @relation(fields: [courseId], references: [id])
+  courseId   Int
+  status     AttendanceStatus
+  date       DateTime
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+// Enum for attendance status
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+// Fee records
+model Fee {
+  id        Int       @id @default(autoincrement())
+  student   Student   @relation(fields: [studentId], references: [id])
+  studentId Int
+  amount    Float
+  status    FeeStatus @default(PENDING)
+  dueDate   DateTime
+  paidDate  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Enum for fee status
+enum FeeStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+

@@ -1,4 +1,4 @@
-import { apiClient } from '../index';
+import apiClient from '../client';
 import type { Student, ApiResponse, PaginatedResponse, StudentFilters } from '@school/shared-types';
 
 export const studentService = {

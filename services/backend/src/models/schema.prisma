@@ -1,0 +1,719 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// AUTHENTICATION & AUTHORIZATION
+// ==========================================
+
+model users {
+  id            String   @id @default(uuid())
+  email         String   @unique @db.VarChar(255)
+  password_hash String   @db.VarChar(255)
+  role          Role
+  mfa_secret    String?  @db.VarChar(32)
+  mfa_enabled   Boolean  @default(false)
+  last_login    DateTime? @db.Timestamp
+  is_active     Boolean  @default(true)
+  metadata      Json?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Back relations
+  sessions      sessions[]
+  student_docs  student_documents[]
+  students      students[]
+  teachers      teachers[]
+  parents       parents[]
+  audit_logs    audit_logs[]
+  fee_payments_collected fee_payments[] @relation("Collector")
+  teacher_attendance_marked teacher_attendance[] @relation("Marker")
+  teacher_leaves_approved teacher_leaves[] @relation("Approver")
+
+  @@index([email])
+  @@index([role])
+}
+
+model sessions {
+  id         String   @id @default(uuid())
+  user_id    String   @db.VarChar(36)
+  token_hash String   @db.VarChar(255)
+  device_info Json?
+  ip_address String?  @db.VarChar(45)
+  expires_at DateTime @db.Timestamp
+  created_at DateTime @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model permissions {
+  id         String   @id @default(uuid())
+  role       String   @db.VarChar(50)
+  resource   String   @db.VarChar(50)
+  action     String   @db.VarChar(50)
+  conditions Json?
+
+  @@unique([role, resource, action], name: "unique_role_permission")
+}
+
+// ==========================================
+// STUDENT MANAGEMENT
+// ==========================================
+
+model students {
+  id                String   @id @default(uuid())
+  user_id           String?  @unique @db.VarChar(36)
+  admission_number  String   @unique @db.VarChar(50)
+  first_name        String   @db.VarChar(100)
+  last_name         String   @db.VarChar(100)
+  date_of_birth     DateTime @db.Date
+  gender            Gender?
+  blood_group       String?  @db.VarChar(5)
+  religion          String?  @db.VarChar(50)
+  caste             String?  @db.VarChar(50)
+  category          Category?
+  aadhar_number     String?  @db.VarChar(12)
+  roll_number       String?  @db.VarChar(20)
+  class_id          String?  @db.VarChar(36)
+  section_id        String?  @db.VarChar(36)
+  parent_id         String?  @db.VarChar(36)
+  joining_date      DateTime? @db.Date
+  admission_date    DateTime? @db.Date
+  status            StudentStatus @default(active)
+  is_new_admission  Boolean  @default(true)
+  medical_notes     String?  @db.Text
+  emergency_contact Json?
+  profile_photo_url String?  @db.VarChar(500)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  user            users?           @relation(fields: [user_id], references: [id])
+  class           classes?         @relation("StudentClass", fields: [class_id], references: [id])
+  section         sections?        @relation("StudentSection", fields: [section_id], references: [id])
+  parent          parents?         @relation("StudentParent", fields: [parent_id], references: [id])
+  documents       student_documents[]
+  promotions      student_promotions[]
+  attendance      attendance[]
+  exam_results    exam_results[]
+  gradebook       gradebook[]
+  fee_invoices    fee_invoices[]
+  parent_students parent_students[] @relation("StudentParentStudents")
+}
+
+model student_documents {
+  id             String           @id @default(uuid())
+  student_id     String           @db.VarChar(36)
+  document_type  DocumentType
+  file_url       String           @db.VarChar(500)
+  file_name      String?          @db.VarChar(255)
+  file_size      Int?
+  uploaded_by    String?          @db.VarChar(36)
+  created_at     DateTime         @default(now())
+
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  uploader users?  @relation(fields: [uploaded_by], references: [id])
+}
+
+model student_promotions {
+  id             String          @id @default(uuid())
+  student_id     String          @db.VarChar(36)
+  from_class_id  String?         @db.VarChar(36)
+  to_class_id    String?         @db.VarChar(36)
+  session        String          @db.VarChar(20)
+  result         PromotionResult
+  percentage     Decimal?        @db.Decimal(5, 2)
+  created_at     DateTime        @default(now())
+
+  student   students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  from_class classes?  @relation("PromotionFromClass", fields: [from_class_id], references: [id])
+  to_class   classes?  @relation("PromotionToClass", fields: [to_class_id], references: [id])
+}
+
+// ==========================================
+// TEACHER MANAGEMENT
+// ==========================================
+
+model teachers {
+  id              String   @id @default(uuid())
+  user_id         String?  @unique @db.VarChar(36)
+  employee_id     String   @unique @db.VarChar(50)
+  first_name      String   @db.VarChar(100)
+  last_name       String   @db.VarChar(100)
+  date_of_birth   DateTime? @db.Date
+  gender          Gender?
+  date_of_joining DateTime? @db.Date
+  qualification   String?  @db.Text
+  specialization  String?  @db.VarChar(255)
+  experience_years Int?
+  department_id   String?  @db.VarChar(36)
+  designation     String?  @db.VarChar(100)
+  salary_grade    String?  @db.VarChar(50)
+  account_number  String?  @db.VarChar(50)
+  ifsc_code       String?  @db.VarChar(20)
+  pan_number      String?  @db.VarChar(20)
+  profile_photo_url String? @db.VarChar(500)
+  is_class_teacher Boolean @default(false)
+  class_id        String?  @db.VarChar(36)
+  section_id      String?  @db.VarChar(36)
+  status          TeacherStatus @default(active)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user            users?            @relation(fields: [user_id], references: [id])
+  department      departments?      @relation(fields: [department_id], references: [id])
+  class           classes?          @relation("TeacherClass", fields: [class_id], references: [id])
+  section         sections?         @relation("TeacherSection", fields: [section_id], references: [id])
+  attendance      teacher_attendance[]
+  leaves          teacher_leaves[]
+  timetable       timetable[]
+  substitutions_original substitutions[] @relation("OriginalTeacher")
+  substitutions_substitute substitutions[] @relation("SubstituteTeacher")
+  class_subjects  class_subjects[]
+  exam_results    exam_results[]
+  gradebook       gradebook[]
+  classes_as_teacher classes[] @relation("ClassTeacher")
+  attendance_marked attendance[] @relation("AttendanceMarker")
+  exam_schedule   exam_schedule[]
+
+  @@index([employee_id])
+}
+
+model teacher_attendance {
+  id            String           @id @default(uuid())
+  teacher_id    String           @db.VarChar(36)
+  date          DateTime         @db.Date
+  status        AttendanceStatus
+  check_in_time DateTime?        @db.Time
+  check_out_time DateTime?       @db.Time
+  location      Json?
+  marked_by     String?          @db.VarChar(36)
+  created_at    DateTime         @default(now())
+
+  teacher teachers @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  marker   users?   @relation("Marker", fields: [marked_by], references: [id])
+}
+
+model teacher_leaves {
+  id          String      @id @default(uuid())
+  teacher_id  String      @db.VarChar(36)
+  leave_type  LeaveType
+  start_date  DateTime    @db.Date
+  end_date    DateTime    @db.Date
+  reason      String?     @db.Text
+  status      LeaveStatus @default(pending)
+  approved_by String?     @db.VarChar(36)
+  applied_at  DateTime    @default(now())
+
+  teacher teachers @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  approver users?   @relation("Approver", fields: [approved_by], references: [id])
+}
+
+// ==========================================
+// PARENT MANAGEMENT
+// ==========================================
+
+model parents {
+  id                String   @id @default(uuid())
+  user_id           String?  @unique @db.VarChar(36)
+  first_name        String   @db.VarChar(100)
+  last_name         String   @db.VarChar(100)
+  relationship      Relationship?
+  occupation        String?  @db.VarChar(100)
+  annual_income     Decimal? @db.Decimal(12,2)
+  education         String?  @db.VarChar(100)
+  address           String?  @db.Text
+  city              String?  @db.VarChar(100)
+  pincode           String?  @db.VarChar(10)
+  phone_primary     String   @db.VarChar(15)
+  phone_secondary   String?  @db.VarChar(15)
+  profile_photo_url String?  @db.VarChar(500)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  user            users?           @relation(fields: [user_id], references: [id])
+  parent_students parent_students[] @relation("ParentStudents")
+  students        students[]       @relation("StudentParent")
+}
+
+model parent_students {
+  id                String        @id @default(uuid())
+  parent_id         String        @db.VarChar(36)
+  student_id        String        @db.VarChar(36)
+  relationship      Relationship?
+  is_primary_contact Boolean      @default(false)
+  can_pickup        Boolean       @default(false)
+
+  parent  parents  @relation("ParentStudents", fields: [parent_id], references: [id], onDelete: Cascade)
+  student students @relation("StudentParentStudents", fields: [student_id], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// ACADEMIC MANAGEMENT
+// ==========================================
+
+model subjects {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(100)
+  code        String?  @unique @db.VarChar(20)
+  description String?  @db.Text
+  category    SubjectCategory?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  class_subjects class_subjects[]
+  exam_results   exam_results[]
+  gradebook      gradebook[]
+  timetable      timetable[]
+  substitutions  substitutions[]
+  exam_schedule  exam_schedule[]
+}
+
+model classes {
+  id              String   @id @default(uuid())
+  name            String   @db.VarChar(50)
+  numeric_value   Int
+  section         String   @db.VarChar(10)
+  class_teacher_id String? @db.VarChar(36)
+  max_students    Int      @default(40)
+  room_number     String?  @db.VarChar(20)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  class_teacher teachers?        @relation("ClassTeacher", fields: [class_teacher_id], references: [id])
+  students      students[]       @relation("StudentClass")
+  timetable     timetable[]
+  exam_schedule exam_schedule[]
+  class_subjects class_subjects[]
+  fee_structure fee_structure[]
+  gradebook     gradebook[]
+  promotions_from student_promotions[] @relation("PromotionFromClass")
+  promotions_to   student_promotions[] @relation("PromotionToClass")
+  teachers      teachers[] @relation("TeacherClass")
+  exams         exams[]
+  substitutions substitutions[]
+
+  @@unique([name, section], name: "unique_class_section")
+}
+
+model sections {
+  id         String   @id @default(uuid())
+  name       String   @db.VarChar(50)
+  created_at DateTime @default(now())
+
+  students students[] @relation("StudentSection")
+  teachers teachers[] @relation("TeacherSection")
+}
+
+model class_subjects {
+  id            String  @id @default(uuid())
+  class_id      String  @db.VarChar(36)
+  subject_id    String  @db.VarChar(36)
+  teacher_id    String? @db.VarChar(36)
+  is_optional   Boolean @default(false)
+  weekly_hours  Int?
+
+  class   classes   @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  subject subjects  @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher teachers? @relation(fields: [teacher_id], references: [id])
+}
+
+model exams {
+  id                  String   @id @default(uuid())
+  name                String   @db.VarChar(100)
+  type                ExamType
+  session             String   @db.VarChar(20)
+  class_id            String   @db.VarChar(36)
+  start_date          DateTime @db.Date
+  end_date            DateTime @db.Date
+  max_marks           Decimal? @db.Decimal(6, 2)
+  passing_marks       Decimal? @db.Decimal(6, 2)
+  weightage           Decimal? @db.Decimal(3, 2)
+  is_results_published Boolean @default(false)
+  created_at          DateTime @default(now())
+
+  class         classes  @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  exam_results  exam_results[]
+  exam_schedule exam_schedule[]
+
+  @@index([class_id])
+}
+
+model exam_results {
+  id            String   @id @default(uuid())
+  exam_id       String   @db.VarChar(36)
+  student_id    String   @db.VarChar(36)
+  subject_id    String   @db.VarChar(36)
+  marks_obtained Decimal? @db.Decimal(6, 2)
+  grade         String?  @db.VarChar(5)
+  remarks       String?  @db.Text
+  teacher_id    String?  @db.VarChar(36)
+  created_at    DateTime @default(now())
+
+  exam    exams     @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+  student students  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject subjects  @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher teachers? @relation(fields: [teacher_id], references: [id])
+}
+
+model gradebook {
+  id              String           @id @default(uuid())
+  class_id        String?          @db.VarChar(36)
+  student_id      String           @db.VarChar(36)
+  subject_id      String           @db.VarChar(36)
+  assessment_type AssessmentType
+  marks           Decimal?         @db.Decimal(6, 2)
+  max_marks       Decimal?         @db.Decimal(6, 2)
+  grade           String?          @db.VarChar(5)
+  teacher_id      String?          @db.VarChar(36)
+  date            DateTime         @db.Date
+  notes           String?          @db.Text
+  created_at      DateTime         @default(now())
+
+  class   classes?  @relation(fields: [class_id], references: [id])
+  student students  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject subjects  @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher teachers? @relation(fields: [teacher_id], references: [id])
+}
+
+model departments {
+  id         String   @id @default(uuid())
+  name       String   @db.VarChar(100)
+  created_at DateTime @default(now())
+
+  teachers teachers[]
+}
+
+// ==========================================
+// ATTENDANCE MODULE
+// ==========================================
+
+model attendance {
+  id            String            @id @default(uuid())
+  student_id    String            @db.VarChar(36)
+  date          DateTime          @db.Date
+  status        AttendanceStatus
+  check_in_time DateTime?         @db.Time
+  check_out_time DateTime?        @db.Time
+  marked_by     String?           @db.VarChar(36)
+  reason        String?           @db.Text
+  is_excused    Boolean           @default(false)
+  created_at    DateTime          @default(now())
+
+  student  students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  marker   teachers? @relation("AttendanceMarker", fields: [marked_by], references: [id])
+}
+
+model attendance_sessions {
+  id         String   @id @default(uuid())
+  name       String   @db.VarChar(50)
+  start_time DateTime @db.Time
+  end_time   DateTime @db.Time
+  is_active  Boolean  @default(true)
+}
+
+// ==========================================
+// FEE MANAGEMENT MODULE
+// ==========================================
+
+model fee_structure {
+  id                  String   @id @default(uuid())
+  class_id            String   @db.VarChar(36)
+  name                String   @db.VarChar(100)
+  amount              Decimal  @db.Decimal(10, 2)
+  frequency           FeeFrequency
+  due_day             Int      @default(10)
+  late_fee_amount     Decimal  @default(0) @db.Decimal(10, 2)
+  late_fee_per_day    Decimal  @default(0) @db.Decimal(10, 2)
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now())
+
+  class classes @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  fee_invoices fee_invoices[]
+}
+
+model fee_invoices {
+  id              String        @id @default(uuid())
+  student_id      String        @db.VarChar(36)
+  invoice_number  String        @unique @db.VarChar(50)
+  month           String        @db.VarChar(7)
+  total_amount    Decimal       @db.Decimal(10, 2)
+  discount_amount Decimal       @default(0) @db.Decimal(10, 2)
+  tax_amount      Decimal       @default(0) @db.Decimal(10, 2)
+  net_amount      Decimal       @db.Decimal(10, 2)
+  due_date        DateTime      @db.Date
+  status          InvoiceStatus @default(pending)
+  created_at      DateTime      @default(now())
+
+  student     students     @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  fee_structure fee_structure[]
+  fee_payments fee_payments[]
+}
+
+model fee_payments {
+  id              String        @id @default(uuid())
+  invoice_id      String        @db.VarChar(36)
+  payment_method  PaymentMethod
+  transaction_id  String?       @db.VarChar(255)
+  amount          Decimal       @db.Decimal(10, 2)
+  payment_date    DateTime      @default(now()) @db.Timestamp
+  collected_by    String?       @db.VarChar(36)
+  gateway_response Json?
+  receipt_url     String?       @db.VarChar(500)
+
+  invoice fee_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  collector users?     @relation("Collector", fields: [collected_by], references: [id])
+}
+
+// ==========================================
+// TIMETABLE MODULE
+// ==========================================
+
+model periods {
+  id         String   @id @default(uuid())
+  name       String   @db.VarChar(50)
+  start_time DateTime @db.Time
+  end_time   DateTime @db.Time
+  is_break   Boolean  @default(false)
+
+  timetable   timetable[]
+  exam_schedule exam_schedule[]
+  substitutions substitutions[]
+}
+
+model timetable {
+  id          String   @id @default(uuid())
+  class_id    String   @db.VarChar(36)
+  subject_id  String   @db.VarChar(36)
+  teacher_id  String   @db.VarChar(36)
+  period_id   String   @db.VarChar(36)
+  day_of_week Day
+  room_number String?  @db.VarChar(20)
+
+  class   classes   @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  subject subjects  @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher teachers  @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  period  periods   @relation(fields: [period_id], references: [id], onDelete: Cascade)
+}
+
+model substitutions {
+  id                    String   @id @default(uuid())
+  original_teacher_id   String   @db.VarChar(36)
+  substitute_teacher_id String   @db.VarChar(36)
+  class_id              String   @db.VarChar(36)
+  subject_id            String   @db.VarChar(36)
+  date                  DateTime @db.Date
+  period_id             String   @db.VarChar(36)
+  reason                String   @db.Text
+  notified_at           DateTime @default(now()) @db.Timestamp
+
+  original_teacher   teachers @relation("OriginalTeacher", fields: [original_teacher_id], references: [id])
+  substitute_teacher teachers @relation("SubstituteTeacher", fields: [substitute_teacher_id], references: [id])
+  class              classes  @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  subject            subjects @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  period             periods  @relation(fields: [period_id], references: [id], onDelete: Cascade)
+}
+
+model exam_schedule {
+  id           String  @id @default(uuid())
+  exam_id      String  @db.VarChar(36)
+  class_id     String  @db.VarChar(36)
+  subject_id   String  @db.VarChar(36)
+  teacher_id   String  @db.VarChar(36)
+  date         DateTime @db.Date
+  period_id    String  @db.VarChar(36)
+  room_number  String? @db.VarChar(20)
+  max_students Int?
+
+  exam    exams    @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+  class   classes  @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  subject subjects @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher teachers @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  period  periods  @relation(fields: [period_id], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// ADMINISTRATIVE MODULE
+// ==========================================
+
+model settings {
+  id                     String        @id @default(uuid())
+  school_name            String?       @db.VarChar(255)
+  school_logo_url        String?       @db.VarChar(500)
+  address                String?       @db.Text
+  phone                  String?       @db.VarChar(20)
+  email                  String?       @db.VarChar(255)
+  current_session        String?       @db.VarChar(20)
+  timezone               String        @default("Asia/Kolkata") @db.VarChar(50)
+  attendance_method      AttendanceMethod @default(all)
+  fee_late_fee_applicable Boolean      @default(true)
+  created_at             DateTime      @default(now())
+  updated_at             DateTime      @updatedAt
+}
+
+model audit_logs {
+  id           String   @id @default(uuid())
+  user_id      String   @db.VarChar(36)
+  action       String   @db.VarChar(100)
+  resource     String?  @db.VarChar(100)
+  resource_id  String?  @db.VarChar(36)
+  old_values   Json?
+  new_values   Json?
+  ip_address   String?  @db.VarChar(45)
+  user_agent   String?  @db.Text
+  created_at   DateTime @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], name: "idx_user")
+  @@index([resource, resource_id], name: "idx_resource")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  admin
+  teacher
+  student
+  parent
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum Category {
+  general
+  obc
+  sc
+  st
+  other
+}
+
+enum StudentStatus {
+  active
+  inactive
+  suspended
+  transferred
+}
+
+enum DocumentType {
+  birth_certificate
+  transfer_certificate
+  medical
+  address_proof
+  photo
+  other
+}
+
+enum PromotionResult {
+  promoted
+  detained
+  transfer
+}
+
+enum TeacherStatus {
+  active
+  inactive
+  on_leave
+  resigned
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  half_day
+  holiday
+}
+
+enum LeaveType {
+  casual
+  sick
+  earned
+  maternity
+  paternity
+  other
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+enum Relationship {
+  father
+  mother
+  guardian
+  other
+}
+
+enum SubjectCategory {
+  core
+  elective
+  co_curricular
+}
+
+enum ExamType {
+  unit_test
+  term
+  half_yearly
+  final
+  practical
+}
+
+enum AssessmentType {
+  homework
+  classwork
+  project
+  presentation
+  behavior
+}
+
+enum FeeFrequency {
+  monthly
+  quarterly
+  half_yearly
+  yearly
+}
+
+enum InvoiceStatus {
+  pending
+  paid
+  partial
+  overdue
+}
+
+enum PaymentMethod {
+  cash
+  cheque
+  card
+  upi
+  net_banking
+  wallet
+}
+
+enum Day {
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+}
+
+enum AttendanceMethod {
+  manual
+  biometric
+  qr
+  all
+}

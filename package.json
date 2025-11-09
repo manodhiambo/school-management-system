@@ -1,0 +1,19 @@
+{
+  "name": "school-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=apps/web\" \"npm run dev --workspace=services/backend\"",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "eslint '**/*.{ts,tsx}'",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

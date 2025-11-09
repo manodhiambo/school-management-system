@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Production
+build/
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Editor
+.DS_Store
+.idea/
+.vscode/
+*.sublime-*
+
+# Database
+*.db
+*.sqlite

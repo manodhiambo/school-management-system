@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@sms/shared-ui';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@school/shared-ui';
 
 export const DashboardPage: React.FC = () => {
   return (

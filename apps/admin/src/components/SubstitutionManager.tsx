@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react'';
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@school/shared-ui';
 import { Users, AlertCircle } from 'lucide-react';
 

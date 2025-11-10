@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react'';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { apiClient } from '@school/api-client';
 import { Card, CardHeader, CardTitle, CardContent, Button, DataTable, Modal, Input } from '@school/shared-ui';
@@ -77,18 +77,18 @@ function InventoryForm({ onSubmit, onCancel }: any) {
       <Input
         label="Item Name"
         value={formData.name}
-        onChange={(e) => setFormData({...formData, name: e.target.value})}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
       />
       <Input
         label="Category"
         value={formData.category}
-        onChange={(e) => setFormData({...formData, category: e.target.value})}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
       />
       <Input
         label="Quantity"
         type="number"
         value={formData.quantity}
-        onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
       />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>

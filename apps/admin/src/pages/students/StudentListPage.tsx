@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import type { Student } from '@sms/shared-types';
+import React from 'react'';
+import type { Student } from '@school/shared-types';
 
 const StudentListPage = () => {
   const [students, setStudents] = useState<Student[]>([]);

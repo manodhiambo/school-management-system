@@ -1,3 +1,1 @@
-export * from './formatting';
-export * from './constants';
-export * from './validation';
+export { passwordSchema, emailSchema, getRegisterSchema } from './validation';

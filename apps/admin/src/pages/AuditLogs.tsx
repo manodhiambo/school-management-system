@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react'';
 import { useQuery } from 'react-query';
 import { apiClient } from '@school/api-client';
 import { Card, CardHeader, CardTitle, CardContent, DataTable, Input } from '@school/shared-ui';
@@ -39,17 +39,17 @@ export default function AuditLogs() {
             <Input
               placeholder="Filter by User ID"
               value={filters.userId}
-              onChange={(e) => setFilters({...filters, userId: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
             />
             <Input
               placeholder="Filter by Action"
               value={filters.action}
-              onChange={(e) => setFilters({...filters, action: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
             />
             <Input
               placeholder="Filter by Resource"
               value={filters.resource}
-              onChange={(e) => setFilters({...filters, resource: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
             />
           </div>
           <DataTable

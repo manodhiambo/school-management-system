@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react'';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu, X, Users, BookOpen, Calendar, DollarSign, BarChart3, Settings, LogOut, Home, Clock, MessageSquare, Shield } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';

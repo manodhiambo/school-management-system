@@ -10,30 +10,32 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.3.4",
+    "@school/api-client": "workspace:*",
     "@school/shared-types": "workspace:*",
     "@school/shared-ui": "workspace:*",
-    "@school/api-client": "workspace:*",
+    "axios": "^1.13.2",
+    "clsx": "^2.0.0",
+    "date-fns": "^3.0.0",
+    "lucide-react": "^0.553.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.0",
-    "react-query": "^3.39.3",
     "react-hook-form": "^7.48.2",
-    "zod": "^3.22.4",
-    "@hookform/resolvers": "^3.3.4",
+    "react-query": "^3.39.3",
+    "react-router-dom": "^6.21.0",
     "recharts": "^2.10.3",
-    "date-fns": "^3.0.0",
-    "clsx": "^2.0.0",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.2.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.0",
-    "tailwindcss": "^3.4.0",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
     "vitest": "^1.1.0"
   }
 }

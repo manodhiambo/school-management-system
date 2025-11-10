@@ -1,15 +1,10 @@
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-}
-
-export interface ApiResponse<T> {
+export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
   message?: string;
+  meta?: {
+    total: number;
+    page: number;
+    limit: number;
+  };
 }

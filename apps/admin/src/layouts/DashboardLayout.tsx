@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Sidebar } from '@sms/shared-ui';
-import { Header } from '@sms/shared-ui';
-import { useAuth } from '@sms/api-client/src';
+import React from 'react'';
+import { Sidebar } from '@school/shared-ui';
+import { Header } from '@school/shared-ui';
+import { useAuth } from '@school/api-client/src';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;

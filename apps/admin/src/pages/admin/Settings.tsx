@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React from 'react'';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { apiClient } from '@school/api-client';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '@school/shared-ui';
@@ -66,20 +66,20 @@ export default function SettingsPage() {
             <Input
               label="School Name"
               value={settings.schoolName}
-              onChange={(e) => setSettings({...settings, schoolName: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
               placeholder="Enter school name"
             />
             <Input
               label="School Logo URL"
               value={settings.schoolLogoUrl}
-              onChange={(e) => setSettings({...settings, schoolLogoUrl: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
               placeholder="Enter logo URL"
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <textarea
                 value={settings.address}
-                onChange={(e) => setSettings({...settings, address: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 rows={3}
                 placeholder="Enter school address"
@@ -88,27 +88,27 @@ export default function SettingsPage() {
             <Input
               label="Phone"
               value={settings.phone}
-              onChange={(e) => setSettings({...settings, phone: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
               placeholder="Enter phone number"
             />
             <Input
               label="Email"
               type="email"
               value={settings.email}
-              onChange={(e) => setSettings({...settings, email: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
               placeholder="Enter email"
             />
             <Input
               label="Current Session"
               value={settings.currentSession}
-              onChange={(e) => setSettings({...settings, currentSession: e.target.value})}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
               placeholder="e.g., 2024-25"
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
               <select
                 value={settings.timezone}
-                onChange={(e) => setSettings({...settings, timezone: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="Asia/Kolkata">Asia/Kolkata</option>
@@ -120,7 +120,7 @@ export default function SettingsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Attendance Method</label>
               <select
                 value={settings.attendanceMethod}
-                onChange={(e) => setSettings({...settings, attendanceMethod: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set.*e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="manual">Manual</option>

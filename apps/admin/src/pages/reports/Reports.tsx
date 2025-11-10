@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react'';
 import { Tabs, TabsList, TabsTrigger, TabsContent, Card, CardHeader, CardTitle, CardContent } from '@school/shared-ui';
 import { BarChart3, Users, TrendingUp, DollarSign } from 'lucide-react';
 import EnrollmentReport from '../../components/EnrollmentReport';

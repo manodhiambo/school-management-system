@@ -10,6 +10,6 @@ export interface Attendance {
 export interface CreateAttendanceDto {
   studentId: string;
   date: string;
-  status: 'present' | 'absent' | 'late' | 'half_day';
+  status: Attendance['status'];
   checkInTime?: string;
 }

@@ -1,49 +1,39 @@
 import React from 'react';
-import { cn } from '../utils';
+import { cn } from '../utils/cn';
 
 interface DataTableProps<T> {
   data: T[];
   columns: {
     key: keyof T;
     header: string;
-    render?: (value: any, row: T) => React.ReactNode;
+    render?: (value: any, item: T) => React.ReactNode;
   }[];
   className?: string;
 }
 
-export function DataTable<T>({ data, columns, className }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, any>>({ data, columns, className }: DataTableProps<T>) {
   return (
-    <div className="overflow-x-auto">
-      <table className={cn("w-full text-sm border-collapse", className)}>
+    <div className={cn('overflow-x-auto', className)}>
+      <table className="w-full border-collapse border border-gray-200">
         <thead>
-          <tr className="border-b">
-            {columns.map((column) => (
-              <th key={String(column.key)} className="text-left p-3 font-medium">
-                {column.header}
+          <tr className="bg-gray-50">
+            {columns.map((col, idx) => (
+              <th key={idx} className="border border-gray-200 p-2 text-left">
+                {col.header}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {data.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="p-3 text-center text-muted-foreground">
-                No data available
-              </td>
+          {data.map((item, rowIdx) => (
+            <tr key={rowIdx} className="hover:bg-gray-50">
+              {columns.map((col, colIdx) => (
+                <td key={colIdx} className="border border-gray-200 p-2">
+                  {col.render ? col.render(item[col.key], item) : String(item[col.key] ?? '')}
+                </td>
+              ))}
             </tr>
-          ) : (
-            data.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b hover:bg-muted/50">
-                {columns.map((column) => (
-                  <td key={String(column.key)} className="p-3">
-                    {column.render
-                      ? column.render(row[column.key], row)
-                      : String(row[column.key] ?? '')}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
+          ))}
         </tbody>
       </table>
     </div>

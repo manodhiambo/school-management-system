@@ -15,7 +15,7 @@ interface ToastProps {
 
 export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
   const baseClasses = "pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5";
-  
+
   const variants = {
     default: "border-l-4 border-blue-500",
     success: "border-l-4 border-green-500",
@@ -47,17 +47,14 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 export const Toaster: React.FC = () => {
   const [toasts, setToasts] = React.useState<Toast[]>([]);
 
-  // Simple toast manager - in real app you'd use context
   React.useEffect(() => {
     const handler = (e: CustomEvent) => {
       const toast = e.detail as Toast;
       setToasts(prev => [...prev, toast]);
-      
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== toast.id));
       }, 5000);
     };
-
     window.addEventListener('show-toast' as any, handler);
     return () => window.removeEventListener('show-toast' as any, handler);
   }, []);
@@ -67,10 +64,18 @@ export const Toaster: React.FC = () => {
   return (
     <div className="fixed top-4 right-4 z-50 space-y-2">
       {toasts.map(toast => (
-        <Toast key={toast.id} toast={toast} onDismiss={(id) => {
-          setToasts(prev => prev.filter(t => t.id !== id));
-        }} />
+        <Toast key={toast.id} toast={toast} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
       ))}
     </div>
   );
+};
+
+// --- Add useToast hook ---
+export const useToast = () => {
+  const showToast = (toast: Omit<Toast, 'id'>) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    const event = new CustomEvent('show-toast', { detail: { ...toast, id } });
+    window.dispatchEvent(event);
+  };
+  return { showToast };
 };

@@ -1,43 +1,27 @@
-import React from 'react'';
-import type { Student } from '@school/shared-types';
+import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@school/shared-ui';
 
-const StudentListPage = () => {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+interface Student {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
 
-  useEffect(() => {
-    // Mock data - replace with real API call
-    setStudents([
-      { id: '1', name: 'John Doe', email: 'john@example.com', role: 'student', grade: '10' },
-    ]);
-    setLoading(false);
-  }, []);
-
-  if (loading) return <div>Loading...</div>;
+export const StudentListPage: React.FC = () => {
+  const [students] = useState<Student[]>([]);
 
   return (
-    <div>
-      <h1>Students</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Grade</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((student) => (
-            <tr key={student.id}>
-              <td>{student.name}</td>
-              <td>{student.email}</td>
-              <td>{student.grade}</td>
-            </tr>
+    <Card>
+      <CardHeader>
+        <CardTitle>Students</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul>
+          {students.map(student => (
+            <li key={student.id}>{student.firstName} {student.lastName}</li>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </ul>
+      </CardContent>
+    </Card>
   );
 };
-
-export default StudentListPage;

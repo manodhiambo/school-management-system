@@ -1,13 +1,16 @@
 // Components
-export { PasswordInput } from './components/PasswordInput';
 export { Button } from './components/Button';
-export { Input } from './components/Input';
-export { Card, CardHeader, CardTitle, CardContent, CardDescription } from './components/Card';
-export { Tabs, TabsList, TabsTrigger, TabsContent } from './components/Tabs';
-export { useToast } from './hooks/useToast';
-export { useAuth } from './hooks/useAuth';
-export { Modal } from './components/Modal';
+export { Card, CardContent, CardHeader, CardTitle, CardDescription } from './components/Card';
 export { DataTable } from './components/DataTable';
+export { Modal } from './components/Modal';
+export { PasswordInput } from './components/PasswordInput';
+export { Tabs, TabsTrigger, TabsContent } from './components/Tabs';
+export { Badge } from './components/Badge';
+export { Input } from './components/Input';
+export { Toast } from './components/Toast';
+
+// Hooks
+export { useToast } from './hooks/useToast';
 
 // Utils
 export { cn } from './utils/cn';

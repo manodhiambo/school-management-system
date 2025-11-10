@@ -7,13 +7,13 @@ interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export const Tabs: React.FC<TabsProps> = ({ defaultValue, children, ...props }) => {
-  const [activeTab, setActiveTab] = useState(defaultValue);
+  const [, setActiveTab] = useState(defaultValue);
   
   return (
     <div {...props}>
       {React.Children.map(children, child => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child, { activeTab, setActiveTab } as any);
+          return React.cloneElement(child, { activeTab: defaultValue, setActiveTab } as any);
         }
         return child;
       })}
@@ -21,10 +21,7 @@ export const Tabs: React.FC<TabsProps> = ({ defaultValue, children, ...props }) 
   );
 };
 
-interface TabsListProps extends React.HTMLAttributes<HTMLDivElement> {
-  activeTab?: string;
-  setActiveTab?: (value: string) => void;
-}
+interface TabsListProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export const TabsList: React.FC<TabsListProps> = ({ className, children, ...props }) => (
   <div className={cn('flex space-x-1 border-b', className)} {...props}>
@@ -34,15 +31,13 @@ export const TabsList: React.FC<TabsListProps> = ({ className, children, ...prop
 
 interface TabsTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   value: string;
-  activeTab?: string;
   setActiveTab?: (value: string) => void;
 }
 
-export const TabsTrigger: React.FC<TabsTriggerProps> = ({ value, activeTab, setActiveTab, className, children, ...props }) => (
+export const TabsTrigger: React.FC<TabsTriggerProps> = ({ value, setActiveTab, className, children, ...props }) => (
   <button
     className={cn(
       'px-4 py-2 text-sm font-medium rounded-t-lg hover:bg-gray-100',
-      activeTab === value ? 'bg-white border-t border-l border-r border-gray-300 -mb-px' : '',
       className
     )}
     onClick={() => setActiveTab?.(value)}

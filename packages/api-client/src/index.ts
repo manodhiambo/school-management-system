@@ -1,5 +1,11 @@
-export { authClient } from './auth-client';
-export { AuthClient } from './auth-client';
+import axios, { AxiosRequestConfig } from 'axios';
+import type { User } from '@school/shared-types';
 
-// Export a convenience instance as apiClient for backward compatibility
-export const apiClient = authClient;
+export const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000'
+});
+
+export const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
+  const response = await apiClient.request<T>(config);
+  return response.data;
+};

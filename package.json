@@ -7,17 +7,6 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=apps/web\" \"npm run dev --workspace=services/backend\"",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "lint": "eslint '**/*.{ts,tsx}'",
-    "type-check": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "lucide-react": "^0.553.0",
-    "tailwind-merge": "^2.6.0"
+    "build": "pnpm --filter @school/shared-types --filter @school/shared-ui --filter @school/api-client --filter @school/admin build"
   }
 }

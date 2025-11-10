@@ -1,38 +1,46 @@
-import React from 'react'';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { apiClient } from '@school/api-client';
+import { useMutation } from '@tanstack/react-query';
 
-const LoginPage = () => {
+export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('admin');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const login = useMutation({
+    mutationFn: (credentials: { email: string; password: string }) => 
+      apiClient.request({
+        url: '/api/v1/auth/login',
+        method: 'POST',
+        data: credentials,
+      }),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    
-    // Mock login - replace with real auth
-    localStorage.setItem('auth_token', 'mock-token');
-    localStorage.setItem('auth_user', JSON.stringify({ email, role }));
-    navigate('/dashboard');
+    login.mutate({ email, password });
   };
 
   return (
-    <div>
-      <h1>Login</h1>
-      <form onSubmit={handleSubmit}>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" />
-        <select value={role} onChange={e => setRole(e.target.value)}>
-          <option value="admin">Admin</option>
-          <option value="teacher">Teacher</option>
-          <option value="student">Student</option>
-        </select>
-        <button type="submit">Login</button>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit}>
+      <input 
+        type="email" 
+        value={email} 
+        onChange={e => setEmail(e.target.value)} 
+        placeholder="Email"
+        required
+      />
+      <input 
+        type="password" 
+        value={password} 
+        onChange={e => setPassword(e.target.value)} 
+        placeholder="Password"
+        required
+      />
+      <button type="submit" disabled={login.isPending}>
+        {login.isPending ? 'Logging in...' : 'Login'}
+      </button>
+      {login.isError && <p>Error: {login.error.message}</p>}
+      {login.isSuccess && <p>Login successful!</p>}
+    </form>
   );
 };
-
-export default LoginPage;

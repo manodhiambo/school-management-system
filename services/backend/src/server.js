@@ -6,6 +6,7 @@ import { config } from './config/env.js';
 import { testConnection, createDatabasePool } from './config/database.js';
 import logger from './utils/logger.js';
 import routes from './routes/index.js';
+import testRoutes from './routes/testRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import fs from 'fs';
@@ -41,6 +42,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Test routes (for development)
+if (config.env === 'development') {
+  app.use('/api/test', testRoutes);
+}
+
 // API routes
 app.use(`/api/${config.apiVersion}`, routes);
 
@@ -61,13 +67,21 @@ const startServer = async () => {
       throw new Error('Database connection failed');
     }
 
-    logger.info('Database connected successfully');
+    logger.info('✓ Database connected successfully');
 
     // Start listening
     const PORT = config.port;
     app.listen(PORT, () => {
-      logger.info(`Server running in ${config.env} mode on port ${PORT}`);
-      logger.info(`API available at http://localhost:${PORT}/api/${config.apiVersion}`);
+      logger.info('========================================');
+      logger.info('School Management System API');
+      logger.info('========================================');
+      logger.info(`Environment: ${config.env}`);
+      logger.info(`Server running on port ${PORT}`);
+      logger.info(`API: http://localhost:${PORT}/api/${config.apiVersion}`);
+      if (config.env === 'development') {
+        logger.info(`Test endpoints: http://localhost:${PORT}/api/test`);
+      }
+      logger.info('========================================');
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
@@ -85,6 +99,12 @@ process.on('unhandledRejection', (err) => {
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception:', err);
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  process.exit(0);
 });
 
 startServer();

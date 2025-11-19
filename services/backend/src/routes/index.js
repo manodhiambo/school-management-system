@@ -4,6 +4,8 @@ import studentRoutes from './studentRoutes.js';
 import teacherRoutes from './teacherRoutes.js';
 import parentRoutes from './parentRoutes.js';
 import academicRoutes from './academicRoutes.js';
+import attendanceRoutes from './attendanceRoutes.js';
+import feeRoutes from './feeRoutes.js';
 
 const router = express.Router();
 
@@ -12,7 +14,8 @@ router.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Server is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV
   });
 });
 
@@ -22,5 +25,7 @@ router.use('/students', studentRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/parents', parentRoutes);
 router.use('/academic', academicRoutes);
+router.use('/attendance', attendanceRoutes);
+router.use('/fee', feeRoutes);
 
 export default router;

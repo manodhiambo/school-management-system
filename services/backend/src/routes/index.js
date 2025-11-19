@@ -3,6 +3,7 @@ import authRoutes from './authRoutes.js';
 import studentRoutes from './studentRoutes.js';
 import teacherRoutes from './teacherRoutes.js';
 import parentRoutes from './parentRoutes.js';
+import academicRoutes from './academicRoutes.js';
 
 const router = express.Router();
 
@@ -20,5 +21,6 @@ router.use('/auth', authRoutes);
 router.use('/students', studentRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/parents', parentRoutes);
+router.use('/academic', academicRoutes);
 
 export default router;

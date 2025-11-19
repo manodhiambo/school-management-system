@@ -1,5 +1,6 @@
 import express from 'express';
 import authRoutes from './authRoutes.js';
+import studentRoutes from './studentRoutes.js';
 
 const router = express.Router();
 
@@ -14,5 +15,6 @@ router.get('/health', (req, res) => {
 
 // API routes
 router.use('/auth', authRoutes);
+router.use('/students', studentRoutes);
 
 export default router;

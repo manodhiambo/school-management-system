@@ -1,0 +1,82 @@
+CREATE TABLE IF NOT EXISTS messages (
+  id VARCHAR(36) PRIMARY KEY,
+  sender_id VARCHAR(36) NOT NULL,
+  recipient_id VARCHAR(36),
+  recipient_role ENUM('admin', 'teacher', 'student', 'parent', 'all'),
+  recipient_class_id VARCHAR(36),
+  subject VARCHAR(255) NOT NULL,
+  body TEXT NOT NULL,
+  message_type ENUM('direct', 'broadcast', 'announcement') DEFAULT 'direct',
+  priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
+  is_read BOOLEAN DEFAULT FALSE,
+  read_at TIMESTAMP NULL,
+  parent_message_id VARCHAR(36),
+  attachments JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sender (sender_id),
+  INDEX idx_recipient (recipient_id),
+  INDEX idx_created_at (created_at),
+  FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (parent_message_id) REFERENCES messages(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  type ENUM('info', 'success', 'warning', 'error', 'attendance', 'fee', 'exam', 'announcement') NOT NULL,
+  data JSON,
+  is_read BOOLEAN DEFAULT FALSE,
+  read_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user_id (user_id),
+  INDEX idx_created_at (created_at),
+  INDEX idx_is_read (is_read),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS announcements (
+  id VARCHAR(36) PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  target_role ENUM('all', 'admin', 'teacher', 'student', 'parent'),
+  target_class_id VARCHAR(36),
+  priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
+  publish_date DATE NOT NULL,
+  expiry_date DATE,
+  is_published BOOLEAN DEFAULT FALSE,
+  attachments JSON,
+  created_by VARCHAR(36),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_publish_date (publish_date),
+  INDEX idx_target_role (target_role),
+  FOREIGN KEY (target_class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS parent_teacher_meetings (
+  id VARCHAR(36) PRIMARY KEY,
+  parent_id VARCHAR(36) NOT NULL,
+  teacher_id VARCHAR(36) NOT NULL,
+  student_id VARCHAR(36) NOT NULL,
+  meeting_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  location VARCHAR(255),
+  purpose TEXT,
+  status ENUM('scheduled', 'confirmed', 'completed', 'cancelled', 'rescheduled') DEFAULT 'scheduled',
+  meeting_notes TEXT,
+  scheduled_by VARCHAR(36),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_meeting_date (meeting_date),
+  INDEX idx_parent_id (parent_id),
+  INDEX idx_teacher_id (teacher_id),
+  FOREIGN KEY (parent_id) REFERENCES parents(id) ON DELETE CASCADE,
+  FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+  FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+  FOREIGN KEY (scheduled_by) REFERENCES users(id) ON DELETE SET NULL
+);

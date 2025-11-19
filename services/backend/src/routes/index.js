@@ -2,6 +2,7 @@ import express from 'express';
 import authRoutes from './authRoutes.js';
 import studentRoutes from './studentRoutes.js';
 import teacherRoutes from './teacherRoutes.js';
+import parentRoutes from './parentRoutes.js';
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes);
 router.use('/students', studentRoutes);
 router.use('/teachers', teacherRoutes);
+router.use('/parents', parentRoutes);
 
 export default router;

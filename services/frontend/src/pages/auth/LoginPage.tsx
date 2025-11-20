@@ -24,9 +24,9 @@ export function LoginPage() {
     try {
       const response: any = await api.login(email, password);
       const { accessToken, user } = response.data;
-      
+
       setAuth(user, accessToken);
-      navigate('/dashboard');
+      navigate('/app/dashboard'); // <-- fixed redirect
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
     } finally {

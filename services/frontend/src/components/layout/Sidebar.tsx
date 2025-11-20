@@ -18,17 +18,17 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Students', href: '/students', icon: Users },
-  { name: 'Teachers', href: '/teachers', icon: GraduationCap },
-  { name: 'Parents', href: '/parents', icon: UserCheck },
-  { name: 'Academic', href: '/academic', icon: BookOpen },
-  { name: 'Attendance', href: '/attendance', icon: Calendar },
-  { name: 'Fee Management', href: '/fee', icon: DollarSign },
-  { name: 'Timetable', href: '/timetable', icon: Clock },
-  { name: 'Communication', href: '/communication', icon: MessageSquare },
-  { name: 'User Management', href: '/users', icon: Shield },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
+  { name: 'Students', href: '/app/students', icon: Users },
+  { name: 'Teachers', href: '/app/teachers', icon: GraduationCap },
+  { name: 'Parents', href: '/app/parents', icon: UserCheck },
+  { name: 'Academic', href: '/app/academic', icon: BookOpen },
+  { name: 'Attendance', href: '/app/attendance', icon: Calendar },
+  { name: 'Fee Management', href: '/app/fee', icon: DollarSign },
+  { name: 'Timetable', href: '/app/timetable', icon: Clock },
+  { name: 'Communication', href: '/app/communication', icon: MessageSquare },
+  { name: 'User Management', href: '/app/users', icon: Shield },
+  { name: 'Settings', href: '/app/settings', icon: Settings },
 ];
 
 export function Sidebar() {

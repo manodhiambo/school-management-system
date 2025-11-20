@@ -15,6 +15,7 @@ import { UsersPage } from './pages/users/UsersPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { LandingPage } from './pages/LandingPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,16 +33,23 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
+
+            {/* Public landing page */}
+            <Route path="/" element={<LandingPage />} />
+
+            {/* Login */}
             <Route path="/login" element={<LoginPage />} />
+
+            {/* Protected dashboard area */}
             <Route
-              path="/"
+              path="/app"
               element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="students" element={<StudentsPage />} />
               <Route path="teachers" element={<TeachersPage />} />
@@ -53,8 +61,9 @@ function App() {
               <Route path="communication" element={<CommunicationPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
             </Route>
+
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>

@@ -1,0 +1,115 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Award, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import api from '@/services/api';
+
+export function MyResultsPage() {
+  const { user } = useAuth();
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadResults();
+    }
+  }, [user]);
+
+  const loadResults = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.getStudentExamResults(user?.id);
+      console.log('My results data:', response);
+      setResults(response.results || response || []);
+    } catch (error: any) {
+      console.error('Error loading results:', error);
+      setError(error?.message || 'Failed to load exam results');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-red-600">Error Loading Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600">{error}</p>
+            <Button onClick={loadResults} className="mt-4">Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-3xl font-bold">My Results</h2>
+        <p className="text-gray-500">View your exam results and grades</p>
+      </div>
+
+      <div className="space-y-4">
+        {results.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center text-gray-500">No exam results available yet</p>
+            </CardContent>
+          </Card>
+        ) : (
+          results.map((result, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Award className="h-5 w-5 text-primary" />
+                    <span>{result.exam_name}</span>
+                  </CardTitle>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-primary">{result.percentage}%</p>
+                    <p className="text-sm text-gray-500">Grade: {result.grade}</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {result.subjects && result.subjects.map((subject: any, sIndex: number) => (
+                    <div key={sIndex} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium">{subject.subject_name}</p>
+                        <p className="text-sm text-gray-500">Grade: {subject.grade}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold">
+                          {subject.marks_obtained}/{subject.total_marks}
+                        </p>
+                        <div className="flex items-center text-sm text-green-600">
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          {subject.percentage}%
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

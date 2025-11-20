@@ -4,6 +4,25 @@ import passwordService from './passwordService.js';
 import ApiError from '../utils/ApiError.js';
 
 class StudentService {
+  async generateAdmissionNumber() {
+    const year = new Date().getFullYear();
+    
+    const results = await query(
+      `SELECT admission_number FROM students
+       WHERE admission_number LIKE ?
+       ORDER BY admission_number DESC LIMIT 1`,
+      [`STD${year}%`]
+    );
+
+    let sequence = 1;
+    if (results.length > 0) {
+      const lastNumber = results[0].admission_number;
+      sequence = parseInt(lastNumber.slice(-4)) + 1;
+    }
+
+    return `STD${year}${sequence.toString().padStart(4, '0')}`;
+  }
+
   async createStudent(studentData) {
     const {
       email,
@@ -50,19 +69,23 @@ class StudentService {
       [userId, email, hashedPassword]
     );
 
+    // Generate admission number
+    const admissionNumber = await this.generateAdmissionNumber();
+
     // Create student record
     const studentId = uuidv4();
     
     await query(
       `INSERT INTO students (
-        id, user_id, first_name, last_name, date_of_birth, gender,
+        id, user_id, admission_number, first_name, last_name, date_of_birth, gender,
         blood_group, religion, caste, category, aadhar_number,
         class_id, section_id, parent_id, joining_date, admission_date,
         medical_notes, emergency_contact, address, city, state, pincode, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
       [
         studentId,
         userId,
+        admissionNumber,
         firstName,
         lastName,
         dateOfBirth || null,
@@ -164,11 +187,12 @@ class StudentService {
       sql += ` AND (
         s.first_name LIKE ? OR 
         s.last_name LIKE ? OR 
+        s.admission_number LIKE ? OR
         s.roll_number LIKE ? OR
         u.email LIKE ?
       )`;
       const searchPattern = `%${search}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
     // Get total count
@@ -227,10 +251,8 @@ class StudentService {
     const updates = [];
     const values = [];
 
-    // Build dynamic update query
     Object.keys(updateData).forEach(key => {
       if (updateData[key] !== undefined) {
-        // Convert camelCase to snake_case
         const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
         updates.push(`${dbKey} = ?`);
         values.push(updateData[key] === '' ? null : updateData[key]);
@@ -267,15 +289,9 @@ class StudentService {
   }
 
   async deleteStudent(id) {
-    // Get student to find associated user
     const student = await this.getStudentById(id);
-
-    // Delete student record
     await query('DELETE FROM students WHERE id = ?', [id]);
-
-    // Delete associated user account
     await query('DELETE FROM users WHERE id = ?', [student.user_id]);
-
     return { message: 'Student deleted successfully' };
   }
 
@@ -308,7 +324,6 @@ class StudentService {
 
     const attendance = await query(sql, params);
 
-    // Get statistics
     const stats = await query(
       `SELECT 
         COUNT(*) as total,
@@ -323,7 +338,7 @@ class StudentService {
 
     return {
       attendance,
-      statistics: stats
+      statistics: stats[0] || {}
     };
   }
 
@@ -360,7 +375,6 @@ class StudentService {
     sql += ' ORDER BY e.start_date DESC';
 
     const results = await query(sql, params);
-
     return results;
   }
 

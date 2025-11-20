@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Download } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Download, Upload } from 'lucide-react';
 import { AddTeacherModal } from '@/components/modals/AddTeacherModal';
+import { EditTeacherModal } from '@/components/modals/EditTeacherModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { BulkImportModal } from '@/components/modals/BulkImportModal';
 import api from '@/services/api';
 
 interface Teacher {
@@ -24,6 +26,11 @@ export function TeachersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [editModal, setEditModal] = useState<{ open: boolean; teacherId: string | null }>({
+    open: false,
+    teacherId: null,
+  });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; teacher: Teacher | null }>({
     open: false,
     teacher: null,
@@ -112,6 +119,10 @@ export function TeachersPage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
+          <Button variant="outline" onClick={() => setShowBulkImportModal(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           <Button onClick={() => setShowAddModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Teacher
@@ -182,7 +193,12 @@ export function TeachersPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex space-x-2">
-                          <Button variant="ghost" size="icon" title="Edit">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Edit"
+                            onClick={() => setEditModal({ open: true, teacherId: teacher.id })}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button 
@@ -204,14 +220,22 @@ export function TeachersPage() {
         </CardContent>
       </Card>
 
-      {/* Add Teacher Modal */}
+      {/* Modals */}
       <AddTeacherModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={loadTeachers}
       />
 
-      {/* Delete Confirmation Modal */}
+      {editModal.teacherId && (
+        <EditTeacherModal
+          open={editModal.open}
+          onOpenChange={(open) => setEditModal({ open, teacherId: null })}
+          onSuccess={loadTeachers}
+          teacherId={editModal.teacherId}
+        />
+      )}
+
       <ConfirmDeleteModal
         open={deleteModal.open}
         onOpenChange={(open) => setDeleteModal({ open, teacher: null })}
@@ -219,6 +243,13 @@ export function TeachersPage() {
         title="Delete Teacher"
         description={`Are you sure you want to delete ${deleteModal.teacher?.first_name} ${deleteModal.teacher?.last_name}? This will remove their access and all associated records.`}
         loading={deleting}
+      />
+
+      <BulkImportModal
+        open={showBulkImportModal}
+        onOpenChange={setShowBulkImportModal}
+        onSuccess={loadTeachers}
+        type="teachers"
       />
     </div>
   );

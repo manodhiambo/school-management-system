@@ -381,3 +381,28 @@ class ApiService {
 }
 
 export default new ApiService();
+
+  // ==================== USERS (Admin Only) ====================
+  getUsers(params?: any) {
+    return this.api.get('/users', { params });
+  }
+
+  createUser(data: any) {
+    return this.api.post('/users', data);
+  }
+
+  updateUserStatus(id: string, isActive: boolean) {
+    return this.api.patch(`/users/${id}/status`, { is_active: isActive });
+  }
+
+  resetUserPassword(id: string, newPassword: string) {
+    return this.api.post(`/users/${id}/reset-password`, { password: newPassword });
+  }
+
+  sendUserCredentials(id: string) {
+    return this.api.post(`/users/${id}/send-credentials`);
+  }
+
+  deleteUser(id: string) {
+    return this.api.delete(`/users/${id}`);
+  }

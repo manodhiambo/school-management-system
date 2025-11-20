@@ -1,0 +1,7 @@
+        teacherId, userId, employeeId, firstName, lastName, dateOfBirth || null,
+        gender, dateOfJoining, qualification || null, specialization || null, experienceYears || null,
+        departmentId || null, designation || null, salaryGrade || null, basicSalary || null,
+        accountNumber || null, ifscCode || null, panNumber || null, aadharNumber || null,
+        address || null, city || null, state || null, pincode || null, phone || null, 
+        emergencyContact ? JSON.stringify(emergencyContact) : null,
+        isClassTeacher || false, classId || null, sectionId || null

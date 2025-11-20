@@ -17,17 +17,16 @@ interface AddTeacherModalProps {
 export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    employee_id: '',
-    first_name: '',
-    last_name: '',
     email: '',
-    phone: '',
-    date_of_birth: '',
+    password: 'teacher123',
+    firstName: '',
+    lastName: '',
+    dateOfBirth: '',
     gender: 'male',
-    date_of_joining: '',
+    dateOfJoining: '',
     qualification: '',
     specialization: '',
-    experience_years: '',
+    experienceYears: '',
     designation: '',
     address: '',
   });
@@ -41,27 +40,33 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
     setLoading(true);
 
     try {
-      await api.createTeacher(formData);
+      // Convert experienceYears to number if provided
+      const submitData = {
+        ...formData,
+        experienceYears: formData.experienceYears ? Number(formData.experienceYears) : undefined,
+      };
+      
+      await api.createTeacher(submitData);
       alert('Teacher added successfully!');
       onSuccess();
       onOpenChange(false);
       // Reset form
       setFormData({
-        employee_id: '',
-        first_name: '',
-        last_name: '',
         email: '',
-        phone: '',
-        date_of_birth: '',
+        password: 'teacher123',
+        firstName: '',
+        lastName: '',
+        dateOfBirth: '',
         gender: 'male',
-        date_of_joining: '',
+        dateOfJoining: '',
         qualification: '',
         specialization: '',
-        experience_years: '',
+        experienceYears: '',
         designation: '',
         address: '',
       });
     } catch (error: any) {
+      console.error('Create teacher error:', error);
       alert(error.message || 'Failed to add teacher');
     } finally {
       setLoading(false);
@@ -88,39 +93,30 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
               <h3 className="font-semibold mb-3">Personal Information</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <Label htmlFor="employee_id">Employee ID *</Label>
+                  <Label htmlFor="firstName">First Name *</Label>
                   <Input
-                    id="employee_id"
-                    value={formData.employee_id}
-                    onChange={(e) => handleChange('employee_id', e.target.value)}
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={(e) => handleChange('firstName', e.target.value)}
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="first_name">First Name *</Label>
+                  <Label htmlFor="lastName">Last Name *</Label>
                   <Input
-                    id="first_name"
-                    value={formData.first_name}
-                    onChange={(e) => handleChange('first_name', e.target.value)}
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) => handleChange('lastName', e.target.value)}
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="last_name">Last Name *</Label>
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
                   <Input
-                    id="last_name"
-                    value={formData.last_name}
-                    onChange={(e) => handleChange('last_name', e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="date_of_birth">Date of Birth</Label>
-                  <Input
-                    id="date_of_birth"
+                    id="dateOfBirth"
                     type="date"
-                    value={formData.date_of_birth}
-                    onChange={(e) => handleChange('date_of_birth', e.target.value)}
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleChange('dateOfBirth', e.target.value)}
                   />
                 </div>
                 <div>
@@ -137,12 +133,12 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="date_of_joining">Date of Joining *</Label>
+                  <Label htmlFor="dateOfJoining">Date of Joining *</Label>
                   <Input
-                    id="date_of_joining"
+                    id="dateOfJoining"
                     type="date"
-                    value={formData.date_of_joining}
-                    onChange={(e) => handleChange('date_of_joining', e.target.value)}
+                    value={formData.dateOfJoining}
+                    onChange={(e) => handleChange('dateOfJoining', e.target.value)}
                     required
                   />
                 </div>
@@ -164,13 +160,15 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
                   />
                 </div>
                 <div>
-                  <Label htmlFor="phone">Phone *</Label>
+                  <Label htmlFor="password">Password *</Label>
                   <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
+                    id="password"
+                    type="text"
+                    value={formData.password}
+                    onChange={(e) => handleChange('password', e.target.value)}
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">Default: teacher123</p>
                 </div>
                 <div className="md:col-span-2">
                   <Label htmlFor="address">Address</Label>
@@ -189,13 +187,12 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
               <h3 className="font-semibold mb-3">Professional Information</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <Label htmlFor="designation">Designation *</Label>
+                  <Label htmlFor="designation">Designation</Label>
                   <Input
                     id="designation"
                     value={formData.designation}
                     onChange={(e) => handleChange('designation', e.target.value)}
                     placeholder="e.g., Senior Teacher"
-                    required
                   />
                 </div>
                 <div>
@@ -208,12 +205,12 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
                   />
                 </div>
                 <div>
-                  <Label htmlFor="experience_years">Years of Experience</Label>
+                  <Label htmlFor="experienceYears">Years of Experience</Label>
                   <Input
-                    id="experience_years"
+                    id="experienceYears"
                     type="number"
-                    value={formData.experience_years}
-                    onChange={(e) => handleChange('experience_years', e.target.value)}
+                    value={formData.experienceYears}
+                    onChange={(e) => handleChange('experienceYears', e.target.value)}
                   />
                 </div>
                 <div className="md:col-span-2">

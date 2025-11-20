@@ -18,7 +18,7 @@ export function AddExamModal({ open, onOpenChange, onSuccess }: AddExamModalProp
   const [classes, setClasses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'midterm',
+    type: 'term',
     session: '2024-2025',
     class_id: '',
     start_date: '',
@@ -61,7 +61,7 @@ export function AddExamModal({ open, onOpenChange, onSuccess }: AddExamModalProp
       onOpenChange(false);
       setFormData({
         name: '',
-        type: 'midterm',
+        type: 'term',
         session: '2024-2025',
         class_id: '',
         start_date: '',
@@ -111,10 +111,10 @@ export function AddExamModal({ open, onOpenChange, onSuccess }: AddExamModalProp
                   onChange={(e) => handleChange('type', e.target.value)}
                   required
                 >
-                  <option value="midterm">Mid Term</option>
+                  <option value="term">Term</option>
                   <option value="final">Final</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="unit">Unit Test</option>
+                  <option value="half_yearly">Half Yearly</option>
+                  <option value="unit_test">Unit Test</option>
                 </Select>
               </div>
             </div>

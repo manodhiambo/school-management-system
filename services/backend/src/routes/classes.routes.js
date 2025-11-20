@@ -15,7 +15,7 @@ router.get('/', authenticate, async (req, res) => {
       FROM classes c
       LEFT JOIN students s ON c.id = s.class_id AND s.status = 'active'
       GROUP BY c.id
-      ORDER BY c.name, c.section
+      ORDER BY c.numeric_value, c.section
     `);
     
     res.json({
@@ -28,35 +28,25 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Get single class
-router.get('/:id', authenticate, async (req, res) => {
-  try {
-    const classes = await query('SELECT * FROM classes WHERE id = ?', [req.params.id]);
-    
-    if (classes.length === 0) {
-      return res.status(404).json({ success: false, message: 'Class not found' });
-    }
-    
-    res.json({
-      success: true,
-      data: classes[0]
-    });
-  } catch (error) {
-    console.error('Get class error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching class' });
-  }
-});
-
 // Create class
 router.post('/', authenticate, async (req, res) => {
   try {
     const { name, section, max_students, room_number } = req.body;
     
+    // Extract numeric value from class name (e.g., "Grade 10" -> 10)
+    const numericMatch = name.match(/\d+/);
+    const numeric_value = numericMatch ? parseInt(numericMatch[0]) : 0;
+    
+    // Get current academic year
+    const currentYear = new Date().getFullYear();
+    const academic_year = `${currentYear}-${currentYear + 1}`;
+    
     const classId = uuidv4();
     
     await query(
-      'INSERT INTO classes (id, name, section, max_students, room_number) VALUES (?, ?, ?, ?, ?)',
-      [classId, name, section, max_students || 40, room_number]
+      `INSERT INTO classes (id, name, numeric_value, section, max_students, room_number, academic_year) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [classId, name, numeric_value, section, max_students || 40, room_number || null, academic_year]
     );
     
     res.status(201).json({
@@ -75,9 +65,13 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const { name, section, max_students, room_number } = req.body;
     
+    const numericMatch = name.match(/\d+/);
+    const numeric_value = numericMatch ? parseInt(numericMatch[0]) : 0;
+    
     await query(
-      'UPDATE classes SET name = ?, section = ?, max_students = ?, room_number = ? WHERE id = ?',
-      [name, section, max_students, room_number, req.params.id]
+      `UPDATE classes SET name = ?, numeric_value = ?, section = ?, max_students = ?, room_number = ? 
+       WHERE id = ?`,
+      [name, numeric_value, section, max_students, room_number, req.params.id]
     );
     
     res.json({

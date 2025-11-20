@@ -378,9 +378,6 @@ class ApiService {
   exportReport(type: string, params?: any) {
     return this.api.get(`/reports/export?type=${type}`, { params, responseType: 'blob' });
   }
-}
-
-export default new ApiService();
 
   // ==================== USERS (Admin Only) ====================
   getUsers(params?: any) {
@@ -406,3 +403,6 @@ export default new ApiService();
   deleteUser(id: string) {
     return this.api.delete(`/users/${id}`);
   }
+}
+
+export default new ApiService();

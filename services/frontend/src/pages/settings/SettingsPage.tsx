@@ -31,11 +31,48 @@ export function SettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await api.updateSettings(settings);
+      
+      // Convert snake_case to camelCase for backend
+      const backendSettings = {
+        schoolName: settings?.school_name,
+        schoolCode: settings?.school_code,
+        schoolLogoUrl: settings?.school_logo_url,
+        address: settings?.address,
+        city: settings?.city,
+        state: settings?.state,
+        pincode: settings?.pincode,
+        phone: settings?.phone,
+        email: settings?.email,
+        website: settings?.website,
+        currentAcademicYear: settings?.current_academic_year,
+        timezone: settings?.timezone,
+        currency: settings?.currency,
+        dateFormat: settings?.date_format,
+        timeFormat: settings?.time_format,
+        attendanceMethod: settings?.attendance_method,
+        feeLateeFeeApplicable: settings?.fee_late_fee_applicable,
+        smsEnabled: settings?.sms_enabled,
+        emailEnabled: settings?.email_enabled,
+        pushNotificationEnabled: settings?.push_notification_enabled,
+      };
+      
+      // Remove undefined values
+      Object.keys(backendSettings).forEach(key => 
+        backendSettings[key] === undefined && delete backendSettings[key]
+      );
+      
+      await api.updateSettings(backendSettings);
       alert('Settings saved successfully!');
-    } catch (error) {
+      loadSettings(); // Reload to get updated data
+    } catch (error: any) {
+      console.log("Validation errors:", error.errors);
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      if (error.errors && Array.isArray(error.errors)) {
+        const errorMessages = error.errors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
+        alert(`Validation failed:\n${errorMessages}`);
+      } else {
+        alert(error.message || 'Failed to save settings');
+      }
     } finally {
       setSaving(false);
     }

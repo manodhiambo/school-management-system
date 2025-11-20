@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, GraduationCap, FileText, Calendar } from 'lucide-react';
+import { BookOpen, GraduationCap, FileText, Calendar, Plus } from 'lucide-react';
+import { AddClassModal } from '@/components/modals/AddClassModal';
+import { AddSubjectModal } from '@/components/modals/AddSubjectModal';
+import { AddExamModal } from '@/components/modals/AddExamModal';
 import api from '@/services/api';
 
 export function AcademicPage() {
@@ -9,6 +12,9 @@ export function AcademicPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showClassModal, setShowClassModal] = useState(false);
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [showExamModal, setShowExamModal] = useState(false);
 
   useEffect(() => {
     loadAcademicData();
@@ -58,7 +64,10 @@ export function AcademicPage() {
           <CardContent>
             <div className="text-3xl font-bold">{classes.length}</div>
             <p className="text-xs text-gray-500">Total classes</p>
-            <Button className="w-full mt-4" size="sm">Manage Classes</Button>
+            <Button className="w-full mt-4" size="sm" onClick={() => setShowClassModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Class
+            </Button>
           </CardContent>
         </Card>
 
@@ -72,7 +81,10 @@ export function AcademicPage() {
           <CardContent>
             <div className="text-3xl font-bold">{subjects.length}</div>
             <p className="text-xs text-gray-500">Total subjects</p>
-            <Button className="w-full mt-4" size="sm">Manage Subjects</Button>
+            <Button className="w-full mt-4" size="sm" onClick={() => setShowSubjectModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Subject
+            </Button>
           </CardContent>
         </Card>
 
@@ -86,7 +98,10 @@ export function AcademicPage() {
           <CardContent>
             <div className="text-3xl font-bold">{exams.length}</div>
             <p className="text-xs text-gray-500">Scheduled exams</p>
-            <Button className="w-full mt-4" size="sm">Manage Exams</Button>
+            <Button className="w-full mt-4" size="sm" onClick={() => setShowExamModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Schedule Exam
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -98,7 +113,13 @@ export function AcademicPage() {
           </CardHeader>
           <CardContent>
             {classes.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No classes configured</p>
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No classes configured</p>
+                <Button onClick={() => setShowClassModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add First Class
+                </Button>
+              </div>
             ) : (
               <div className="space-y-2">
                 {classes.slice(0, 5).map((cls: any) => (
@@ -107,7 +128,6 @@ export function AcademicPage() {
                       <p className="font-medium">{cls.name} - Section {cls.section}</p>
                       <p className="text-sm text-gray-500">{cls.student_count || 0} students</p>
                     </div>
-                    <Button variant="ghost" size="sm">View</Button>
                   </div>
                 ))}
               </div>
@@ -121,7 +141,13 @@ export function AcademicPage() {
           </CardHeader>
           <CardContent>
             {subjects.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No subjects configured</p>
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No subjects configured</p>
+                <Button onClick={() => setShowSubjectModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add First Subject
+                </Button>
+              </div>
             ) : (
               <div className="space-y-2">
                 {subjects.slice(0, 5).map((subject: any) => (
@@ -147,7 +173,7 @@ export function AcademicPage() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Upcoming Exams</span>
-            <Button size="sm">
+            <Button size="sm" onClick={() => setShowExamModal(true)}>
               <Calendar className="mr-2 h-4 w-4" />
               Schedule Exam
             </Button>
@@ -155,7 +181,13 @@ export function AcademicPage() {
         </CardHeader>
         <CardContent>
           {exams.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No upcoming exams</p>
+            <div className="text-center py-8">
+              <p className="text-gray-500 mb-4">No upcoming exams</p>
+              <Button onClick={() => setShowExamModal(true)}>
+                <Calendar className="mr-2 h-4 w-4" />
+                Schedule First Exam
+              </Button>
+            </div>
           ) : (
             <div className="space-y-3">
               {exams.map((exam: any) => (
@@ -166,16 +198,31 @@ export function AcademicPage() {
                       {new Date(exam.start_date).toLocaleDateString()} - {new Date(exam.end_date).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button variant="ghost" size="sm">View Details</Button>
-                    <Button variant="ghost" size="sm">Upload Results</Button>
-                  </div>
+                  <span className="text-sm text-gray-600">{exam.class_name || 'All Classes'}</span>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <AddClassModal
+        open={showClassModal}
+        onOpenChange={setShowClassModal}
+        onSuccess={loadAcademicData}
+      />
+
+      <AddSubjectModal
+        open={showSubjectModal}
+        onOpenChange={setShowSubjectModal}
+        onSuccess={loadAcademicData}
+      />
+
+      <AddExamModal
+        open={showExamModal}
+        onOpenChange={setShowExamModal}
+        onSuccess={loadAcademicData}
+      />
     </div>
   );
 }

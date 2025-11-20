@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, Users } from 'lucide-react';
+import { AddParentModal } from '@/components/modals/AddParentModal';
 import api from '@/services/api';
 
 interface Parent {
@@ -13,6 +14,7 @@ interface Parent {
   phone_primary: string;
   relationship: string;
   occupation: string;
+  children_count?: number;
   created_at: string;
 }
 
@@ -20,6 +22,7 @@ export function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     loadParents();
@@ -34,6 +37,19 @@ export function ParentsPage() {
       console.error('Error loading parents:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this parent?')) return;
+    
+    try {
+      await api.deleteUser(id);
+      alert('Parent deleted successfully');
+      loadParents();
+    } catch (error) {
+      console.error('Error deleting parent:', error);
+      alert('Failed to delete parent');
     }
   };
 
@@ -58,7 +74,7 @@ export function ParentsPage() {
           <h2 className="text-3xl font-bold">Parents</h2>
           <p className="text-gray-500">Manage parent accounts and relationships</p>
         </div>
-        <Button>
+        <Button onClick={() => setShowAddModal(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Parent
         </Button>
@@ -81,7 +97,7 @@ export function ParentsPage() {
             <div className="text-center py-12">
               <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 mb-4">No parents found</p>
-              <Button>
+              <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Your First Parent
               </Button>
@@ -96,6 +112,7 @@ export function ParentsPage() {
                     <th className="text-left p-4">Phone</th>
                     <th className="text-left p-4">Relationship</th>
                     <th className="text-left p-4">Occupation</th>
+                    <th className="text-left p-4">Children</th>
                     <th className="text-left p-4">Actions</th>
                   </tr>
                 </thead>
@@ -107,12 +124,17 @@ export function ParentsPage() {
                       <td className="p-4">{parent.phone_primary}</td>
                       <td className="p-4 capitalize">{parent.relationship}</td>
                       <td className="p-4">{parent.occupation || 'N/A'}</td>
+                      <td className="p-4">{parent.children_count || 0}</td>
                       <td className="p-4">
                         <div className="flex space-x-2">
                           <Button variant="ghost" size="icon">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleDelete(parent.id)}
+                          >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
@@ -125,6 +147,12 @@ export function ParentsPage() {
           )}
         </CardContent>
       </Card>
+
+      <AddParentModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSuccess={loadParents}
+      />
     </div>
   );
 }

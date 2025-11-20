@@ -44,11 +44,27 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
     setLoading(true);
 
     try {
-      // Convert annualIncome to number if provided
-      const submitData = {
-        ...formData,
-        annualIncome: formData.annualIncome ? Number(formData.annualIncome) : undefined,
+      // Convert annualIncome to number if provided, remove empty optional fields
+      const submitData: any = {
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        relationship: formData.relationship,
+        phonePrimary: formData.phonePrimary,
       };
+
+      // Add optional fields only if they have values
+      if (formData.phoneSecondary) submitData.phoneSecondary = formData.phoneSecondary;
+      if (formData.emailSecondary) submitData.emailSecondary = formData.emailSecondary;
+      if (formData.occupation) submitData.occupation = formData.occupation;
+      if (formData.annualIncome) submitData.annualIncome = Number(formData.annualIncome);
+      if (formData.education) submitData.education = formData.education;
+      if (formData.aadharNumber) submitData.aadharNumber = formData.aadharNumber;
+      if (formData.address) submitData.address = formData.address;
+      if (formData.city) submitData.city = formData.city;
+      if (formData.state) submitData.state = formData.state;
+      if (formData.pincode) submitData.pincode = formData.pincode;
       
       await api.createParent(submitData);
       alert('Parent added successfully!');
@@ -75,7 +91,14 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
       });
     } catch (error: any) {
       console.error('Create parent error:', error);
-      alert(error.message || 'Failed to add parent');
+      
+      // Show detailed validation errors if available
+      if (error.errors && Array.isArray(error.errors)) {
+        const errorMessages = error.errors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
+        alert(`Validation failed:\n${errorMessages}`);
+      } else {
+        alert(error.message || 'Failed to add parent');
+      }
     } finally {
       setLoading(false);
     }
@@ -142,13 +165,13 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                   />
                 </div>
                 <div>
-                  <Label htmlFor="aadharNumber">Aadhar Number (12 digits)</Label>
+                  <Label htmlFor="aadharNumber">ID Number (8 digits)</Label>
                   <Input
                     id="aadharNumber"
                     value={formData.aadharNumber}
                     onChange={(e) => handleChange('aadharNumber', e.target.value)}
-                    pattern="[0-9]{12}"
-                    placeholder="123456789012"
+                    pattern="[0-9]{8}"
+                    placeholder="12345678"
                   />
                 </div>
               </div>
@@ -196,7 +219,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                     value={formData.phonePrimary}
                     onChange={(e) => handleChange('phonePrimary', e.target.value)}
                     pattern="[0-9]{10}"
-                    placeholder="9876543210"
+                    placeholder="0712345678"
                     required
                   />
                 </div>
@@ -207,7 +230,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                     value={formData.phoneSecondary}
                     onChange={(e) => handleChange('phoneSecondary', e.target.value)}
                     pattern="[0-9]{10}"
-                    placeholder="9876543210"
+                    placeholder="0712345678"
                   />
                 </div>
               </div>
@@ -226,7 +249,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                   />
                 </div>
                 <div>
-                  <Label htmlFor="annualIncome">Annual Income</Label>
+                  <Label htmlFor="annualIncome">Annual Income (KSH)</Label>
                   <Input
                     id="annualIncome"
                     type="number"
@@ -260,15 +283,16 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                   />
                 </div>
                 <div>
-                  <Label htmlFor="state">State</Label>
+                  <Label htmlFor="state">County</Label>
                   <Input
                     id="state"
                     value={formData.state}
                     onChange={(e) => handleChange('state', e.target.value)}
+                    placeholder="e.g., Nyeri"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="pincode">Pincode</Label>
+                  <Label htmlFor="pincode">Postal Code</Label>
                   <Input
                     id="pincode"
                     value={formData.pincode}

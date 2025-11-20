@@ -11,9 +11,18 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const users = await query(`
       SELECT 
-        id, email, role, is_active, last_login, created_at
-      FROM users 
-      ORDER BY created_at DESC
+        u.id, u.email, u.role, u.is_active, u.last_login, u.created_at,
+        CASE 
+          WHEN u.role = 'student' THEN CONCAT(s.first_name, ' ', s.last_name)
+          WHEN u.role = 'teacher' THEN CONCAT(t.first_name, ' ', t.last_name)
+          WHEN u.role = 'parent' THEN CONCAT(p.first_name, ' ', p.last_name)
+          ELSE NULL
+        END as full_name
+      FROM users u
+      LEFT JOIN students s ON u.id = s.user_id AND u.role = 'student'
+      LEFT JOIN teachers t ON u.id = t.user_id AND u.role = 'teacher'
+      LEFT JOIN parents p ON u.id = p.user_id AND u.role = 'parent'
+      ORDER BY u.created_at DESC
     `);
     
     res.json({
@@ -92,10 +101,31 @@ router.post('/:id/reset-password', authenticate, async (req, res) => {
   }
 });
 
-// Delete user
+// Delete user - CASCADE delete related records
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM users WHERE id = ?', [req.params.id]);
+    const userId = req.params.id;
+    
+    // Get user role
+    const users = await query('SELECT role FROM users WHERE id = ?', [userId]);
+    
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const role = users[0].role;
+    
+    // Delete role-specific records first
+    if (role === 'student') {
+      await query('DELETE FROM students WHERE user_id = ?', [userId]);
+    } else if (role === 'teacher') {
+      await query('DELETE FROM teachers WHERE user_id = ?', [userId]);
+    } else if (role === 'parent') {
+      await query('DELETE FROM parents WHERE user_id = ?', [userId]);
+    }
+    
+    // Delete user account
+    await query('DELETE FROM users WHERE id = ?', [userId]);
     
     res.json({
       success: true,

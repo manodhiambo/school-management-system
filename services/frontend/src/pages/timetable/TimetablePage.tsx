@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Calendar, Users, BookOpen } from 'lucide-react';
+import { Clock, Calendar, Users, BookOpen, Plus } from 'lucide-react';
+import { AddTimetableModal } from '@/components/modals/AddTimetableModal';
+import { AssignSubstituteModal } from '@/components/modals/AssignSubstituteModal';
 import api from '@/services/api';
 
 export function TimetablePage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showSubstituteModal, setShowSubstituteModal] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [timetable, setTimetable] = useState<any[]>([]);
 
   useEffect(() => {
     loadClasses();
@@ -22,6 +28,20 @@ export function TimetablePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadTimetable = async (classId: string) => {
+    try {
+      const response: any = await api.getTimetable(classId);
+      setTimetable(response.data || []);
+    } catch (error) {
+      console.error('Error loading timetable:', error);
+    }
+  };
+
+  const handleClassSelect = (classId: string) => {
+    setSelectedClass(classId);
+    loadTimetable(classId);
   };
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -53,11 +73,11 @@ export function TimetablePage() {
           <p className="text-gray-500">Manage class schedules and periods</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
-            <Calendar className="mr-2 h-4 w-4" />
-            Generate Timetable
+          <Button variant="outline" onClick={() => setShowAddModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Entry
           </Button>
-          <Button>
+          <Button onClick={() => setShowSubstituteModal(true)}>
             <Clock className="mr-2 h-4 w-4" />
             Assign Substitute
           </Button>
@@ -113,8 +133,9 @@ export function TimetablePage() {
             {classes.slice(0, 8).map((cls: any) => (
               <Button
                 key={cls.id}
-                variant="outline"
+                variant={selectedClass === cls.id ? 'default' : 'outline'}
                 className="justify-start"
+                onClick={() => handleClassSelect(cls.id)}
               >
                 <BookOpen className="mr-2 h-4 w-4" />
                 {cls.name} - {cls.section}
@@ -129,7 +150,7 @@ export function TimetablePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Weekly Timetable Preview</CardTitle>
+          <CardTitle>Weekly Timetable {selectedClass && '- ' + classes.find(c => c.id === selectedClass)?.name}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -154,7 +175,9 @@ export function TimetablePage() {
                         {period.name.includes('Break') || period.name.includes('Lunch') ? (
                           <span className="text-gray-400 italic text-sm">{period.name}</span>
                         ) : (
-                          <div className="text-sm text-gray-400">-</div>
+                          <div className="text-sm text-gray-400">
+                            {selectedClass ? 'No class' : 'Select a class'}
+                          </div>
                         )}
                       </td>
                     ))}
@@ -166,24 +189,17 @@ export function TimetablePage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Period Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {periods.filter(p => !p.name.includes('Break') && !p.name.includes('Lunch')).map(period => (
-              <div key={period.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                <div>
-                  <p className="font-medium">{period.name}</p>
-                  <p className="text-sm text-gray-500">{period.time}</p>
-                </div>
-                <Button variant="ghost" size="sm">Edit</Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <AddTimetableModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSuccess={() => selectedClass && loadTimetable(selectedClass)}
+      />
+
+      <AssignSubstituteModal
+        open={showSubstituteModal}
+        onOpenChange={setShowSubstituteModal}
+        onSuccess={() => alert('Substitute assigned successfully')}
+      />
     </div>
   );
 }

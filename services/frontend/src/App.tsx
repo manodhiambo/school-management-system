@@ -2,6 +2,15 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LoginPage } from './pages/auth/LoginPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { StudentsPage } from './pages/students/StudentsPage';
+import { TeachersPage } from './pages/teachers/TeachersPage';
+import { ParentsPage } from './pages/parents/ParentsPage';
+import { AcademicPage } from './pages/academic/AcademicPage';
+import { AttendancePage } from './pages/attendance/AttendancePage';
+import { FeePage } from './pages/fee/FeePage';
+import { TimetablePage } from './pages/timetable/TimetablePage';
+import { CommunicationPage } from './pages/communication/CommunicationPage';
+import { SettingsPage } from './pages/settings/SettingsPage';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
@@ -30,15 +39,16 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="students" element={<div className="p-6">Students Page (Coming Soon)</div>} />
-            <Route path="teachers" element={<div className="p-6">Teachers Page (Coming Soon)</div>} />
-            <Route path="parents" element={<div className="p-6">Parents Page (Coming Soon)</div>} />
-            <Route path="academic" element={<div className="p-6">Academic Page (Coming Soon)</div>} />
-            <Route path="attendance" element={<div className="p-6">Attendance Page (Coming Soon)</div>} />
-            <Route path="fee" element={<div className="p-6">Fee Page (Coming Soon)</div>} />
-            <Route path="timetable" element={<div className="p-6">Timetable Page (Coming Soon)</div>} />
-            <Route path="communication" element={<div className="p-6">Communication Page (Coming Soon)</div>} />
-            <Route path="settings" element={<div className="p-6">Settings Page (Coming Soon)</div>} />
+            <Route path="students" element={<StudentsPage />} />
+            <Route path="teachers" element={<TeachersPage />} />
+            <Route path="parents" element={<ParentsPage />} />
+            <Route path="academic" element={<AcademicPage />} />
+            <Route path="attendance" element={<AttendancePage />} />
+            <Route path="fee" element={<FeePage />} />
+            <Route path="timetable" element={<TimetablePage />} />
+            <Route path="communication" element={<CommunicationPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="*" element={<div className="p-6">Page Not Found</div>} />
           </Route>
         </Routes>
       </BrowserRouter>

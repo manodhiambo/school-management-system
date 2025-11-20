@@ -48,12 +48,7 @@ export function Sidebar() {
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               )}
             >
-              <item.icon
-                className={cn(
-                  'mr-3 h-5 w-5 flex-shrink-0',
-                  isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
-                )}
-              />
+              <item.icon className={cn('mr-3 h-5 w-5 flex-shrink-0', isActive ? 'text-white' : 'text-gray-400')} />
               {item.name}
             </Link>
           );

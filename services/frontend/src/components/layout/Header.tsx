@@ -11,10 +11,9 @@ export function Header() {
   const handleLogout = async () => {
     try {
       await api.logout();
-      clearAuth();
-      navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
       clearAuth();
       navigate('/login');
     }

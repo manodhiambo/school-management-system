@@ -1,0 +1,36 @@
+  // Timetable Management
+  getTimetable(classId: string) {
+    return this.api.get(`/timetable/class/${classId}`);
+  },
+
+  createTimetableEntry(data: any) {
+    return this.api.post('/timetable', data);
+  },
+
+  updateTimetableEntry(id: string, data: any) {
+    return this.api.put(`/timetable/${id}`, data);
+  },
+
+  deleteTimetableEntry(id: string) {
+    return this.api.delete(`/timetable/${id}`);
+  },
+
+  generateTimetable(data: any) {
+    return this.api.post('/timetable/generate', data);
+  },
+
+  getClassTimetable(classId: string) {
+    return this.api.get(`/timetable/class/${classId}`);
+  },
+
+  getTeacherTimetable(teacherId: string) {
+    return this.api.get(`/timetable/teacher/${teacherId}`);
+  },
+
+  assignSubstitute(data: any) {
+    return this.api.post('/timetable/substitute', data);
+  },
+
+  getTimetableConflicts() {
+    return this.api.get('/timetable/conflicts');
+  },

@@ -244,10 +244,6 @@ class ApiService {
     return this.api.post('/fee/payment', data);
   }
 
-  generateInvoices(data: any) {
-    return this.api.post('/fee/invoices/generate', data);
-  }
-
   initiateOnlinePayment(data: any) {
     return this.api.post('/fee/payment/online', data);
   }
@@ -301,11 +297,11 @@ class ApiService {
   }
 
   createPeriod(data: any) {
-    return this.api.post('/timetable/periods', data);
+    return this.api.post("/timetable/periods", data);
   }
 
   createTimetableEntry(data: any) {
-    return this.api.post('/timetable', data);
+    return this.api.post("/timetable", data);
   }
 
   updateTimetableEntry(id: string, data: any) {
@@ -317,7 +313,7 @@ class ApiService {
   }
 
   generateTimetable(data: any) {
-    return this.api.post('/timetable/generate', data);
+    return this.api.post("/timetable/generate", data);
   }
 
   getClassTimetable(classId: string) {
@@ -329,11 +325,11 @@ class ApiService {
   }
 
   assignSubstitute(data: any) {
-    return this.api.post('/timetable/substitute', data);
+    return this.api.post("/timetable/substitute", data);
   }
 
   getTimetableConflicts() {
-    return this.api.get('/timetable/conflicts');
+    return this.api.get("/timetable/conflicts");
   }
 
   // ==================== COMMUNICATION ====================
@@ -372,6 +368,12 @@ class ApiService {
   updateNotification(id: string, data: any) {
     return this.api.put(`/notifications/${id}`, data);
   }
+
+  markNotificationAsRead(id: string) {
+    return this.api.put(`/notifications/${id}/read`);
+  }
+
+  markNotificationAsRead(id: string) {
 
   markNotificationAsRead(id: string) {
     return this.api.put(`/notifications/${id}/read`);

@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { MessageSquare, Send, Inbox, Users, Bell } from 'lucide-react';
+import { MessageSquare, Send, Inbox, Users, Bell, Plus } from 'lucide-react';
+import { SendMessageModal } from '@/components/modals/SendMessageModal';
+import { BroadcastAnnouncementModal } from '@/components/modals/BroadcastAnnouncementModal';
 import api from '@/services/api';
 
 export function CommunicationPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'compose'>('inbox');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
 
   useEffect(() => {
     loadCommunicationData();
@@ -26,6 +29,8 @@ export function CommunicationPage() {
       setNotifications(notificationsRes.data || []);
     } catch (error) {
       console.error('Error loading communication data:', error);
+      setMessages([]);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -46,10 +51,16 @@ export function CommunicationPage() {
           <h2 className="text-3xl font-bold">Communication</h2>
           <p className="text-gray-500">Manage messages and announcements</p>
         </div>
-        <Button onClick={() => setActiveTab('compose')}>
-          <Send className="mr-2 h-4 w-4" />
-          Compose Message
-        </Button>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => setShowBroadcastModal(true)}>
+            <Users className="mr-2 h-4 w-4" />
+            Broadcast
+          </Button>
+          <Button onClick={() => setShowMessageModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Message
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -94,12 +105,12 @@ export function CommunicationPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Broadcast</span>
+              <span>Quick Action</span>
               <Users className="h-4 w-4 text-green-500" />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Button className="w-full" size="sm">
+            <Button className="w-full" size="sm" onClick={() => setShowBroadcastModal(true)}>
               Send to All
             </Button>
           </CardContent>
@@ -109,7 +120,7 @@ export function CommunicationPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle className="text-sm">Filters</CardTitle>
+            <CardTitle className="text-sm">Mailbox</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Button
@@ -118,7 +129,7 @@ export function CommunicationPage() {
               onClick={() => setActiveTab('inbox')}
             >
               <Inbox className="mr-2 h-4 w-4" />
-              Inbox
+              Inbox ({messages.length})
             </Button>
             <Button
               className="w-full justify-start"
@@ -130,10 +141,10 @@ export function CommunicationPage() {
             </Button>
             <Button
               className="w-full justify-start"
-              variant={activeTab === 'compose' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('compose')}
+              variant="ghost"
+              onClick={() => setShowMessageModal(true)}
             >
-              <MessageSquare className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4" />
               Compose
             </Button>
           </CardContent>
@@ -142,39 +153,19 @@ export function CommunicationPage() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>
-              {activeTab === 'inbox' && 'Inbox Messages'}
-              {activeTab === 'sent' && 'Sent Messages'}
-              {activeTab === 'compose' && 'Compose New Message'}
+              {activeTab === 'inbox' ? 'Inbox Messages' : 'Sent Messages'}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {activeTab === 'compose' ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">To</label>
-                  <Input placeholder="Select recipients..." />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Subject</label>
-                  <Input placeholder="Enter subject..." />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Message</label>
-                  <textarea
-                    className="w-full border rounded-md p-3 min-h-[200px]"
-                    placeholder="Type your message..."
-                  />
-                </div>
-                <div className="flex space-x-2">
-                  <Button>
-                    <Send className="mr-2 h-4 w-4" />
-                    Send Message
-                  </Button>
-                  <Button variant="outline">Save Draft</Button>
-                </div>
+            {messages.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 mb-4">No messages yet</p>
+                <Button onClick={() => setShowMessageModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Send First Message
+                </Button>
               </div>
-            ) : messages.length === 0 ? (
-              <p className="text-gray-500 text-center py-12">No messages</p>
             ) : (
               <div className="space-y-2">
                 {messages.slice(0, 10).map((message: any) => (
@@ -209,7 +200,14 @@ export function CommunicationPage() {
         </CardHeader>
         <CardContent>
           {notifications.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No notifications</p>
+            <div className="text-center py-8">
+              <Bell className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 mb-4">No notifications yet</p>
+              <Button onClick={() => setShowBroadcastModal(true)}>
+                <Users className="mr-2 h-4 w-4" />
+                Broadcast Announcement
+              </Button>
+            </div>
           ) : (
             <div className="space-y-2">
               {notifications.slice(0, 5).map((notification: any) => (
@@ -231,6 +229,18 @@ export function CommunicationPage() {
           )}
         </CardContent>
       </Card>
+
+      <SendMessageModal
+        open={showMessageModal}
+        onOpenChange={setShowMessageModal}
+        onSuccess={loadCommunicationData}
+      />
+
+      <BroadcastAnnouncementModal
+        open={showBroadcastModal}
+        onOpenChange={setShowBroadcastModal}
+        onSuccess={loadCommunicationData}
+      />
     </div>
   );
 }

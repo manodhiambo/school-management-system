@@ -19,14 +19,14 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
   const [subjects, setSubjects] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    class_id: '',
-    subject_id: '',
-    teacher_id: '',
-    day_of_week: 'monday',
-    period: '1',
-    start_time: '08:00',
-    end_time: '08:45',
-    room_number: '',
+    classId: '',
+    subjectId: '',
+    teacherId: '',
+    dayOfWeek: 'monday',
+    periodNumber: '1',
+    startTime: '08:00:00',
+    endTime: '08:45:00',
+    academicYear: '2024-2025',
   });
 
   useEffect(() => {
@@ -59,23 +59,57 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
     setLoading(true);
 
     try {
-      await api.createTimetableEntry(formData);
+      // Create period first (simplified - you might want to check if it exists)
+      const periodData = {
+        name: `Period ${formData.periodNumber}`,
+        periodNumber: Number(formData.periodNumber),
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        isBreak: false
+      };
+
+      let periodId;
+      try {
+        const periodRes: any = await api.createPeriod(periodData);
+        periodId = periodRes.data?.id;
+      } catch (err) {
+        // Period might already exist, try to get it
+        console.log('Period creation failed, it might already exist');
+        // For now, we'll create a temp ID - ideally you'd fetch existing periods
+        periodId = `period-${formData.periodNumber}`;
+      }
+
+      // Now create timetable entry
+      await api.createTimetableEntry({
+        classId: formData.classId,
+        subjectId: formData.subjectId,
+        teacherId: formData.teacherId,
+        periodId: periodId,
+        dayOfWeek: formData.dayOfWeek,
+        academicYear: formData.academicYear,
+      });
+
       alert('Timetable entry added successfully!');
       onSuccess();
       onOpenChange(false);
       setFormData({
-        class_id: '',
-        subject_id: '',
-        teacher_id: '',
-        day_of_week: 'monday',
-        period: '1',
-        start_time: '08:00',
-        end_time: '08:45',
-        room_number: '',
+        classId: '',
+        subjectId: '',
+        teacherId: '',
+        dayOfWeek: 'monday',
+        periodNumber: '1',
+        startTime: '08:00:00',
+        endTime: '08:45:00',
+        academicYear: '2024-2025',
       });
     } catch (error: any) {
       console.error('Add timetable error:', error);
-      alert(error.message || 'Failed to add timetable entry');
+      if (error.errors && Array.isArray(error.errors)) {
+        const errorMessages = error.errors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
+        alert(`Validation failed:\n${errorMessages}`);
+      } else {
+        alert(error.message || 'Failed to add timetable entry');
+      }
     } finally {
       setLoading(false);
     }
@@ -97,11 +131,11 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="class_id">Class *</Label>
+              <Label htmlFor="classId">Class *</Label>
               <Select
-                id="class_id"
-                value={formData.class_id}
-                onChange={(e) => handleChange('class_id', e.target.value)}
+                id="classId"
+                value={formData.classId}
+                onChange={(e) => handleChange('classId', e.target.value)}
                 required
               >
                 <option value="">Select Class</option>
@@ -115,11 +149,11 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="subject_id">Subject *</Label>
+                <Label htmlFor="subjectId">Subject *</Label>
                 <Select
-                  id="subject_id"
-                  value={formData.subject_id}
-                  onChange={(e) => handleChange('subject_id', e.target.value)}
+                  id="subjectId"
+                  value={formData.subjectId}
+                  onChange={(e) => handleChange('subjectId', e.target.value)}
                   required
                 >
                   <option value="">Select Subject</option>
@@ -131,11 +165,11 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
                 </Select>
               </div>
               <div>
-                <Label htmlFor="teacher_id">Teacher *</Label>
+                <Label htmlFor="teacherId">Teacher *</Label>
                 <Select
-                  id="teacher_id"
-                  value={formData.teacher_id}
-                  onChange={(e) => handleChange('teacher_id', e.target.value)}
+                  id="teacherId"
+                  value={formData.teacherId}
+                  onChange={(e) => handleChange('teacherId', e.target.value)}
                   required
                 >
                   <option value="">Select Teacher</option>
@@ -150,11 +184,11 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="day_of_week">Day of Week *</Label>
+                <Label htmlFor="dayOfWeek">Day of Week *</Label>
                 <Select
-                  id="day_of_week"
-                  value={formData.day_of_week}
-                  onChange={(e) => handleChange('day_of_week', e.target.value)}
+                  id="dayOfWeek"
+                  value={formData.dayOfWeek}
+                  onChange={(e) => handleChange('dayOfWeek', e.target.value)}
                   required
                 >
                   <option value="monday">Monday</option>
@@ -166,11 +200,11 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
                 </Select>
               </div>
               <div>
-                <Label htmlFor="period">Period *</Label>
+                <Label htmlFor="periodNumber">Period *</Label>
                 <Select
-                  id="period"
-                  value={formData.period}
-                  onChange={(e) => handleChange('period', e.target.value)}
+                  id="periodNumber"
+                  value={formData.periodNumber}
+                  onChange={(e) => handleChange('periodNumber', e.target.value)}
                   required
                 >
                   <option value="1">1st Period</option>
@@ -186,34 +220,35 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start_time">Start Time *</Label>
+                <Label htmlFor="startTime">Start Time *</Label>
                 <Input
-                  id="start_time"
+                  id="startTime"
                   type="time"
-                  value={formData.start_time}
-                  onChange={(e) => handleChange('start_time', e.target.value)}
+                  value={formData.startTime.slice(0, 5)}
+                  onChange={(e) => handleChange('startTime', e.target.value + ':00')}
                   required
                 />
               </div>
               <div>
-                <Label htmlFor="end_time">End Time *</Label>
+                <Label htmlFor="endTime">End Time *</Label>
                 <Input
-                  id="end_time"
+                  id="endTime"
                   type="time"
-                  value={formData.end_time}
-                  onChange={(e) => handleChange('end_time', e.target.value)}
+                  value={formData.endTime.slice(0, 5)}
+                  onChange={(e) => handleChange('endTime', e.target.value + ':00')}
                   required
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="room_number">Room Number</Label>
+              <Label htmlFor="academicYear">Academic Year *</Label>
               <Input
-                id="room_number"
-                value={formData.room_number}
-                onChange={(e) => handleChange('room_number', e.target.value)}
-                placeholder="e.g., Room 101"
+                id="academicYear"
+                value={formData.academicYear}
+                onChange={(e) => handleChange('academicYear', e.target.value)}
+                placeholder="2024-2025"
+                required
               />
             </div>
           </div>

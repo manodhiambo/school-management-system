@@ -345,7 +345,7 @@ class ApiService {
   }
 
   getTeacherTimetable(teacherId: string) {
-    return this.api.get(`/timetable/teacher/${teacherId}`);
+    return this.api.get(`/teachers/${teacherId}/timetable`);
   }
 
   assignSubstitute(data: any) {

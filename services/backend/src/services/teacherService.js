@@ -363,6 +363,55 @@ class TeacherService {
     
     return classes;
   }
+
+
+  async getTeacherTimetable(teacherId) {
+    // Get timetable entries for the teacher
+    const timetable = await query(
+      `SELECT 
+        t.id,
+        t.day_of_week,
+        p.period_number,
+        p.start_time,
+        p.end_time,
+        s.name as subject_name,
+        s.code as subject_code,
+        c.name as class_name,
+        c.section,
+        r.room_number
+       FROM timetable t
+       JOIN periods p ON t.period_id = p.id
+       JOIN subjects s ON t.subject_id = s.id
+       JOIN classes c ON t.class_id = c.id
+       LEFT JOIN rooms r ON t.room_id = r.id
+       WHERE t.teacher_id = ? AND t.is_active = TRUE
+       ORDER BY 
+        FIELD(t.day_of_week, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'),
+        p.period_number`,
+      [teacherId]
+    );
+
+    // Group by day
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const groupedTimetable = days.map(day => ({
+      day_name: day,
+      day: day,
+      periods: timetable
+        .filter(entry => entry.day_of_week.toLowerCase() === day.toLowerCase())
+        .map(entry => ({
+          period_number: entry.period_number,
+          start_time: entry.start_time,
+          end_time: entry.end_time,
+          subject_name: entry.subject_name,
+          subject_code: entry.subject_code,
+          class_name: `${entry.class_name}${entry.section ? '-' + entry.section : ''}`,
+          room_number: entry.room_number,
+          room: entry.room_number
+        }))
+    }));
+
+    return groupedTimetable;
+  }
 }
 
 export default new TeacherService();

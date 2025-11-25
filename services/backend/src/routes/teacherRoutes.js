@@ -239,4 +239,11 @@ router.get(
   requireRole(['admin', 'teacher']),
   teacherController.getTeacherClasses
 );
+
+// Get teacher timetable
+router.get(
+  '/:id/timetable',
+  requireRole(['admin', 'teacher']),
+  teacherController.getTeacherTimetable
+);
 export default router;

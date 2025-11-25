@@ -21,7 +21,12 @@ export function MyTimetablePage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getStudentTimetable(user?.id);
+      let response;
+      if (user?.role === 'teacher') {
+        response = await api.getTeacherTimetable(user?.id);
+      } else {
+        response = await api.getStudentTimetable(user?.id);
+      }
       console.log('My timetable:', response);
       setTimetable(Array.isArray(response.data) ? response.data : (response.data?.timetable || []));
     } catch (error: any) {

@@ -216,6 +216,16 @@ class TeacherController {
       new ApiResponse(200, classes, 'Teacher classes retrieved successfully')
     );
   });
+
+
+  getTeacherTimetable = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const timetable = await teacherService.getTeacherTimetable(id);
+    
+    res.status(200).json(
+      new ApiResponse(200, timetable, 'Teacher timetable retrieved successfully')
+    );
+  });
 }
 
 export default new TeacherController();

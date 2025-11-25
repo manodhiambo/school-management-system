@@ -516,7 +516,7 @@ class StudentService {
     const { class_id, section_id } = student[0];
 
     if (!class_id) {
-      return { timetable: [] };
+      return [];
     }
 
     // Get timetable for the class
@@ -524,20 +524,22 @@ class StudentService {
       `SELECT 
         t.id,
         t.day_of_week,
-        t.period_number,
-        t.start_time,
-        t.end_time,
+        p.period_number,
+        p.start_time,
+        p.end_time,
         s.name as subject_name,
         s.code as subject_code,
         CONCAT(te.first_name, ' ', te.last_name) as teacher_name,
-        t.room_number
+        r.room_number
        FROM timetable t
+       JOIN periods p ON t.period_id = p.id
        JOIN subjects s ON t.subject_id = s.id
        LEFT JOIN teachers te ON t.teacher_id = te.id
-       WHERE t.class_id = ?
+       LEFT JOIN rooms r ON t.room_id = r.id
+       WHERE t.class_id = ? AND t.is_active = TRUE
        ORDER BY 
-        FIELD(t.day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
-        t.period_number`,
+        FIELD(t.day_of_week, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'),
+        p.period_number`,
       [class_id]
     );
 
@@ -547,7 +549,7 @@ class StudentService {
       day_name: day,
       day: day,
       periods: timetable
-        .filter(entry => entry.day_of_week === day)
+        .filter(entry => entry.day_of_week.toLowerCase() === day.toLowerCase())
         .map(entry => ({
           period_number: entry.period_number,
           start_time: entry.start_time,

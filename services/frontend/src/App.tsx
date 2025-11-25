@@ -2,6 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { LoginPage } from './pages/auth/LoginPage';
+import { LandingPage } from './pages/LandingPage';
+
+// Admin & Teacher Pages
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { StudentsPage } from './pages/students/StudentsPage';
 import { TeachersPage } from './pages/teachers/TeachersPage';
@@ -13,9 +16,31 @@ import { TimetablePage } from './pages/timetable/TimetablePage';
 import { CommunicationPage } from './pages/communication/CommunicationPage';
 import { UsersPage } from './pages/users/UsersPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
+
+// Student Pages
+import { MyCoursesPage } from './pages/student/MyCoursesPage';
+import { MyAttendancePage } from './pages/student/MyAttendancePage';
+import { MyResultsPage } from './pages/student/MyResultsPage';
+import { MyFeesPage } from './pages/student/MyFeesPage';
+import { MyTimetablePage } from './pages/student/MyTimetablePage';
+import { AssignmentsPage } from './pages/student/AssignmentsPage';
+import { MessagesPage } from './pages/student/MessagesPage';
+import { NotificationsPage } from './pages/student/NotificationsPage';
+
+// Parent Pages
+import { MyChildrenPage } from './pages/parent/MyChildrenPage';
+import { ChildrenProgressPage } from './pages/parent/ChildrenProgressPage';
+import { FeePaymentsPage } from './pages/parent/FeePaymentsPage';
+
+// Teacher Pages
+import { MyClassesPage } from './pages/teacher/MyClassesPage';
+import { GradeBookPage } from './pages/teacher/GradeBookPage';
+
+// Shared Pages
+import { ProfilePage } from './pages/shared/ProfilePage';
+
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { LandingPage } from './pages/LandingPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,11 +58,8 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
-
-            {/* Public landing page */}
+            {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
-
-            {/* Login */}
             <Route path="/login" element={<LoginPage />} />
 
             {/* Protected dashboard area */}
@@ -51,6 +73,8 @@ function App() {
             >
               <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
+              
+              {/* Admin & Teacher Routes */}
               <Route path="students" element={<StudentsPage />} />
               <Route path="teachers" element={<TeachersPage />} />
               <Route path="parents" element={<ParentsPage />} />
@@ -61,9 +85,31 @@ function App() {
               <Route path="communication" element={<CommunicationPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              
+              {/* Student Routes */}
+              <Route path="my-courses" element={<MyCoursesPage />} />
+              <Route path="my-attendance" element={<MyAttendancePage />} />
+              <Route path="my-results" element={<MyResultsPage />} />
+              <Route path="my-fees" element={<MyFeesPage />} />
+              <Route path="my-timetable" element={<MyTimetablePage />} />
+              <Route path="assignments" element={<AssignmentsPage />} />
+              <Route path="messages" element={<MessagesPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              
+              {/* Parent Routes */}
+              <Route path="my-children" element={<MyChildrenPage />} />
+              <Route path="children-progress" element={<ChildrenProgressPage />} />
+              <Route path="fee-payments" element={<FeePaymentsPage />} />
+              
+              {/* Teacher Routes */}
+              <Route path="my-classes" element={<MyClassesPage />} />
+              <Route path="gradebook" element={<GradeBookPage />} />
+              
+              {/* Shared Routes */}
+              <Route path="profile" element={<ProfilePage />} />
+              
               <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
             </Route>
-
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard,
   Users,
@@ -15,27 +16,202 @@ import {
   Menu,
   X,
   Shield,
+  Award,
+  User,
+  FileText,
+  Bell,
+  TrendingUp,
 } from 'lucide-react';
 
-const navigation = [
-  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
-  { name: 'Students', href: '/app/students', icon: Users },
-  { name: 'Teachers', href: '/app/teachers', icon: GraduationCap },
-  { name: 'Parents', href: '/app/parents', icon: UserCheck },
-  { name: 'Academic', href: '/app/academic', icon: BookOpen },
-  { name: 'Attendance', href: '/app/attendance', icon: Calendar },
-  { name: 'Fee Management', href: '/app/fee', icon: DollarSign },
-  { name: 'Timetable', href: '/app/timetable', icon: Clock },
-  { name: 'Communication', href: '/app/communication', icon: MessageSquare },
-  { name: 'User Management', href: '/app/users', icon: Shield },
-  { name: 'Settings', href: '/app/settings', icon: Settings },
+// Define navigation items with role-based access
+const navigationItems = [
+  // Admin routes
+  { 
+    name: 'Dashboard', 
+    href: '/app/dashboard', 
+    icon: LayoutDashboard, 
+    roles: ['admin', 'teacher', 'student', 'parent'] 
+  },
+  { 
+    name: 'Students', 
+    href: '/app/students', 
+    icon: Users, 
+    roles: ['admin', 'teacher'] 
+  },
+  { 
+    name: 'Teachers', 
+    href: '/app/teachers', 
+    icon: GraduationCap, 
+    roles: ['admin'] 
+  },
+  { 
+    name: 'Parents', 
+    href: '/app/parents', 
+    icon: UserCheck, 
+    roles: ['admin', 'teacher'] 
+  },
+  { 
+    name: 'Academic', 
+    href: '/app/academic', 
+    icon: BookOpen, 
+    roles: ['admin', 'teacher'] 
+  },
+  { 
+    name: 'Attendance', 
+    href: '/app/attendance', 
+    icon: Calendar, 
+    roles: ['admin', 'teacher'] 
+  },
+  { 
+    name: 'Fee Management', 
+    href: '/app/fee', 
+    icon: DollarSign, 
+    roles: ['admin'] 
+  },
+  { 
+    name: 'Timetable', 
+    href: '/app/timetable', 
+    icon: Clock, 
+    roles: ['admin', 'teacher'] 
+  },
+  { 
+    name: 'Communication', 
+    href: '/app/communication', 
+    icon: MessageSquare, 
+    roles: ['admin', 'teacher'] 
+  },
+  { 
+    name: 'User Management', 
+    href: '/app/users', 
+    icon: Shield, 
+    roles: ['admin'] 
+  },
+  { 
+    name: 'Settings', 
+    href: '/app/settings', 
+    icon: Settings, 
+    roles: ['admin'] 
+  },
+  
+  // Student routes
+  { 
+    name: 'My Courses', 
+    href: '/app/my-courses', 
+    icon: BookOpen, 
+    roles: ['student'] 
+  },
+  { 
+    name: 'My Attendance', 
+    href: '/app/my-attendance', 
+    icon: Calendar, 
+    roles: ['student'] 
+  },
+  { 
+    name: 'My Results', 
+    href: '/app/my-results', 
+    icon: Award, 
+    roles: ['student'] 
+  },
+  { 
+    name: 'My Fees', 
+    href: '/app/my-fees', 
+    icon: DollarSign, 
+    roles: ['student', 'parent'] 
+  },
+  { 
+    name: 'My Timetable', 
+    href: '/app/my-timetable', 
+    icon: Clock, 
+    roles: ['student', 'teacher'] 
+  },
+  { 
+    name: 'Assignments', 
+    href: '/app/assignments', 
+    icon: FileText, 
+    roles: ['student', 'teacher'] 
+  },
+  { 
+    name: 'Messages', 
+    href: '/app/messages', 
+    icon: MessageSquare, 
+    roles: ['student', 'parent'] 
+  },
+  
+  // Parent routes
+  { 
+    name: 'My Children', 
+    href: '/app/my-children', 
+    icon: Users, 
+    roles: ['parent'] 
+  },
+  { 
+    name: 'Children Progress', 
+    href: '/app/children-progress', 
+    icon: TrendingUp, 
+    roles: ['parent'] 
+  },
+  { 
+    name: 'Fee Payments', 
+    href: '/app/fee-payments', 
+    icon: DollarSign, 
+    roles: ['parent'] 
+  },
+  { 
+    name: 'Notifications', 
+    href: '/app/notifications', 
+    icon: Bell, 
+    roles: ['parent', 'student'] 
+  },
+  
+  // Teacher routes
+  { 
+    name: 'My Classes', 
+    href: '/app/my-classes', 
+    icon: Users, 
+    roles: ['teacher'] 
+  },
+  { 
+    name: 'Grade Book', 
+    href: '/app/gradebook', 
+    icon: Award, 
+    roles: ['teacher'] 
+  },
+  
+  // Profile (all roles)
+  { 
+    name: 'My Profile', 
+    href: '/app/profile', 
+    icon: User, 
+    roles: ['admin', 'teacher', 'student', 'parent'] 
+  },
 ];
 
 export function Sidebar() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const userRole = user?.role || 'admin';
+
+  // Filter navigation based on user role
+  const filteredNavigation = navigationItems.filter(item =>
+    item.roles.includes(userRole)
+  );
 
   const toggleSidebar = () => setIsOpen(!isOpen);
+
+  const getRoleBadgeColor = (role: string) => {
+    switch(role) {
+      case 'admin': return 'bg-red-600';
+      case 'teacher': return 'bg-blue-600';
+      case 'student': return 'bg-green-600';
+      case 'parent': return 'bg-purple-600';
+      default: return 'bg-gray-600';
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
 
   return (
     <>
@@ -62,12 +238,40 @@ export function Sidebar() {
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
+        {/* Logo */}
         <div className="flex h-16 items-center justify-center border-b border-gray-800">
-          <h1 className="text-xl font-bold text-white">School Management</h1>
+          <GraduationCap className="h-8 w-8 mr-2 text-blue-500" />
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            EduManage
+          </h1>
         </div>
+
+        {/* User Info */}
+        <div className="p-4 border-b border-gray-800">
+          <div className="flex items-center space-x-3">
+            <div className={cn(
+              'h-10 w-10 rounded-full flex items-center justify-center',
+              getRoleBadgeColor(userRole)
+            )}>
+              <span className="text-sm font-semibold text-white">
+                {user?.email?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {user?.email?.split('@')[0] || 'User'}
+              </p>
+              <p className="text-xs text-gray-400">
+                {getRoleLabel(userRole)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
         <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = location.pathname.startsWith(item.href);
+          {filteredNavigation.map((item) => {
+            const isActive = location.pathname === item.href;
             return (
               <Link
                 key={item.name}
@@ -86,6 +290,13 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-800">
+          <p className="text-xs text-gray-400 text-center">
+            © {new Date().getFullYear()} EduManage Pro
+          </p>
+        </div>
       </div>
     </>
   );

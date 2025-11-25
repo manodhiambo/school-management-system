@@ -42,6 +42,10 @@ class ApiService {
     return this.api.get('/auth/me');
   }
 
+  updateProfile(data: any) {
+    return this.api.put('/auth/profile', data);
+  }
+
   forgotPassword(email: string) {
     return this.api.post('/auth/forgot-password', { email });
   }
@@ -106,6 +110,14 @@ class ApiService {
     return this.api.post(`/students/${id}/promote`, data);
   }
 
+  getStudentTimetable(id: string) {
+    return this.api.get(`/students/${id}/timetable`);
+  }
+
+  getStudentExamResults(studentId: string) {
+    return this.api.get(`/students/${studentId}/exam-results`);
+  }
+
   // ==================== TEACHERS ====================
   getTeachers(params?: any) {
     return this.api.get('/teachers', { params });
@@ -141,6 +153,10 @@ class ApiService {
 
   getTeacherLeaves(id: string) {
     return this.api.get(`/teachers/${id}/leave`);
+  }
+
+  getTeacherClasses(teacherId: string) {
+    return this.api.get(`/teachers/${teacherId}/classes`);
   }
 
   // ==================== PARENTS ====================
@@ -183,6 +199,10 @@ class ApiService {
 
   deleteClass(id: string) {
     return this.api.delete(`/classes/${id}`);
+  }
+
+  getClassStudents(classId: string) {
+    return this.api.get(`/classes/${classId}/students`);
   }
 
   getSubjects(params?: any) {
@@ -252,6 +272,10 @@ class ApiService {
     return this.api.post('/fee/payment/online', data);
   }
 
+  initiateMpesaPayment(invoiceId: string, amount: number) {
+    return this.api.post('/fee/payment/mpesa', { invoiceId, amount });
+  }
+
   getFeeReceipt(paymentId: string) {
     return this.api.get(`/fee/receipt/${paymentId}`);
   }
@@ -289,10 +313,6 @@ class ApiService {
     return this.api.post(`/exams/${examId}/results`, file, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-  }
-
-  getStudentExamResults(studentId: string) {
-    return this.api.get(`/students/${studentId}/exam-results`);
   }
 
   // ==================== TIMETABLE ====================

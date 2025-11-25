@@ -22,7 +22,7 @@ class ParentService {
       phonePrimary,
       phoneSecondary,
       emailSecondary,
-      aadharNumber
+      idNumber
     } = parentData;
 
     // Check if email already exists
@@ -52,7 +52,7 @@ class ParentService {
         id, user_id, first_name, last_name, relationship,
         occupation, annual_income, education,
         address, city, state, pincode,
-        phone_primary, phone_secondary, email_secondary, aadhar_number
+        phone_primary, phone_secondary, email_secondary, id_number
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         parentId,
@@ -70,9 +70,24 @@ class ParentService {
         phonePrimary,
         phoneSecondary || null,
         emailSecondary || null,
-        aadharNumber || null
+        idNumber || null
       ]
     );
+
+    // Link parent to students if studentIds provided
+    if (parentData.studentIds && Array.isArray(parentData.studentIds) && parentData.studentIds.length > 0) {
+      for (const studentId of parentData.studentIds) {
+        const linkId = uuidv4();
+        await query(
+          `INSERT INTO parent_students (id, parent_id, student_id, is_primary_contact, receive_notifications)
+           VALUES (?, ?, ?, TRUE, TRUE)`,
+          [linkId, parentId, studentId]
+        );
+      }
+      logger.info(`Parent ${parentId} linked to ${parentData.studentIds.length} student(s)`);
+    }
+
+    logger.info(`Parent created: ${email}`);
 
     logger.info(`Parent created: ${email}`);
 

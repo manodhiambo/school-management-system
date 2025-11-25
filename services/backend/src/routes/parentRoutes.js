@@ -28,7 +28,8 @@ const createParentSchema = Joi.object({
     phonePrimary: schemas.phone,
     phoneSecondary: Joi.string().pattern(/^[0-9]{10}$/).optional(),
     emailSecondary: Joi.string().email().optional(),
-    aadharNumber: Joi.string().pattern(/^[0-9]{12}$/).optional()
+    idNumber: Joi.string().pattern(/^[0-9]{7,8}$/).optional(),
+    studentIds: Joi.array().items(Joi.string().uuid()).optional(),
   })
 });
 
@@ -50,7 +51,8 @@ const updateParentSchema = Joi.object({
     phonePrimary: Joi.string().pattern(/^[0-9]{10}$/).optional(),
     phoneSecondary: Joi.string().pattern(/^[0-9]{10}$/).optional(),
     emailSecondary: Joi.string().email().optional(),
-    aadharNumber: Joi.string().pattern(/^[0-9]{12}$/).optional(),
+    idNumber: Joi.string().pattern(/^[0-9]{7,8}$/).optional(),
+    studentIds: Joi.array().items(Joi.string().uuid()).optional(),
     profilePhotoUrl: Joi.string().uri().optional()
   })
 });

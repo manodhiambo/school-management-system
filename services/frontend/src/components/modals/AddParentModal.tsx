@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ interface AddParentModalProps {
 
 export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModalProps) {
   const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     email: '',
     password: 'parent123',
@@ -32,10 +33,24 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
     address: '',
     city: '',
     state: '',
+
     pincode: '',
+    studentIds: [],
   });
 
-  const handleChange = (field: string, value: string) => {
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const response = await api.getStudents();
+        setStudents(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Error fetching students:", error);
+      }
+    };
+    if (open) fetchStudents();
+  }, [open]);
+
+  const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -88,6 +103,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
         city: '',
         state: '',
         pincode: '',
+    studentIds: [],
       });
     } catch (error: any) {
       console.error('Create parent error:', error);
@@ -298,6 +314,39 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                     value={formData.pincode}
                     onChange={(e) => handleChange('pincode', e.target.value)}
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Student Association */}
+            <div className="border-b pb-4">
+              <h3 className="font-semibold mb-3">Associate with Students</h3>
+              <div className="space-y-2">
+                <Label>Select Students (Children) *</Label>
+                <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
+                  {students.map((student: any) => (
+                    <div key={student.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`student-${student.id}`}
+                        checked={formData.studentIds.includes(student.id)}
+                        onChange={(e) => {
+                          const newStudentIds = e.target.checked
+                            ? [...formData.studentIds, student.id]
+                            : formData.studentIds.filter(id => id !== student.id);
+                          handleChange('studentIds', newStudentIds);
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <label htmlFor={`student-${student.id}`} className="text-sm cursor-pointer">
+                        {student.first_name} {student.last_name} - {student.admission_number}
+                        {student.class_name && ` (${student.class_name})`}
+                      </label>
+                    </div>
+                  ))}
+                  {students.length === 0 && (
+                    <p className="text-sm text-gray-500">No students available. Add students first.</p>
+                  )}
                 </div>
               </div>
             </div>

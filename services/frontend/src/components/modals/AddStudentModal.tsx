@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import { X } from 'lucide-react';
 import api from '@/services/api';
+import { useToast } from '@/components/ui/use-toast';
 
 interface AddStudentModalProps {
   open: boolean;
@@ -13,8 +13,10 @@ interface AddStudentModalProps {
   onSuccess: () => void;
 }
 
-export function AddStudentModal({ open, onOpenChange, onSuccess }: AddStudentModalProps) {
+export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddStudentModalProps) {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [classes, setClasses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     email: '',
     password: 'student123',
@@ -23,11 +25,24 @@ export function AddStudentModal({ open, onOpenChange, onSuccess }: AddStudentMod
     dateOfBirth: '',
     gender: 'male',
     bloodGroup: '',
+    classId: '',
     address: '',
     city: '',
     state: '',
     pincode: '',
   });
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const response = await api.getClasses();
+        setClasses(response.data || []);
+      } catch (error) {
+        console.error('Error fetching classes:', error);
+      }
+    };
+    if (open) fetchClasses();
+  }, [open]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -35,14 +50,15 @@ export function AddStudentModal({ open, onOpenChange, onSuccess }: AddStudentMod
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
     try {
+      setLoading(true);
       await api.createStudent(formData);
-      alert('Student added successfully!');
+      toast({
+        title: 'Success',
+        description: 'Student added successfully',
+      });
       onSuccess();
       onOpenChange(false);
-      // Reset form
       setFormData({
         email: '',
         password: 'student123',
@@ -51,14 +67,18 @@ export function AddStudentModal({ open, onOpenChange, onSuccess }: AddStudentMod
         dateOfBirth: '',
         gender: 'male',
         bloodGroup: '',
+        classId: '',
         address: '',
         city: '',
         state: '',
         pincode: '',
       });
     } catch (error: any) {
-      console.error('Create student error:', error);
-      alert(error.message || 'Failed to add student');
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to add student',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -102,45 +122,52 @@ export function AddStudentModal({ open, onOpenChange, onSuccess }: AddStudentMod
                   />
                 </div>
                 <div>
-                  <Label htmlFor="dateOfBirth">Date of Birth *</Label>
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
                   <Input
                     id="dateOfBirth"
                     type="date"
                     value={formData.dateOfBirth}
                     onChange={(e) => handleChange('dateOfBirth', e.target.value)}
-                    required
                   />
                 </div>
                 <div>
                   <Label htmlFor="gender">Gender *</Label>
-                  <Select
+                  <select
                     id="gender"
                     value={formData.gender}
                     onChange={(e) => handleChange('gender', e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     required
                   >
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                     <option value="other">Other</option>
-                  </Select>
+                  </select>
                 </div>
                 <div>
                   <Label htmlFor="bloodGroup">Blood Group</Label>
-                  <Select
+                  <Input
                     id="bloodGroup"
                     value={formData.bloodGroup}
                     onChange={(e) => handleChange('bloodGroup', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="classId">Class/Grade *</Label>
+                  <select
+                    id="classId"
+                    value={formData.classId}
+                    onChange={(e) => handleChange('classId', e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    required
                   >
-                    <option value="">Select Blood Group</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                  </Select>
+                    <option value="">Select Class</option>
+                    {classes.map((cls: any) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name} {cls.section ? `- ${cls.section}` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -206,14 +233,19 @@ export function AddStudentModal({ open, onOpenChange, onSuccess }: AddStudentMod
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
               {loading ? 'Adding...' : 'Add Student'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

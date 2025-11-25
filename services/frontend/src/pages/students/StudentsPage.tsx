@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, Download, Upload, Eye } from 'lucide-react';
-import { AddStudentModal } from '@/components/modals/AddStudentModal';
+import AddStudentModal from '@/components/modals/AddStudentModal';
 import { EditStudentModal } from '@/components/modals/EditStudentModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { BulkImportModal } from '@/components/modals/BulkImportModal';

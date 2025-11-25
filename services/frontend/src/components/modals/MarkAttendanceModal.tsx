@@ -85,13 +85,13 @@ export function MarkAttendanceModal({ open, onOpenChange, onSuccess }: MarkAtten
     setLoading(true);
     try {
       const attendanceRecords = Object.entries(attendance).map(([studentId, status]) => ({
-        student_id: studentId,
-        class_id: selectedClass,
+        studentId: studentId,
+        
         date: date,
         status: status,
       }));
 
-      await api.markAttendance({ attendance: attendanceRecords });
+      await api.markAttendance({ attendanceList: attendanceRecords });
       alert('Attendance marked successfully!');
       onSuccess();
       onOpenChange(false);

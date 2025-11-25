@@ -28,7 +28,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
     occupation: '',
     annualIncome: '',
     education: '',
-    aadharNumber: '',
+    idNumber: '',
     address: '',
     city: '',
     state: '',
@@ -60,7 +60,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
       if (formData.occupation) submitData.occupation = formData.occupation;
       if (formData.annualIncome) submitData.annualIncome = Number(formData.annualIncome);
       if (formData.education) submitData.education = formData.education;
-      if (formData.aadharNumber) submitData.aadharNumber = formData.aadharNumber;
+      if (formData.idNumber) submitData.idNumber = formData.idNumber;
       if (formData.address) submitData.address = formData.address;
       if (formData.city) submitData.city = formData.city;
       if (formData.state) submitData.state = formData.state;
@@ -83,7 +83,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
         occupation: '',
         annualIncome: '',
         education: '',
-        aadharNumber: '',
+        idNumber: '',
         address: '',
         city: '',
         state: '',
@@ -165,11 +165,11 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                   />
                 </div>
                 <div>
-                  <Label htmlFor="aadharNumber">ID Number (8 digits)</Label>
+                  <Label htmlFor="idNumber">ID Number (8 digits)</Label>
                   <Input
-                    id="aadharNumber"
-                    value={formData.aadharNumber}
-                    onChange={(e) => handleChange('aadharNumber', e.target.value)}
+                    id="idNumber"
+                    value={formData.idNumber}
+                    onChange={(e) => handleChange('idNumber', e.target.value)}
                     pattern="[0-9]{8}"
                     placeholder="12345678"
                   />

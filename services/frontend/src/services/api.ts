@@ -223,7 +223,7 @@ class ApiService {
 
   // ==================== ATTENDANCE ====================
   markAttendance(data: any) {
-    return this.api.post('/attendance/mark', data);
+    return this.api.post('/attendance/mark/bulk', data);
   }
 
   getAttendance(params?: any) {

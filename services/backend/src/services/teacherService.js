@@ -336,6 +336,33 @@ class TeacherService {
     const teachers = await query(sql, params);
     return teachers;
   }
+
+
+  async getTeacherClasses(teacherId) {
+    // Get classes where teacher is assigned
+    const classes = await query(
+      `SELECT DISTINCT
+        c.id,
+        c.name as class_name,
+        c.section,
+        c.academic_year,
+        COUNT(DISTINCT s.id) as current_strength,
+        COUNT(DISTINCT cs.subject_id) as total_subjects,
+        ROUND(AVG(CASE WHEN a.status = 'present' THEN 100 ELSE 0 END), 2) as attendance_percentage,
+        ROUND(AVG(er.marks_obtained * 100.0 / e.max_marks), 2) as average_grade
+       FROM classes c
+       LEFT JOIN class_subjects cs ON c.id = cs.class_id
+       LEFT JOIN students s ON c.id = s.class_id AND s.status = 'active'
+       LEFT JOIN attendance a ON s.id = a.student_id
+       LEFT JOIN exam_results er ON s.id = er.student_id
+       LEFT JOIN exams e ON er.exam_id = e.id
+       WHERE cs.teacher_id = ?
+       GROUP BY c.id, c.name, c.section, c.academic_year`,
+      [teacherId]
+    );
+    
+    return classes;
+  }
 }
 
 export default new TeacherService();

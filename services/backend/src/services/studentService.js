@@ -147,7 +147,7 @@ class StudentService {
         u.email,
         u.is_active,
         c.name as class_name,
-        c.section as section_name
+        c.section as section_name,
         CONCAT(p.first_name, ' ', p.last_name) as parent_name
       FROM students s
       JOIN users u ON s.user_id = u.id

@@ -206,6 +206,16 @@ class TeacherController {
       new ApiResponse(200, result, 'Teacher deleted successfully')
     );
   });
+
+
+  getTeacherClasses = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const classes = await teacherService.getTeacherClasses(id);
+    
+    res.status(200).json(
+      new ApiResponse(200, classes, 'Teacher classes retrieved successfully')
+    );
+  });
 }
 
 export default new TeacherController();

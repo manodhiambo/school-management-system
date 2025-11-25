@@ -232,4 +232,11 @@ router.delete(
   teacherController.deleteTeacher
 );
 
+
+// Get teacher classes
+router.get(
+  '/:id/classes',
+  requireRole(['admin', 'teacher']),
+  teacherController.getTeacherClasses
+);
 export default router;

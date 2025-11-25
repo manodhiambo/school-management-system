@@ -21,7 +21,7 @@ export function ChildrenProgressPage() {
 
   useEffect(() => {
     if (selectedChild) {
-      loadChildProgress(selectedChild.id);
+      loadChildProgress(selectedChild.student_id || selectedChild.id);
     }
   }, [selectedChild]);
 
@@ -29,8 +29,10 @@ export function ChildrenProgressPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getParent(user?.id);
-      const childrenData = response.children || response.data?.children || [];
+      // Use getParentByUserId instead of getParent
+      const response: any = await api.getParentByUserId(user?.id);
+      const parentData = response.data || response;
+      const childrenData = parentData.children || [];
       setChildren(childrenData);
       if (childrenData.length > 0) {
         setSelectedChild(childrenData[0]);
@@ -46,14 +48,14 @@ export function ChildrenProgressPage() {
   const loadChildProgress = async (childId: string) => {
     try {
       // Load attendance
-      const attendanceResponse = await api.getStudentAttendance(childId);
-      
+      const attendanceResponse: any = await api.getStudentAttendance(childId);
+
       // Load results
-      const resultsResponse = await api.getStudentExamResults(childId);
-      
+      const resultsResponse: any = await api.getStudentExamResults(childId);
+
       setProgress({
-        attendance: attendanceResponse,
-        results: resultsResponse.results || resultsResponse.data || []
+        attendance: attendanceResponse.data || attendanceResponse,
+        results: resultsResponse.data?.results || resultsResponse.results || resultsResponse.data || []
       });
     } catch (error: any) {
       console.error('Error loading child progress:', error);
@@ -107,8 +109,8 @@ export function ChildrenProgressPage() {
       <div className="flex gap-2 flex-wrap">
         {children.map((child) => (
           <Button
-            key={child.id}
-            variant={selectedChild?.id === child.id ? "default" : "outline"}
+            key={child.student_id || child.id}
+            variant={(selectedChild?.student_id || selectedChild?.id) === (child.student_id || child.id) ? "default" : "outline"}
             onClick={() => setSelectedChild(child)}
           >
             {child.first_name} {child.last_name}
@@ -122,23 +124,23 @@ export function ChildrenProgressPage() {
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Class Rank</CardTitle>
+                <CardTitle className="text-sm font-medium">Class</CardTitle>
                 <Award className="h-4 w-4 text-yellow-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{selectedChild.class_rank || 'N/A'}</div>
-                <p className="text-xs text-gray-500">Out of {selectedChild.total_students || 0}</p>
+                <div className="text-2xl font-bold">{selectedChild.class_name || 'N/A'}</div>
+                <p className="text-xs text-gray-500">{selectedChild.section_name || ''}</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Grade</CardTitle>
+                <CardTitle className="text-sm font-medium">Admission No</CardTitle>
                 <TrendingUp className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{selectedChild.average_grade || 'N/A'}</div>
-                <p className="text-xs text-gray-500">Overall performance</p>
+                <div className="text-2xl font-bold">{selectedChild.admission_number || 'N/A'}</div>
+                <p className="text-xs text-gray-500">Student ID</p>
               </CardContent>
             </Card>
 
@@ -148,19 +150,23 @@ export function ChildrenProgressPage() {
                 <Calendar className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{selectedChild.attendance_percentage || 0}%</div>
-                <p className="text-xs text-gray-500">This term</p>
+                <div className="text-2xl font-bold">
+                  {progress?.attendance?.summary?.present || progress?.attendance?.present || 0}
+                </div>
+                <p className="text-xs text-gray-500">Days Present</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Subjects</CardTitle>
+                <CardTitle className="text-sm font-medium">Status</CardTitle>
                 <BookOpen className="h-4 w-4 text-purple-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{selectedChild.total_subjects || 0}</div>
-                <p className="text-xs text-gray-500">Enrolled</p>
+                <div className={`text-2xl font-bold ${selectedChild.status === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
+                  {selectedChild.status || 'N/A'}
+                </div>
+                <p className="text-xs text-gray-500">Enrollment Status</p>
               </CardContent>
             </Card>
           </div>
@@ -176,19 +182,14 @@ export function ChildrenProgressPage() {
                   {progress.results.map((result: any, index: number) => (
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold">{result.exam_name}</h4>
+                        <h4 className="font-semibold">{result.exam_name || result.subject_name || 'Exam'}</h4>
                         <div className="text-right">
-                          <p className="text-xl font-bold text-primary">{result.percentage}%</p>
-                          <p className="text-sm text-gray-500">Grade: {result.grade}</p>
+                          <p className="text-xl font-bold text-primary">
+                            {result.marks_obtained || result.percentage || 0}
+                            {result.total_marks ? `/${result.total_marks}` : '%'}
+                          </p>
+                          <p className="text-sm text-gray-500">Grade: {result.grade || 'N/A'}</p>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {result.subjects?.map((subject: any, sIndex: number) => (
-                          <div key={sIndex} className="p-2 bg-gray-50 rounded text-sm">
-                            <p className="font-medium">{subject.subject_name}</p>
-                            <p className="text-gray-600">{subject.marks_obtained}/{subject.total_marks}</p>
-                          </div>
-                        ))}
                       </div>
                     </div>
                   ))}
@@ -208,19 +209,19 @@ export function ChildrenProgressPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <p className="text-2xl font-bold text-green-600">
-                    {progress?.attendance?.present || 0}
+                    {progress?.attendance?.summary?.present || progress?.attendance?.present || 0}
                   </p>
                   <p className="text-sm text-gray-600">Present</p>
                 </div>
                 <div className="text-center p-4 bg-red-50 rounded-lg">
                   <p className="text-2xl font-bold text-red-600">
-                    {progress?.attendance?.absent || 0}
+                    {progress?.attendance?.summary?.absent || progress?.attendance?.absent || 0}
                   </p>
                   <p className="text-sm text-gray-600">Absent</p>
                 </div>
                 <div className="text-center p-4 bg-yellow-50 rounded-lg">
                   <p className="text-2xl font-bold text-yellow-600">
-                    {progress?.attendance?.late || 0}
+                    {progress?.attendance?.summary?.late || progress?.attendance?.late || 0}
                   </p>
                   <p className="text-sm text-gray-600">Late</p>
                 </div>

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, BookOpen, Calendar, DollarSign, TrendingUp } from 'lucide-react';
+import { Users, BookOpen, Calendar, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
@@ -21,9 +21,11 @@ export function MyChildrenPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getParent(user?.id);
-      console.log('My children:', response);
-      setChildren(response.children || response.data?.children || []);
+      // Use getParentByUserId instead of getParent
+      const response: any = await api.getParentByUserId(user?.id);
+      console.log('Parent data:', response);
+      const parentData = response.data || response;
+      setChildren(parentData.children || []);
     } catch (error: any) {
       console.error('Error loading children:', error);
       setError(error?.message || 'Failed to load children information');
@@ -60,19 +62,19 @@ export function MyChildrenPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold">My Children</h2>
-        <p className="text-gray-500">View your children's information and progress</p>
+        <p className="text-gray-500">View your children's information</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {children.length === 0 ? (
-          <Card className="md:col-span-2">
+          <Card className="md:col-span-2 lg:col-span-3">
             <CardContent className="pt-6">
-              <p className="text-center text-gray-500">No children linked to your account</p>
+              <p className="text-center text-gray-500">No children records found</p>
             </CardContent>
           </Card>
         ) : (
           children.map((child) => (
-            <Card key={child.id} className="hover:shadow-lg transition-shadow">
+            <Card key={child.id || child.student_id}>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="h-5 w-5 text-primary" />
@@ -80,50 +82,28 @@ export function MyChildrenPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <BookOpen className="h-4 w-4 text-blue-600" />
-                        <span className="text-xs text-gray-600">Class</span>
-                      </div>
-                      <p className="font-semibold text-blue-900">{child.class_name || 'N/A'}</p>
-                    </div>
-                    
-                    <div className="p-3 bg-green-50 rounded-lg">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Calendar className="h-4 w-4 text-green-600" />
-                        <span className="text-xs text-gray-600">Attendance</span>
-                      </div>
-                      <p className="font-semibold text-green-900">{child.attendance_percentage || 0}%</p>
-                    </div>
-                    
-                    <div className="p-3 bg-purple-50 rounded-lg">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <TrendingUp className="h-4 w-4 text-purple-600" />
-                        <span className="text-xs text-gray-600">Average Grade</span>
-                      </div>
-                      <p className="font-semibold text-purple-900">{child.average_grade || 'N/A'}</p>
-                    </div>
-                    
-                    <div className="p-3 bg-orange-50 rounded-lg">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <DollarSign className="h-4 w-4 text-orange-600" />
-                        <span className="text-xs text-gray-600">Pending Fees</span>
-                      </div>
-                      <p className="font-semibold text-orange-900">
-                        KES {parseFloat(child.pending_fees || '0').toLocaleString()}
-                      </p>
-                    </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center text-gray-600">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Class
+                    </span>
+                    <span className="font-medium">{child.class_name || 'N/A'}</span>
                   </div>
-                  
-                  <div className="pt-2 space-y-2">
-                    <Button variant="outline" className="w-full" size="sm">
-                      View Full Report
-                    </Button>
-                    <Button className="w-full" size="sm">
-                      Contact Class Teacher
-                    </Button>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center text-gray-600">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Admission No
+                    </span>
+                    <span className="font-medium">{child.admission_number || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center text-gray-600">
+                      Status
+                    </span>
+                    <span className={`font-medium ${child.status === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
+                      {child.status || 'N/A'}
+                    </span>
                   </div>
                 </div>
               </CardContent>

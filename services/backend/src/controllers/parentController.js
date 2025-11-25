@@ -43,6 +43,16 @@ class ParentController {
     );
   });
 
+  // NEW: Get parent by user_id
+  getParentByUserId = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const parent = await parentService.getParentByUserId(userId);
+
+    res.status(200).json(
+      new ApiResponse(200, parent, 'Parent retrieved successfully')
+    );
+  });
+
   updateParent = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;

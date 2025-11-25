@@ -101,6 +101,12 @@ router.get(
   parentController.getStatistics
 );
 
+// NEW: Get parent profile by user_id (for logged-in parent)
+router.get(
+  '/by-user/:userId',
+  parentController.getParentByUserId
+);
+
 router.get(
   '/:id',
   parentController.getParentById

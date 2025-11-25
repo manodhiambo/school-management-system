@@ -1,35 +1,42 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 class ApiService {
   private api: AxiosInstance;
 
   constructor() {
     this.api = axios.create({
-      baseURL: API_BASE_URL,
-      headers: { 'Content-Type': 'application/json' },
+      baseURL: API_URL,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
+    // Add request interceptor to include auth token
     this.api.interceptors.request.use((config) => {
       const token = localStorage.getItem('accessToken');
-      if (token) config.headers.Authorization = `Bearer ${token}`;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
       return config;
     });
 
+    // Add response interceptor to handle errors
     this.api.interceptors.response.use(
       (response) => response.data,
       (error) => {
         if (error.response?.status === 401) {
           localStorage.removeItem('accessToken');
+          localStorage.removeItem('user');
           window.location.href = '/login';
         }
-        return Promise.reject(error.response?.data || error.message);
+        throw error.response?.data || error;
       }
     );
   }
 
-  // ==================== AUTH ====================
+  // Auth
   login(email: string, password: string) {
     return this.api.post('/auth/login', { email, password });
   }
@@ -38,32 +45,16 @@ class ApiService {
     return this.api.post('/auth/logout');
   }
 
-  getCurrentUser() {
+  getMe() {
     return this.api.get('/auth/me');
   }
 
-  updateProfile(data: any) {
-    return this.api.put('/auth/profile', data);
-  }
-
-  forgotPassword(email: string) {
-    return this.api.post('/auth/forgot-password', { email });
-  }
-
-  resetPassword(token: string, password: string) {
-    return this.api.post(`/auth/reset-password/${token}`, { password });
-  }
-
-  changePassword(oldPassword: string, newPassword: string) {
-    return this.api.post('/auth/change-password', { oldPassword, newPassword });
-  }
-
-  // ==================== DASHBOARD ====================
+  // Dashboard
   getDashboardStats() {
     return this.api.get('/admin/dashboard');
   }
 
-  // ==================== STUDENTS ====================
+  // Students
   getStudents(params?: any) {
     return this.api.get('/students', { params });
   }
@@ -84,41 +75,19 @@ class ApiService {
     return this.api.delete(`/students/${id}`);
   }
 
-  updateStudentStatus(id: string, status: string) {
-    return this.api.patch(`/students/${id}/status`, { status });
-  }
-
-  bulkImportStudents(file: FormData) {
-    return this.api.post('/students/bulk-import', file, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  }
-
-  getStudentAttendance(id: string) {
-    return this.api.get(`/students/${id}/attendance`);
-  }
-
-  getStudentAcademicReport(id: string) {
-    return this.api.get(`/students/${id}/academic-report`);
-  }
-
-  getStudentFinance(id: string) {
-    return this.api.get(`/students/${id}/finance`);
-  }
-
-  promoteStudent(id: string, data: any) {
-    return this.api.post(`/students/${id}/promote`, data);
-  }
-
-  getStudentTimetable(id: string) {
-    return this.api.get(`/students/${id}/timetable`);
+  getStudentAttendance(studentId: string, params?: any) {
+    return this.api.get(`/attendance/student/${studentId}`, { params });
   }
 
   getStudentExamResults(studentId: string) {
-    return this.api.get(`/students/${studentId}/exam-results`);
+    return this.api.get(`/academic/results/student/${studentId}`);
   }
 
-  // ==================== TEACHERS ====================
+  getStudentFeeAccount(studentId: string) {
+    return this.api.get(`/fee/student/${studentId}`);
+  }
+
+  // Teachers
   getTeachers(params?: any) {
     return this.api.get('/teachers', { params });
   }
@@ -139,33 +108,19 @@ class ApiService {
     return this.api.delete(`/teachers/${id}`);
   }
 
-  assignTeacherToClass(id: string, classId: string, sectionId: string) {
-    return this.api.patch(`/teachers/${id}/assign-class`, { classId, sectionId });
-  }
-
-  getTeacherSchedule(id: string) {
-    return this.api.get(`/teachers/${id}/schedule`);
-  }
-
-  applyTeacherLeave(id: string, data: any) {
-    return this.api.post(`/teachers/${id}/leave`, data);
-  }
-
-  getTeacherLeaves(id: string) {
-    return this.api.get(`/teachers/${id}/leave`);
-  }
-
-  getTeacherClasses(teacherId: string) {
-    return this.api.get(`/teachers/${teacherId}/classes`);
-  }
-
-  // ==================== PARENTS ====================
+  // Parents
   getParents(params?: any) {
     return this.api.get('/parents', { params });
   }
 
+  // Get parent by parent.id
   getParent(id: string) {
     return this.api.get(`/parents/${id}`);
+  }
+
+  // NEW: Get parent by user_id (use this when logged in as parent)
+  getParentByUserId(userId: string) {
+    return this.api.get(`/parents/by-user/${userId}`);
   }
 
   createParent(data: any) {
@@ -176,11 +131,11 @@ class ApiService {
     return this.api.put(`/parents/${id}`, data);
   }
 
-  linkParentToStudent(parentId: string, studentId: string) {
+  linkStudentToParent(parentId: string, studentId: string) {
     return this.api.post(`/parents/${parentId}/link-student`, { studentId });
   }
 
-  // ==================== CLASSES & SUBJECTS ====================
+  // Classes
   getClasses(params?: any) {
     return this.api.get('/classes', { params });
   }
@@ -201,12 +156,13 @@ class ApiService {
     return this.api.delete(`/classes/${id}`);
   }
 
-  getClassStudents(classId: string) {
-    return this.api.get(`/classes/${classId}/students`);
-  }
-
+  // Subjects
   getSubjects(params?: any) {
     return this.api.get('/subjects', { params });
+  }
+
+  getSubject(id: string) {
+    return this.api.get(`/subjects/${id}`);
   }
 
   createSubject(data: any) {
@@ -221,78 +177,45 @@ class ApiService {
     return this.api.delete(`/subjects/${id}`);
   }
 
-  // ==================== ATTENDANCE ====================
-  markAttendance(data: any) {
-    return this.api.post('/attendance/mark/bulk', data);
-  }
-
+  // Attendance
   getAttendance(params?: any) {
     return this.api.get('/attendance', { params });
   }
 
-  getClassAttendance(classId: string, date: string) {
-    return this.api.get(`/attendance/class/${classId}/date/${date}`);
+  markAttendance(data: any) {
+    return this.api.post('/attendance', data);
   }
 
-  getAttendanceStatistics(studentId?: string) {
-    const url = studentId ? `/attendance/statistics/${studentId}` : '/attendance/statistics';
-    return this.api.get(url);
+  markBulkAttendance(data: any) {
+    return this.api.post('/attendance/bulk', data);
   }
 
-  getAttendanceReport(params?: any) {
-    return this.api.get('/attendance/report', { params });
+  getAttendanceByClass(classId: string, date: string) {
+    return this.api.get(`/attendance/class/${classId}`, { params: { date } });
   }
 
-  // ==================== FEES ====================
+  // Fee Management
   getFeeStructures(params?: any) {
-    return this.api.get('/fee/structure', { params });
+    return this.api.get('/fee/structures', { params });
   }
 
   createFeeStructure(data: any) {
-    return this.api.post('/fee/structure', data);
+    return this.api.post('/fee/structures', data);
   }
 
-  updateFeeStructure(id: string, data: any) {
-    return this.api.put(`/fee/structure/${id}`, data);
+  getFeeInvoices(params?: any) {
+    return this.api.get('/fee/invoices', { params });
   }
 
-  getStudentFeeAccount(studentId: string) {
-    return this.api.get(`/fee/student/${studentId}`);
+  createFeeInvoice(data: any) {
+    return this.api.post('/fee/invoices', data);
   }
 
-  recordPayment(data: any) {
-    return this.api.post('/fee/payment', data);
+  recordFeePayment(data: any) {
+    return this.api.post('/fee/payments', data);
   }
 
-  generateInvoices(data: any) {
-    return this.api.post('/fee/invoices/generate', data);
-  }
-
-  initiateOnlinePayment(data: any) {
-    return this.api.post('/fee/payment/online', data);
-  }
-
-  initiateMpesaPayment(invoiceId: string, amount: number) {
-    return this.api.post('/fee/payment/mpesa', { invoiceId, amount });
-  }
-
-  getFeeReceipt(paymentId: string) {
-    return this.api.get(`/fee/receipt/${paymentId}`);
-  }
-
-  getFeeDefaulters() {
-    return this.api.get('/fee/defaulters');
-  }
-
-  sendFeeReminders(data: any) {
-    return this.api.post('/fee/reminders', data);
-  }
-
-  getFeeStatistics() {
-    return this.api.get('/fee/statistics');
-  }
-
-  // ==================== EXAMS ====================
+  // Exams
   getExams(params?: any) {
     return this.api.get('/exams', { params });
   }
@@ -301,137 +224,55 @@ class ApiService {
     return this.api.post('/exams', data);
   }
 
-  getExam(id: string) {
-    return this.api.get(`/exams/${id}`);
+  // Academic
+  getResults(params?: any) {
+    return this.api.get('/academic/results', { params });
   }
 
-  updateExam(id: string, data: any) {
-    return this.api.put(`/exams/${id}`, data);
+  submitResults(data: any) {
+    return this.api.post('/academic/results', data);
   }
 
-  uploadExamResults(examId: string, file: FormData) {
-    return this.api.post(`/exams/${examId}/results`, file, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  }
-
-  // ==================== TIMETABLE ====================
-  getTimetable(classId: string) {
-    return this.api.get(`/timetable/class/${classId}`);
-  }
-
-  createPeriod(data: any) {
-    return this.api.post('/timetable/periods', data);
+  // Timetable
+  getTimetable(params?: any) {
+    return this.api.get('/timetable', { params });
   }
 
   createTimetableEntry(data: any) {
     return this.api.post('/timetable', data);
   }
 
-  updateTimetableEntry(id: string, data: any) {
-    return this.api.put(`/timetable/${id}`, data);
+  // Communication
+  getAnnouncements(params?: any) {
+    return this.api.get('/communication/announcements', { params });
   }
 
-  deleteTimetableEntry(id: string) {
-    return this.api.delete(`/timetable/${id}`);
-  }
-
-  generateTimetable(data: any) {
-    return this.api.post('/timetable/generate', data);
-  }
-
-  getClassTimetable(classId: string) {
-    return this.api.get(`/timetable/class/${classId}`);
-  }
-
-  getTeacherTimetable(teacherId: string) {
-    return this.api.get(`/teachers/${teacherId}/timetable`);
-  }
-
-  assignSubstitute(data: any) {
-    return this.api.post('/timetable/substitute', data);
-  }
-
-  getTimetableConflicts() {
-    return this.api.get('/timetable/conflicts');
-  }
-
-  // ==================== COMMUNICATION ====================
-  sendMessage(data: any) {
-    return this.api.post('/messages', data);
+  createAnnouncement(data: any) {
+    return this.api.post('/communication/announcements', data);
   }
 
   getMessages(params?: any) {
-    return this.api.get('/messages', { params });
+    return this.api.get('/communication/messages', { params });
   }
 
-  getSentMessages() {
-    return this.api.get('/messages/sent');
+  sendMessage(data: any) {
+    return this.api.post('/communication/messages', data);
   }
 
-  markMessageAsRead(id: string) {
-    return this.api.post(`/messages/${id}/read`);
-  }
-
-  broadcastMessage(data: any) {
-    return this.api.post('/messages/broadcast', data);
-  }
-
-  schedulePTM(data: any) {
-    return this.api.post('/messages/parent-teacher-meeting', data);
-  }
-
+  // Notifications
   getNotifications() {
     return this.api.get('/notifications');
-  }
-
-  createNotification(data: any) {
-    return this.api.post('/notifications', data);
-  }
-
-  updateNotification(id: string, data: any) {
-    return this.api.put(`/notifications/${id}`, data);
   }
 
   markNotificationAsRead(id: string) {
     return this.api.put(`/notifications/${id}/read`);
   }
 
-  // ==================== SETTINGS ====================
-  getSettings() {
-    return this.api.get('/admin/settings');
+  markAllNotificationsAsRead() {
+    return this.api.post('/notifications/mark-all-read');
   }
 
-  updateSettings(data: any) {
-    return this.api.put('/admin/settings', data);
-  }
-
-  getAuditLogs(params?: any) {
-    return this.api.get('/admin/audit-logs', { params });
-  }
-
-  // ==================== REPORTS ====================
-  getEnrollmentReport(params?: any) {
-    return this.api.get('/reports/enrollment', { params });
-  }
-
-  getAttendanceAnalytics(params?: any) {
-    return this.api.get('/reports/attendance', { params });
-  }
-
-  getFinancialReport(params?: any) {
-    return this.api.get('/reports/finance', { params });
-  }
-
-  getAcademicReport(params?: any) {
-    return this.api.get('/reports/academic', { params });
-  }
-
-  exportReport(type: string, params?: any) {
-    return this.api.get(`/reports/export?type=${type}`, { params, responseType: 'blob' });
-  }
-
-  // ==================== USERS (Admin Only) ====================
+  // Users
   getUsers(params?: any) {
     return this.api.get('/users', { params });
   }
@@ -440,20 +281,29 @@ class ApiService {
     return this.api.post('/users', data);
   }
 
-  updateUserStatus(id: string, isActive: boolean) {
-    return this.api.patch(`/users/${id}/status`, { is_active: isActive });
-  }
-
-  resetUserPassword(id: string, newPassword: string) {
-    return this.api.post(`/users/${id}/reset-password`, { password: newPassword });
-  }
-
-  sendUserCredentials(id: string) {
-    return this.api.post(`/users/${id}/send-credentials`);
+  updateUser(id: string, data: any) {
+    return this.api.put(`/users/${id}`, data);
   }
 
   deleteUser(id: string) {
     return this.api.delete(`/users/${id}`);
+  }
+
+  // Settings
+  getSettings() {
+    return this.api.get('/settings');
+  }
+
+  updateSettings(data: any) {
+    return this.api.put('/settings', data);
+  }
+
+  getAcademicYears() {
+    return this.api.get('/settings/academic-years');
+  }
+
+  createAcademicYear(data: any) {
+    return this.api.post('/settings/academic-years', data);
   }
 }
 

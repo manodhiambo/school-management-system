@@ -21,7 +21,7 @@ export function FeePaymentsPage() {
 
   useEffect(() => {
     if (selectedChild) {
-      loadFeeDetails(selectedChild.id);
+      loadFeeDetails(selectedChild.student_id || selectedChild.id);
     }
   }, [selectedChild]);
 
@@ -29,8 +29,10 @@ export function FeePaymentsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getParent(user?.id);
-      const childrenData = response.children || response.data?.children || [];
+      // Use getParentByUserId instead of getParent
+      const response: any = await api.getParentByUserId(user?.id);
+      const parentData = response.data || response;
+      const childrenData = parentData.children || [];
       setChildren(childrenData);
       if (childrenData.length > 0) {
         setSelectedChild(childrenData[0]);
@@ -45,19 +47,18 @@ export function FeePaymentsPage() {
 
   const loadFeeDetails = async (studentId: string) => {
     try {
-      const response = await api.getStudentFeeAccount(studentId);
+      const response: any = await api.getStudentFeeAccount(studentId);
       console.log('Fee details:', response);
-      setFeeDetails(response);
+      setFeeDetails(response.data || response);
     } catch (error: any) {
       console.error('Error loading fee details:', error);
+      setFeeDetails(null);
     }
   };
 
   const handleMpesaPayment = async (invoiceId: string, amount: number) => {
     try {
-      // TODO: Implement M-Pesa STK Push
       alert(`Initiating M-Pesa payment of KES ${amount.toLocaleString()} for invoice ${invoiceId}`);
-      // const response = await api.initiateMpesaPayment(invoiceId, amount);
     } catch (error: any) {
       console.error('Error initiating payment:', error);
       alert('Failed to initiate M-Pesa payment');
@@ -111,8 +112,8 @@ export function FeePaymentsPage() {
       <div className="flex gap-2 flex-wrap">
         {children.map((child) => (
           <Button
-            key={child.id}
-            variant={selectedChild?.id === child.id ? "default" : "outline"}
+            key={child.student_id || child.id}
+            variant={(selectedChild?.student_id || selectedChild?.id) === (child.student_id || child.id) ? "default" : "outline"}
             onClick={() => setSelectedChild(child)}
           >
             {child.first_name} {child.last_name}
@@ -120,7 +121,7 @@ export function FeePaymentsPage() {
         ))}
       </div>
 
-      {selectedChild && feeDetails && (
+      {selectedChild && (
         <>
           {/* Fee Summary */}
           <div className="grid gap-4 md:grid-cols-3">
@@ -131,7 +132,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  KES {parseFloat(feeDetails.total_fees || '0').toLocaleString()}
+                  KES {parseFloat(feeDetails?.total_amount || feeDetails?.total_fees || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">This academic year</p>
               </CardContent>
@@ -144,7 +145,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  KES {parseFloat(feeDetails.paid || '0').toLocaleString()}
+                  KES {parseFloat(feeDetails?.paid_amount || feeDetails?.paid || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">Cleared payments</p>
               </CardContent>
@@ -157,7 +158,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
-                  KES {parseFloat(feeDetails.pending || '0').toLocaleString()}
+                  KES {parseFloat(feeDetails?.balance || feeDetails?.pending || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">Outstanding amount</p>
               </CardContent>
@@ -170,11 +171,11 @@ export function FeePaymentsPage() {
               <CardTitle>Fee Invoices</CardTitle>
             </CardHeader>
             <CardContent>
-              {feeDetails.invoices && feeDetails.invoices.length > 0 ? (
+              {feeDetails?.invoices && feeDetails.invoices.length > 0 ? (
                 <div className="space-y-4">
                   {feeDetails.invoices.map((invoice: any) => (
-                    <div 
-                      key={invoice.id} 
+                    <div
+                      key={invoice.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex-1">
@@ -202,28 +203,15 @@ export function FeePaymentsPage() {
                           <p className="text-xl font-bold">
                             KES {parseFloat(invoice.amount).toLocaleString()}
                           </p>
-                          {invoice.status === 'paid' && invoice.payment_date && (
-                            <p className="text-xs text-gray-500">
-                              Paid on {new Date(invoice.payment_date).toLocaleDateString()}
-                            </p>
-                          )}
                         </div>
                         {invoice.status !== 'paid' && (
-                          <div className="flex flex-col gap-2">
-                            <Button 
-                              size="sm"
-                              onClick={() => handleMpesaPayment(invoice.id, invoice.amount)}
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Pay with M-Pesa
-                            </Button>
-                            <Button 
-                              size="sm"
-                              variant="outline"
-                            >
-                              View Invoice
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleMpesaPayment(invoice.id, invoice.amount)}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Pay
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -241,21 +229,21 @@ export function FeePaymentsPage() {
               <CardTitle>Payment History</CardTitle>
             </CardHeader>
             <CardContent>
-              {feeDetails.payment_history && feeDetails.payment_history.length > 0 ? (
+              {feeDetails?.payments && feeDetails.payments.length > 0 ? (
                 <div className="space-y-2">
-                  {feeDetails.payment_history.map((payment: any, index: number) => (
+                  {feeDetails.payments.map((payment: any, index: number) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
-                        <p className="font-medium">{payment.description}</p>
+                        <p className="font-medium">{payment.description || 'Fee Payment'}</p>
                         <p className="text-sm text-gray-500">
-                          {new Date(payment.payment_date).toLocaleDateString()}
+                          {new Date(payment.payment_date || payment.created_at).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-green-600">
                           KES {parseFloat(payment.amount).toLocaleString()}
                         </p>
-                        <p className="text-xs text-gray-500">{payment.payment_method}</p>
+                        <p className="text-xs text-gray-500">{payment.payment_method || 'N/A'}</p>
                       </div>
                     </div>
                   ))}

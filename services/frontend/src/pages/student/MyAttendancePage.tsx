@@ -29,7 +29,7 @@ export function MyAttendancePage() {
       
       // Get attendance records
       const recordsResponse = await api.getStudentAttendance(user?.id);
-      setAttendance(recordsResponse.attendance || recordsResponse.data || []);
+      setAttendance(Array.isArray(recordsResponse.data?.attendance?.attendance) ? recordsResponse.data.attendance.attendance : (Array.isArray(recordsResponse.data?.attendance) ? recordsResponse.data.attendance : []));
       
     } catch (error: any) {
       console.error('Error loading attendance:', error);

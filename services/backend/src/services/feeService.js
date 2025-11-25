@@ -632,22 +632,20 @@ class FeeService {
         fi.invoice_number,
         fi.month,
         fi.due_date,
-        fi.gross_amount,
+        fi.total_amount,
         fi.discount_amount,
         fi.net_amount,
         fi.paid_amount,
         fi.balance_amount,
         fi.status,
-        fi.payment_date,
+        
         fi.created_at,
-        fs.name as fee_structure_name,
         CONCAT('Term ', MONTH(fi.month)) as description,
         CASE 
           WHEN fi.status = 'paid' THEN fi.month
           ELSE NULL
         END as term
        FROM fee_invoices fi
-       LEFT JOIN fee_structure fs ON fi.fee_structure_id = fs.id
        WHERE fi.student_id = ?
        ORDER BY fi.due_date DESC`,
       [studentId]
@@ -663,10 +661,9 @@ class FeeService {
         fp.payment_date,
         fp.created_at,
         fi.invoice_number,
-        CONCAT('Payment for ', fs.name) as description
+        'Payment' as description
        FROM fee_payments fp
        JOIN fee_invoices fi ON fp.invoice_id = fi.id
-       LEFT JOIN fee_structure fs ON fi.fee_structure_id = fs.id
        WHERE fi.student_id = ?
        ORDER BY fp.payment_date DESC`,
       [studentId]

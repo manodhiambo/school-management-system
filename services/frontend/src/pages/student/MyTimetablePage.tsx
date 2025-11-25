@@ -23,7 +23,7 @@ export function MyTimetablePage() {
       setError(null);
       const response = await api.getStudentTimetable(user?.id);
       console.log('My timetable:', response);
-      setTimetable(response.timetable || response.data || []);
+      setTimetable(Array.isArray(response.data) ? response.data : (response.data?.timetable || []));
     } catch (error: any) {
       console.error('Error loading timetable:', error);
       setError(error?.message || 'Failed to load timetable');

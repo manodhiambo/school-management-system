@@ -147,7 +147,7 @@ class StudentService {
         u.email,
         u.is_active,
         c.name as class_name,
-        c.section as section_name,
+        c.section as section_name
         CONCAT(p.first_name, ' ', p.last_name) as parent_name
       FROM students s
       JOIN users u ON s.user_id = u.id
@@ -229,7 +229,7 @@ class StudentService {
         u.is_active,
         u.last_login,
         c.name as class_name,
-        c.section as section_name,
+        c.section as section_name
         CONCAT(p.first_name, ' ', p.last_name) as parent_name,
         p.phone_primary as parent_phone
       FROM students s
@@ -302,11 +302,10 @@ class StudentService {
       SELECT 
         a.*,
         c.name as class_name,
-        c.section as section_name,
-        sub.name as subject_name
+        c.section as section_name
       FROM attendance a
-      LEFT JOIN classes c ON a.class_id = c.id
-      LEFT JOIN subjects sub ON a.subject_id = sub.id
+      JOIN students s ON a.student_id = s.id
+      LEFT JOIN classes c ON s.class_id = c.id
       WHERE a.student_id = ?
     `;
 
@@ -352,7 +351,6 @@ class StudentService {
         e.type as exam_type,
         e.max_marks,
         e.passing_marks,
-        sub.name as subject_name,
         sub.code as subject_code
       FROM exam_results er
       JOIN exams e ON er.exam_id = e.id

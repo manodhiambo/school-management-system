@@ -23,7 +23,7 @@ export function MyResultsPage() {
       setError(null);
       const response = await api.getStudentExamResults(user?.id);
       console.log('My results:', response);
-      setResults(response.results || response.data || []);
+      setResults(Array.isArray(response.data?.results) ? response.data.results : (Array.isArray(response.data) ? response.data : []));
     } catch (error: any) {
       console.error('Error loading results:', error);
       setError(error?.message || 'Failed to load exam results');

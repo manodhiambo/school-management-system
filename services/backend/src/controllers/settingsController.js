@@ -64,7 +64,7 @@ class SettingsController {
 
   // ==================== DASHBOARD ====================
   getDashboardStatistics = asyncHandler(async (req, res) => {
-    const stats = await settingsService.getDashboardStatistics();
+    const stats = await settingsService.getDashboardStatistics(req.user.id, req.user.role);
     res.status(200).json(new ApiResponse(200, stats, 'Dashboard statistics retrieved successfully'));
   });
 

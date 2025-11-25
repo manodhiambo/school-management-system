@@ -159,6 +159,16 @@ class AttendanceController {
       new ApiResponse(200, result, 'Absence notifications sent successfully')
     );
   });
+
+
+  getStudentAttendanceStatistics = asyncHandler(async (req, res) => {
+    const { studentId } = req.params;
+    const stats = await attendanceService.getStudentAttendanceStatistics(studentId);
+    
+    res.status(200).json(
+      new ApiResponse(200, stats, 'Student attendance statistics retrieved successfully')
+    );
+  });
 }
 
 export default new AttendanceController();

@@ -174,4 +174,12 @@ router.get(
   feeController.getFeeStatistics
 );
 
+
+// Student fee account route
+router.get(
+  '/student/:studentId',
+  requireRole(['admin', 'teacher', 'parent', 'student']),
+  feeController.getStudentFeeAccount
+);
+
 export default router;

@@ -8,7 +8,6 @@ import Joi from 'joi';
 const router = express.Router();
 
 router.use(authenticate);
-router.use(requireRole(['admin']));
 
 // Validation schemas
 const updateSettingsSchema = Joi.object({
@@ -51,26 +50,26 @@ const setCurrentYearSchema = Joi.object({
   })
 });
 
-// Settings routes
-router.get('/settings', settingsController.getSettings);
-router.put('/settings', validateRequest(updateSettingsSchema), settingsController.updateSettings);
-
-// Academic year routes
-router.post('/academic-years', validateRequest(createAcademicYearSchema), settingsController.createAcademicYear);
-router.get('/academic-years', settingsController.getAcademicYears);
-router.get('/academic-years/current', settingsController.getCurrentAcademicYear);
-router.post('/academic-years/set-current', validateRequest(setCurrentYearSchema), settingsController.setCurrentAcademicYear);
-
-// Audit logs
-router.get('/audit-logs', settingsController.getAuditLogs);
-
-// System logs
-router.get('/system-logs', settingsController.getSystemLogs);
-
-// Dashboard
+// Dashboard - accessible by all authenticated users
 router.get('/dashboard', settingsController.getDashboardStatistics);
 
-// Backup
-router.post('/backup', settingsController.createBackup);
+// Settings routes - admin only
+router.get('/settings', requireRole(['admin']), settingsController.getSettings);
+router.put('/settings', requireRole(['admin']), validateRequest(updateSettingsSchema), settingsController.updateSettings);
+
+// Academic year routes - admin only
+router.post('/academic-years', requireRole(['admin']), validateRequest(createAcademicYearSchema), settingsController.createAcademicYear);
+router.get('/academic-years', requireRole(['admin']), settingsController.getAcademicYears);
+router.get('/academic-years/current', requireRole(['admin']), settingsController.getCurrentAcademicYear);
+router.post('/academic-years/set-current', requireRole(['admin']), validateRequest(setCurrentYearSchema), settingsController.setCurrentAcademicYear);
+
+// Audit logs - admin only
+router.get('/audit-logs', requireRole(['admin']), settingsController.getAuditLogs);
+
+// System logs - admin only
+router.get('/system-logs', requireRole(['admin']), settingsController.getSystemLogs);
+
+// Backup - admin only
+router.post('/backup', requireRole(['admin']), settingsController.createBackup);
 
 export default router;

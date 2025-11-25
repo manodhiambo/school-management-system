@@ -415,6 +415,155 @@ class StudentService {
 
     return results;
   }
+
+
+  async getStudentExamResults(studentId) {
+    // Get all exam results for the student
+    const results = await query(
+      `SELECT 
+        e.id as exam_id,
+        e.name as exam_name,
+        e.type as exam_type,
+        e.session,
+        e.start_date,
+        e.max_marks as total_marks,
+        er.marks_obtained,
+        er.grade,
+        er.is_absent,
+        s.name as subject_name,
+        s.code as subject_code
+       FROM exam_results er
+       JOIN exams e ON er.exam_id = e.id
+       JOIN subjects s ON er.subject_id = s.id
+       WHERE er.student_id = ?
+       ORDER BY e.start_date DESC`,
+      [studentId]
+    );
+
+    // Group results by exam
+    const examMap = new Map();
+    
+    results.forEach(row => {
+      if (!examMap.has(row.exam_id)) {
+        examMap.set(row.exam_id, {
+          exam_id: row.exam_id,
+          exam_name: row.exam_name,
+          exam_type: row.exam_type,
+          session: row.session,
+          start_date: row.start_date,
+          subjects: [],
+          total_marks: 0,
+          marks_obtained: 0
+        });
+      }
+      
+      const exam = examMap.get(row.exam_id);
+      exam.subjects.push({
+        subject_name: row.subject_name,
+        subject_code: row.subject_code,
+        marks_obtained: row.marks_obtained,
+        total_marks: row.total_marks,
+        grade: row.grade,
+        is_absent: row.is_absent,
+        percentage: row.is_absent ? 0 : ((row.marks_obtained / row.total_marks) * 100).toFixed(2)
+      });
+      
+      if (!row.is_absent) {
+        exam.total_marks += parseFloat(row.total_marks);
+        exam.marks_obtained += parseFloat(row.marks_obtained);
+      }
+    });
+
+    // Calculate overall percentage and grade for each exam
+    const examResults = Array.from(examMap.values()).map(exam => {
+      exam.percentage = exam.total_marks > 0 
+        ? ((exam.marks_obtained / exam.total_marks) * 100).toFixed(2)
+        : 0;
+      
+      // Calculate grade based on percentage
+      if (exam.percentage >= 90) exam.grade = 'A+';
+      else if (exam.percentage >= 80) exam.grade = 'A';
+      else if (exam.percentage >= 70) exam.grade = 'B+';
+      else if (exam.percentage >= 60) exam.grade = 'B';
+      else if (exam.percentage >= 50) exam.grade = 'C';
+      else if (exam.percentage >= 40) exam.grade = 'D';
+      else exam.grade = 'F';
+      
+      return exam;
+    });
+
+    return examResults;
+  }
+
+
+  async getStudentTimetable(studentId) {
+    // First, check if this is a user_id or student id
+    let student = await query(
+      'SELECT id, class_id, section_id FROM students WHERE id = ?',
+      [studentId]
+    );
+
+    // If not found, try user_id
+    if (student.length === 0) {
+      student = await query(
+        'SELECT id, class_id, section_id FROM students WHERE user_id = ?',
+        [studentId]
+      );
+    }
+
+    if (student.length === 0) {
+      throw new ApiError(404, 'Student not found');
+    }
+
+    const { class_id, section_id } = student[0];
+
+    if (!class_id) {
+      return { timetable: [] };
+    }
+
+    // Get timetable for the class
+    const timetable = await query(
+      `SELECT 
+        t.id,
+        t.day_of_week,
+        t.period_number,
+        t.start_time,
+        t.end_time,
+        s.name as subject_name,
+        s.code as subject_code,
+        CONCAT(te.first_name, ' ', te.last_name) as teacher_name,
+        t.room_number
+       FROM timetable t
+       JOIN subjects s ON t.subject_id = s.id
+       LEFT JOIN teachers te ON t.teacher_id = te.id
+       WHERE t.class_id = ?
+       ORDER BY 
+        FIELD(t.day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
+        t.period_number`,
+      [class_id]
+    );
+
+    // Group by day
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const groupedTimetable = days.map(day => ({
+      day_name: day,
+      day: day,
+      periods: timetable
+        .filter(entry => entry.day_of_week === day)
+        .map(entry => ({
+          period_number: entry.period_number,
+          start_time: entry.start_time,
+          end_time: entry.end_time,
+          subject_name: entry.subject_name,
+          subject_code: entry.subject_code,
+          teacher_name: entry.teacher_name,
+          room_number: entry.room_number,
+          room: entry.room_number
+        }))
+    }));
+
+    return groupedTimetable;
+  }
 }
 
 export default new StudentService();

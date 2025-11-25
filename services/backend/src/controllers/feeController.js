@@ -141,6 +141,16 @@ class FeeController {
       new ApiResponse(200, stats, 'Fee statistics retrieved successfully')
     );
   });
+
+
+  getStudentFeeAccount = asyncHandler(async (req, res) => {
+    const { studentId } = req.params;
+    const feeAccount = await feeService.getStudentFeeAccount(studentId);
+    
+    res.status(200).json(
+      new ApiResponse(200, feeAccount, 'Student fee account retrieved successfully')
+    );
+  });
 }
 
 export default new FeeController();

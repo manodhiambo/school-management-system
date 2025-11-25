@@ -216,4 +216,12 @@ router.delete(
   studentController.deleteStudentDocument
 );
 
+
+// Exam results route
+router.get(
+  '/:id/exam-results',
+  requireRole(['admin', 'teacher', 'parent', 'student']),
+  studentController.getStudentExamResults
+);
+
 export default router;

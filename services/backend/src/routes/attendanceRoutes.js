@@ -175,4 +175,12 @@ router.post(
   attendanceController.notifyParentsOfAbsence
 );
 
+
+// Student-specific attendance statistics
+router.get(
+  '/statistics/:studentId',
+  requireRole(['admin', 'teacher', 'parent', 'student']),
+  attendanceController.getStudentAttendanceStatistics
+);
+
 export default router;

@@ -622,6 +622,93 @@ class FeeService {
 
     return stats[0];
   }
+
+
+  async getStudentFeeAccount(studentId) {
+    // Get all invoices for the student
+    const invoices = await query(
+      `SELECT 
+        fi.id,
+        fi.invoice_number,
+        fi.month,
+        fi.due_date,
+        fi.gross_amount,
+        fi.discount_amount,
+        fi.net_amount,
+        fi.paid_amount,
+        fi.balance_amount,
+        fi.status,
+        fi.payment_date,
+        fi.created_at,
+        fs.name as fee_structure_name,
+        CONCAT('Term ', MONTH(fi.month)) as description,
+        CASE 
+          WHEN fi.status = 'paid' THEN fi.month
+          ELSE NULL
+        END as term
+       FROM fee_invoices fi
+       LEFT JOIN fee_structure fs ON fi.fee_structure_id = fs.id
+       WHERE fi.student_id = ?
+       ORDER BY fi.due_date DESC`,
+      [studentId]
+    );
+
+    // Get payment history
+    const payments = await query(
+      `SELECT 
+        fp.id,
+        fp.amount,
+        fp.payment_method,
+        fp.transaction_id,
+        fp.payment_date,
+        fp.created_at,
+        fi.invoice_number,
+        CONCAT('Payment for ', fs.name) as description
+       FROM fee_payments fp
+       JOIN fee_invoices fi ON fp.invoice_id = fi.id
+       LEFT JOIN fee_structure fs ON fi.fee_structure_id = fs.id
+       WHERE fi.student_id = ?
+       ORDER BY fp.payment_date DESC`,
+      [studentId]
+    );
+
+    // Calculate totals
+    const totals = await query(
+      `SELECT 
+        SUM(net_amount) as total_fees,
+        SUM(paid_amount) as paid,
+        SUM(balance_amount) as pending
+       FROM fee_invoices
+       WHERE student_id = ?`,
+      [studentId]
+    );
+
+    return {
+      total_fees: totals[0]?.total_fees || 0,
+      paid: totals[0]?.paid || 0,
+      pending: totals[0]?.pending || 0,
+      invoices: invoices.map(inv => ({
+        id: inv.id,
+        invoice_number: inv.invoice_number,
+        description: inv.description || inv.fee_structure_name,
+        term: inv.term,
+        due_date: inv.due_date,
+        amount: parseFloat(inv.net_amount),
+        paid_amount: parseFloat(inv.paid_amount),
+        balance: parseFloat(inv.balance_amount),
+        status: inv.status,
+        payment_date: inv.payment_date
+      })),
+      payment_history: payments.map(pay => ({
+        id: pay.id,
+        amount: parseFloat(pay.amount),
+        payment_method: pay.payment_method,
+        transaction_id: pay.transaction_id,
+        payment_date: pay.payment_date,
+        description: pay.description
+      }))
+    };
+  }
 }
 
 export default new FeeService();

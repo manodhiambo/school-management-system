@@ -495,6 +495,55 @@ class AttendanceService {
       students: absentStudents
     };
   }
+
+
+  async getStudentAttendanceStatistics(studentId) {
+    // Get attendance statistics for the student
+    const stats = await query(
+      `SELECT 
+        COUNT(*) as total_days,
+        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
+        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
+        SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_day
+       FROM attendance
+       WHERE student_id = ?`,
+      [studentId]
+    );
+
+    const result = stats[0] || {
+      total_days: 0,
+      present: 0,
+      absent: 0,
+      late: 0,
+      half_day: 0
+    };
+
+    // Calculate percentage
+    result.percentage = result.total_days > 0
+      ? ((result.present / result.total_days) * 100).toFixed(2)
+      : 0;
+
+    // Get recent attendance records
+    const recentRecords = await query(
+      `SELECT 
+        date,
+        status,
+        check_in_time,
+        check_out_time,
+        reason
+       FROM attendance
+       WHERE student_id = ?
+       ORDER BY date DESC
+       LIMIT 30`,
+      [studentId]
+    );
+
+    return {
+      ...result,
+      recent_records: recentRecords
+    };
+  }
 }
 
 export default new AttendanceService();

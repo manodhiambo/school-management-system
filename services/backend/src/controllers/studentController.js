@@ -200,6 +200,16 @@ class StudentController {
       new ApiResponse(200, stats, 'Student statistics retrieved successfully')
     );
   });
+
+
+  getStudentExamResults = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const results = await studentService.getStudentExamResults(id);
+    
+    res.status(200).json(
+      new ApiResponse(200, { results }, 'Exam results retrieved successfully')
+    );
+  });
 }
 
 export default new StudentController();

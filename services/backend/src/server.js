@@ -21,8 +21,17 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = config.corsOrigin.split(',').map(origin => origin.trim());
 const corsOptions = {
-  origin: config.corsOrigin.split(',').map(origin => origin.trim()),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -43,13 +52,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint (before API routes)
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     success: true,
     message: 'API is running',
     timestamp: new Date().toISOString(),
     environment: config.env
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'School Management System API',
+    version: '1.0.0',
+    docs: `/api/${config.apiVersion}`
   });
 });
 
@@ -70,7 +89,7 @@ const startServer = async () => {
     const isConnected = await testConnection();
     
     if (!isConnected) {
-      logger.error('Database connection failed - server will start but DB features may not work');
+      logger.warn('Database connection failed - server will start but DB features may not work');
     } else {
       logger.info('✓ Database connected successfully');
     }
@@ -84,7 +103,7 @@ const startServer = async () => {
       logger.info(`Environment: ${config.env}`);
       logger.info(`Server running on port ${PORT}`);
       logger.info(`API: http://localhost:${PORT}/api/${config.apiVersion}`);
-      logger.info(`CORS Origin: ${config.corsOrigin}`);
+      logger.info(`CORS Origins: ${config.corsOrigin}`);
       logger.info('========================================');
     });
   } catch (error) {

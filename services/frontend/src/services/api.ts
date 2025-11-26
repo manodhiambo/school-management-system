@@ -13,9 +13,7 @@ class ApiService {
       },
     });
 
-    // Add request interceptor to include auth token
     this.api.interceptors.request.use((config) => {
-      // Check both token keys for compatibility
       const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -23,7 +21,6 @@ class ApiService {
       return config;
     });
 
-    // Add response interceptor to handle errors
     this.api.interceptors.response.use(
       (response) => response.data,
       (error) => {
@@ -39,7 +36,6 @@ class ApiService {
     );
   }
 
-  // Auth
   login(email: string, password: string) {
     return this.api.post('/auth/login', { email, password });
   }
@@ -52,23 +48,20 @@ class ApiService {
     return this.api.get('/auth/me');
   }
 
-  // Alias for getMe - for compatibility
   getCurrentUser() {
     return this.api.get('/auth/me');
   }
 
-  // Dashboard
   getDashboardStats() {
     return this.api.get('/admin/dashboard');
   }
 
-  // Students
   getStudents(params?: any) {
     return this.api.get('/students', { params });
   }
 
   getStudent(id: string) {
-    return this.api.get(`/students/${id}`);
+    return this.api.get('/students/' + id);
   }
 
   createStudent(data: any) {
@@ -76,32 +69,31 @@ class ApiService {
   }
 
   updateStudent(id: string, data: any) {
-    return this.api.put(`/students/${id}`, data);
+    return this.api.put('/students/' + id, data);
   }
 
   deleteStudent(id: string) {
-    return this.api.delete(`/students/${id}`);
+    return this.api.delete('/students/' + id);
   }
 
   getStudentAttendance(studentId: string, params?: any) {
-    return this.api.get(`/attendance/student/${studentId}`, { params });
+    return this.api.get('/attendance/student/' + studentId, { params });
   }
 
   getStudentExamResults(studentId: string) {
-    return this.api.get(`/academic/results/student/${studentId}`);
+    return this.api.get('/academic/results/student/' + studentId);
   }
 
   getStudentFeeAccount(studentId: string) {
-    return this.api.get(`/fee/student/${studentId}`);
+    return this.api.get('/fee/student/' + studentId);
   }
 
-  // Teachers
   getTeachers(params?: any) {
     return this.api.get('/teachers', { params });
   }
 
   getTeacher(id: string) {
-    return this.api.get(`/teachers/${id}`);
+    return this.api.get('/teachers/' + id);
   }
 
   createTeacher(data: any) {
@@ -109,26 +101,23 @@ class ApiService {
   }
 
   updateTeacher(id: string, data: any) {
-    return this.api.put(`/teachers/${id}`, data);
+    return this.api.put('/teachers/' + id, data);
   }
 
   deleteTeacher(id: string) {
-    return this.api.delete(`/teachers/${id}`);
+    return this.api.delete('/teachers/' + id);
   }
 
-  // Parents
   getParents(params?: any) {
     return this.api.get('/parents', { params });
   }
 
-  // Get parent by parent.id
   getParent(id: string) {
-    return this.api.get(`/parents/${id}`);
+    return this.api.get('/parents/' + id);
   }
 
-  // Get parent by user_id (use this when logged in as parent)
   getParentByUserId(userId: string) {
-    return this.api.get(`/parents/by-user/${userId}`);
+    return this.api.get('/parents/by-user/' + userId);
   }
 
   createParent(data: any) {
@@ -136,20 +125,19 @@ class ApiService {
   }
 
   updateParent(id: string, data: any) {
-    return this.api.put(`/parents/${id}`, data);
+    return this.api.put('/parents/' + id, data);
   }
 
   linkStudentToParent(parentId: string, studentId: string) {
-    return this.api.post(`/parents/${parentId}/link-student`, { studentId });
+    return this.api.post('/parents/' + parentId + '/link-student', { studentId });
   }
 
-  // Classes
   getClasses(params?: any) {
     return this.api.get('/classes', { params });
   }
 
   getClass(id: string) {
-    return this.api.get(`/classes/${id}`);
+    return this.api.get('/classes/' + id);
   }
 
   createClass(data: any) {
@@ -157,20 +145,19 @@ class ApiService {
   }
 
   updateClass(id: string, data: any) {
-    return this.api.put(`/classes/${id}`, data);
+    return this.api.put('/classes/' + id, data);
   }
 
   deleteClass(id: string) {
-    return this.api.delete(`/classes/${id}`);
+    return this.api.delete('/classes/' + id);
   }
 
-  // Subjects
   getSubjects(params?: any) {
     return this.api.get('/subjects', { params });
   }
 
   getSubject(id: string) {
-    return this.api.get(`/subjects/${id}`);
+    return this.api.get('/subjects/' + id);
   }
 
   createSubject(data: any) {
@@ -178,14 +165,13 @@ class ApiService {
   }
 
   updateSubject(id: string, data: any) {
-    return this.api.put(`/subjects/${id}`, data);
+    return this.api.put('/subjects/' + id, data);
   }
 
   deleteSubject(id: string) {
-    return this.api.delete(`/subjects/${id}`);
+    return this.api.delete('/subjects/' + id);
   }
 
-  // Attendance
   getAttendance(params?: any) {
     return this.api.get('/attendance', { params });
   }
@@ -199,31 +185,61 @@ class ApiService {
   }
 
   getAttendanceByClass(classId: string, date: string) {
-    return this.api.get(`/attendance/class/${classId}`, { params: { date } });
+    return this.api.get('/attendance/class/' + classId, { params: { date } });
   }
 
-  // Fee Management
   getFeeStructures(params?: any) {
-    return this.api.get('/fee/structures', { params });
+    return this.api.get('/fee/structure', { params });
   }
 
   createFeeStructure(data: any) {
-    return this.api.post('/fee/structures', data);
+    return this.api.post('/fee/structure', data);
   }
 
   getFeeInvoices(params?: any) {
-    return this.api.get('/fee/invoices', { params });
+    return this.api.get('/fee/invoice', { params });
+  }
+
+  getFeeInvoice(id: string) {
+    return this.api.get('/fee/invoice/' + id);
   }
 
   createFeeInvoice(data: any) {
-    return this.api.post('/fee/invoices', data);
+    return this.api.post('/fee/invoice', data);
   }
 
   recordFeePayment(data: any) {
-    return this.api.post('/fee/payments', data);
+    return this.api.post('/fee/payment', data);
   }
 
-  // Exams
+  getFeePayments(params?: any) {
+    return this.api.get('/fee/payment', { params });
+  }
+
+  getFeeDefaulters(params?: any) {
+    return this.api.get('/fee/defaulters', { params });
+  }
+
+  getFeeStatistics(params?: any) {
+    return this.api.get('/fee/statistics', { params });
+  }
+
+  initiateMpesaPayment(invoiceId: string, phoneNumber: string, amount: number) {
+    return this.api.post('/fee/mpesa/pay', { invoiceId, phoneNumber, amount });
+  }
+
+  getMpesaTransactionStatus(checkoutRequestId: string) {
+    return this.api.get('/fee/mpesa/status/' + checkoutRequestId);
+  }
+
+  getMpesaTransaction(transactionId: string) {
+    return this.api.get('/fee/mpesa/transaction/' + transactionId);
+  }
+
+  getStudentMpesaTransactions(studentId: string) {
+    return this.api.get('/fee/mpesa/student/' + studentId);
+  }
+
   getExams(params?: any) {
     return this.api.get('/exams', { params });
   }
@@ -232,7 +248,6 @@ class ApiService {
     return this.api.post('/exams', data);
   }
 
-  // Academic
   getResults(params?: any) {
     return this.api.get('/academic/results', { params });
   }
@@ -241,7 +256,6 @@ class ApiService {
     return this.api.post('/academic/results', data);
   }
 
-  // Timetable
   getTimetable(params?: any) {
     return this.api.get('/timetable', { params });
   }
@@ -250,7 +264,6 @@ class ApiService {
     return this.api.post('/timetable', data);
   }
 
-  // Communication
   getAnnouncements(params?: any) {
     return this.api.get('/communication/announcements', { params });
   }
@@ -267,20 +280,18 @@ class ApiService {
     return this.api.post('/communication/messages', data);
   }
 
-  // Notifications
   getNotifications() {
     return this.api.get('/notifications');
   }
 
   markNotificationAsRead(id: string) {
-    return this.api.put(`/notifications/${id}/read`);
+    return this.api.put('/notifications/' + id + '/read');
   }
 
   markAllNotificationsAsRead() {
     return this.api.post('/notifications/mark-all-read');
   }
 
-  // Users
   getUsers(params?: any) {
     return this.api.get('/users', { params });
   }
@@ -290,14 +301,13 @@ class ApiService {
   }
 
   updateUser(id: string, data: any) {
-    return this.api.put(`/users/${id}`, data);
+    return this.api.put('/users/' + id, data);
   }
 
   deleteUser(id: string) {
-    return this.api.delete(`/users/${id}`);
+    return this.api.delete('/users/' + id);
   }
 
-  // Settings
   getSettings() {
     return this.api.get('/settings');
   }

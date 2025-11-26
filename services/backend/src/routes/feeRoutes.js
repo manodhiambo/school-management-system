@@ -4,11 +4,11 @@ import { authenticate } from '../middleware/authMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { validateRequest, schemas } from '../utils/validators.js';
 import Joi from 'joi';
+import mpesaService from '../services/mpesaService.js';
+import ApiResponse from '../utils/ApiResponse.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
-
-// All routes require authentication
-router.use(authenticate);
 
 // ==================== VALIDATION SCHEMAS ====================
 const createFeeStructureSchema = Joi.object({
@@ -75,7 +75,7 @@ const generateInvoiceSchema = Joi.object({
 const recordPaymentSchema = Joi.object({
   body: Joi.object({
     invoiceId: schemas.id,
-    paymentMethod: Joi.string().valid('cash', 'cheque', 'card', 'upi', 'net_banking', 'wallet', 'other').required(),
+    paymentMethod: Joi.string().valid('cash', 'cheque', 'card', 'upi', 'net_banking', 'wallet', 'mpesa', 'other').required(),
     transactionId: Joi.string().optional(),
     amount: Joi.number().min(0).required(),
     bankName: Joi.string().optional(),
@@ -84,6 +84,108 @@ const recordPaymentSchema = Joi.object({
     remarks: Joi.string().optional()
   })
 });
+
+const mpesaPaymentSchema = Joi.object({
+  body: Joi.object({
+    invoiceId: Joi.string().uuid().required(),
+    phoneNumber: Joi.string().pattern(/^(\+?254|0)?[17]\d{8}$/).required().messages({
+      'string.pattern.base': 'Please provide a valid Kenyan phone number'
+    }),
+    amount: Joi.number().min(1).required()
+  })
+});
+
+// All routes require authentication (except M-Pesa callback)
+router.use((req, res, next) => {
+  // Skip authentication for M-Pesa callback
+  if (req.path === '/mpesa/callback') {
+    return next();
+  }
+  return authenticate(req, res, next);
+});
+
+// ==================== M-PESA ROUTES ====================
+
+// Initiate M-Pesa STK Push payment (accessible by parent)
+router.post(
+  '/mpesa/pay',
+  requireRole(['admin', 'parent']),
+  validateRequest(mpesaPaymentSchema),
+  async (req, res, next) => {
+    try {
+      const { invoiceId, phoneNumber, amount } = req.body;
+      const result = await mpesaService.initiateSTKPush(invoiceId, phoneNumber, amount, req.user.id);
+      
+      res.status(200).json(
+        new ApiResponse(200, result, 'M-Pesa payment initiated. Check your phone.')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// M-Pesa callback (no authentication required - called by Safaricom)
+router.post('/mpesa/callback', async (req, res) => {
+  try {
+    logger.info('M-Pesa callback received');
+    const result = await mpesaService.handleCallback(req.body);
+    
+    // Always respond with success to Safaricom
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
+  } catch (error) {
+    logger.error('M-Pesa callback error:', error);
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
+  }
+});
+
+// Query M-Pesa transaction status
+router.get(
+  '/mpesa/status/:checkoutRequestId',
+  requireRole(['admin', 'parent']),
+  async (req, res, next) => {
+    try {
+      const result = await mpesaService.queryTransactionStatus(req.params.checkoutRequestId);
+      res.status(200).json(
+        new ApiResponse(200, result, 'Transaction status retrieved')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get M-Pesa transaction details
+router.get(
+  '/mpesa/transaction/:transactionId',
+  requireRole(['admin', 'parent']),
+  async (req, res, next) => {
+    try {
+      const transaction = await mpesaService.getTransaction(req.params.transactionId);
+      res.status(200).json(
+        new ApiResponse(200, transaction, 'Transaction retrieved')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get all M-Pesa transactions for a student
+router.get(
+  '/mpesa/student/:studentId',
+  requireRole(['admin', 'parent', 'teacher']),
+  async (req, res, next) => {
+    try {
+      const transactions = await mpesaService.getStudentTransactions(req.params.studentId);
+      res.status(200).json(
+        new ApiResponse(200, transactions, 'Transactions retrieved')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // ==================== FEE STRUCTURE ROUTES ====================
 router.post(
@@ -173,7 +275,6 @@ router.get(
   requireRole(['admin']),
   feeController.getFeeStatistics
 );
-
 
 // Student fee account route
 router.get(

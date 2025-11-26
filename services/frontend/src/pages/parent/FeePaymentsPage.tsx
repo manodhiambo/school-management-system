@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, CreditCard, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { DollarSign, CreditCard, CheckCircle, AlertCircle, Clock, Phone, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 
@@ -12,6 +22,15 @@ export function FeePaymentsPage() {
   const [feeDetails, setFeeDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // M-Pesa payment state
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
+  const [paymentMessage, setPaymentMessage] = useState('');
 
   useEffect(() => {
     if (user?.id) {
@@ -29,7 +48,6 @@ export function FeePaymentsPage() {
     try {
       setLoading(true);
       setError(null);
-      // Use getParentByUserId instead of getParent
       const response: any = await api.getParentByUserId(user?.id);
       const parentData = response.data || response;
       const childrenData = parentData.children || [];
@@ -56,12 +74,88 @@ export function FeePaymentsPage() {
     }
   };
 
-  const handleMpesaPayment = async (invoiceId: string, amount: number) => {
+  const openPaymentModal = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setPaymentAmount(invoice.balance?.toString() || invoice.amount?.toString() || '');
+    setPhoneNumber('');
+    setPaymentStatus('idle');
+    setPaymentMessage('');
+    setPaymentModalOpen(true);
+  };
+
+  const handleMpesaPayment = async () => {
+    if (!selectedInvoice || !phoneNumber || !paymentAmount) {
+      setPaymentMessage('Please fill in all fields');
+      return;
+    }
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setPaymentMessage('Please enter a valid amount');
+      return;
+    }
+
+    if (amount > parseFloat(selectedInvoice.balance || selectedInvoice.amount)) {
+      setPaymentMessage('Amount exceeds the balance due');
+      return;
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^(\+?254|0)?[17]\d{8}$/;
+    if (!phoneRegex.test(phoneNumber.replace(/\s/g, ''))) {
+      setPaymentMessage('Please enter a valid Kenyan phone number (e.g., 0712345678)');
+      return;
+    }
+
     try {
-      alert(`Initiating M-Pesa payment of KES ${amount.toLocaleString()} for invoice ${invoiceId}`);
+      setPaymentLoading(true);
+      setPaymentStatus('processing');
+      setPaymentMessage('Sending payment request to your phone...');
+
+      const response: any = await api.initiateMpesaPayment(
+        selectedInvoice.id,
+        phoneNumber.replace(/\s/g, ''),
+        amount
+      );
+
+      console.log('M-Pesa response:', response);
+
+      if (response.data?.success || response.success) {
+        setPaymentStatus('success');
+        setPaymentMessage(
+          response.data?.message || response.message || 
+          'Payment request sent! Please check your phone and enter your M-Pesa PIN to complete the payment.'
+        );
+        
+        // Poll for payment status (optional - can be done via callback)
+        // After successful payment, reload fee details
+        setTimeout(() => {
+          loadFeeDetails(selectedChild.student_id || selectedChild.id);
+        }, 5000);
+      } else {
+        setPaymentStatus('failed');
+        setPaymentMessage(response.data?.message || response.message || 'Failed to initiate payment');
+      }
     } catch (error: any) {
-      console.error('Error initiating payment:', error);
-      alert('Failed to initiate M-Pesa payment');
+      console.error('M-Pesa payment error:', error);
+      setPaymentStatus('failed');
+      setPaymentMessage(error?.message || 'Failed to initiate M-Pesa payment. Please try again.');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const closePaymentModal = () => {
+    setPaymentModalOpen(false);
+    setSelectedInvoice(null);
+    setPhoneNumber('');
+    setPaymentAmount('');
+    setPaymentStatus('idle');
+    setPaymentMessage('');
+    
+    // Reload fee details to get updated payment status
+    if (selectedChild) {
+      loadFeeDetails(selectedChild.student_id || selectedChild.id);
     }
   };
 
@@ -105,7 +199,7 @@ export function FeePaymentsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold">Fee Payments</h2>
-        <p className="text-gray-500">Manage and pay school fees</p>
+        <p className="text-gray-500">Manage and pay school fees via M-Pesa</p>
       </div>
 
       {/* Child Selector */}
@@ -132,7 +226,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  KES {parseFloat(feeDetails?.total_amount || feeDetails?.total_fees || '0').toLocaleString()}
+                  KES {parseFloat(feeDetails?.total_fees || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">This academic year</p>
               </CardContent>
@@ -145,7 +239,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  KES {parseFloat(feeDetails?.paid_amount || feeDetails?.paid || '0').toLocaleString()}
+                  KES {parseFloat(feeDetails?.paid || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">Cleared payments</p>
               </CardContent>
@@ -158,7 +252,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
-                  KES {parseFloat(feeDetails?.balance || feeDetails?.pending || '0').toLocaleString()}
+                  KES {parseFloat(feeDetails?.pending || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">Outstanding amount</p>
               </CardContent>
@@ -176,19 +270,21 @@ export function FeePaymentsPage() {
                   {feeDetails.invoices.map((invoice: any) => (
                     <div
                       key={invoice.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-4"
                     >
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-1">
                           <h4 className="font-semibold">
-                            {invoice.description || `Term ${invoice.term} Fees`}
+                            {invoice.description || invoice.invoice_number || 'School Fees'}
                           </h4>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             invoice.status === 'paid'
                               ? 'bg-green-100 text-green-700'
                               : invoice.status === 'overdue'
                               ? 'bg-red-100 text-red-700'
-                              : 'bg-yellow-100 text-yellow-700'
+                              : invoice.status === 'partial'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-gray-100 text-gray-700'
                           }`}>
                             {invoice.status}
                           </span>
@@ -198,19 +294,24 @@ export function FeePaymentsPage() {
                           Due: {new Date(invoice.due_date).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="text-right">
-                          <p className="text-xl font-bold">
-                            KES {parseFloat(invoice.amount).toLocaleString()}
+                      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                        <div className="text-left md:text-right">
+                          <p className="text-lg font-bold">
+                            KES {parseFloat(invoice.amount || invoice.net_amount || 0).toLocaleString()}
                           </p>
+                          {invoice.balance > 0 && (
+                            <p className="text-sm text-red-600">
+                              Balance: KES {parseFloat(invoice.balance).toLocaleString()}
+                            </p>
+                          )}
                         </div>
-                        {invoice.status !== 'paid' && (
+                        {invoice.status !== 'paid' && parseFloat(invoice.balance || invoice.amount) > 0 && (
                           <Button
-                            size="sm"
-                            onClick={() => handleMpesaPayment(invoice.id, invoice.amount)}
+                            onClick={() => openPaymentModal(invoice)}
+                            className="bg-green-600 hover:bg-green-700"
                           >
-                            <CreditCard className="h-4 w-4 mr-2" />
-                            Pay
+                            <Phone className="h-4 w-4 mr-2" />
+                            Pay with M-Pesa
                           </Button>
                         )}
                       </div>
@@ -229,21 +330,26 @@ export function FeePaymentsPage() {
               <CardTitle>Payment History</CardTitle>
             </CardHeader>
             <CardContent>
-              {feeDetails?.payments && feeDetails.payments.length > 0 ? (
+              {feeDetails?.payment_history && feeDetails.payment_history.length > 0 ? (
                 <div className="space-y-2">
-                  {feeDetails.payments.map((payment: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {feeDetails.payment_history.map((payment: any, index: number) => (
+                    <div key={payment.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
                         <p className="font-medium">{payment.description || 'Fee Payment'}</p>
                         <p className="text-sm text-gray-500">
                           {new Date(payment.payment_date || payment.created_at).toLocaleDateString()}
+                          {payment.transaction_id && (
+                            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                              {payment.transaction_id}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-green-600">
                           KES {parseFloat(payment.amount).toLocaleString()}
                         </p>
-                        <p className="text-xs text-gray-500">{payment.payment_method || 'N/A'}</p>
+                        <p className="text-xs text-gray-500 capitalize">{payment.payment_method || 'N/A'}</p>
                       </div>
                     </div>
                   ))}
@@ -255,6 +361,127 @@ export function FeePaymentsPage() {
           </Card>
         </>
       )}
+
+      {/* M-Pesa Payment Modal */}
+      <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6" />
+              Pay with M-Pesa
+            </DialogTitle>
+            <DialogDescription>
+              Enter your M-Pesa registered phone number to receive a payment prompt
+            </DialogDescription>
+          </DialogHeader>
+
+          {paymentStatus === 'idle' && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="invoice">Invoice</Label>
+                <Input
+                  id="invoice"
+                  value={selectedInvoice?.invoice_number || selectedInvoice?.description || 'School Fees'}
+                  disabled
+                  className="bg-gray-50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount (KES)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  max={selectedInvoice?.balance || selectedInvoice?.amount}
+                />
+                <p className="text-xs text-gray-500">
+                  Maximum: KES {parseFloat(selectedInvoice?.balance || selectedInvoice?.amount || 0).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">M-Pesa Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="0712345678"
+                />
+                <p className="text-xs text-gray-500">
+                  Enter the phone number registered with M-Pesa
+                </p>
+              </div>
+
+              {paymentMessage && (
+                <p className="text-sm text-red-600">{paymentMessage}</p>
+              )}
+            </div>
+          )}
+
+          {paymentStatus === 'processing' && (
+            <div className="py-8 text-center">
+              <Loader2 className="h-12 w-12 animate-spin mx-auto text-green-600 mb-4" />
+              <p className="text-lg font-medium">Processing Payment</p>
+              <p className="text-gray-500">{paymentMessage}</p>
+            </div>
+          )}
+
+          {paymentStatus === 'success' && (
+            <div className="py-8 text-center">
+              <CheckCircle className="h-12 w-12 mx-auto text-green-600 mb-4" />
+              <p className="text-lg font-medium text-green-600">Payment Request Sent!</p>
+              <p className="text-gray-500 mt-2">{paymentMessage}</p>
+              <p className="text-sm text-gray-400 mt-4">
+                You will receive an SMS confirmation once the payment is complete.
+              </p>
+            </div>
+          )}
+
+          {paymentStatus === 'failed' && (
+            <div className="py-8 text-center">
+              <AlertCircle className="h-12 w-12 mx-auto text-red-600 mb-4" />
+              <p className="text-lg font-medium text-red-600">Payment Failed</p>
+              <p className="text-gray-500 mt-2">{paymentMessage}</p>
+            </div>
+          )}
+
+          <DialogFooter>
+            {paymentStatus === 'idle' && (
+              <>
+                <Button variant="outline" onClick={closePaymentModal}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleMpesaPayment} 
+                  disabled={paymentLoading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {paymentLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="h-4 w-4 mr-2" />
+                      Send Payment Request
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+            {(paymentStatus === 'success' || paymentStatus === 'failed') && (
+              <Button onClick={closePaymentModal}>
+                Close
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

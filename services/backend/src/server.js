@@ -18,25 +18,20 @@ if (!fs.existsSync('./logs')) {
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
-// CORS configuration
-const allowedOrigins = config.corsOrigin.split(',').map(origin => origin.trim());
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+// CORS configuration - Allow all origins for now
+app.use(cors({
+  origin: true, // Allow all origins
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-app.use(cors(corsOptions));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
+
+// Handle preflight requests
+app.options('*', cors());
 
 // Rate limiting
 app.use('/api', apiLimiter);
@@ -68,7 +63,7 @@ app.get('/', (req, res) => {
     success: true,
     message: 'School Management System API',
     version: '1.0.0',
-    docs: `/api/${config.apiVersion}`
+    api: `/api/${config.apiVersion}`
   });
 });
 
@@ -103,7 +98,6 @@ const startServer = async () => {
       logger.info(`Environment: ${config.env}`);
       logger.info(`Server running on port ${PORT}`);
       logger.info(`API: http://localhost:${PORT}/api/${config.apiVersion}`);
-      logger.info(`CORS Origins: ${config.corsOrigin}`);
       logger.info('========================================');
     });
   } catch (error) {

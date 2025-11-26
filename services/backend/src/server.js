@@ -6,24 +6,28 @@ import { config } from './config/env.js';
 import { testConnection, createDatabasePool } from './config/database.js';
 import logger from './utils/logger.js';
 import routes from './routes/index.js';
-import testRoutes from './routes/testRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import fs from 'fs';
 
 // Create logs directory if it doesn't exist
 if (!fs.existsSync('./logs')) {
-  fs.mkdirSync('./logs');
+  fs.mkdirSync('./logs', { recursive: true });
 }
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
-}));
+
+// CORS configuration
+const corsOptions = {
+  origin: config.corsOrigin.split(',').map(origin => origin.trim()),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
 
 // Rate limiting
 app.use('/api', apiLimiter);
@@ -35,17 +39,19 @@ app.use(cookieParser());
 
 // Request logging
 app.use((req, res, next) => {
-  logger.http(`${req.method} ${req.url}`, {
-    ip: req.ip,
-    userAgent: req.get('user-agent')
-  });
+  logger.http(`${req.method} ${req.url}`);
   next();
 });
 
-// Test routes (for development)
-if (config.env === 'development') {
-  app.use('/api/test', testRoutes);
-}
+// Health check endpoint (before API routes)
+app.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API is running',
+    timestamp: new Date().toISOString(),
+    environment: config.env
+  });
+});
 
 // API routes
 app.use(`/api/${config.apiVersion}`, routes);
@@ -64,23 +70,21 @@ const startServer = async () => {
     const isConnected = await testConnection();
     
     if (!isConnected) {
-      throw new Error('Database connection failed');
+      logger.error('Database connection failed - server will start but DB features may not work');
+    } else {
+      logger.info('✓ Database connected successfully');
     }
-
-    logger.info('✓ Database connected successfully');
-
+    
     // Start listening
     const PORT = config.port;
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       logger.info('========================================');
       logger.info('School Management System API');
       logger.info('========================================');
       logger.info(`Environment: ${config.env}`);
       logger.info(`Server running on port ${PORT}`);
       logger.info(`API: http://localhost:${PORT}/api/${config.apiVersion}`);
-      if (config.env === 'development') {
-        logger.info(`Test endpoints: http://localhost:${PORT}/api/test`);
-      }
+      logger.info(`CORS Origin: ${config.corsOrigin}`);
       logger.info('========================================');
     });
   } catch (error) {
@@ -92,7 +96,6 @@ const startServer = async () => {
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   logger.error('Unhandled Rejection:', err);
-  process.exit(1);
 });
 
 // Handle uncaught exceptions

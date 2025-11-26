@@ -6,6 +6,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+.next/
 
 # Environment files
 .env
@@ -13,7 +14,6 @@ build/
 .env.*.local
 services/backend/.env
 services/frontend/.env.local
-services/frontend/.env.production
 
 # Logs
 logs/
@@ -37,8 +37,3 @@ coverage/
 *.tmp
 *.temp
 .cache/
-
-# Temp files
-temp_*.js
-temp_*.txt
-*.sh

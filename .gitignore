@@ -1,39 +1,6 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
-
-# Build outputs
-dist/
-build/
-.next/
-
-# Environment files
-.env
-.env.local
-.env.*.local
-services/backend/.env
-services/frontend/.env.local
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Testing
-coverage/
-
-# Misc
-*.tmp
-*.temp
-.cache/
+[master ecaaa90] Prepare for deployment to Render and Vercelcat
+ 8 files changed, 171 insertions(+), 96 deletions(-)
+ create mode 100644 render.yaml
+ create mode 100644 services/frontend/.env.example
+ create mode 100644 services/frontend/.env.production
+ create mode 100644 services/frontend/vercel.json

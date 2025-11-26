@@ -69,6 +69,13 @@ class FeeController {
     );
   });
 
+  generateBulkInvoices = asyncHandler(async (req, res) => {
+    const result = await feeService.generateBulkInvoices(req.body, req.user.id);
+    res.status(201).json(
+      new ApiResponse(201, result, `Successfully generated ${result.invoices_created} invoices`)
+    );
+  });
+
   getInvoices = asyncHandler(async (req, res) => {
     const filters = {
       studentId: req.query.studentId,
@@ -142,11 +149,9 @@ class FeeController {
     );
   });
 
-
   getStudentFeeAccount = asyncHandler(async (req, res) => {
     const { studentId } = req.params;
     const feeAccount = await feeService.getStudentFeeAccount(studentId);
-    
     res.status(200).json(
       new ApiResponse(200, feeAccount, 'Student fee account retrieved successfully')
     );

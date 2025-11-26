@@ -72,6 +72,17 @@ const generateInvoiceSchema = Joi.object({
   })
 });
 
+const generateBulkInvoicesSchema = Joi.object({
+  body: Joi.object({
+    class_id: Joi.string().uuid().optional().allow(''),
+    fee_type: Joi.string().valid('tuition', 'transport', 'library', 'laboratory', 'sports', 'exam', 'other').required(),
+    amount: Joi.number().min(1).required(),
+    due_date: Joi.string().required(),
+    academic_year: Joi.string().required(),
+    description: Joi.string().optional().allow('')
+  })
+});
+
 const recordPaymentSchema = Joi.object({
   body: Joi.object({
     invoiceId: schemas.id,
@@ -97,7 +108,6 @@ const mpesaPaymentSchema = Joi.object({
 
 // All routes require authentication (except M-Pesa callback)
 router.use((req, res, next) => {
-  // Skip authentication for M-Pesa callback
   if (req.path === '/mpesa/callback') {
     return next();
   }
@@ -106,7 +116,6 @@ router.use((req, res, next) => {
 
 // ==================== M-PESA ROUTES ====================
 
-// Initiate M-Pesa STK Push payment (accessible by parent)
 router.post(
   '/mpesa/pay',
   requireRole(['admin', 'parent']),
@@ -115,7 +124,6 @@ router.post(
     try {
       const { invoiceId, phoneNumber, amount } = req.body;
       const result = await mpesaService.initiateSTKPush(invoiceId, phoneNumber, amount, req.user.id);
-      
       res.status(200).json(
         new ApiResponse(200, result, 'M-Pesa payment initiated. Check your phone.')
       );
@@ -125,13 +133,10 @@ router.post(
   }
 );
 
-// M-Pesa callback (no authentication required - called by Safaricom)
 router.post('/mpesa/callback', async (req, res) => {
   try {
     logger.info('M-Pesa callback received');
-    const result = await mpesaService.handleCallback(req.body);
-    
-    // Always respond with success to Safaricom
+    await mpesaService.handleCallback(req.body);
     res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
   } catch (error) {
     logger.error('M-Pesa callback error:', error);
@@ -139,7 +144,6 @@ router.post('/mpesa/callback', async (req, res) => {
   }
 });
 
-// Query M-Pesa transaction status
 router.get(
   '/mpesa/status/:checkoutRequestId',
   requireRole(['admin', 'parent']),
@@ -155,7 +159,6 @@ router.get(
   }
 );
 
-// Get M-Pesa transaction details
 router.get(
   '/mpesa/transaction/:transactionId',
   requireRole(['admin', 'parent']),
@@ -171,7 +174,6 @@ router.get(
   }
 );
 
-// Get all M-Pesa transactions for a student
 router.get(
   '/mpesa/student/:studentId',
   requireRole(['admin', 'parent', 'teacher']),
@@ -230,11 +232,21 @@ router.post(
 );
 
 // ==================== INVOICE ROUTES ====================
+
+// Generate single invoice
 router.post(
   '/invoice',
   requireRole(['admin']),
   validateRequest(generateInvoiceSchema),
   feeController.generateInvoice
+);
+
+// Generate bulk invoices for multiple students
+router.post(
+  '/invoice/bulk',
+  requireRole(['admin']),
+  validateRequest(generateBulkInvoicesSchema),
+  feeController.generateBulkInvoices
 );
 
 router.get(

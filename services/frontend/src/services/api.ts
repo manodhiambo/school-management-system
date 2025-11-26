@@ -188,6 +188,7 @@ class ApiService {
     return this.api.get('/attendance/class/' + classId, { params: { date } });
   }
 
+  // Fee Management
   getFeeStructures(params?: any) {
     return this.api.get('/fee/structure', { params });
   }
@@ -208,6 +209,11 @@ class ApiService {
     return this.api.post('/fee/invoice', data);
   }
 
+  // Generate bulk invoices for students
+  generateInvoices(data: any) {
+    return this.api.post('/fee/invoice/bulk', data);
+  }
+
   recordFeePayment(data: any) {
     return this.api.post('/fee/payment', data);
   }
@@ -224,6 +230,7 @@ class ApiService {
     return this.api.get('/fee/statistics', { params });
   }
 
+  // M-Pesa Payments
   initiateMpesaPayment(invoiceId: string, phoneNumber: string, amount: number) {
     return this.api.post('/fee/mpesa/pay', { invoiceId, phoneNumber, amount });
   }
@@ -240,6 +247,7 @@ class ApiService {
     return this.api.get('/fee/mpesa/student/' + studentId);
   }
 
+  // Exams
   getExams(params?: any) {
     return this.api.get('/exams', { params });
   }
@@ -248,6 +256,7 @@ class ApiService {
     return this.api.post('/exams', data);
   }
 
+  // Academic
   getResults(params?: any) {
     return this.api.get('/academic/results', { params });
   }
@@ -256,6 +265,7 @@ class ApiService {
     return this.api.post('/academic/results', data);
   }
 
+  // Timetable
   getTimetable(params?: any) {
     return this.api.get('/timetable', { params });
   }
@@ -264,6 +274,7 @@ class ApiService {
     return this.api.post('/timetable', data);
   }
 
+  // Communication
   getAnnouncements(params?: any) {
     return this.api.get('/communication/announcements', { params });
   }
@@ -280,6 +291,7 @@ class ApiService {
     return this.api.post('/communication/messages', data);
   }
 
+  // Notifications
   getNotifications() {
     return this.api.get('/notifications');
   }
@@ -292,6 +304,7 @@ class ApiService {
     return this.api.post('/notifications/mark-all-read');
   }
 
+  // Users
   getUsers(params?: any) {
     return this.api.get('/users', { params });
   }
@@ -308,6 +321,7 @@ class ApiService {
     return this.api.delete('/users/' + id);
   }
 
+  // Settings
   getSettings() {
     return this.api.get('/settings');
   }

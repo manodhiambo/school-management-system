@@ -15,7 +15,8 @@ class ApiService {
 
     // Add request interceptor to include auth token
     this.api.interceptors.request.use((config) => {
-      const token = localStorage.getItem('accessToken');
+      // Check both token keys for compatibility
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -28,7 +29,9 @@ class ApiService {
       (error) => {
         if (error.response?.status === 401) {
           localStorage.removeItem('accessToken');
+          localStorage.removeItem('token');
           localStorage.removeItem('user');
+          localStorage.removeItem('auth-storage');
           window.location.href = '/login';
         }
         throw error.response?.data || error;
@@ -46,6 +49,11 @@ class ApiService {
   }
 
   getMe() {
+    return this.api.get('/auth/me');
+  }
+
+  // Alias for getMe - for compatibility
+  getCurrentUser() {
     return this.api.get('/auth/me');
   }
 
@@ -118,7 +126,7 @@ class ApiService {
     return this.api.get(`/parents/${id}`);
   }
 
-  // NEW: Get parent by user_id (use this when logged in as parent)
+  // Get parent by user_id (use this when logged in as parent)
   getParentByUserId(userId: string) {
     return this.api.get(`/parents/by-user/${userId}`);
   }

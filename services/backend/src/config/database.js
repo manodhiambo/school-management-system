@@ -1,19 +1,19 @@
-import mysql from 'mysql2/promise';
+import pg from 'pg';
 import { config } from './env.js';
 import logger from '../utils/logger.js';
+
+const { Pool } = pg;
 
 let pool = null;
 
 export const createDatabasePool = () => {
-  // Support DATABASE_URL format or individual config
-  const dbConfig = config.databaseUrl
+  if (pool) return pool;
+
+  // Use DATABASE_URL if available, otherwise build from individual config
+  const connectionConfig = config.databaseUrl
     ? {
-        uri: config.databaseUrl,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 0
+        connectionString: config.databaseUrl,
+        ssl: { rejectUnauthorized: false }
       }
     : {
         host: config.db.host,
@@ -21,48 +21,19 @@ export const createDatabasePool = () => {
         user: config.db.user,
         password: config.db.password,
         database: config.db.name,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 0
+        ssl: config.env === 'production' ? { rejectUnauthorized: false } : false
       };
 
-  // If using DATABASE_URL, parse it
-  if (config.databaseUrl) {
-    try {
-      const url = new URL(config.databaseUrl);
-      pool = mysql.createPool({
-        host: url.hostname,
-        port: parseInt(url.port) || 3306,
-        user: url.username,
-        password: url.password,
-        database: url.pathname.slice(1),
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 0,
-        ssl: config.env === 'production' ? { rejectUnauthorized: true } : undefined
-      });
-    } catch (error) {
-      logger.error('Failed to parse DATABASE_URL:', error);
-      throw error;
-    }
-  } else {
-    pool = mysql.createPool({
-      host: config.db.host,
-      port: config.db.port,
-      user: config.db.user,
-      password: config.db.password,
-      database: config.db.name,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 0
-    });
-  }
+  pool = new Pool({
+    ...connectionConfig,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+  pool.on('error', (err) => {
+    logger.error('Unexpected database pool error:', err);
+  });
 
   logger.info('Database pool created');
   return pool;
@@ -75,13 +46,20 @@ export const getPool = () => {
   return pool;
 };
 
+// Query function compatible with MySQL-style placeholders (?)
+// Converts ? to $1, $2, etc. for PostgreSQL
 export const query = async (sql, params = []) => {
   const connection = getPool();
+  
+  // Convert MySQL-style ? placeholders to PostgreSQL $1, $2, etc.
+  let paramIndex = 0;
+  const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
+  
   try {
-    const [results] = await connection.execute(sql, params);
-    return results;
+    const result = await connection.query(pgSql, params);
+    return result.rows;
   } catch (error) {
-    logger.error('Database query error:', { sql, error: error.message });
+    logger.error('Database query error:', { sql: pgSql, error: error.message });
     throw error;
   }
 };
@@ -89,7 +67,7 @@ export const query = async (sql, params = []) => {
 export const testConnection = async () => {
   try {
     const connection = getPool();
-    await connection.execute('SELECT 1');
+    await connection.query('SELECT 1');
     logger.info('Database connection test successful');
     return true;
   } catch (error) {
@@ -98,4 +76,10 @@ export const testConnection = async () => {
   }
 };
 
-export default { createDatabasePool, getPool, query, testConnection };
+// Get a client for transactions
+export const getClient = async () => {
+  const connection = getPool();
+  return await connection.connect();
+};
+
+export default { createDatabasePool, getPool, query, testConnection, getClient };

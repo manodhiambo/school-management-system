@@ -13,7 +13,9 @@ router.use(authenticate);
 const updateSettingsSchema = Joi.object({
   body: Joi.object({
     schoolName: Joi.string().optional(),
+    school_name: Joi.string().optional(),
     schoolCode: Joi.string().optional(),
+    school_code: Joi.string().optional(),
     schoolLogoUrl: Joi.string().uri().optional(),
     address: Joi.string().optional(),
     city: Joi.string().optional(),
@@ -23,6 +25,7 @@ const updateSettingsSchema = Joi.object({
     email: Joi.string().email().optional(),
     website: Joi.string().uri().optional(),
     currentAcademicYear: Joi.string().optional(),
+    current_academic_year: Joi.string().optional(),
     timezone: Joi.string().optional(),
     currency: Joi.string().optional(),
     dateFormat: Joi.string().optional(),
@@ -53,7 +56,11 @@ const setCurrentYearSchema = Joi.object({
 // Dashboard - accessible by all authenticated users
 router.get('/dashboard', settingsController.getDashboardStatistics);
 
-// Settings routes - admin only
+// Settings routes - GET and PUT on root path (since this router is mounted at /settings)
+router.get('/', requireRole(['admin']), settingsController.getSettings);
+router.put('/', requireRole(['admin']), validateRequest(updateSettingsSchema), settingsController.updateSettings);
+
+// Also support /settings/settings for backwards compatibility
 router.get('/settings', requireRole(['admin']), settingsController.getSettings);
 router.put('/settings', requireRole(['admin']), validateRequest(updateSettingsSchema), settingsController.updateSettings);
 

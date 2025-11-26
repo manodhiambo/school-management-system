@@ -32,11 +32,13 @@ class AttendanceController {
   });
 
   bulkMarkAttendance = asyncHandler(async (req, res) => {
-    const { attendanceList } = req.body;
+    const { attendanceList, classId, date } = req.body;
     const result = await attendanceService.bulkMarkAttendance(
       attendanceList,
       req.user.id,
-      req.body.method || 'manual'
+      req.body.method || 'manual',
+      classId,
+      date
     );
     res.status(200).json(
       new ApiResponse(200, result, 'Bulk attendance marked successfully')
@@ -77,7 +79,7 @@ class AttendanceController {
   getClassAttendanceByDate = asyncHandler(async (req, res) => {
     const { classId } = req.params;
     const { date, sessionId } = req.query;
-    
+
     const attendance = await attendanceService.getClassAttendanceByDate(
       classId,
       date,
@@ -85,6 +87,22 @@ class AttendanceController {
     );
     res.status(200).json(
       new ApiResponse(200, attendance, 'Class attendance retrieved successfully')
+    );
+  });
+
+  // Get attendance for a specific student
+  getStudentAttendance = asyncHandler(async (req, res) => {
+    const { studentId } = req.params;
+    const filters = {
+      studentId,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      status: req.query.status,
+      month: req.query.month
+    };
+    const attendance = await attendanceService.getStudentAttendance(studentId, filters);
+    res.status(200).json(
+      new ApiResponse(200, attendance, 'Student attendance retrieved successfully')
     );
   });
 
@@ -106,7 +124,7 @@ class AttendanceController {
   getStudentAttendanceSummary = asyncHandler(async (req, res) => {
     const { studentId } = req.params;
     const { month } = req.query;
-    
+
     const summary = await attendanceService.getStudentAttendanceSummary(studentId, month);
     res.status(200).json(
       new ApiResponse(200, summary, 'Student attendance summary retrieved successfully')
@@ -116,7 +134,7 @@ class AttendanceController {
   updateAttendanceSummary = asyncHandler(async (req, res) => {
     const { studentId } = req.params;
     const { month } = req.body;
-    
+
     const summary = await attendanceService.updateAttendanceSummary(studentId, month);
     res.status(200).json(
       new ApiResponse(200, summary, 'Attendance summary updated successfully')
@@ -126,7 +144,7 @@ class AttendanceController {
   // ==================== DEFAULTERS & REPORTS ====================
   getDefaulters = asyncHandler(async (req, res) => {
     const { classId, threshold, startDate, endDate } = req.query;
-    
+
     const defaulters = await attendanceService.getDefaulters(
       classId,
       parseFloat(threshold) || 75,
@@ -160,11 +178,10 @@ class AttendanceController {
     );
   });
 
-
   getStudentAttendanceStatistics = asyncHandler(async (req, res) => {
     const { studentId } = req.params;
     const stats = await attendanceService.getStudentAttendanceStatistics(studentId);
-    
+
     res.status(200).json(
       new ApiResponse(200, stats, 'Student attendance statistics retrieved successfully')
     );

@@ -544,6 +544,76 @@ class AttendanceService {
       recent_records: recentRecords
     };
   }
+
+  // Get attendance records for a specific student
+  async getStudentAttendance(studentId, filters = {}) {
+    const { startDate, endDate, status, month } = filters;
+    
+    let whereConditions = ['a.student_id = ?'];
+    let queryParams = [studentId];
+
+    if (startDate && endDate) {
+      whereConditions.push('a.date BETWEEN ? AND ?');
+      queryParams.push(startDate, endDate);
+    }
+
+    if (month) {
+      whereConditions.push('DATE_FORMAT(a.date, "%Y-%m") = ?');
+      queryParams.push(month);
+    }
+
+    if (status) {
+      whereConditions.push('a.status = ?');
+      queryParams.push(status);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const records = await query(
+      `SELECT 
+        a.id,
+        a.date,
+        a.status,
+        a.check_in_time,
+        a.check_out_time,
+        a.reason,
+        a.is_excused,
+        a.method,
+        s.first_name,
+        s.last_name,
+        s.admission_number,
+        c.name as class_name
+       FROM attendance a
+       JOIN students s ON a.student_id = s.id
+       LEFT JOIN classes c ON s.class_id = c.id
+       WHERE ${whereClause}
+       ORDER BY a.date DESC`,
+      queryParams
+    );
+
+    // Get summary statistics
+    const stats = await query(
+      `SELECT
+        COUNT(*) as total_days,
+        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
+        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
+        SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_day
+       FROM attendance
+       WHERE student_id = ?`,
+      [studentId]
+    );
+
+    const summary = stats[0] || { total_days: 0, present: 0, absent: 0, late: 0, half_day: 0 };
+    summary.percentage = summary.total_days > 0
+      ? ((summary.present / summary.total_days) * 100).toFixed(2)
+      : 0;
+
+    return {
+      records,
+      summary
+    };
+  }
 }
 
 export default new AttendanceService();

@@ -1,5 +1,6 @@
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
 
 class SettingsService {
   async getSettings() {
@@ -14,7 +15,7 @@ class SettingsService {
       const id = uuidv4();
       await query(
         `INSERT INTO settings (id, school_name, school_code, phone, email, current_academic_year, timezone, currency)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [id, data.school_name, data.school_code, data.phone, data.email, data.current_academic_year, data.timezone, data.currency]
       );
       return await this.getSettings();
@@ -22,17 +23,20 @@ class SettingsService {
 
     const updates = [];
     const values = [];
+    let paramIndex = 1;
+    
     Object.keys(data).forEach(key => {
       if (data[key] !== undefined) {
-        updates.push(`${key} = ?`);
+        updates.push(`${key} = $${paramIndex}`);
         values.push(data[key]);
+        paramIndex++;
       }
     });
 
     if (updates.length > 0) {
       values.push(settings.id);
       await query(
-        `UPDATE settings SET ${updates.join(', ')}, updated_at = NOW() WHERE id = ?`,
+        `UPDATE settings SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex}`,
         values
       );
     }
@@ -47,7 +51,7 @@ class SettingsService {
         COUNT(*) as total_students,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_students,
         SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_students,
-        SUM(CASE WHEN is_new_admission = 1 THEN 1 ELSE 0 END) as new_admissions
+        SUM(CASE WHEN is_new_admission = true THEN 1 ELSE 0 END) as new_admissions
       FROM students
     `);
 
@@ -95,46 +99,46 @@ class SettingsService {
         SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
         SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late
       FROM attendance
-      WHERE DATE(date) = CURDATE()
+      WHERE DATE(date) = CURRENT_DATE
     `);
 
     // Monthly student enrollment (last 6 months)
     const enrollmentTrend = await query(`
       SELECT 
-        DATE_FORMAT(created_at, '%b') as month,
-        DATE_FORMAT(created_at, '%Y-%m') as month_year,
+        TO_CHAR(created_at, 'Mon') as month,
+        TO_CHAR(created_at, 'YYYY-MM') as month_year,
         COUNT(*) as students
       FROM students
-      WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-      GROUP BY DATE_FORMAT(created_at, '%Y-%m'), DATE_FORMAT(created_at, '%b')
+      WHERE created_at >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY TO_CHAR(created_at, 'YYYY-MM'), TO_CHAR(created_at, 'Mon')
       ORDER BY month_year ASC
     `);
 
     // Monthly fee collection (last 6 months)
     const feeCollectionTrend = await query(`
       SELECT 
-        DATE_FORMAT(payment_date, '%b') as month,
-        DATE_FORMAT(payment_date, '%Y-%m') as month_year,
+        TO_CHAR(payment_date, 'Mon') as month,
+        TO_CHAR(payment_date, 'YYYY-MM') as month_year,
         COALESCE(SUM(amount), 0) as amount
       FROM fee_payments
-      WHERE payment_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+      WHERE payment_date >= CURRENT_DATE - INTERVAL '6 months'
         AND status = 'success'
-      GROUP BY DATE_FORMAT(payment_date, '%Y-%m'), DATE_FORMAT(payment_date, '%b')
+      GROUP BY TO_CHAR(payment_date, 'YYYY-MM'), TO_CHAR(payment_date, 'Mon')
       ORDER BY month_year ASC
     `);
 
     // Monthly attendance summary (last 6 months)
     const attendanceTrend = await query(`
       SELECT 
-        DATE_FORMAT(date, '%b') as month,
-        DATE_FORMAT(date, '%Y-%m') as month_year,
+        TO_CHAR(date, 'Mon') as month,
+        TO_CHAR(date, 'YYYY-MM') as month_year,
         SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
         SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
         SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
         COUNT(*) as total
       FROM attendance
-      WHERE date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-      GROUP BY DATE_FORMAT(date, '%Y-%m'), DATE_FORMAT(date, '%b')
+      WHERE date >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY TO_CHAR(date, 'YYYY-MM'), TO_CHAR(date, 'Mon')
       ORDER BY month_year ASC
     `);
 
@@ -142,28 +146,8 @@ class SettingsService {
     const upcomingExams = await query(`
       SELECT COUNT(*) as upcoming
       FROM exams
-      WHERE start_date > CURDATE()
+      WHERE start_date > CURRENT_DATE
     `);
-
-    // Recent activities (last 10)
-    let recentActivities = [];
-    try {
-      recentActivities = await query(`
-        SELECT
-          al.action,
-          al.resource,
-          al.resource_id,
-          al.created_at,
-          u.email as user_email
-        FROM audit_logs al
-        LEFT JOIN users u ON al.user_id = u.id
-        ORDER BY al.created_at DESC
-        LIMIT 10
-      `);
-    } catch (e) {
-      // audit_logs table might not exist
-      recentActivities = [];
-    }
 
     // Recent payments (last 5)
     const recentPayments = await query(`
@@ -283,7 +267,7 @@ class SettingsService {
         feeCollectionTrend: filledFeeCollectionTrend,
         attendanceTrend: filledAttendanceTrend
       },
-      recentActivities: recentActivities || [],
+      recentActivities: [],
       recentPayments: recentPayments || [],
       recentAdmissions: recentAdmissions || []
     };
@@ -297,36 +281,24 @@ class SettingsService {
       WHERE 1=1
     `;
     const params = [];
+    let paramIndex = 1;
 
     if (filters.userId) {
-      sql += ' AND al.user_id = ?';
+      sql += ` AND al.user_id = $${paramIndex}`;
       params.push(filters.userId);
+      paramIndex++;
     }
 
     if (filters.action) {
-      sql += ' AND al.action = ?';
+      sql += ` AND al.action = $${paramIndex}`;
       params.push(filters.action);
-    }
-
-    if (filters.resource) {
-      sql += ' AND al.resource = ?';
-      params.push(filters.resource);
-    }
-
-    if (filters.startDate) {
-      sql += ' AND al.created_at >= ?';
-      params.push(filters.startDate);
-    }
-
-    if (filters.endDate) {
-      sql += ' AND al.created_at <= ?';
-      params.push(filters.endDate);
+      paramIndex++;
     }
 
     sql += ' ORDER BY al.created_at DESC';
 
     if (filters.limit) {
-      sql += ' LIMIT ?';
+      sql += ` LIMIT $${paramIndex}`;
       params.push(parseInt(filters.limit));
     }
 
@@ -337,7 +309,7 @@ class SettingsService {
     const id = uuidv4();
     await query(
       `INSERT INTO audit_logs (id, user_id, action, resource, resource_id, old_values, new_values, ip_address, user_agent)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         id,
         data.userId,
@@ -357,12 +329,12 @@ class SettingsService {
     const id = uuidv4();
     await query(
       `INSERT INTO academic_years (id, year, start_date, end_date, is_current)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5)`,
       [id, data.year, data.startDate, data.endDate, data.isCurrent || false]
     );
 
     if (data.isCurrent) {
-      await query('UPDATE academic_years SET is_current = FALSE WHERE id != ?', [id]);
+      await query('UPDATE academic_years SET is_current = false WHERE id != $1', [id]);
     }
 
     return { id, ...data };
@@ -373,27 +345,21 @@ class SettingsService {
   }
 
   async getCurrentAcademicYear() {
-    const results = await query('SELECT * FROM academic_years WHERE is_current = TRUE LIMIT 1');
+    const results = await query('SELECT * FROM academic_years WHERE is_current = true LIMIT 1');
     return results[0] || null;
   }
 
   async setCurrentAcademicYear(yearId) {
-    await query('UPDATE academic_years SET is_current = FALSE');
-    await query('UPDATE academic_years SET is_current = TRUE WHERE id = ?', [yearId]);
+    await query('UPDATE academic_years SET is_current = false');
+    await query('UPDATE academic_years SET is_current = true WHERE id = $1', [yearId]);
     return await this.getCurrentAcademicYear();
   }
 
   async getSystemLogs() {
-    // Return empty array if system_logs table doesn't exist
-    try {
-      return await query('SELECT * FROM system_logs ORDER BY created_at DESC LIMIT 100');
-    } catch (e) {
-      return [];
-    }
+    return [];
   }
 
   async createBackup() {
-    // Placeholder for backup functionality
     return {
       id: uuidv4(),
       created_at: new Date(),

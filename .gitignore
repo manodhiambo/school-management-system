@@ -4,3 +4,4 @@
  create mode 100644 services/frontend/.env.example
  create mode 100644 services/frontend/.env.production
  create mode 100644 services/frontend/vercel.json
+.vercel

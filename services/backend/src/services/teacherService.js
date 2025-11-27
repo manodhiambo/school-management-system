@@ -1,154 +1,99 @@
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
-import passwordService from './passwordService.js';
+import bcrypt from 'bcryptjs';
 import ApiError from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
 
 class TeacherService {
-  async createTeacher(teacherData) {
+  async createTeacher(data) {
     const {
-      email,
-      password,
-      firstName,
-      lastName,
-      dateOfBirth,
-      gender,
-      dateOfJoining,
-      qualification,
-      specialization,
-      experienceYears,
-      departmentId,
-      designation,
-      salaryGrade,
-      basicSalary,
-      accountNumber,
-      ifscCode,
-      panNumber,
-      aadharNumber,
-      address,
-      city,
-      state,
-      pincode,
-      phone,
-      emergencyContact,
-      isClassTeacher,
-      classId,
-      sectionId
-    } = teacherData;
+      email, password, firstName, lastName, employeeId,
+      dateOfBirth, gender, phonePrimary, phoneSecondary,
+      address, city, state, pincode, qualification,
+      experienceYears, specialization, joiningDate, salary
+    } = data;
 
     // Check if email already exists
-    const existingUsers = await query(
-      'SELECT * FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (existingUsers.length > 0) {
-      throw new ApiError(400, 'Email already exists');
+    const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.length > 0) {
+      throw new ApiError(400, 'Email already registered');
     }
 
     // Create user account
     const userId = uuidv4();
-    const hashedPassword = await passwordService.hashPassword(password);
-
+    const hashedPassword = await bcrypt.hash(password || 'teacher123', 10);
+    
     await query(
-      `INSERT INTO users (id, email, password_hash, role, is_active)
-       VALUES (?, ?, ?, 'teacher', TRUE)`,
+      `INSERT INTO users (id, email, password, role, is_active, is_verified)
+       VALUES ($1, $2, $3, 'teacher', true, true)`,
       [userId, email, hashedPassword]
     );
 
-    // Generate employee ID
-    const employeeId = await this.generateEmployeeId();
-
-    // Create teacher record
+    // Create teacher profile
     const teacherId = uuidv4();
     await query(
       `INSERT INTO teachers (
-        id, user_id, employee_id, first_name, last_name, date_of_birth,
-        gender, date_of_joining, qualification, specialization, experience_years,
-        department_id, designation, salary_grade, basic_salary,
-        account_number, ifsc_code, pan_number, aadhar_number,
-        address, city, state, pincode, phone, emergency_contact,
-        is_class_teacher, class_id, section_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+        id, user_id, employee_id, first_name, last_name,
+        date_of_birth, gender, phone_primary, phone_secondary,
+        address, city, state, pincode, qualification,
+        experience_years, specialization, joining_date, salary, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'active')`,
       [
-        teacherId,
-        userId,
-        employeeId,
-        firstName,
-        lastName,
-        dateOfBirth || null,
-        gender,
-        dateOfJoining,
-        qualification || null,
-        specialization || null,
-        experienceYears || null,
-        departmentId || null,
-        designation || null,
-        salaryGrade || null,
-        basicSalary || null,
-        accountNumber || null,
-        ifscCode || null,
-        panNumber || null,
-        aadharNumber || null,
-        address || null,
-        city || null,
-        state || null,
-        pincode || null,
-        phone || null,
-        emergencyContact ? JSON.stringify(emergencyContact) : null,
-        isClassTeacher || false,
-        classId || null,
-        sectionId || null
+        teacherId, userId, employeeId || null, firstName, lastName,
+        dateOfBirth || null, gender || null, phonePrimary || null, phoneSecondary || null,
+        address || null, city || null, state || null, pincode || null, qualification || null,
+        experienceYears || 0, specialization || null, joiningDate || null, salary || null
       ]
     );
 
-    // Update class teacher assignment
-    if (isClassTeacher && classId) {
-      await query(
-        'UPDATE classes SET class_teacher_id = ? WHERE id = ?',
-        [teacherId, classId]
-      );
-    }
-
-    logger.info(`Teacher created: ${employeeId}`);
-
+    logger.info(`Teacher created: ${firstName} ${lastName}`);
     return await this.getTeacherById(teacherId);
   }
 
-  async generateEmployeeId() {
-    const year = new Date().getFullYear().toString().slice(-2);
+  async getTeachers(filters = {}, pagination = {}) {
+    const { search, status, specialization } = filters;
+    const { page = 1, limit = 20 } = pagination;
+    const offset = (page - 1) * limit;
 
-    const results = await query(
-      `SELECT employee_id FROM teachers
-       WHERE employee_id LIKE ?
-       ORDER BY employee_id DESC LIMIT 1`,
-      [`TCH${year}%`]
-    );
+    let sql = `
+      SELECT t.*, u.email, u.is_active as user_active
+      FROM teachers t
+      LEFT JOIN users u ON t.user_id = u.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
 
-    let sequence = 1;
-    if (results.length > 0) {
-      const lastNumber = results[0].employee_id;
-      sequence = parseInt(lastNumber.slice(-4)) + 1;
+    if (search) {
+      sql += ` AND (t.first_name ILIKE $${paramIndex} OR t.last_name ILIKE $${paramIndex} OR t.employee_id ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
     }
 
-    return `TCH${year}${sequence.toString().padStart(4, '0')}`;
+    if (status) {
+      sql += ` AND t.status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
+    }
+
+    sql += ' ORDER BY t.created_at DESC';
+    sql += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    const teachers = await query(sql, params);
+    
+    return {
+      teachers,
+      pagination: { page, limit }
+    };
   }
 
   async getTeacherById(id) {
     const results = await query(
-      `SELECT
-        t.*,
-        u.email,
-        u.last_login,
-        d.name as department_name,
-        d.code as department_code,
-        c.name as class_name,
-        c.section as section_name
+      `SELECT t.*, u.email, u.is_active as user_active
        FROM teachers t
        LEFT JOIN users u ON t.user_id = u.id
-       LEFT JOIN departments d ON t.department_id = d.id
-       LEFT JOIN classes c ON t.class_id = c.id
-       WHERE t.id = ?`,
+       WHERE t.id = $1`,
       [id]
     );
 
@@ -159,258 +104,73 @@ class TeacherService {
     return results[0];
   }
 
-  async getTeachers(filters = {}, pagination = {}) {
-    const {
-      departmentId,
-      status,
-      search,
-      specialization,
-      isClassTeacher,
-      gender
-    } = filters;
+  async updateTeacher(id, data) {
+    await this.getTeacherById(id);
 
-    const {
-      page = 1,
-      limit = 20,
-      sortBy = 'created_at',
-      sortOrder = 'DESC'
-    } = pagination;
-
-    const offset = (page - 1) * limit;
-
-    let sql = `
-      SELECT
-        t.*,
-        u.email,
-        u.is_active,
-        d.name as department_name,
-        c.name as class_name,
-        c.section as section_name
-      FROM teachers t
-      JOIN users u ON t.user_id = u.id
-      LEFT JOIN departments d ON t.department_id = d.id
-      LEFT JOIN classes c ON t.class_id = c.id
-      WHERE 1=1
-    `;
-
-    const params = [];
-
-    if (departmentId) {
-      sql += ' AND t.department_id = ?';
-      params.push(departmentId);
-    }
-
-    if (status) {
-      sql += ' AND t.status = ?';
-      params.push(status);
-    }
-
-    if (specialization) {
-      sql += ' AND t.specialization = ?';
-      params.push(specialization);
-    }
-
-    if (isClassTeacher !== undefined) {
-      sql += ' AND t.is_class_teacher = ?';
-      params.push(isClassTeacher);
-    }
-
-    if (gender) {
-      sql += ' AND t.gender = ?';
-      params.push(gender);
-    }
-
-    if (search) {
-      sql += ` AND (
-        t.first_name LIKE ? OR
-        t.last_name LIKE ? OR
-        t.employee_id LIKE ? OR
-        u.email LIKE ?
-      )`;
-      const searchPattern = `%${search}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
-    }
-
-    // Get total count
-    const countSql = sql.replace(
-      /SELECT .+ FROM/,
-      'SELECT COUNT(*) as total FROM'
-    );
-    const countResult = await query(countSql, params);
-    const total = countResult[0]?.total || 0;
-
-    // Add sorting and pagination
-    sql += ` ORDER BY t.${sortBy} ${sortOrder}`;
-    sql += ` LIMIT ? OFFSET ?`;
-    params.push(limit, offset);
-
-    const teachers = await query(sql, params);
-
-    return {
-      teachers,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    };
-  }
-
-  async updateTeacher(id, updateData) {
     const updates = [];
     const values = [];
+    let paramIndex = 1;
 
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] !== undefined) {
-        const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        updates.push(`${dbKey} = ?`);
-        values.push(updateData[key] === '' ? null : updateData[key]);
+    const fieldMap = {
+      firstName: 'first_name',
+      lastName: 'last_name',
+      employeeId: 'employee_id',
+      dateOfBirth: 'date_of_birth',
+      gender: 'gender',
+      phonePrimary: 'phone_primary',
+      phoneSecondary: 'phone_secondary',
+      address: 'address',
+      city: 'city',
+      state: 'state',
+      pincode: 'pincode',
+      qualification: 'qualification',
+      experienceYears: 'experience_years',
+      specialization: 'specialization',
+      salary: 'salary',
+      status: 'status'
+    };
+
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined && fieldMap[key]) {
+        updates.push(`${fieldMap[key]} = $${paramIndex}`);
+        values.push(data[key]);
+        paramIndex++;
       }
     });
 
-    if (updates.length === 0) {
-      throw new ApiError(400, 'No fields to update');
+    if (updates.length > 0) {
+      values.push(id);
+      await query(
+        `UPDATE teachers SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex}`,
+        values
+      );
     }
-
-    values.push(id);
-
-    await query(
-      `UPDATE teachers SET ${updates.join(', ')}, updated_at = NOW() WHERE id = ?`,
-      values
-    );
 
     return await this.getTeacherById(id);
   }
 
   async deleteTeacher(id) {
     const teacher = await this.getTeacherById(id);
-
-    await query('DELETE FROM teachers WHERE id = ?', [id]);
-    await query('DELETE FROM users WHERE id = ?', [teacher.user_id]);
-
+    
+    // Delete user account
+    if (teacher.user_id) {
+      await query('DELETE FROM users WHERE id = $1', [teacher.user_id]);
+    }
+    
+    await query('DELETE FROM teachers WHERE id = $1', [id]);
     return { message: 'Teacher deleted successfully' };
   }
 
-  async getTeacherStatistics() {
+  async getStatistics() {
     const stats = await query(`
       SELECT
-        COUNT(*) as total_teachers,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_teachers,
-        SUM(CASE WHEN status = 'on_leave' THEN 1 ELSE 0 END) as on_leave_teachers,
-        SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as male_teachers,
-        SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as female_teachers,
-        SUM(CASE WHEN is_class_teacher = TRUE THEN 1 ELSE 0 END) as class_teachers
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN status = 'on_leave' THEN 1 ELSE 0 END) as on_leave,
+        SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive
       FROM teachers
     `);
-
-    return stats[0] || {};
-  }
-
-  async getAvailableTeachers(filters = {}) {
-    const { date, timeSlot } = filters;
-
-    let sql = `
-      SELECT
-        t.*,
-        u.email,
-        d.name as department_name
-      FROM teachers t
-      JOIN users u ON t.user_id = u.id
-      LEFT JOIN departments d ON t.department_id = d.id
-      WHERE t.status = 'active'
-    `;
-
-    const params = [];
-
-    if (date && timeSlot) {
-      sql += `
-        AND t.id NOT IN (
-          SELECT teacher_id FROM timetable
-          WHERE date = ? AND time_slot = ?
-        )
-      `;
-      params.push(date, timeSlot);
-    }
-
-    const teachers = await query(sql, params);
-    return teachers;
-  }
-
-
-  async getTeacherClasses(teacherId) {
-    // Get classes where teacher is assigned
-    const classes = await query(
-      `SELECT DISTINCT
-        c.id,
-        c.name as class_name,
-        c.section,
-        c.academic_year,
-        COUNT(DISTINCT s.id) as current_strength,
-        COUNT(DISTINCT cs.subject_id) as total_subjects,
-        ROUND(AVG(CASE WHEN a.status = 'present' THEN 100 ELSE 0 END), 2) as attendance_percentage,
-        ROUND(AVG(er.marks_obtained * 100.0 / e.max_marks), 2) as average_grade
-       FROM classes c
-       LEFT JOIN class_subjects cs ON c.id = cs.class_id
-       LEFT JOIN students s ON c.id = s.class_id AND s.status = 'active'
-       LEFT JOIN attendance a ON s.id = a.student_id
-       LEFT JOIN exam_results er ON s.id = er.student_id
-       LEFT JOIN exams e ON er.exam_id = e.id
-       WHERE cs.teacher_id = ?
-       GROUP BY c.id, c.name, c.section, c.academic_year`,
-      [teacherId]
-    );
-    
-    return classes;
-  }
-
-
-  async getTeacherTimetable(teacherId) {
-    // Get timetable entries for the teacher
-    const timetable = await query(
-      `SELECT 
-        t.id,
-        t.day_of_week,
-        p.period_number,
-        p.start_time,
-        p.end_time,
-        s.name as subject_name,
-        s.code as subject_code,
-        c.name as class_name,
-        c.section,
-        r.room_number
-       FROM timetable t
-       JOIN periods p ON t.period_id = p.id
-       JOIN subjects s ON t.subject_id = s.id
-       JOIN classes c ON t.class_id = c.id
-       LEFT JOIN rooms r ON t.room_id = r.id
-       WHERE t.teacher_id = ? AND t.is_active = TRUE
-       ORDER BY 
-        FIELD(t.day_of_week, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'),
-        p.period_number`,
-      [teacherId]
-    );
-
-    // Group by day
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    const groupedTimetable = days.map(day => ({
-      day_name: day,
-      day: day,
-      periods: timetable
-        .filter(entry => entry.day_of_week.toLowerCase() === day.toLowerCase())
-        .map(entry => ({
-          period_number: entry.period_number,
-          start_time: entry.start_time,
-          end_time: entry.end_time,
-          subject_name: entry.subject_name,
-          subject_code: entry.subject_code,
-          class_name: `${entry.class_name}${entry.section ? '-' + entry.section : ''}`,
-          room_number: entry.room_number,
-          room: entry.room_number
-        }))
-    }));
-
-    return groupedTimetable;
+    return stats[0];
   }
 }
 

@@ -17,14 +17,17 @@ if (!fs.existsSync('./logs')) {
 
 const app = express();
 
+// Trust proxy for Render/Heroku/etc
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS configuration - Allow all origins for now
+// CORS configuration - Allow all origins
 app.use(cors({
-  origin: true, // Allow all origins
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
@@ -68,6 +71,7 @@ app.get('/', (req, res) => {
 });
 
 // API routes
+logger.info(`Registering routes at /api/${config.apiVersion}`);
 app.use(`/api/${config.apiVersion}`, routes);
 
 // 404 handler

@@ -15,9 +15,8 @@ router.get('/', authenticate, async (req, res) => {
       FROM classes c
       LEFT JOIN students s ON c.id = s.class_id AND s.status = 'active'
       GROUP BY c.id
-      ORDER BY c.numeric_value, c.section
+      ORDER BY c.name, c.section
     `);
-    
     res.json({
       success: true,
       data: classes
@@ -28,31 +27,41 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// Get single class
+router.get('/:id', authenticate, async (req, res) => {
+  try {
+    const classes = await query('SELECT * FROM classes WHERE id = $1', [req.params.id]);
+    if (classes.length === 0) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+    res.json({ success: true, data: classes[0] });
+  } catch (error) {
+    console.error('Get class error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching class' });
+  }
+});
+
 // Create class
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { name, section, max_students, room_number } = req.body;
+    const { name, section, capacity, room_number, academic_year, description } = req.body;
     
-    // Extract numeric value from class name (e.g., "Grade 10" -> 10)
-    const numericMatch = name.match(/\d+/);
-    const numeric_value = numericMatch ? parseInt(numericMatch[0]) : 0;
-    
-    // Get current academic year
     const currentYear = new Date().getFullYear();
-    const academic_year = `${currentYear}-${currentYear + 1}`;
+    const academicYear = academic_year || `${currentYear}-${currentYear + 1}`;
     
     const classId = uuidv4();
-    
     await query(
-      `INSERT INTO classes (id, name, numeric_value, section, max_students, room_number, academic_year) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [classId, name, numeric_value, section, max_students || 40, room_number || null, academic_year]
+      `INSERT INTO classes (id, name, section, capacity, room_number, academic_year, description, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
+      [classId, name, section || null, capacity || 40, room_number || null, academicYear, description || null]
     );
+    
+    const newClass = await query('SELECT * FROM classes WHERE id = $1', [classId]);
     
     res.status(201).json({
       success: true,
       message: 'Class created successfully',
-      data: { id: classId }
+      data: newClass[0]
     });
   } catch (error) {
     console.error('Create class error:', error);
@@ -63,20 +72,22 @@ router.post('/', authenticate, async (req, res) => {
 // Update class
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, section, max_students, room_number } = req.body;
-    
-    const numericMatch = name.match(/\d+/);
-    const numeric_value = numericMatch ? parseInt(numericMatch[0]) : 0;
+    const { name, section, capacity, room_number, academic_year, description, is_active } = req.body;
     
     await query(
-      `UPDATE classes SET name = ?, numeric_value = ?, section = ?, max_students = ?, room_number = ? 
-       WHERE id = ?`,
-      [name, numeric_value, section, max_students, room_number, req.params.id]
+      `UPDATE classes 
+       SET name = $1, section = $2, capacity = $3, room_number = $4, 
+           academic_year = $5, description = $6, is_active = $7, updated_at = NOW()
+       WHERE id = $8`,
+      [name, section, capacity, room_number, academic_year, description, is_active !== false, req.params.id]
     );
+    
+    const updated = await query('SELECT * FROM classes WHERE id = $1', [req.params.id]);
     
     res.json({
       success: true,
-      message: 'Class updated successfully'
+      message: 'Class updated successfully',
+      data: updated[0]
     });
   } catch (error) {
     console.error('Update class error:', error);
@@ -87,8 +98,7 @@ router.put('/:id', authenticate, async (req, res) => {
 // Delete class
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM classes WHERE id = ?', [req.params.id]);
-    
+    await query('DELETE FROM classes WHERE id = $1', [req.params.id]);
     res.json({
       success: true,
       message: 'Class deleted successfully'

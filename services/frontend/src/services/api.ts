@@ -36,6 +36,7 @@ class ApiService {
     );
   }
 
+  // Auth
   login(email: string, password: string) {
     return this.api.post('/auth/login', { email, password });
   }
@@ -52,10 +53,12 @@ class ApiService {
     return this.api.get('/auth/me');
   }
 
+  // Dashboard
   getDashboardStats() {
     return this.api.get('/admin/dashboard');
   }
 
+  // Students
   getStudents(params?: any) {
     return this.api.get('/students', { params });
   }
@@ -88,6 +91,7 @@ class ApiService {
     return this.api.get('/fee/student/' + studentId);
   }
 
+  // Teachers
   getTeachers(params?: any) {
     return this.api.get('/teachers', { params });
   }
@@ -108,6 +112,11 @@ class ApiService {
     return this.api.delete('/teachers/' + id);
   }
 
+  getTeacherClasses(teacherId: string) {
+    return this.api.get('/teachers/' + teacherId + '/classes');
+  }
+
+  // Parents
   getParents(params?: any) {
     return this.api.get('/parents', { params });
   }
@@ -128,10 +137,15 @@ class ApiService {
     return this.api.put('/parents/' + id, data);
   }
 
+  deleteParent(id: string) {
+    return this.api.delete('/parents/' + id);
+  }
+
   linkStudentToParent(parentId: string, studentId: string) {
     return this.api.post('/parents/' + parentId + '/link-student', { studentId });
   }
 
+  // Classes
   getClasses(params?: any) {
     return this.api.get('/classes', { params });
   }
@@ -152,6 +166,11 @@ class ApiService {
     return this.api.delete('/classes/' + id);
   }
 
+  getClassStudents(classId: string) {
+    return this.api.get('/students', { params: { classId } });
+  }
+
+  // Subjects
   getSubjects(params?: any) {
     return this.api.get('/subjects', { params });
   }
@@ -172,6 +191,7 @@ class ApiService {
     return this.api.delete('/subjects/' + id);
   }
 
+  // Attendance
   getAttendance(params?: any) {
     return this.api.get('/attendance', { params });
   }
@@ -186,6 +206,14 @@ class ApiService {
 
   getAttendanceByClass(classId: string, date: string) {
     return this.api.get('/attendance/class/' + classId, { params: { date } });
+  }
+
+  getAttendanceStatistics(params?: any) {
+    return this.api.get('/attendance/statistics', { params });
+  }
+
+  getStudentAttendanceStatistics(studentId: string) {
+    return this.api.get('/attendance/statistics/' + studentId);
   }
 
   // Fee Management
@@ -209,7 +237,6 @@ class ApiService {
     return this.api.post('/fee/invoice', data);
   }
 
-  // Generate bulk invoices for students
   generateInvoices(data: any) {
     return this.api.post('/fee/invoice/bulk', data);
   }
@@ -252,11 +279,23 @@ class ApiService {
     return this.api.get('/exams', { params });
   }
 
+  getExam(id: string) {
+    return this.api.get('/exams/' + id);
+  }
+
   createExam(data: any) {
     return this.api.post('/exams', data);
   }
 
-  // Academic
+  updateExam(id: string, data: any) {
+    return this.api.put('/exams/' + id, data);
+  }
+
+  deleteExam(id: string) {
+    return this.api.delete('/exams/' + id);
+  }
+
+  // Academic Results
   getResults(params?: any) {
     return this.api.get('/academic/results', { params });
   }
@@ -272,6 +311,22 @@ class ApiService {
 
   createTimetableEntry(data: any) {
     return this.api.post('/timetable', data);
+  }
+
+  getTeacherTimetable(teacherId: string) {
+    return this.api.get('/timetable/teacher/' + teacherId);
+  }
+
+  getStudentTimetable(studentId: string) {
+    return this.api.get('/timetable/student/' + studentId);
+  }
+
+  createPeriod(data: any) {
+    return this.api.post('/timetable/period', data);
+  }
+
+  assignSubstitute(data: any) {
+    return this.api.post('/timetable/substitute', data);
   }
 
   // Communication
@@ -291,9 +346,17 @@ class ApiService {
     return this.api.post('/communication/messages', data);
   }
 
+  markMessageAsRead(id: string) {
+    return this.api.put('/communication/messages/' + id + '/read');
+  }
+
   // Notifications
   getNotifications() {
     return this.api.get('/notifications');
+  }
+
+  createNotification(data: any) {
+    return this.api.post('/notifications', data);
   }
 
   markNotificationAsRead(id: string) {
@@ -307,6 +370,10 @@ class ApiService {
   // Users
   getUsers(params?: any) {
     return this.api.get('/users', { params });
+  }
+
+  getUser(id: string) {
+    return this.api.get('/users/' + id);
   }
 
   createUser(data: any) {
@@ -336,6 +403,15 @@ class ApiService {
 
   createAcademicYear(data: any) {
     return this.api.post('/settings/academic-years', data);
+  }
+
+  // Bulk Import
+  bulkImportStudents(data: any) {
+    return this.api.post('/students/bulk-import', data);
+  }
+
+  bulkImportTeachers(data: any) {
+    return this.api.post('/teachers/bulk-import', data);
   }
 }
 

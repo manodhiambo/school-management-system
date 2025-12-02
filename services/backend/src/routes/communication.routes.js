@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.get('/announcements', authenticate, async (req, res) => {
       data: announcements
     });
   } catch (error) {
-    console.error('Get announcements error:', error);
+    logger.error('Get announcements error:', error);
     res.status(500).json({ success: false, message: 'Error fetching announcements' });
   }
 });
@@ -42,7 +43,7 @@ router.post('/announcements', authenticate, async (req, res) => {
       message: 'Announcement created successfully'
     });
   } catch (error) {
-    console.error('Create announcement error:', error);
+    logger.error('Create announcement error:', error);
     res.status(500).json({ success: false, message: 'Error creating announcement' });
   }
 });
@@ -66,7 +67,7 @@ router.get('/messages', authenticate, async (req, res) => {
       data: { messages }
     });
   } catch (error) {
-    console.error('Get messages error:', error);
+    logger.error('Get messages error:', error);
     res.status(500).json({ success: false, message: 'Error fetching messages' });
   }
 });
@@ -88,7 +89,7 @@ router.post('/messages', authenticate, async (req, res) => {
       message: 'Message sent successfully'
     });
   } catch (error) {
-    console.error('Send message error:', error);
+    logger.error('Send message error:', error);
     res.status(500).json({ success: false, message: 'Error sending message' });
   }
 });
@@ -105,7 +106,7 @@ router.put('/messages/:id/read', authenticate, async (req, res) => {
       message: 'Message marked as read'
     });
   } catch (error) {
-    console.error('Mark message error:', error);
+    logger.error('Mark message error:', error);
     res.status(500).json({ success: false, message: 'Error marking message' });
   }
 });

@@ -1,82 +1,129 @@
 import express from 'express';
-import settingsController from '../controllers/settingsController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
-import { validateRequest, schemas } from '../utils/validators.js';
-import Joi from 'joi';
+import { query } from '../config/database.js';
+import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-router.use(authenticate);
-
-// Validation schemas
-const updateSettingsSchema = Joi.object({
-  body: Joi.object({
-    schoolName: Joi.string().optional(),
-    school_name: Joi.string().optional(),
-    schoolCode: Joi.string().optional(),
-    school_code: Joi.string().optional(),
-    schoolLogoUrl: Joi.string().uri().optional(),
-    address: Joi.string().optional(),
-    city: Joi.string().optional(),
-    state: Joi.string().optional(),
-    pincode: Joi.string().optional(),
-    phone: Joi.string().optional(),
-    email: Joi.string().email().optional(),
-    website: Joi.string().uri().optional(),
-    currentAcademicYear: Joi.string().optional(),
-    current_academic_year: Joi.string().optional(),
-    timezone: Joi.string().optional(),
-    currency: Joi.string().optional(),
-    dateFormat: Joi.string().optional(),
-    timeFormat: Joi.string().optional(),
-    attendanceMethod: Joi.string().valid('manual', 'biometric', 'qr', 'rfid', 'all').optional(),
-    feeLateeFeeApplicable: Joi.boolean().optional(),
-    smsEnabled: Joi.boolean().optional(),
-    emailEnabled: Joi.boolean().optional(),
-    pushNotificationEnabled: Joi.boolean().optional()
-  })
+// Get settings
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const settings = await query('SELECT * FROM settings LIMIT 1');
+    res.json({
+      success: true,
+      data: settings[0] || {}
+    });
+  } catch (error) {
+    logger.error('Get settings error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching settings' });
+  }
 });
 
-const createAcademicYearSchema = Joi.object({
-  body: Joi.object({
-    year: Joi.string().required(),
-    startDate: schemas.date,
-    endDate: schemas.date,
-    isCurrent: Joi.boolean().default(false)
-  })
+// Update settings
+router.put('/', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const {
+      school_name, school_code, phone, email, address, city, state, pincode,
+      website, current_academic_year, timezone, currency, date_format,
+      logo_url, principal_name, principal_signature
+    } = req.body;
+
+    // Check if settings exist
+    const existing = await query('SELECT * FROM settings LIMIT 1');
+    
+    if (existing.length === 0) {
+      // Create settings
+      const settingsId = uuidv4();
+      await query(
+        `INSERT INTO settings (id, school_name, school_code, phone, email, address, city, state, pincode, 
+          website, current_academic_year, timezone, currency, date_format, logo_url, principal_name, principal_signature)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+        [settingsId, school_name, school_code, phone, email, address, city, state, pincode,
+          website, current_academic_year, timezone || 'Africa/Nairobi', currency || 'KES', 
+          date_format || 'DD/MM/YYYY', logo_url, principal_name, principal_signature]
+      );
+    } else {
+      // Update settings
+      await query(
+        `UPDATE settings SET 
+          school_name = COALESCE($1, school_name),
+          school_code = COALESCE($2, school_code),
+          phone = COALESCE($3, phone),
+          email = COALESCE($4, email),
+          address = COALESCE($5, address),
+          city = COALESCE($6, city),
+          state = COALESCE($7, state),
+          pincode = COALESCE($8, pincode),
+          website = COALESCE($9, website),
+          current_academic_year = COALESCE($10, current_academic_year),
+          timezone = COALESCE($11, timezone),
+          currency = COALESCE($12, currency),
+          date_format = COALESCE($13, date_format),
+          logo_url = COALESCE($14, logo_url),
+          principal_name = COALESCE($15, principal_name),
+          principal_signature = COALESCE($16, principal_signature),
+          updated_at = NOW()
+         WHERE id = $17`,
+        [school_name, school_code, phone, email, address, city, state, pincode,
+          website, current_academic_year, timezone, currency, date_format,
+          logo_url, principal_name, principal_signature, existing[0].id]
+      );
+    }
+
+    const settings = await query('SELECT * FROM settings LIMIT 1');
+    
+    res.json({
+      success: true,
+      message: 'Settings updated successfully',
+      data: settings[0]
+    });
+  } catch (error) {
+    logger.error('Update settings error:', error);
+    res.status(500).json({ success: false, message: 'Error updating settings' });
+  }
 });
 
-const setCurrentYearSchema = Joi.object({
-  body: Joi.object({
-    yearId: schemas.id
-  })
+// Get academic years
+router.get('/academic-years', authenticate, async (req, res) => {
+  try {
+    const years = await query('SELECT * FROM academic_years ORDER BY start_date DESC');
+    res.json({
+      success: true,
+      data: years
+    });
+  } catch (error) {
+    logger.error('Get academic years error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching academic years' });
+  }
 });
 
-// Dashboard - accessible by all authenticated users
-router.get('/dashboard', settingsController.getDashboardStatistics);
-
-// Settings routes - GET and PUT on root path (since this router is mounted at /settings)
-router.get('/', requireRole(['admin']), settingsController.getSettings);
-router.put('/', requireRole(['admin']), validateRequest(updateSettingsSchema), settingsController.updateSettings);
-
-// Also support /settings/settings for backwards compatibility
-router.get('/settings', requireRole(['admin']), settingsController.getSettings);
-router.put('/settings', requireRole(['admin']), validateRequest(updateSettingsSchema), settingsController.updateSettings);
-
-// Academic year routes - admin only
-router.post('/academic-years', requireRole(['admin']), validateRequest(createAcademicYearSchema), settingsController.createAcademicYear);
-router.get('/academic-years', requireRole(['admin']), settingsController.getAcademicYears);
-router.get('/academic-years/current', requireRole(['admin']), settingsController.getCurrentAcademicYear);
-router.post('/academic-years/set-current', requireRole(['admin']), validateRequest(setCurrentYearSchema), settingsController.setCurrentAcademicYear);
-
-// Audit logs - admin only
-router.get('/audit-logs', requireRole(['admin']), settingsController.getAuditLogs);
-
-// System logs - admin only
-router.get('/system-logs', requireRole(['admin']), settingsController.getSystemLogs);
-
-// Backup - admin only
-router.post('/backup', requireRole(['admin']), settingsController.createBackup);
+// Create academic year
+router.post('/academic-years', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const { year, start_date, end_date, is_current } = req.body;
+    
+    const yearId = uuidv4();
+    
+    if (is_current) {
+      await query('UPDATE academic_years SET is_current = false');
+    }
+    
+    await query(
+      `INSERT INTO academic_years (id, year, start_date, end_date, is_current)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [yearId, year, start_date, end_date, is_current || false]
+    );
+    
+    res.status(201).json({
+      success: true,
+      message: 'Academic year created successfully'
+    });
+  } catch (error) {
+    logger.error('Create academic year error:', error);
+    res.status(500).json({ success: false, message: 'Error creating academic year' });
+  }
+});
 
 export default router;

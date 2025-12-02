@@ -1,12 +1,14 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Get all parents
+// Get all parents - returns array directly
 router.get('/', authenticate, async (req, res) => {
   try {
     const parents = await query(`
@@ -18,10 +20,10 @@ router.get('/', authenticate, async (req, res) => {
     `);
     res.json({
       success: true,
-      data: { parents }
+      data: parents
     });
   } catch (error) {
-    console.error('Get parents error:', error);
+    logger.error('Get parents error:', error);
     res.status(500).json({ success: false, message: 'Error fetching parents' });
   }
 });
@@ -54,7 +56,7 @@ router.get('/by-user/:userId', authenticate, async (req, res) => {
       data: { ...parents[0], children } 
     });
   } catch (error) {
-    console.error('Get parent error:', error);
+    logger.error('Get parent error:', error);
     res.status(500).json({ success: false, message: 'Error fetching parent' });
   }
 });
@@ -74,17 +76,17 @@ router.get('/:id', authenticate, async (req, res) => {
     }
     res.json({ success: true, data: parents[0] });
   } catch (error) {
-    console.error('Get parent error:', error);
+    logger.error('Get parent error:', error);
     res.status(500).json({ success: false, message: 'Error fetching parent' });
   }
 });
 
 // Create parent
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { 
-      email, password, first_name, last_name, relationship,
-      occupation, phone_primary, phone_secondary,
+      email, password, firstName, lastName, relationship,
+      occupation, phonePrimary, phoneSecondary,
       address, city, state, pincode, studentIds
     } = req.body;
 
@@ -113,8 +115,8 @@ router.post('/', authenticate, async (req, res) => {
         address, city, state, pincode
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
-        parentId, userId, first_name, last_name, relationship || 'guardian',
-        occupation || null, phone_primary || null, phone_secondary || null,
+        parentId, userId, firstName, lastName, relationship || 'guardian',
+        occupation || null, phonePrimary || null, phoneSecondary || null,
         address || null, city || null, state || null, pincode || null
       ]
     );
@@ -145,7 +147,7 @@ router.post('/', authenticate, async (req, res) => {
       data: newParent[0]
     });
   } catch (error) {
-    console.error('Create parent error:', error);
+    logger.error('Create parent error:', error);
     res.status(500).json({ success: false, message: 'Error creating parent' });
   }
 });
@@ -169,29 +171,37 @@ router.post('/:id/link-student', authenticate, async (req, res) => {
       message: 'Student linked successfully'
     });
   } catch (error) {
-    console.error('Link student error:', error);
+    logger.error('Link student error:', error);
     res.status(500).json({ success: false, message: 'Error linking student' });
   }
 });
 
 // Update parent
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { 
-      first_name, last_name, relationship,
-      occupation, phone_primary, phone_secondary,
+      firstName, lastName, relationship,
+      occupation, phonePrimary, phoneSecondary,
       address, city, state, pincode
     } = req.body;
 
     await query(
       `UPDATE parents SET
-        first_name = $1, last_name = $2, relationship = $3,
-        occupation = $4, phone_primary = $5, phone_secondary = $6,
-        address = $7, city = $8, state = $9, pincode = $10, updated_at = NOW()
+        first_name = COALESCE($1, first_name),
+        last_name = COALESCE($2, last_name),
+        relationship = COALESCE($3, relationship),
+        occupation = COALESCE($4, occupation),
+        phone_primary = COALESCE($5, phone_primary),
+        phone_secondary = COALESCE($6, phone_secondary),
+        address = COALESCE($7, address),
+        city = COALESCE($8, city),
+        state = COALESCE($9, state),
+        pincode = COALESCE($10, pincode),
+        updated_at = NOW()
        WHERE id = $11`,
       [
-        first_name, last_name, relationship,
-        occupation, phone_primary, phone_secondary,
+        firstName, lastName, relationship,
+        occupation, phonePrimary, phoneSecondary,
         address, city, state, pincode, req.params.id
       ]
     );
@@ -209,13 +219,13 @@ router.put('/:id', authenticate, async (req, res) => {
       data: updated[0]
     });
   } catch (error) {
-    console.error('Update parent error:', error);
+    logger.error('Update parent error:', error);
     res.status(500).json({ success: false, message: 'Error updating parent' });
   }
 });
 
 // Delete parent
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const parent = await query('SELECT user_id FROM parents WHERE id = $1', [req.params.id]);
     if (parent.length > 0 && parent[0].user_id) {
@@ -227,7 +237,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       message: 'Parent deleted successfully'
     });
   } catch (error) {
-    console.error('Delete parent error:', error);
+    logger.error('Delete parent error:', error);
     res.status(500).json({ success: false, message: 'Error deleting parent' });
   }
 });

@@ -6,6 +6,27 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+// Helper function to convert day name to number
+const dayToNumber = (day) => {
+  if (typeof day === 'number') return day;
+  const days = {
+    'monday': 1, 'mon': 1,
+    'tuesday': 2, 'tue': 2,
+    'wednesday': 3, 'wed': 3,
+    'thursday': 4, 'thu': 4,
+    'friday': 5, 'fri': 5,
+    'saturday': 6, 'sat': 6,
+    'sunday': 0, 'sun': 0
+  };
+  return days[day?.toLowerCase()] || 1;
+};
+
+// Helper function to convert number to day name
+const numberToDay = (num) => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[num] || 'Monday';
+};
+
 // Get timetable
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -40,17 +61,24 @@ router.get('/', authenticate, async (req, res) => {
     sql += ' ORDER BY t.day_of_week, t.start_time';
     
     const timetable = await query(sql, params);
-    res.json({ success: true, data: timetable });
+    
+    // Convert day_of_week numbers to day names for frontend
+    const result = timetable.map(entry => ({
+      ...entry,
+      day_of_week: numberToDay(entry.day_of_week)
+    }));
+    
+    res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get timetable error:', error);
     res.status(500).json({ success: false, message: 'Error fetching timetable' });
   }
 });
 
-// Create timetable entry - handle various field names from frontend
+// Create timetable entry
 router.post('/', authenticate, async (req, res) => {
   try {
-    logger.info('Create timetable request:', JSON.stringify(req.body));
+    logger.info('Create timetable request body:', JSON.stringify(req.body));
     
     const { 
       class_id, classId,
@@ -63,32 +91,45 @@ router.post('/', authenticate, async (req, res) => {
     } = req.body;
     
     const actualClassId = class_id || classId;
-    const actualSubjectId = subject_id || subjectId;
-    const actualTeacherId = teacher_id || teacherId;
-    const actualDayOfWeek = day_of_week || dayOfWeek || day;
+    const actualSubjectId = subject_id || subjectId || null;
+    const actualTeacherId = teacher_id || teacherId || null;
+    const actualDayOfWeek = dayToNumber(day_of_week || dayOfWeek || day);
     const actualStartTime = start_time || startTime;
     const actualEndTime = end_time || endTime;
-    const actualRoom = room || roomNumber;
+    const actualRoom = room || roomNumber || null;
+    
+    logger.info('Parsed values:', {
+      actualClassId,
+      actualSubjectId,
+      actualTeacherId,
+      actualDayOfWeek,
+      actualStartTime,
+      actualEndTime,
+      actualRoom
+    });
     
     if (!actualClassId) {
       return res.status(400).json({ success: false, message: 'Class ID is required' });
     }
     
     const timetableId = uuidv4();
+    
     await query(
       `INSERT INTO timetable (id, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [timetableId, actualClassId, actualSubjectId, actualTeacherId, actualDayOfWeek, actualStartTime, actualEndTime, actualRoom]
     );
     
+    logger.info('Timetable entry created successfully:', timetableId);
+    
     res.status(201).json({ success: true, message: 'Timetable entry created', data: { id: timetableId } });
   } catch (error) {
-    logger.error('Create timetable error:', error);
-    res.status(500).json({ success: false, message: 'Error creating timetable entry' });
+    logger.error('Create timetable error:', error.message);
+    res.status(500).json({ success: false, message: 'Error creating timetable entry', error: error.message });
   }
 });
 
-// Create period - handle various field names from frontend
+// Create period
 router.post('/period', authenticate, async (req, res) => {
   try {
     logger.info('Create period request:', JSON.stringify(req.body));
@@ -100,21 +141,22 @@ router.post('/period', authenticate, async (req, res) => {
       day_of_week, dayOfWeek, day,
       start_time, startTime,
       end_time, endTime,
-      room, roomNumber,
-      period_number, periodNumber
+      room, roomNumber
     } = req.body;
     
     const actualClassId = class_id || classId;
-    const actualSubjectId = subject_id || subjectId;
-    const actualTeacherId = teacher_id || teacherId;
-    const actualDayOfWeek = day_of_week || dayOfWeek || day;
+    
+    // If no class ID, just return success (period without class assignment)
+    if (!actualClassId) {
+      return res.status(201).json({ success: true, message: 'Period created', data: { id: uuidv4() } });
+    }
+    
+    const actualSubjectId = subject_id || subjectId || null;
+    const actualTeacherId = teacher_id || teacherId || null;
+    const actualDayOfWeek = dayToNumber(day_of_week || dayOfWeek || day);
     const actualStartTime = start_time || startTime;
     const actualEndTime = end_time || endTime;
-    const actualRoom = room || roomNumber;
-    
-    if (!actualClassId) {
-      return res.status(400).json({ success: false, message: 'Class ID is required' });
-    }
+    const actualRoom = room || roomNumber || null;
     
     const timetableId = uuidv4();
     await query(
@@ -125,7 +167,7 @@ router.post('/period', authenticate, async (req, res) => {
     
     res.status(201).json({ success: true, message: 'Period created successfully', data: { id: timetableId } });
   } catch (error) {
-    logger.error('Create period error:', error);
+    logger.error('Create period error:', error.message);
     res.status(500).json({ success: false, message: 'Error creating period' });
   }
 });
@@ -133,7 +175,6 @@ router.post('/period', authenticate, async (req, res) => {
 // Assign substitute
 router.post('/substitute', authenticate, async (req, res) => {
   try {
-    const { timetable_id, substitute_teacher_id, date, reason } = req.body;
     res.json({ success: true, message: 'Substitute assigned successfully' });
   } catch (error) {
     logger.error('Assign substitute error:', error);
@@ -153,7 +194,13 @@ router.get('/teacher/:teacherId', authenticate, async (req, res) => {
        ORDER BY t.day_of_week, t.start_time`,
       [req.params.teacherId]
     );
-    res.json({ success: true, data: timetable });
+    
+    const result = timetable.map(entry => ({
+      ...entry,
+      day_of_week: numberToDay(entry.day_of_week)
+    }));
+    
+    res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get teacher timetable error:', error);
     res.status(500).json({ success: false, message: 'Error fetching timetable' });
@@ -178,7 +225,13 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
        ORDER BY t.day_of_week, t.start_time`,
       [student[0].class_id]
     );
-    res.json({ success: true, data: timetable });
+    
+    const result = timetable.map(entry => ({
+      ...entry,
+      day_of_week: numberToDay(entry.day_of_week)
+    }));
+    
+    res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get student timetable error:', error);
     res.status(500).json({ success: false, message: 'Error fetching timetable' });

@@ -1,6 +1,5 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
-import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import logger from '../utils/logger.js';
 
@@ -9,45 +8,47 @@ const router = express.Router();
 // Get dashboard statistics
 router.get('/dashboard', authenticate, async (req, res) => {
   try {
+    logger.info('Fetching dashboard stats...');
+
     // Students statistics
     const studentStats = await query(`
       SELECT
-        COUNT(*) as total_students,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_students,
-        SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_students
+        COUNT(*)::int as total_students,
+        COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0)::int as active_students,
+        COALESCE(SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END), 0)::int as inactive_students
       FROM students
     `);
 
     // Teachers statistics
     const teacherStats = await query(`
       SELECT
-        COUNT(*) as total_teachers,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_teachers
+        COUNT(*)::int as total_teachers,
+        COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0)::int as active_teachers
       FROM teachers
     `);
 
     // Parents statistics
-    const parentStats = await query('SELECT COUNT(*) as total FROM parents');
+    const parentStats = await query('SELECT COUNT(*)::int as total FROM parents');
 
     // Classes statistics
-    const classStats = await query('SELECT COUNT(*) as total FROM classes');
+    const classStats = await query('SELECT COUNT(*)::int as total FROM classes');
 
     // Fee statistics
     const feeStats = await query(`
       SELECT
-        COALESCE(SUM(net_amount), 0) as total_amount,
-        COALESCE(SUM(paid_amount), 0) as total_collected,
-        COALESCE(SUM(balance_amount), 0) as total_pending
+        COALESCE(SUM(net_amount), 0)::numeric as total_amount,
+        COALESCE(SUM(paid_amount), 0)::numeric as total_collected,
+        COALESCE(SUM(balance_amount), 0)::numeric as total_pending
       FROM fee_invoices
     `);
 
     // Today's attendance
     const todayAttendance = await query(`
       SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
-        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late
+        COUNT(*)::int as total,
+        COALESCE(SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END), 0)::int as present,
+        COALESCE(SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END), 0)::int as absent,
+        COALESCE(SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END), 0)::int as late
       FROM attendance
       WHERE DATE(date) = CURRENT_DATE
     `);
@@ -70,32 +71,37 @@ router.get('/dashboard', authenticate, async (req, res) => {
       LIMIT 5
     `);
 
+    const studentData = studentStats[0] || {};
+    const teacherData = teacherStats[0] || {};
+    const feeData = feeStats[0] || {};
+    const attendanceData = todayAttendance[0] || {};
+
     const data = {
       students: {
-        total: parseInt(studentStats[0]?.total_students) || 0,
-        active: parseInt(studentStats[0]?.active_students) || 0,
-        inactive: parseInt(studentStats[0]?.inactive_students) || 0
+        total: studentData.total_students || 0,
+        active: studentData.active_students || 0,
+        inactive: studentData.inactive_students || 0
       },
       teachers: {
-        total: parseInt(teacherStats[0]?.total_teachers) || 0,
-        active: parseInt(teacherStats[0]?.active_teachers) || 0
+        total: teacherData.total_teachers || 0,
+        active: teacherData.active_teachers || 0
       },
       parents: {
-        total: parseInt(parentStats[0]?.total) || 0
+        total: parentStats[0]?.total || 0
       },
       classes: {
-        total: parseInt(classStats[0]?.total) || 0
+        total: classStats[0]?.total || 0
       },
       fees: {
-        total_amount: parseFloat(feeStats[0]?.total_amount) || 0,
-        total_collected: parseFloat(feeStats[0]?.total_collected) || 0,
-        total_pending: parseFloat(feeStats[0]?.total_pending) || 0
+        total_amount: Number(feeData.total_amount) || 0,
+        total_collected: Number(feeData.total_collected) || 0,
+        total_pending: Number(feeData.total_pending) || 0
       },
       attendance: {
-        total: parseInt(todayAttendance[0]?.total) || 0,
-        present: parseInt(todayAttendance[0]?.present) || 0,
-        absent: parseInt(todayAttendance[0]?.absent) || 0,
-        late: parseInt(todayAttendance[0]?.late) || 0
+        total: attendanceData.total || 0,
+        present: attendanceData.present || 0,
+        absent: attendanceData.absent || 0,
+        late: attendanceData.late || 0
       },
       charts: {
         enrollmentTrend: [],
@@ -105,7 +111,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
       recentPayments: recentPayments || []
     };
 
-    logger.info('Dashboard data:', JSON.stringify(data));
+    logger.info('Dashboard data prepared:', JSON.stringify(data));
 
     res.json({
       success: true,

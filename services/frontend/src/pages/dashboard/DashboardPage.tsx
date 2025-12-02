@@ -49,7 +49,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600">{error}</p>
-            <button 
+            <button
               onClick={loadDashboardStats}
               className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
             >
@@ -64,7 +64,7 @@ export function DashboardPage() {
   // Get chart data from API response or use empty arrays
   const enrollmentData = stats?.charts?.enrollmentTrend || [];
   const feeCollectionData = stats?.charts?.feeCollectionTrend || [];
-  
+
   // Attendance pie chart data
   const attendanceData = [
     { name: 'Present', value: stats?.attendance?.present || 0 },
@@ -106,10 +106,10 @@ export function DashboardPage() {
             <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.students?.total_students || 0}</div>
+            <div className="text-2xl font-bold">{stats?.students?.total || 0}</div>
             <div className="flex items-center text-xs text-green-600 mt-1">
               <TrendingUp className="h-3 w-3 mr-1" />
-              <span>{stats?.students?.active_students || 0} active</span>
+              <span>{stats?.students?.active || 0} active</span>
             </div>
           </CardContent>
         </Card>
@@ -120,10 +120,10 @@ export function DashboardPage() {
             <GraduationCap className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.teachers?.total_teachers || 0}</div>
+            <div className="text-2xl font-bold">{stats?.teachers?.total || 0}</div>
             <div className="flex items-center text-xs text-green-600 mt-1">
               <TrendingUp className="h-3 w-3 mr-1" />
-              <span>{stats?.teachers?.active_teachers || 0} active</span>
+              <span>{stats?.teachers?.active || 0} active</span>
             </div>
           </CardContent>
         </Card>
@@ -135,11 +135,11 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              KES {parseFloat(stats?.fees?.total_collected || '0').toLocaleString()}
+              KES {(stats?.fees?.total_collected || 0).toLocaleString()}
             </div>
             <div className="flex items-center text-xs text-red-600 mt-1">
               <TrendingDown className="h-3 w-3 mr-1" />
-              <span>KES {parseFloat(stats?.fees?.total_pending || '0').toLocaleString()} pending</span>
+              <span>KES {(stats?.fees?.total_pending || 0).toLocaleString()} pending</span>
             </div>
           </CardContent>
         </Card>
@@ -151,32 +151,24 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.attendance?.present || 0}</div>
-            <div className="flex items-center text-xs text-gray-500 mt-1">
+            <div className="flex items-center text-xs text-gray-600 mt-1">
               <span>{stats?.attendance?.absent || 0} absent, {stats?.attendance?.late || 0} late</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Row 1 */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+      {/* Charts Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Student Enrollment Trend
-            </CardTitle>
+            <CardTitle>Student Enrollment Trend</CardTitle>
           </CardHeader>
           <CardContent>
             {enrollmentData.length > 0 ? (
-              <LineChart
-                data={enrollmentData}
-                xKey="month"
-                yKey="students"
-                color="#8884d8"
-              />
+              <LineChart data={enrollmentData} />
             ) : (
-              <div className="flex items-center justify-center h-64 text-gray-400">
+              <div className="h-[300px] flex items-center justify-center text-gray-400">
                 No enrollment data available
               </div>
             )}
@@ -185,21 +177,13 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Today's Attendance Distribution
-            </CardTitle>
+            <CardTitle>Today's Attendance Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             {hasAttendanceData ? (
-              <PieChart
-                data={attendanceData}
-                nameKey="name"
-                valueKey="value"
-                colors={['#00C49F', '#FF8042', '#FFBB28']}
-              />
+              <PieChart data={attendanceData} />
             ) : (
-              <div className="flex items-center justify-center h-64 text-gray-400">
+              <div className="h-[300px] flex items-center justify-center text-gray-400">
                 No attendance data for today
               </div>
             )}
@@ -207,94 +191,120 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Charts Row 2 */}
-      <div className="grid gap-4 md:grid-cols-1">
+      {/* Bottom Row */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Fee Collection Trend (Last 6 Months)
-            </CardTitle>
+            <CardTitle>Fee Collection Overview</CardTitle>
           </CardHeader>
           <CardContent>
             {feeCollectionData.length > 0 ? (
-              <BarChart
-                data={feeCollectionData}
-                xKey="month"
-                yKey="amount"
-                color="#10b981"
-              />
+              <BarChart data={feeCollectionData} />
             ) : (
-              <div className="flex items-center justify-center h-64 text-gray-400">
-                No fee collection data available
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-3 bg-green-50 rounded">
+                  <span className="text-sm font-medium">Total Expected</span>
+                  <span className="font-bold text-green-600">
+                    KES {(stats?.fees?.total_amount || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
+                  <span className="text-sm font-medium">Total Collected</span>
+                  <span className="font-bold text-blue-600">
+                    KES {(stats?.fees?.total_collected || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-red-50 rounded">
+                  <span className="text-sm font-medium">Total Pending</span>
+                  <span className="font-bold text-red-600">
+                    KES {(stats?.fees?.total_pending || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activities</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentActivities.length > 0 ? (
+              <div className="space-y-3">
+                {recentActivities.map((activity: any, index: number) => (
+                  <div key={index} className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded">
+                    <div className={`w-2 h-2 rounded-full mt-2 ${
+                      activity.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                    }`} />
+                    <div className="flex-1">
+                      <p className="text-sm">{activity.action}</p>
+                      <p className="text-xs text-gray-500">{activity.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-gray-400">
+                No recent activities
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Bottom Section */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* Quick Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Activities</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <BookOpen className="h-4 w-4 mr-2 text-indigo-500" />
+              Classes
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentActivities.length > 0 ? (
-                recentActivities.map((activity: any, index: number) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      activity.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
-                    }`} />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-gray-400 py-4">No recent activities</p>
-              )}
+            <div className="text-2xl font-bold">{stats?.classes?.total || 0}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <UserPlus className="h-4 w-4 mr-2 text-teal-500" />
+              Parents
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.parents?.total || 0}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <CreditCard className="h-4 w-4 mr-2 text-pink-500" />
+              Pending Invoices
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {stats?.fees?.pending_count || 0}
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Quick Stats
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Calendar className="h-4 w-4 mr-2 text-amber-500" />
+              Attendance Rate
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">Classes</span>
-                <span className="font-bold">{stats?.classes?.total || 0}</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">Subjects</span>
-                <span className="font-bold">{stats?.subjects?.total || 0}</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">Upcoming Exams</span>
-                <span className="font-bold">{stats?.exams?.upcoming || 0}</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">Pending Fees</span>
-                <span className="font-bold text-red-600">
-                  KES {parseFloat(stats?.fees?.total_pending || '0').toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">Active Parents</span>
-                <span className="font-bold">{stats?.parents?.total || 0}</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">New Admissions</span>
-                <span className="font-bold text-green-600">{stats?.students?.new_admissions || 0}</span>
-              </div>
+            <div className="text-2xl font-bold text-green-600">
+              {stats?.attendance?.total > 0 
+                ? Math.round((stats?.attendance?.present / stats?.attendance?.total) * 100)
+                : 0}%
             </div>
           </CardContent>
         </Card>

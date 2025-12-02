@@ -6,7 +6,7 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Get notifications for current user
+// Get notifications for current user - returns array directly
 router.get('/', authenticate, async (req, res) => {
   try {
     const notifications = await query(
@@ -16,10 +16,12 @@ router.get('/', authenticate, async (req, res) => {
        LIMIT 50`,
       [req.user.id]
     );
+    // Return array directly
     res.json({ success: true, data: notifications });
   } catch (error) {
     logger.error('Get notifications error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching notifications' });
+    // Return empty array on error
+    res.status(500).json({ success: false, message: 'Error fetching notifications', data: [] });
   }
 });
 
@@ -32,7 +34,7 @@ router.post('/', authenticate, async (req, res) => {
     await query(
       `INSERT INTO notifications (id, user_id, title, message, type)
        VALUES ($1, $2, $3, $4, $5)`,
-      [notificationId, user_id, title, message, type || 'info']
+      [notificationId, user_id || req.user.id, title, message, type || 'info']
     );
     
     res.status(201).json({ success: true, message: 'Notification created' });

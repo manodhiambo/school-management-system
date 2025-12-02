@@ -1,12 +1,14 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Get all teachers
+// Get all teachers - returns array directly
 router.get('/', authenticate, async (req, res) => {
   try {
     const teachers = await query(`
@@ -17,10 +19,10 @@ router.get('/', authenticate, async (req, res) => {
     `);
     res.json({
       success: true,
-      data: { teachers }
+      data: teachers
     });
   } catch (error) {
-    console.error('Get teachers error:', error);
+    logger.error('Get teachers error:', error);
     res.status(500).json({ success: false, message: 'Error fetching teachers' });
   }
 });
@@ -40,19 +42,19 @@ router.get('/:id', authenticate, async (req, res) => {
     }
     res.json({ success: true, data: teachers[0] });
   } catch (error) {
-    console.error('Get teacher error:', error);
+    logger.error('Get teacher error:', error);
     res.status(500).json({ success: false, message: 'Error fetching teacher' });
   }
 });
 
 // Create teacher
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { 
-      email, password, first_name, last_name, employee_id,
-      date_of_birth, gender, phone_primary, phone_secondary,
+      email, password, firstName, lastName, employeeId,
+      dateOfBirth, gender, phonePrimary, phoneSecondary,
       address, city, state, pincode, qualification,
-      experience_years, specialization, joining_date, salary
+      experienceYears, specialization, joiningDate, salary
     } = req.body;
 
     // Check if email exists
@@ -81,10 +83,10 @@ router.post('/', authenticate, async (req, res) => {
         experience_years, specialization, joining_date, salary, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'active')`,
       [
-        teacherId, userId, employee_id || null, first_name, last_name,
-        date_of_birth || null, gender || null, phone_primary || null, phone_secondary || null,
+        teacherId, userId, employeeId || null, firstName, lastName,
+        dateOfBirth || null, gender || null, phonePrimary || null, phoneSecondary || null,
         address || null, city || null, state || null, pincode || null, qualification || null,
-        experience_years || 0, specialization || null, joining_date || null, salary || null
+        experienceYears || 0, specialization || null, joiningDate || null, salary || null
       ]
     );
 
@@ -101,33 +103,46 @@ router.post('/', authenticate, async (req, res) => {
       data: newTeacher[0]
     });
   } catch (error) {
-    console.error('Create teacher error:', error);
+    logger.error('Create teacher error:', error);
     res.status(500).json({ success: false, message: 'Error creating teacher' });
   }
 });
 
 // Update teacher
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { 
-      first_name, last_name, employee_id,
-      date_of_birth, gender, phone_primary, phone_secondary,
+      firstName, lastName, employeeId,
+      dateOfBirth, gender, phonePrimary, phoneSecondary,
       address, city, state, pincode, qualification,
-      experience_years, specialization, salary, status
+      experienceYears, specialization, salary, status
     } = req.body;
 
     await query(
       `UPDATE teachers SET
-        first_name = $1, last_name = $2, employee_id = $3,
-        date_of_birth = $4, gender = $5, phone_primary = $6, phone_secondary = $7,
-        address = $8, city = $9, state = $10, pincode = $11, qualification = $12,
-        experience_years = $13, specialization = $14, salary = $15, status = $16, updated_at = NOW()
+        first_name = COALESCE($1, first_name),
+        last_name = COALESCE($2, last_name),
+        employee_id = COALESCE($3, employee_id),
+        date_of_birth = COALESCE($4, date_of_birth),
+        gender = COALESCE($5, gender),
+        phone_primary = COALESCE($6, phone_primary),
+        phone_secondary = COALESCE($7, phone_secondary),
+        address = COALESCE($8, address),
+        city = COALESCE($9, city),
+        state = COALESCE($10, state),
+        pincode = COALESCE($11, pincode),
+        qualification = COALESCE($12, qualification),
+        experience_years = COALESCE($13, experience_years),
+        specialization = COALESCE($14, specialization),
+        salary = COALESCE($15, salary),
+        status = COALESCE($16, status),
+        updated_at = NOW()
        WHERE id = $17`,
       [
-        first_name, last_name, employee_id,
-        date_of_birth, gender, phone_primary, phone_secondary,
+        firstName, lastName, employeeId,
+        dateOfBirth, gender, phonePrimary, phoneSecondary,
         address, city, state, pincode, qualification,
-        experience_years, specialization, salary, status || 'active', req.params.id
+        experienceYears, specialization, salary, status, req.params.id
       ]
     );
 
@@ -144,13 +159,13 @@ router.put('/:id', authenticate, async (req, res) => {
       data: updated[0]
     });
   } catch (error) {
-    console.error('Update teacher error:', error);
+    logger.error('Update teacher error:', error);
     res.status(500).json({ success: false, message: 'Error updating teacher' });
   }
 });
 
 // Delete teacher
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const teacher = await query('SELECT user_id FROM teachers WHERE id = $1', [req.params.id]);
     if (teacher.length > 0 && teacher[0].user_id) {
@@ -162,7 +177,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       message: 'Teacher deleted successfully'
     });
   } catch (error) {
-    console.error('Delete teacher error:', error);
+    logger.error('Delete teacher error:', error);
     res.status(500).json({ success: false, message: 'Error deleting teacher' });
   }
 });

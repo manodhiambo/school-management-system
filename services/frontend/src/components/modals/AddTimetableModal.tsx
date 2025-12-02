@@ -22,11 +22,10 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
     classId: '',
     subjectId: '',
     teacherId: '',
-    dayOfWeek: 'monday',
-    periodNumber: '1',
-    startTime: '08:00:00',
-    endTime: '08:45:00',
-    academicYear: '2024-2025',
+    dayOfWeek: 'Monday',
+    startTime: '08:00',
+    endTime: '08:45',
+    room: '',
   });
 
   useEffect(() => {
@@ -56,39 +55,25 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.classId) {
+      alert('Please select a class');
+      return;
+    }
+    
     setLoading(true);
-
     try {
-      // Create period first (simplified - you might want to check if it exists)
-      const periodData = {
-        name: `Period ${formData.periodNumber}`,
-        periodNumber: Number(formData.periodNumber),
-        startTime: formData.startTime,
-        endTime: formData.endTime,
-        isBreak: false
-      };
-
-      let periodId;
-      try {
-        const periodRes: any = await api.createPeriod(periodData);
-        periodId = periodRes.data?.id;
-      } catch (err) {
-        // Period might already exist, try to get it
-        console.log('Period creation failed, it might already exist');
-        // For now, we'll create a temp ID - ideally you'd fetch existing periods
-        periodId = `period-${formData.periodNumber}`;
-      }
-
-      // Now create timetable entry
+      // Create timetable entry directly with all the data
       await api.createTimetableEntry({
         classId: formData.classId,
-        subjectId: formData.subjectId,
-        teacherId: formData.teacherId,
-        periodId: periodId,
+        subjectId: formData.subjectId || null,
+        teacherId: formData.teacherId || null,
         dayOfWeek: formData.dayOfWeek,
-        academicYear: formData.academicYear,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        room: formData.room || null,
       });
-
+      
       alert('Timetable entry added successfully!');
       onSuccess();
       onOpenChange(false);
@@ -96,28 +81,24 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
         classId: '',
         subjectId: '',
         teacherId: '',
-        dayOfWeek: 'monday',
-        periodNumber: '1',
-        startTime: '08:00:00',
-        endTime: '08:45:00',
-        academicYear: '2024-2025',
+        dayOfWeek: 'Monday',
+        startTime: '08:00',
+        endTime: '08:45',
+        room: '',
       });
     } catch (error: any) {
-      console.error('Add timetable error:', error);
-      if (error.errors && Array.isArray(error.errors)) {
-        const errorMessages = error.errors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
-        alert(`Validation failed:\n${errorMessages}`);
-      } else {
-        alert(error.message || 'Failed to add timetable entry');
-      }
+      console.error('Error creating timetable entry:', error);
+      alert(error.message || 'Failed to add timetable entry');
     } finally {
       setLoading(false);
     }
   };
 
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add Timetable Entry</DialogTitle>
           <button
@@ -127,13 +108,11 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
             <X className="h-4 w-4" />
           </button>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="classId">Class *</Label>
               <Select
-                id="classId"
                 value={formData.classId}
                 onChange={(e) => handleChange('classId', e.target.value)}
                 required
@@ -141,119 +120,93 @@ export function AddTimetableModal({ open, onOpenChange, onSuccess }: AddTimetabl
                 <option value="">Select Class</option>
                 {classes.map((cls) => (
                   <option key={cls.id} value={cls.id}>
-                    {cls.name} - {cls.section}
+                    {cls.name} {cls.section || ''}
                   </option>
                 ))}
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="subjectId">Subject *</Label>
-                <Select
-                  id="subjectId"
-                  value={formData.subjectId}
-                  onChange={(e) => handleChange('subjectId', e.target.value)}
-                  required
-                >
-                  <option value="">Select Subject</option>
-                  {subjects.map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="teacherId">Teacher *</Label>
-                <Select
-                  id="teacherId"
-                  value={formData.teacherId}
-                  onChange={(e) => handleChange('teacherId', e.target.value)}
-                  required
-                >
-                  <option value="">Select Teacher</option>
-                  {teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.first_name} {teacher.last_name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="subjectId">Subject</Label>
+              <Select
+                value={formData.subjectId}
+                onChange={(e) => handleChange('subjectId', e.target.value)}
+              >
+                <option value="">Select Subject</option>
+                {subjects.map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="teacherId">Teacher</Label>
+              <Select
+                value={formData.teacherId}
+                onChange={(e) => handleChange('teacherId', e.target.value)}
+              >
+                <option value="">Select Teacher</option>
+                {teachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.first_name} {teacher.last_name}
+                  </option>
+                ))}
+              </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="dayOfWeek">Day of Week *</Label>
-                <Select
-                  id="dayOfWeek"
-                  value={formData.dayOfWeek}
-                  onChange={(e) => handleChange('dayOfWeek', e.target.value)}
-                  required
-                >
-                  <option value="monday">Monday</option>
-                  <option value="tuesday">Tuesday</option>
-                  <option value="wednesday">Wednesday</option>
-                  <option value="thursday">Thursday</option>
-                  <option value="friday">Friday</option>
-                  <option value="saturday">Saturday</option>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="periodNumber">Period *</Label>
-                <Select
-                  id="periodNumber"
-                  value={formData.periodNumber}
-                  onChange={(e) => handleChange('periodNumber', e.target.value)}
-                  required
-                >
-                  <option value="1">1st Period</option>
-                  <option value="2">2nd Period</option>
-                  <option value="3">3rd Period</option>
-                  <option value="4">4th Period</option>
-                  <option value="5">5th Period</option>
-                  <option value="6">6th Period</option>
-                  <option value="7">7th Period</option>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="startTime">Start Time *</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={formData.startTime.slice(0, 5)}
-                  onChange={(e) => handleChange('startTime', e.target.value + ':00')}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="endTime">End Time *</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={formData.endTime.slice(0, 5)}
-                  onChange={(e) => handleChange('endTime', e.target.value + ':00')}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="academicYear">Academic Year *</Label>
-              <Input
-                id="academicYear"
-                value={formData.academicYear}
-                onChange={(e) => handleChange('academicYear', e.target.value)}
-                placeholder="2024-2025"
+            <div className="space-y-2">
+              <Label htmlFor="dayOfWeek">Day of Week *</Label>
+              <Select
+                value={formData.dayOfWeek}
+                onChange={(e) => handleChange('dayOfWeek', e.target.value)}
                 required
+              >
+                {daysOfWeek.map((day) => (
+                  <option key={day} value={day}>
+                    {day}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="startTime">Start Time *</Label>
+              <Input
+                type="time"
+                value={formData.startTime}
+                onChange={(e) => handleChange('startTime', e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="endTime">End Time *</Label>
+              <Input
+                type="time"
+                value={formData.endTime}
+                onChange={(e) => handleChange('endTime', e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="room">Room</Label>
+              <Input
+                type="text"
+                value={formData.room}
+                onChange={(e) => handleChange('room', e.target.value)}
+                placeholder="e.g., Room 101"
               />
             </div>
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

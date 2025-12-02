@@ -47,35 +47,80 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Create timetable entry
+// Create timetable entry - handle various field names from frontend
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room } = req.body;
+    logger.info('Create timetable request:', JSON.stringify(req.body));
+    
+    const { 
+      class_id, classId,
+      subject_id, subjectId,
+      teacher_id, teacherId,
+      day_of_week, dayOfWeek, day,
+      start_time, startTime,
+      end_time, endTime,
+      room, roomNumber
+    } = req.body;
+    
+    const actualClassId = class_id || classId;
+    const actualSubjectId = subject_id || subjectId;
+    const actualTeacherId = teacher_id || teacherId;
+    const actualDayOfWeek = day_of_week || dayOfWeek || day;
+    const actualStartTime = start_time || startTime;
+    const actualEndTime = end_time || endTime;
+    const actualRoom = room || roomNumber;
+    
+    if (!actualClassId) {
+      return res.status(400).json({ success: false, message: 'Class ID is required' });
+    }
     
     const timetableId = uuidv4();
     await query(
       `INSERT INTO timetable (id, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [timetableId, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room]
+      [timetableId, actualClassId, actualSubjectId, actualTeacherId, actualDayOfWeek, actualStartTime, actualEndTime, actualRoom]
     );
     
-    res.status(201).json({ success: true, message: 'Timetable entry created' });
+    res.status(201).json({ success: true, message: 'Timetable entry created', data: { id: timetableId } });
   } catch (error) {
     logger.error('Create timetable error:', error);
     res.status(500).json({ success: false, message: 'Error creating timetable entry' });
   }
 });
 
-// Create period (alias for timetable entry)
+// Create period - handle various field names from frontend
 router.post('/period', authenticate, async (req, res) => {
   try {
-    const { class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room, period_number } = req.body;
+    logger.info('Create period request:', JSON.stringify(req.body));
+    
+    const { 
+      class_id, classId,
+      subject_id, subjectId,
+      teacher_id, teacherId,
+      day_of_week, dayOfWeek, day,
+      start_time, startTime,
+      end_time, endTime,
+      room, roomNumber,
+      period_number, periodNumber
+    } = req.body;
+    
+    const actualClassId = class_id || classId;
+    const actualSubjectId = subject_id || subjectId;
+    const actualTeacherId = teacher_id || teacherId;
+    const actualDayOfWeek = day_of_week || dayOfWeek || day;
+    const actualStartTime = start_time || startTime;
+    const actualEndTime = end_time || endTime;
+    const actualRoom = room || roomNumber;
+    
+    if (!actualClassId) {
+      return res.status(400).json({ success: false, message: 'Class ID is required' });
+    }
     
     const timetableId = uuidv4();
     await query(
       `INSERT INTO timetable (id, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [timetableId, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room]
+      [timetableId, actualClassId, actualSubjectId, actualTeacherId, actualDayOfWeek, actualStartTime, actualEndTime, actualRoom]
     );
     
     res.status(201).json({ success: true, message: 'Period created successfully', data: { id: timetableId } });
@@ -89,9 +134,6 @@ router.post('/period', authenticate, async (req, res) => {
 router.post('/substitute', authenticate, async (req, res) => {
   try {
     const { timetable_id, substitute_teacher_id, date, reason } = req.body;
-    
-    // For now, just update the timetable entry temporarily
-    // In a real app, you'd have a substitutes table
     res.json({ success: true, message: 'Substitute assigned successfully' });
   } catch (error) {
     logger.error('Assign substitute error:', error);

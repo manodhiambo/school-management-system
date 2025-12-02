@@ -1,298 +1,282 @@
 import express from 'express';
-import feeController from '../controllers/feeController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
-import { validateRequest, schemas } from '../utils/validators.js';
-import Joi from 'joi';
-import mpesaService from '../services/mpesaService.js';
-import ApiResponse from '../utils/ApiResponse.js';
+import { query } from '../config/database.js';
+import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// ==================== VALIDATION SCHEMAS ====================
-const createFeeStructureSchema = Joi.object({
-  body: Joi.object({
-    classId: schemas.id.optional(),
-    name: Joi.string().required(),
-    description: Joi.string().optional(),
-    amount: Joi.number().min(0).required(),
-    frequency: Joi.string().valid('monthly', 'quarterly', 'half_yearly', 'yearly', 'one_time').required(),
-    dueDay: Joi.number().min(1).max(31).default(10),
-    lateFeeAmount: Joi.number().min(0).default(0),
-    lateFeePerDay: Joi.number().min(0).default(0),
-    gracePeriodDays: Joi.number().min(0).default(0),
-    isMandatory: Joi.boolean().default(true),
-    academicYear: Joi.string().required()
-  })
-});
-
-const updateFeeStructureSchema = Joi.object({
-  params: Joi.object({
-    id: schemas.id
-  }),
-  body: Joi.object({
-    name: Joi.string().optional(),
-    description: Joi.string().optional(),
-    amount: Joi.number().min(0).optional(),
-    frequency: Joi.string().valid('monthly', 'quarterly', 'half_yearly', 'yearly', 'one_time').optional(),
-    dueDay: Joi.number().min(1).max(31).optional(),
-    lateFeeAmount: Joi.number().min(0).optional(),
-    lateFeePerDay: Joi.number().min(0).optional(),
-    gracePeriodDays: Joi.number().min(0).optional(),
-    isMandatory: Joi.boolean().optional(),
-    isActive: Joi.boolean().optional()
-  })
-});
-
-const createDiscountSchema = Joi.object({
-  body: Joi.object({
-    name: Joi.string().required(),
-    type: Joi.string().valid('percentage', 'fixed').required(),
-    value: Joi.number().min(0).required(),
-    applicableTo: Joi.string().valid('all', 'specific').default('all'),
-    description: Joi.string().optional()
-  })
-});
-
-const applyDiscountSchema = Joi.object({
-  body: Joi.object({
-    studentId: schemas.id,
-    discountId: schemas.id,
-    reason: Joi.string().optional(),
-    validFrom: schemas.date.optional(),
-    validUntil: schemas.date.optional()
-  })
-});
-
-const generateInvoiceSchema = Joi.object({
-  body: Joi.object({
-    studentId: schemas.id,
-    month: Joi.date().required()
-  })
-});
-
-const generateBulkInvoicesSchema = Joi.object({
-  body: Joi.object({
-    class_id: Joi.string().uuid().optional().allow(''),
-    fee_type: Joi.string().valid('tuition', 'transport', 'library', 'laboratory', 'sports', 'exam', 'other').required(),
-    amount: Joi.number().min(1).required(),
-    due_date: Joi.string().required(),
-    academic_year: Joi.string().required(),
-    description: Joi.string().optional().allow('')
-  })
-});
-
-const recordPaymentSchema = Joi.object({
-  body: Joi.object({
-    invoiceId: schemas.id,
-    paymentMethod: Joi.string().valid('cash', 'cheque', 'card', 'upi', 'net_banking', 'wallet', 'mpesa', 'other').required(),
-    transactionId: Joi.string().optional(),
-    amount: Joi.number().min(0).required(),
-    bankName: Joi.string().optional(),
-    chequeNumber: Joi.string().optional(),
-    chequeDate: schemas.date.optional(),
-    remarks: Joi.string().optional()
-  })
-});
-
-const mpesaPaymentSchema = Joi.object({
-  body: Joi.object({
-    invoiceId: Joi.string().uuid().required(),
-    phoneNumber: Joi.string().pattern(/^(\+?254|0)?[17]\d{8}$/).required().messages({
-      'string.pattern.base': 'Please provide a valid Kenyan phone number'
-    }),
-    amount: Joi.number().min(1).required()
-  })
-});
-
-// All routes require authentication (except M-Pesa callback)
-router.use((req, res, next) => {
-  if (req.path === '/mpesa/callback') {
-    return next();
-  }
-  return authenticate(req, res, next);
-});
-
-// ==================== M-PESA ROUTES ====================
-
-router.post(
-  '/mpesa/pay',
-  requireRole(['admin', 'parent']),
-  validateRequest(mpesaPaymentSchema),
-  async (req, res, next) => {
-    try {
-      const { invoiceId, phoneNumber, amount } = req.body;
-      const result = await mpesaService.initiateSTKPush(invoiceId, phoneNumber, amount, req.user.id);
-      res.status(200).json(
-        new ApiResponse(200, result, 'M-Pesa payment initiated. Check your phone.')
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-router.post('/mpesa/callback', async (req, res) => {
+// Get fee structures
+router.get('/structure', authenticate, async (req, res) => {
   try {
-    logger.info('M-Pesa callback received');
-    await mpesaService.handleCallback(req.body);
-    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
+    const structures = await query('SELECT * FROM fee_structure ORDER BY name');
+    res.json({ success: true, data: structures });
   } catch (error) {
-    logger.error('M-Pesa callback error:', error);
-    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
+    logger.error('Get fee structures error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching fee structures' });
   }
 });
 
-router.get(
-  '/mpesa/status/:checkoutRequestId',
-  requireRole(['admin', 'parent']),
-  async (req, res, next) => {
-    try {
-      const result = await mpesaService.queryTransactionStatus(req.params.checkoutRequestId);
-      res.status(200).json(
-        new ApiResponse(200, result, 'Transaction status retrieved')
-      );
-    } catch (error) {
-      next(error);
-    }
+// Create fee structure
+router.post('/structure', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, amount, frequency, description, due_day } = req.body;
+    const structureId = uuidv4();
+    
+    await query(
+      `INSERT INTO fee_structure (id, name, amount, frequency, description, due_day)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [structureId, name, amount, frequency || 'monthly', description, due_day || 1]
+    );
+    
+    res.status(201).json({ success: true, message: 'Fee structure created' });
+  } catch (error) {
+    logger.error('Create fee structure error:', error);
+    res.status(500).json({ success: false, message: 'Error creating fee structure' });
   }
-);
+});
 
-router.get(
-  '/mpesa/transaction/:transactionId',
-  requireRole(['admin', 'parent']),
-  async (req, res, next) => {
-    try {
-      const transaction = await mpesaService.getTransaction(req.params.transactionId);
-      res.status(200).json(
-        new ApiResponse(200, transaction, 'Transaction retrieved')
-      );
-    } catch (error) {
-      next(error);
+// Get fee invoices
+router.get('/invoice', authenticate, async (req, res) => {
+  try {
+    const { studentId, status } = req.query;
+    
+    let sql = `
+      SELECT fi.*, s.first_name, s.last_name, s.admission_number, c.name as class_name
+      FROM fee_invoices fi
+      JOIN students s ON fi.student_id = s.id
+      LEFT JOIN classes c ON s.class_id = c.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+
+    if (studentId) {
+      sql += ` AND fi.student_id = $${paramIndex}`;
+      params.push(studentId);
+      paramIndex++;
     }
-  }
-);
 
-router.get(
-  '/mpesa/student/:studentId',
-  requireRole(['admin', 'parent', 'teacher']),
-  async (req, res, next) => {
-    try {
-      const transactions = await mpesaService.getStudentTransactions(req.params.studentId);
-      res.status(200).json(
-        new ApiResponse(200, transactions, 'Transactions retrieved')
-      );
-    } catch (error) {
-      next(error);
+    if (status) {
+      sql += ` AND fi.status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
     }
+
+    sql += ' ORDER BY fi.created_at DESC';
+
+    const invoices = await query(sql, params);
+    res.json({ success: true, data: invoices });
+  } catch (error) {
+    logger.error('Get fee invoices error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching invoices' });
   }
-);
+});
 
-// ==================== FEE STRUCTURE ROUTES ====================
-router.post(
-  '/structure',
-  requireRole(['admin']),
-  validateRequest(createFeeStructureSchema),
-  feeController.createFeeStructure
-);
+// Get single invoice
+router.get('/invoice/:id', authenticate, async (req, res) => {
+  try {
+    const invoices = await query(
+      `SELECT fi.*, s.first_name, s.last_name, s.admission_number
+       FROM fee_invoices fi
+       JOIN students s ON fi.student_id = s.id
+       WHERE fi.id = $1`,
+      [req.params.id]
+    );
+    
+    if (invoices.length === 0) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+    
+    res.json({ success: true, data: invoices[0] });
+  } catch (error) {
+    logger.error('Get invoice error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching invoice' });
+  }
+});
 
-router.get(
-  '/structure',
-  requireRole(['admin', 'teacher']),
-  feeController.getFeeStructures
-);
+// Create invoice
+router.post('/invoice', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const { student_id, description, gross_amount, discount, net_amount, due_date, status } = req.body;
+    
+    const invoiceId = uuidv4();
+    const invoiceNumber = `INV-${Date.now()}`;
+    
+    await query(
+      `INSERT INTO fee_invoices (id, invoice_number, student_id, description, gross_amount, discount_amount, net_amount, due_date, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [invoiceId, invoiceNumber, student_id, description, gross_amount, discount || 0, net_amount || gross_amount, due_date, status || 'pending']
+    );
+    
+    res.status(201).json({ success: true, message: 'Invoice created', data: { id: invoiceId } });
+  } catch (error) {
+    logger.error('Create invoice error:', error);
+    res.status(500).json({ success: false, message: 'Error creating invoice' });
+  }
+});
 
-router.get(
-  '/structure/:id',
-  requireRole(['admin', 'teacher']),
-  feeController.getFeeStructureById
-);
+// Bulk create invoices
+router.post('/invoice/bulk', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const { studentIds, feeStructureId, description, dueDate } = req.body;
+    
+    // Get fee structure
+    const structures = await query('SELECT * FROM fee_structure WHERE id = $1', [feeStructureId]);
+    if (structures.length === 0) {
+      return res.status(404).json({ success: false, message: 'Fee structure not found' });
+    }
+    
+    const structure = structures[0];
+    const created = [];
+    
+    for (const studentId of studentIds) {
+      const invoiceId = uuidv4();
+      const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      await query(
+        `INSERT INTO fee_invoices (id, invoice_number, student_id, description, gross_amount, net_amount, due_date, status)
+         VALUES ($1, $2, $3, $4, $5, $5, $6, 'pending')`,
+        [invoiceId, invoiceNumber, studentId, description || structure.name, structure.amount, dueDate]
+      );
+      
+      created.push(invoiceId);
+    }
+    
+    res.json({ success: true, message: `${created.length} invoices created` });
+  } catch (error) {
+    logger.error('Bulk create invoices error:', error);
+    res.status(500).json({ success: false, message: 'Error creating invoices' });
+  }
+});
 
-router.put(
-  '/structure/:id',
-  requireRole(['admin']),
-  validateRequest(updateFeeStructureSchema),
-  feeController.updateFeeStructure
-);
+// Get fee payments
+router.get('/payment', authenticate, async (req, res) => {
+  try {
+    const payments = await query(`
+      SELECT fp.*, fi.invoice_number, s.first_name, s.last_name
+      FROM fee_payments fp
+      JOIN fee_invoices fi ON fp.invoice_id = fi.id
+      JOIN students s ON fi.student_id = s.id
+      ORDER BY fp.payment_date DESC
+    `);
+    res.json({ success: true, data: payments });
+  } catch (error) {
+    logger.error('Get payments error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching payments' });
+  }
+});
 
-// ==================== DISCOUNT ROUTES ====================
-router.post(
-  '/discount',
-  requireRole(['admin']),
-  validateRequest(createDiscountSchema),
-  feeController.createDiscount
-);
+// Record payment
+router.post('/payment', authenticate, async (req, res) => {
+  try {
+    const { invoice_id, amount, payment_method, transaction_id, remarks } = req.body;
+    
+    const paymentId = uuidv4();
+    
+    await query(
+      `INSERT INTO fee_payments (id, invoice_id, amount, payment_method, transaction_id, remarks, status, payment_date)
+       VALUES ($1, $2, $3, $4, $5, $6, 'success', NOW())`,
+      [paymentId, invoice_id, amount, payment_method || 'cash', transaction_id, remarks]
+    );
+    
+    // Update invoice
+    await query(
+      `UPDATE fee_invoices 
+       SET paid_amount = COALESCE(paid_amount, 0) + $1,
+           balance_amount = net_amount - (COALESCE(paid_amount, 0) + $1),
+           status = CASE 
+             WHEN net_amount <= (COALESCE(paid_amount, 0) + $1) THEN 'paid'
+             ELSE 'partial'
+           END,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [amount, invoice_id]
+    );
+    
+    res.json({ success: true, message: 'Payment recorded successfully' });
+  } catch (error) {
+    logger.error('Record payment error:', error);
+    res.status(500).json({ success: false, message: 'Error recording payment' });
+  }
+});
 
-router.post(
-  '/discount/apply',
-  requireRole(['admin']),
-  validateRequest(applyDiscountSchema),
-  feeController.applyDiscountToStudent
-);
+// Get fee statistics
+router.get('/statistics', authenticate, async (req, res) => {
+  try {
+    const stats = await query(`
+      SELECT
+        COALESCE(SUM(net_amount), 0) as total_amount,
+        COALESCE(SUM(paid_amount), 0) as total_collected,
+        COALESCE(SUM(balance_amount), 0) as total_pending,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_count,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+        COUNT(CASE WHEN status = 'overdue' THEN 1 END) as overdue_count
+      FROM fee_invoices
+    `);
+    res.json({ success: true, data: stats[0] || {} });
+  } catch (error) {
+    logger.error('Get fee statistics error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching statistics' });
+  }
+});
 
-// ==================== INVOICE ROUTES ====================
+// Get fee defaulters
+router.get('/defaulters', authenticate, async (req, res) => {
+  try {
+    const defaulters = await query(`
+      SELECT s.id, s.first_name, s.last_name, s.admission_number, c.name as class_name,
+        COALESCE(SUM(fi.balance_amount), 0) as total_due
+      FROM students s
+      JOIN fee_invoices fi ON s.id = fi.student_id
+      LEFT JOIN classes c ON s.class_id = c.id
+      WHERE fi.balance_amount > 0
+      GROUP BY s.id, s.first_name, s.last_name, s.admission_number, c.name
+      ORDER BY total_due DESC
+    `);
+    res.json({ success: true, data: defaulters });
+  } catch (error) {
+    logger.error('Get defaulters error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching defaulters' });
+  }
+});
 
-// Generate single invoice
-router.post(
-  '/invoice',
-  requireRole(['admin']),
-  validateRequest(generateInvoiceSchema),
-  feeController.generateInvoice
-);
-
-// Generate bulk invoices for multiple students
-router.post(
-  '/invoice/bulk',
-  requireRole(['admin']),
-  validateRequest(generateBulkInvoicesSchema),
-  feeController.generateBulkInvoices
-);
-
-router.get(
-  '/invoice',
-  requireRole(['admin', 'teacher', 'parent']),
-  feeController.getInvoices
-);
-
-router.get(
-  '/invoice/:id',
-  requireRole(['admin', 'teacher', 'parent']),
-  feeController.getInvoiceById
-);
-
-// ==================== PAYMENT ROUTES ====================
-router.post(
-  '/payment',
-  requireRole(['admin']),
-  validateRequest(recordPaymentSchema),
-  feeController.recordPayment
-);
-
-router.get(
-  '/payment',
-  requireRole(['admin', 'teacher', 'parent']),
-  feeController.getPayments
-);
-
-// ==================== REPORTS ROUTES ====================
-router.get(
-  '/defaulters',
-  requireRole(['admin', 'teacher']),
-  feeController.getDefaulters
-);
-
-router.get(
-  '/statistics',
-  requireRole(['admin']),
-  feeController.getFeeStatistics
-);
-
-// Student fee account route
-router.get(
-  '/student/:studentId',
-  requireRole(['admin', 'teacher', 'parent', 'student']),
-  feeController.getStudentFeeAccount
-);
+// Get student fee account
+router.get('/student/:studentId', authenticate, async (req, res) => {
+  try {
+    const invoices = await query(
+      'SELECT * FROM fee_invoices WHERE student_id = $1 ORDER BY created_at DESC',
+      [req.params.studentId]
+    );
+    
+    const payments = await query(`
+      SELECT fp.* FROM fee_payments fp
+      JOIN fee_invoices fi ON fp.invoice_id = fi.id
+      WHERE fi.student_id = $1
+      ORDER BY fp.payment_date DESC
+    `, [req.params.studentId]);
+    
+    const summary = await query(`
+      SELECT
+        COALESCE(SUM(net_amount), 0) as total_amount,
+        COALESCE(SUM(paid_amount), 0) as total_paid,
+        COALESCE(SUM(balance_amount), 0) as total_balance
+      FROM fee_invoices WHERE student_id = $1
+    `, [req.params.studentId]);
+    
+    res.json({
+      success: true,
+      data: {
+        invoices,
+        payments,
+        summary: summary[0] || {}
+      }
+    });
+  } catch (error) {
+    logger.error('Get student fee account error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching fee account' });
+  }
+});
 
 export default router;

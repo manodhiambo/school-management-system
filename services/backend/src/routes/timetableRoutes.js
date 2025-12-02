@@ -1,92 +1,114 @@
 import express from 'express';
-import timetableController from '../controllers/timetableController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
-import requireRole from '../middleware/roleMiddleware.js';
-import { validateRequest, schemas } from '../utils/validators.js';
-import Joi from 'joi';
+import { query } from '../config/database.js';
+import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-router.use(authenticate);
-
-// Validation schemas
-const createPeriodSchema = Joi.object({
-  body: Joi.object({
-    name: Joi.string().required(),
-    periodNumber: Joi.number().required(),
-    startTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).required(),
-    endTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).required(),
-    isBreak: Joi.boolean().default(false)
-  })
+// Get timetable
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const { classId, teacherId } = req.query;
+    
+    let sql = `
+      SELECT t.*, 
+        c.name as class_name,
+        s.name as subject_name,
+        CONCAT(te.first_name, ' ', te.last_name) as teacher_name
+      FROM timetable t
+      LEFT JOIN classes c ON t.class_id = c.id
+      LEFT JOIN subjects s ON t.subject_id = s.id
+      LEFT JOIN teachers te ON t.teacher_id = te.id
+      WHERE t.is_active = true
+    `;
+    const params = [];
+    let paramIndex = 1;
+    
+    if (classId) {
+      sql += ` AND t.class_id = $${paramIndex}`;
+      params.push(classId);
+      paramIndex++;
+    }
+    
+    if (teacherId) {
+      sql += ` AND t.teacher_id = $${paramIndex}`;
+      params.push(teacherId);
+      paramIndex++;
+    }
+    
+    sql += ' ORDER BY t.day_of_week, t.start_time';
+    
+    const timetable = await query(sql, params);
+    res.json({ success: true, data: timetable });
+  } catch (error) {
+    logger.error('Get timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching timetable' });
+  }
 });
 
-const createRoomSchema = Joi.object({
-  body: Joi.object({
-    roomNumber: Joi.string().required(),
-    roomName: Joi.string().optional(),
-    building: Joi.string().optional(),
-    floor: Joi.number().optional(),
-    capacity: Joi.number().min(1).default(40),
-    roomType: Joi.string().valid('classroom', 'laboratory', 'library', 'auditorium', 'sports', 'other').default('classroom'),
-    facilities: Joi.object().optional()
-  })
+// Create timetable entry
+router.post('/', authenticate, async (req, res) => {
+  try {
+    const { class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room } = req.body;
+    
+    const timetableId = uuidv4();
+    await query(
+      `INSERT INTO timetable (id, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [timetableId, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room]
+    );
+    
+    res.status(201).json({ success: true, message: 'Timetable entry created' });
+  } catch (error) {
+    logger.error('Create timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error creating timetable entry' });
+  }
 });
 
-const createTimetableEntrySchema = Joi.object({
-  body: Joi.object({
-    classId: schemas.id,
-    subjectId: schemas.id,
-    teacherId: schemas.id,
-    periodId: schemas.id,
-    roomId: schemas.id.optional(),
-    dayOfWeek: Joi.string().valid('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday').required(),
-    academicYear: Joi.string().required()
-  })
+// Get teacher timetable
+router.get('/teacher/:teacherId', authenticate, async (req, res) => {
+  try {
+    const timetable = await query(
+      `SELECT t.*, c.name as class_name, s.name as subject_name
+       FROM timetable t
+       LEFT JOIN classes c ON t.class_id = c.id
+       LEFT JOIN subjects s ON t.subject_id = s.id
+       WHERE t.teacher_id = $1 AND t.is_active = true
+       ORDER BY t.day_of_week, t.start_time`,
+      [req.params.teacherId]
+    );
+    res.json({ success: true, data: timetable });
+  } catch (error) {
+    logger.error('Get teacher timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching timetable' });
+  }
 });
 
-const createSubstitutionSchema = Joi.object({
-  body: Joi.object({
-    timetableId: schemas.id.optional(),
-    originalTeacherId: schemas.id,
-    substituteTeacherId: schemas.id,
-    classId: schemas.id,
-    subjectId: schemas.id,
-    date: schemas.date,
-    periodId: schemas.id,
-    reason: Joi.string().required()
-  })
+// Get student timetable (by class)
+router.get('/student/:studentId', authenticate, async (req, res) => {
+  try {
+    // Get student's class
+    const student = await query('SELECT class_id FROM students WHERE id = $1 OR user_id = $1', [req.params.studentId]);
+    
+    if (student.length === 0 || !student[0].class_id) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const timetable = await query(
+      `SELECT t.*, s.name as subject_name, CONCAT(te.first_name, ' ', te.last_name) as teacher_name
+       FROM timetable t
+       LEFT JOIN subjects s ON t.subject_id = s.id
+       LEFT JOIN teachers te ON t.teacher_id = te.id
+       WHERE t.class_id = $1 AND t.is_active = true
+       ORDER BY t.day_of_week, t.start_time`,
+      [student[0].class_id]
+    );
+    res.json({ success: true, data: timetable });
+  } catch (error) {
+    logger.error('Get student timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching timetable' });
+  }
 });
-
-const autoGenerateSchema = Joi.object({
-  body: Joi.object({
-    classId: schemas.id,
-    academicYear: Joi.string().required()
-  })
-});
-
-// Period routes
-router.post('/periods', requireRole(['admin']), validateRequest(createPeriodSchema), timetableController.createPeriod);
-router.get('/periods', requireRole(['admin', 'teacher']), timetableController.getPeriods);
-router.put('/periods/:id', requireRole(['admin']), timetableController.updatePeriod);
-
-// Room routes
-router.post('/rooms', requireRole(['admin']), validateRequest(createRoomSchema), timetableController.createRoom);
-router.get('/rooms', requireRole(['admin', 'teacher']), timetableController.getRooms);
-
-// Timetable routes
-router.post('/', requireRole(['admin']), validateRequest(createTimetableEntrySchema), timetableController.createTimetableEntry);
-router.get('/', requireRole(['admin', 'teacher', 'student', 'parent']), timetableController.getTimetable);
-router.get('/:id', requireRole(['admin', 'teacher']), timetableController.getTimetableEntry);
-router.put('/:id', requireRole(['admin']), timetableController.updateTimetableEntry);
-router.delete('/:id', requireRole(['admin']), timetableController.deleteTimetableEntry);
-
-// Substitution routes
-router.post('/substitutions', requireRole(['admin', 'teacher']), validateRequest(createSubstitutionSchema), timetableController.createSubstitution);
-router.get('/substitutions', requireRole(['admin', 'teacher']), timetableController.getSubstitutions);
-router.get('/substitutions/:id', requireRole(['admin', 'teacher']), timetableController.getSubstitution);
-router.patch('/substitutions/:id/status', requireRole(['admin']), timetableController.updateSubstitutionStatus);
-
-// Auto-generate
-router.post('/auto-generate', requireRole(['admin']), validateRequest(autoGenerateSchema), timetableController.autoGenerateTimetable);
 
 export default router;

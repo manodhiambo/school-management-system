@@ -84,7 +84,7 @@ class ApiService {
   }
 
   getStudentExamResults(studentId: string) {
-    return this.api.get('/academic/results/student/' + studentId);
+    return this.api.get('/students/' + studentId + '/exam-results');
   }
 
   getStudentFeeAccount(studentId: string) {
@@ -304,9 +304,12 @@ class ApiService {
     return this.api.post('/academic/results', data);
   }
 
-  // Timetable
-  getTimetable(params?: any) {
-    return this.api.get('/timetable', { params });
+  // Timetable - FIXED: handle both classId string and params object
+  getTimetable(classIdOrParams?: string | any) {
+    if (typeof classIdOrParams === 'string') {
+      return this.api.get('/timetable', { params: { classId: classIdOrParams } });
+    }
+    return this.api.get('/timetable', { params: classIdOrParams });
   }
 
   createTimetableEntry(data: any) {

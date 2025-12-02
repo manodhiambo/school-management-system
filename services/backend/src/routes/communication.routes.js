@@ -6,7 +6,7 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Get announcements
+// Get announcements - returns array directly
 router.get('/announcements', authenticate, async (req, res) => {
   try {
     const announcements = await query(`
@@ -18,7 +18,7 @@ router.get('/announcements', authenticate, async (req, res) => {
     `);
     res.json({
       success: true,
-      data: announcements
+      data: announcements  // Array directly
     });
   } catch (error) {
     logger.error('Get announcements error:', error);
@@ -48,7 +48,7 @@ router.post('/announcements', authenticate, async (req, res) => {
   }
 });
 
-// Get messages
+// Get messages - returns array directly in data
 router.get('/messages', authenticate, async (req, res) => {
   try {
     const messages = await query(`
@@ -62,13 +62,14 @@ router.get('/messages', authenticate, async (req, res) => {
       ORDER BY m.created_at DESC
     `, [req.user.id]);
     
+    // Return array directly for frontend compatibility
     res.json({
       success: true,
-      data: { messages }
+      data: messages  // Array directly, NOT { messages: [...] }
     });
   } catch (error) {
     logger.error('Get messages error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching messages' });
+    res.status(500).json({ success: false, message: 'Error fetching messages', data: [] });
   }
 });
 

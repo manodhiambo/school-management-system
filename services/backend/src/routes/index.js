@@ -14,6 +14,7 @@ import dashboardRoutes from './dashboardRoutes.js';
 import userRoutes from './userRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
 import timetableRoutes from './timetableRoutes.js';
+import assignmentRoutes from './assignmentRoutes.js';
 
 const router = express.Router();
 
@@ -33,5 +34,6 @@ router.use('/admin', dashboardRoutes);
 router.use('/users', userRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/timetable', timetableRoutes);
+router.use('/assignments', assignmentRoutes);
 
 export default router;

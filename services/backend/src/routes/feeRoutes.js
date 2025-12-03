@@ -7,10 +7,43 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Get fee structures
+// ============== FEE STRUCTURE ROUTES ==============
+
+// Get all fee structures
 router.get('/structure', authenticate, async (req, res) => {
   try {
-    const structures = await query('SELECT * FROM fee_structure ORDER BY name');
+    const { classId, frequency, isActive } = req.query;
+    
+    let sql = `
+      SELECT fs.*, c.name as class_name 
+      FROM fee_structure fs
+      LEFT JOIN classes c ON fs.class_id = c.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+    
+    if (classId) {
+      sql += ` AND (fs.class_id = $${paramIndex} OR fs.class_id IS NULL)`;
+      params.push(classId);
+      paramIndex++;
+    }
+    
+    if (frequency) {
+      sql += ` AND fs.frequency = $${paramIndex}`;
+      params.push(frequency);
+      paramIndex++;
+    }
+    
+    if (isActive !== undefined) {
+      sql += ` AND fs.is_active = $${paramIndex}`;
+      params.push(isActive === 'true');
+      paramIndex++;
+    }
+    
+    sql += ' ORDER BY fs.name';
+    
+    const structures = await query(sql, params);
     res.json({ success: true, data: structures });
   } catch (error) {
     logger.error('Get fee structures error:', error);
@@ -18,29 +51,177 @@ router.get('/structure', authenticate, async (req, res) => {
   }
 });
 
+// Get single fee structure
+router.get('/structure/:id', authenticate, async (req, res) => {
+  try {
+    const structures = await query(
+      `SELECT fs.*, c.name as class_name 
+       FROM fee_structure fs
+       LEFT JOIN classes c ON fs.class_id = c.id
+       WHERE fs.id = $1`,
+      [req.params.id]
+    );
+    
+    if (structures.length === 0) {
+      return res.status(404).json({ success: false, message: 'Fee structure not found' });
+    }
+    
+    res.json({ success: true, data: structures[0] });
+  } catch (error) {
+    logger.error('Get fee structure error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching fee structure' });
+  }
+});
+
 // Create fee structure
 router.post('/structure', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    const { name, amount, frequency, description, due_day } = req.body;
+    logger.info('Create fee structure:', JSON.stringify(req.body));
+    
+    const { 
+      name, amount, frequency, description, due_day, dueDay,
+      class_id, classId, academic_year, academicYear,
+      is_mandatory, isMandatory, late_fee_amount, lateFeeAmount,
+      late_fee_per_day, lateFeePerDay, grace_period_days, gracePeriodDays
+    } = req.body;
+    
+    if (!name || !amount || !frequency) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Name, amount, and frequency are required' 
+      });
+    }
+    
+    // Validate frequency
+    const validFrequencies = ['monthly', 'quarterly', 'half_yearly', 'yearly', 'one_time'];
+    if (!validFrequencies.includes(frequency)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid frequency. Must be one of: ${validFrequencies.join(', ')}` 
+      });
+    }
+    
     const structureId = uuidv4();
     
     await query(
-      `INSERT INTO fee_structure (id, name, amount, frequency, description, due_day)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [structureId, name, amount, frequency || 'monthly', description, due_day || 1]
+      `INSERT INTO fee_structure (
+        id, name, amount, frequency, description, due_day, 
+        class_id, academic_year, is_mandatory, 
+        late_fee_amount, late_fee_per_day, grace_period_days
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        structureId,
+        name,
+        amount,
+        frequency,
+        description || null,
+        due_day || dueDay || 15,
+        class_id || classId || null,
+        academic_year || academicYear || new Date().getFullYear().toString(),
+        is_mandatory ?? isMandatory ?? true,
+        late_fee_amount || lateFeeAmount || 0,
+        late_fee_per_day || lateFeePerDay || 0,
+        grace_period_days || gracePeriodDays || 0
+      ]
     );
     
-    res.status(201).json({ success: true, message: 'Fee structure created' });
+    const newStructure = await query('SELECT * FROM fee_structure WHERE id = $1', [structureId]);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Fee structure created successfully',
+      data: newStructure[0]
+    });
   } catch (error) {
     logger.error('Create fee structure error:', error);
     res.status(500).json({ success: false, message: 'Error creating fee structure' });
   }
 });
 
+// Update fee structure
+router.put('/structure/:id', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const { 
+      name, amount, frequency, description, due_day, dueDay,
+      class_id, classId, academic_year, academicYear,
+      is_mandatory, isMandatory, is_active, isActive,
+      late_fee_amount, lateFeeAmount, late_fee_per_day, lateFeePerDay, 
+      grace_period_days, gracePeriodDays
+    } = req.body;
+    
+    // Validate frequency if provided
+    if (frequency) {
+      const validFrequencies = ['monthly', 'quarterly', 'half_yearly', 'yearly', 'one_time'];
+      if (!validFrequencies.includes(frequency)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Invalid frequency. Must be one of: ${validFrequencies.join(', ')}` 
+        });
+      }
+    }
+    
+    await query(
+      `UPDATE fee_structure SET
+        name = COALESCE($1, name),
+        amount = COALESCE($2, amount),
+        frequency = COALESCE($3, frequency),
+        description = COALESCE($4, description),
+        due_day = COALESCE($5, due_day),
+        class_id = COALESCE($6, class_id),
+        academic_year = COALESCE($7, academic_year),
+        is_mandatory = COALESCE($8, is_mandatory),
+        is_active = COALESCE($9, is_active),
+        late_fee_amount = COALESCE($10, late_fee_amount),
+        late_fee_per_day = COALESCE($11, late_fee_per_day),
+        grace_period_days = COALESCE($12, grace_period_days),
+        updated_at = NOW()
+       WHERE id = $13`,
+      [
+        name, amount, frequency, description, 
+        due_day || dueDay, class_id || classId, 
+        academic_year || academicYear, is_mandatory ?? isMandatory,
+        is_active ?? isActive, late_fee_amount || lateFeeAmount,
+        late_fee_per_day || lateFeePerDay, grace_period_days || gracePeriodDays,
+        req.params.id
+      ]
+    );
+    
+    const updated = await query('SELECT * FROM fee_structure WHERE id = $1', [req.params.id]);
+    
+    res.json({ 
+      success: true, 
+      message: 'Fee structure updated successfully',
+      data: updated[0]
+    });
+  } catch (error) {
+    logger.error('Update fee structure error:', error);
+    res.status(500).json({ success: false, message: 'Error updating fee structure' });
+  }
+});
+
+// Delete fee structure
+router.delete('/structure/:id', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    // Check if there are invoices using this structure
+    // For now, just soft delete by setting is_active = false
+    await query(
+      'UPDATE fee_structure SET is_active = false, updated_at = NOW() WHERE id = $1',
+      [req.params.id]
+    );
+    
+    res.json({ success: true, message: 'Fee structure deleted successfully' });
+  } catch (error) {
+    logger.error('Delete fee structure error:', error);
+    res.status(500).json({ success: false, message: 'Error deleting fee structure' });
+  }
+});
+
+// ============== FEE INVOICE ROUTES ==============
+
 // Get fee invoices
 router.get('/invoice', authenticate, async (req, res) => {
   try {
-    const { studentId, status } = req.query;
+    const { studentId, status, classId } = req.query;
     
     let sql = `
       SELECT fi.*, s.first_name, s.last_name, s.admission_number, c.name as class_name
@@ -61,6 +242,12 @@ router.get('/invoice', authenticate, async (req, res) => {
     if (status) {
       sql += ` AND fi.status = $${paramIndex}`;
       params.push(status);
+      paramIndex++;
+    }
+    
+    if (classId) {
+      sql += ` AND s.class_id = $${paramIndex}`;
+      params.push(classId);
       paramIndex++;
     }
 
@@ -96,21 +283,48 @@ router.get('/invoice/:id', authenticate, async (req, res) => {
   }
 });
 
-// Create invoice
+// Create single invoice
 router.post('/invoice', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    const { student_id, description, gross_amount, discount, net_amount, due_date, status } = req.body;
+    const { 
+      student_id, studentId, description, 
+      gross_amount, grossAmount, discount, discount_amount, discountAmount,
+      net_amount, netAmount, due_date, dueDate, status 
+    } = req.body;
+    
+    const actualStudentId = student_id || studentId;
+    const actualGrossAmount = gross_amount || grossAmount;
+    const actualDiscount = discount || discount_amount || discountAmount || 0;
+    const actualNetAmount = net_amount || netAmount || (actualGrossAmount - actualDiscount);
+    const actualDueDate = due_date || dueDate;
+    
+    if (!actualStudentId || !actualGrossAmount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Student ID and gross amount are required' 
+      });
+    }
     
     const invoiceId = uuidv4();
     const invoiceNumber = `INV-${Date.now()}`;
     
     await query(
-      `INSERT INTO fee_invoices (id, invoice_number, student_id, description, gross_amount, discount_amount, net_amount, due_date, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [invoiceId, invoiceNumber, student_id, description, gross_amount, discount || 0, net_amount || gross_amount, due_date, status || 'pending']
+      `INSERT INTO fee_invoices (
+        id, invoice_number, student_id, description, gross_amount, 
+        discount_amount, net_amount, balance_amount, due_date, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9)`,
+      [
+        invoiceId, invoiceNumber, actualStudentId, description,
+        actualGrossAmount, actualDiscount, actualNetAmount, actualDueDate, 
+        status || 'pending'
+      ]
     );
     
-    res.status(201).json({ success: true, message: 'Invoice created', data: { id: invoiceId } });
+    res.status(201).json({ 
+      success: true, 
+      message: 'Invoice created', 
+      data: { id: invoiceId, invoice_number: invoiceNumber } 
+    });
   } catch (error) {
     logger.error('Create invoice error:', error);
     res.status(500).json({ success: false, message: 'Error creating invoice' });
@@ -120,47 +334,97 @@ router.post('/invoice', authenticate, requireRole(['admin']), async (req, res) =
 // Bulk create invoices
 router.post('/invoice/bulk', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    const { studentIds, feeStructureId, description, dueDate } = req.body;
+    logger.info('Bulk invoice request:', JSON.stringify(req.body));
+    
+    const { studentIds, student_ids, feeStructureId, fee_structure_id, description, dueDate, due_date } = req.body;
+    
+    const actualStudentIds = studentIds || student_ids;
+    const actualFeeStructureId = feeStructureId || fee_structure_id;
+    const actualDueDate = dueDate || due_date;
+    
+    if (!actualStudentIds || !Array.isArray(actualStudentIds) || actualStudentIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Student IDs array is required' });
+    }
+    
+    if (!actualFeeStructureId) {
+      return res.status(400).json({ success: false, message: 'Fee structure ID is required' });
+    }
     
     // Get fee structure
-    const structures = await query('SELECT * FROM fee_structure WHERE id = $1', [feeStructureId]);
+    const structures = await query('SELECT * FROM fee_structure WHERE id = $1', [actualFeeStructureId]);
     if (structures.length === 0) {
       return res.status(404).json({ success: false, message: 'Fee structure not found' });
     }
     
     const structure = structures[0];
     const created = [];
+    const errors = [];
     
-    for (const studentId of studentIds) {
-      const invoiceId = uuidv4();
-      const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      await query(
-        `INSERT INTO fee_invoices (id, invoice_number, student_id, description, gross_amount, net_amount, due_date, status)
-         VALUES ($1, $2, $3, $4, $5, $5, $6, 'pending')`,
-        [invoiceId, invoiceNumber, studentId, description || structure.name, structure.amount, dueDate]
-      );
-      
-      created.push(invoiceId);
+    for (const studentId of actualStudentIds) {
+      try {
+        const invoiceId = uuidv4();
+        const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        
+        await query(
+          `INSERT INTO fee_invoices (
+            id, invoice_number, student_id, description, gross_amount, 
+            net_amount, balance_amount, due_date, status
+          ) VALUES ($1, $2, $3, $4, $5, $5, $5, $6, 'pending')`,
+          [
+            invoiceId, invoiceNumber, studentId, 
+            description || structure.name, structure.amount, actualDueDate
+          ]
+        );
+        
+        created.push({ studentId, invoiceId, invoiceNumber });
+      } catch (err) {
+        errors.push({ studentId, error: err.message });
+      }
     }
     
-    res.json({ success: true, message: `${created.length} invoices created` });
+    res.json({ 
+      success: true, 
+      message: `${created.length} invoices created`,
+      data: { created, errors }
+    });
   } catch (error) {
     logger.error('Bulk create invoices error:', error);
     res.status(500).json({ success: false, message: 'Error creating invoices' });
   }
 });
 
+// ============== FEE PAYMENT ROUTES ==============
+
 // Get fee payments
 router.get('/payment', authenticate, async (req, res) => {
   try {
-    const payments = await query(`
+    const { studentId, invoiceId } = req.query;
+    
+    let sql = `
       SELECT fp.*, fi.invoice_number, s.first_name, s.last_name
       FROM fee_payments fp
       LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
       LEFT JOIN students s ON COALESCE(fp.student_id, fi.student_id) = s.id
-      ORDER BY fp.payment_date DESC
-    `);
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+    
+    if (studentId) {
+      sql += ` AND (fp.student_id = $${paramIndex} OR fi.student_id = $${paramIndex})`;
+      params.push(studentId);
+      paramIndex++;
+    }
+    
+    if (invoiceId) {
+      sql += ` AND fp.invoice_id = $${paramIndex}`;
+      params.push(invoiceId);
+      paramIndex++;
+    }
+    
+    sql += ' ORDER BY fp.payment_date DESC';
+    
+    const payments = await query(sql, params);
     res.json({ success: true, data: payments });
   } catch (error) {
     logger.error('Get payments error:', error);
@@ -168,12 +432,21 @@ router.get('/payment', authenticate, async (req, res) => {
   }
 });
 
-// Record payment - handles both with and without invoice
+// Record payment
 router.post('/payment', authenticate, async (req, res) => {
   try {
     logger.info('Record payment request:', JSON.stringify(req.body));
     
-    const { invoice_id, student_id, amount, payment_method, transaction_id, remarks } = req.body;
+    const { 
+      invoice_id, invoiceId, student_id, studentId,
+      amount, payment_method, paymentMethod, 
+      transaction_id, transactionId, remarks 
+    } = req.body;
+    
+    const actualInvoiceId = invoice_id || invoiceId;
+    const actualStudentId = student_id || studentId;
+    const actualPaymentMethod = payment_method || paymentMethod || 'cash';
+    const actualTransactionId = transaction_id || transactionId;
     
     if (!amount || amount <= 0) {
       return res.status(400).json({ success: false, message: 'Valid amount is required' });
@@ -182,18 +455,17 @@ router.post('/payment', authenticate, async (req, res) => {
     const paymentId = uuidv4();
     
     // If no invoice_id but have student_id, create a general payment
-    if (!invoice_id && student_id) {
-      // Create payment without invoice
+    if (!actualInvoiceId && actualStudentId) {
       await query(
         `INSERT INTO fee_payments (id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date)
          VALUES ($1, $2, $3, $4, $5, $6, 'success', NOW())`,
-        [paymentId, student_id, amount, payment_method || 'cash', transaction_id, remarks]
+        [paymentId, actualStudentId, amount, actualPaymentMethod, actualTransactionId, remarks]
       );
       
-      return res.json({ success: true, message: 'Payment recorded successfully' });
+      return res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
     }
     
-    if (!invoice_id) {
+    if (!actualInvoiceId) {
       return res.status(400).json({ success: false, message: 'Invoice ID or Student ID is required' });
     }
     
@@ -201,7 +473,7 @@ router.post('/payment', authenticate, async (req, res) => {
     await query(
       `INSERT INTO fee_payments (id, invoice_id, amount, payment_method, transaction_id, remarks, status, payment_date)
        VALUES ($1, $2, $3, $4, $5, $6, 'success', NOW())`,
-      [paymentId, invoice_id, amount, payment_method || 'cash', transaction_id, remarks]
+      [paymentId, actualInvoiceId, amount, actualPaymentMethod, actualTransactionId, remarks]
     );
     
     // Update invoice
@@ -215,27 +487,31 @@ router.post('/payment', authenticate, async (req, res) => {
            END,
            updated_at = NOW()
        WHERE id = $2`,
-      [amount, invoice_id]
+      [amount, actualInvoiceId]
     );
     
-    res.json({ success: true, message: 'Payment recorded successfully' });
+    res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
   } catch (error) {
     logger.error('Record payment error:', error);
     res.status(500).json({ success: false, message: 'Error recording payment' });
   }
 });
 
+// ============== STATISTICS ROUTES ==============
+
 // Get fee statistics
 router.get('/statistics', authenticate, async (req, res) => {
   try {
     const stats = await query(`
       SELECT
-        COALESCE(SUM(net_amount), 0) as total_amount,
-        COALESCE(SUM(paid_amount), 0) as total_collected,
-        COALESCE(SUM(balance_amount), 0) as total_pending,
-        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_count,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
-        COUNT(CASE WHEN status = 'overdue' THEN 1 END) as overdue_count
+        COALESCE(SUM(net_amount), 0)::numeric as total_amount,
+        COALESCE(SUM(paid_amount), 0)::numeric as total_collected,
+        COALESCE(SUM(balance_amount), 0)::numeric as total_pending,
+        COUNT(*)::int as total_invoices,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END)::int as paid_count,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END)::int as pending_count,
+        COUNT(CASE WHEN status = 'partial' THEN 1 END)::int as partial_count,
+        COUNT(CASE WHEN status = 'overdue' THEN 1 END)::int as overdue_count
       FROM fee_invoices
     `);
     res.json({ success: true, data: stats[0] || {} });
@@ -250,7 +526,8 @@ router.get('/defaulters', authenticate, async (req, res) => {
   try {
     const defaulters = await query(`
       SELECT s.id, s.first_name, s.last_name, s.admission_number, c.name as class_name,
-        COALESCE(SUM(fi.balance_amount), 0) as total_due
+        COALESCE(SUM(fi.balance_amount), 0)::numeric as total_due,
+        COUNT(fi.id)::int as pending_invoices
       FROM students s
       JOIN fee_invoices fi ON s.id = fi.student_id
       LEFT JOIN classes c ON s.class_id = c.id
@@ -268,9 +545,11 @@ router.get('/defaulters', authenticate, async (req, res) => {
 // Get student fee account
 router.get('/student/:studentId', authenticate, async (req, res) => {
   try {
+    const studentId = req.params.studentId;
+    
     const invoices = await query(
       'SELECT * FROM fee_invoices WHERE student_id = $1 ORDER BY created_at DESC',
-      [req.params.studentId]
+      [studentId]
     );
     
     const payments = await query(`
@@ -278,22 +557,22 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
       LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
       WHERE fi.student_id = $1 OR fp.student_id = $1
       ORDER BY fp.payment_date DESC
-    `, [req.params.studentId]);
+    `, [studentId]);
     
     const summary = await query(`
       SELECT
-        COALESCE(SUM(net_amount), 0) as total_amount,
-        COALESCE(SUM(paid_amount), 0) as total_paid,
-        COALESCE(SUM(balance_amount), 0) as total_balance
+        COALESCE(SUM(net_amount), 0)::numeric as total_amount,
+        COALESCE(SUM(paid_amount), 0)::numeric as total_paid,
+        COALESCE(SUM(balance_amount), 0)::numeric as total_balance
       FROM fee_invoices WHERE student_id = $1
-    `, [req.params.studentId]);
+    `, [studentId]);
     
     res.json({
       success: true,
       data: {
         invoices,
         payments,
-        summary: summary[0] || {}
+        summary: summary[0] || { total_amount: 0, total_paid: 0, total_balance: 0 }
       }
     });
   } catch (error) {

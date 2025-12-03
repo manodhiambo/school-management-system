@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 
 export function MyTimetablePage() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [timetable, setTimetable] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,8 +65,6 @@ export function MyTimetablePage() {
     };
   });
 
-  console.log('Grouped timetable:', groupedTimetable);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -98,9 +96,6 @@ export function MyTimetablePage() {
         <p className="text-gray-500">
           {user?.role === 'teacher' ? 'View your teaching schedule' : 'View your weekly class schedule'}
         </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Total entries: {timetable.length}
-        </p>
       </div>
 
       {timetable.length === 0 ? (
@@ -125,7 +120,9 @@ export function MyTimetablePage() {
                 <CardTitle className="flex items-center space-x-2 text-lg">
                   <Clock className="h-5 w-5 text-primary" />
                   <span>{day}</span>
-                  <span className="text-sm font-normal text-gray-400">({entries.length})</span>
+                  {entries.length > 0 && (
+                    <span className="text-sm font-normal text-gray-400">({entries.length})</span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>

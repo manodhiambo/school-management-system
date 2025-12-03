@@ -29,10 +29,27 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging
+// Request logging (skip health checks)
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`);
+  if (req.path !== '/' && req.path !== '/health') {
+    logger.info(`${req.method} ${req.path}`);
+  }
   next();
+});
+
+// Root route - for health checks
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'School Management API',
+    version: '1.0.0',
+    timestamp: new Date().toISOString() 
+  });
+});
+
+// Also handle HEAD requests for health checks
+app.head('/', (req, res) => {
+  res.status(200).end();
 });
 
 // Health check

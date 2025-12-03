@@ -81,11 +81,15 @@ export async function seedAcademicYears() {
       
       const currentYear = new Date().getFullYear();
       
+      // Column is 'year' not 'name'
       await query(`
-        INSERT INTO academic_years (id, name, start_date, end_date, is_current) VALUES
-        (gen_random_uuid(), '${currentYear}', '${currentYear}-01-01', '${currentYear}-12-31', true),
-        (gen_random_uuid(), '${currentYear + 1}', '${currentYear + 1}-01-01', '${currentYear + 1}-12-31', false)
-      `);
+        INSERT INTO academic_years (id, year, start_date, end_date, is_current) VALUES
+        (gen_random_uuid(), $1, $2, $3, true),
+        (gen_random_uuid(), $4, $5, $6, false)
+      `, [
+        String(currentYear), `${currentYear}-01-01`, `${currentYear}-12-31`,
+        String(currentYear + 1), `${currentYear + 1}-01-01`, `${currentYear + 1}-12-31`
+      ]);
       
       logger.info('Academic years seeded');
     }
@@ -118,10 +122,14 @@ export async function seedTerms() {
       
       await query(`
         INSERT INTO terms (id, name, start_date, end_date, is_current) VALUES
-        (gen_random_uuid(), 'Term 1 ${currentYear}', '${currentYear}-01-15', '${currentYear}-04-15', false),
-        (gen_random_uuid(), 'Term 2 ${currentYear}', '${currentYear}-05-01', '${currentYear}-08-15', false),
-        (gen_random_uuid(), 'Term 3 ${currentYear}', '${currentYear}-09-01', '${currentYear}-12-01', true)
-      `);
+        (gen_random_uuid(), $1, $2, $3, false),
+        (gen_random_uuid(), $4, $5, $6, false),
+        (gen_random_uuid(), $7, $8, $9, true)
+      `, [
+        `Term 1 ${currentYear}`, `${currentYear}-01-15`, `${currentYear}-04-15`,
+        `Term 2 ${currentYear}`, `${currentYear}-05-01`, `${currentYear}-08-15`,
+        `Term 3 ${currentYear}`, `${currentYear}-09-01`, `${currentYear}-12-01`
+      ]);
       
       logger.info('Terms seeded');
     }

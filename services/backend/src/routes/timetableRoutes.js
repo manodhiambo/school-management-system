@@ -83,18 +83,24 @@ router.get('/', authenticate, async (req, res) => {
 // Get teacher timetable - handles both teacher_id and user_id
 router.get('/teacher/:teacherId', authenticate, async (req, res) => {
   try {
+    logger.info('=== GET TEACHER TIMETABLE ===');
+    logger.info('Requested teacherId/userId:', req.params.teacherId);
+    
     // First, resolve the actual teacher_id from either teacher_id or user_id
     const teacher = await query(
       'SELECT id FROM teachers WHERE id = $1 OR user_id = $1',
       [req.params.teacherId]
     );
     
+    logger.info('Teacher lookup result:', JSON.stringify(teacher));
+    
     if (teacher.length === 0) {
+      logger.info('No teacher found, returning empty array');
       return res.json({ success: true, data: [] });
     }
     
     const actualTeacherId = teacher[0].id;
-    logger.info(`Getting timetable for teacher: ${actualTeacherId} (requested: ${req.params.teacherId})`);
+    logger.info('Actual teacher_id:', actualTeacherId);
     
     const timetable = await query(
       `SELECT t.*, c.name as class_name, s.name as subject_name
@@ -106,12 +112,15 @@ router.get('/teacher/:teacherId', authenticate, async (req, res) => {
       [actualTeacherId]
     );
     
-    logger.info(`Found ${timetable.length} timetable entries for teacher`);
+    logger.info('Timetable entries found:', timetable.length);
+    logger.info('Timetable data:', JSON.stringify(timetable));
     
     const result = timetable.map(entry => ({
       ...entry,
       day_of_week: numberToDay(entry.day_of_week)
     }));
+    
+    logger.info('Returning result:', JSON.stringify(result));
     
     res.json({ success: true, data: result });
   } catch (error) {
@@ -123,9 +132,15 @@ router.get('/teacher/:teacherId', authenticate, async (req, res) => {
 // Get student timetable
 router.get('/student/:studentId', authenticate, async (req, res) => {
   try {
+    logger.info('=== GET STUDENT TIMETABLE ===');
+    logger.info('Requested studentId/userId:', req.params.studentId);
+    
     const student = await query('SELECT class_id FROM students WHERE id = $1 OR user_id = $1', [req.params.studentId]);
     
+    logger.info('Student lookup result:', JSON.stringify(student));
+    
     if (student.length === 0 || !student[0].class_id) {
+      logger.info('No student or class found, returning empty array');
       return res.json({ success: true, data: [] });
     }
     
@@ -138,6 +153,8 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
        ORDER BY t.day_of_week, t.start_time`,
       [student[0].class_id]
     );
+    
+    logger.info('Timetable entries found:', timetable.length);
     
     const result = timetable.map(entry => ({
       ...entry,

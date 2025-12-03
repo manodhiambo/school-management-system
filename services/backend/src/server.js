@@ -1,132 +1,88 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import cookieParser from 'cookie-parser';
-import { config } from './config/env.js';
-import { testConnection, createDatabasePool } from './config/database.js';
-import logger from './utils/logger.js';
+import dotenv from 'dotenv';
 import routes from './routes/index.js';
-import { errorHandler, notFound } from './middleware/errorHandler.js';
-import { apiLimiter } from './middleware/rateLimiter.js';
-import fs from 'fs';
+import logger from './utils/logger.js';
+import { testConnection } from './config/database.js';
+import runAllSeeds from './utils/seedData.js';
+import ensureTablesExist from './utils/createTables.js';
 
-// Create logs directory if it doesn't exist
-if (!fs.existsSync('./logs')) {
-  fs.mkdirSync('./logs', { recursive: true });
-}
+dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Trust proxy for Render/Heroku/etc
-app.set('trust proxy', 1);
-
-// Security middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-
-// CORS configuration - Allow all origins
+// Middleware
+app.use(helmet());
 app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://skulmanager.org',
+    'https://www.skulmanager.org',
+    'https://school-management-system-fhbwful50.vercel.app',
+    /\.vercel\.app$/
+  ],
+  credentials: true
 }));
-
-// Handle preflight requests
-app.options('*', cors());
-
-// Rate limiting
-app.use('/api', apiLimiter);
-
-// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
-  logger.http(`${req.method} ${req.url}`);
+  logger.info(`${req.method} ${req.path}`);
   next();
 });
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API is running',
-    timestamp: new Date().toISOString(),
-    environment: config.env
-  });
-});
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'School Management System API',
-    version: '1.0.0',
-    api: `/api/${config.apiVersion}`
-  });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // API routes
-logger.info(`Registering routes at /api/${config.apiVersion}`);
-app.use(`/api/${config.apiVersion}`, routes);
+app.use('/api/v1', routes);
 
 // 404 handler
-app.use(notFound);
+app.use((req, res) => {
+  logger.error(`Error: Route ${req.method} ${req.originalUrl} not found`);
+  res.status(404).json({
+    success: false,
+    statusCode: 404,
+    message: `Route ${req.originalUrl} not found`
+  });
+});
 
 // Error handler
-app.use(errorHandler);
+app.use((err, req, res, next) => {
+  logger.error('Server error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
 
 // Start server
-const startServer = async () => {
+async function startServer() {
   try {
     // Test database connection
-    createDatabasePool();
-    const isConnected = await testConnection();
+    await testConnection();
+    logger.info('Database connected successfully');
     
-    if (!isConnected) {
-      logger.warn('Database connection failed - server will start but DB features may not work');
-    } else {
-      logger.info('✓ Database connected successfully');
-    }
+    // Ensure all tables exist
+    await ensureTablesExist();
     
-    // Start listening
-    const PORT = config.port;
-    app.listen(PORT, '0.0.0.0', () => {
-      logger.info('========================================');
-      logger.info('School Management System API');
-      logger.info('========================================');
-      logger.info(`Environment: ${config.env}`);
+    // Run seeds
+    await runAllSeeds();
+    
+    app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
-      logger.info(`API: http://localhost:${PORT}/api/${config.apiVersion}`);
-      logger.info('========================================');
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
-};
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  logger.error('Unhandled Rejection:', err);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  logger.error('Uncaught Exception:', err);
-  process.exit(1);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+}
 
 startServer();
-
-export default app;

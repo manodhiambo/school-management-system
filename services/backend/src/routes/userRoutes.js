@@ -30,9 +30,11 @@ router.get('/:id', authenticate, async (req, res) => {
       'SELECT id, email, role, is_active, is_verified, last_login, created_at FROM users WHERE id = $1',
       [req.params.id]
     );
+    
     if (users.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    
     res.json({ success: true, data: users[0] });
   } catch (error) {
     logger.error('Get user error:', error);
@@ -73,12 +75,15 @@ router.post('/', authenticate, requireRole(['admin']), async (req, res) => {
 // Update user
 router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    const { role, is_active } = req.body;
+    const { role, is_active, isActive } = req.body;
     
     await query(
-      `UPDATE users SET role = COALESCE($1, role), is_active = COALESCE($2, is_active), updated_at = NOW()
+      `UPDATE users SET 
+        role = COALESCE($1, role), 
+        is_active = COALESCE($2, is_active), 
+        updated_at = NOW()
        WHERE id = $3`,
-      [role, is_active, req.params.id]
+      [role, is_active ?? isActive, req.params.id]
     );
     
     res.json({ success: true, message: 'User updated successfully' });
@@ -88,14 +93,107 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   }
 });
 
-// Delete user
+// Delete user - with cascade deletion of related records
 router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    await query('DELETE FROM users WHERE id = $1', [req.params.id]);
-    res.json({ success: true, message: 'User deleted successfully' });
+    const userId = req.params.id;
+    
+    logger.info('Deleting user:', userId);
+    
+    // Check if user exists
+    const userCheck = await query('SELECT id, role, email FROM users WHERE id = $1', [userId]);
+    if (userCheck.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const user = userCheck[0];
+    logger.info('Found user to delete:', user.email, 'role:', user.role);
+    
+    // Delete related records based on user role
+    try {
+      // Delete student record if exists
+      const studentDelete = await query('DELETE FROM students WHERE user_id = $1 RETURNING id', [userId]);
+      if (studentDelete.length > 0) {
+        logger.info('Deleted student record:', studentDelete[0].id);
+      }
+      
+      // Delete teacher record if exists
+      const teacherDelete = await query('DELETE FROM teachers WHERE user_id = $1 RETURNING id', [userId]);
+      if (teacherDelete.length > 0) {
+        logger.info('Deleted teacher record:', teacherDelete[0].id);
+      }
+      
+      // Delete parent record if exists
+      const parentDelete = await query('DELETE FROM parents WHERE user_id = $1 RETURNING id', [userId]);
+      if (parentDelete.length > 0) {
+        logger.info('Deleted parent record:', parentDelete[0].id);
+      }
+      
+      // Delete notifications
+      await query('DELETE FROM notifications WHERE user_id = $1', [userId]).catch(() => {});
+      
+      // Delete user sessions
+      await query('DELETE FROM user_sessions WHERE user_id = $1', [userId]).catch(() => {});
+      
+    } catch (relatedError) {
+      logger.warn('Error deleting related records:', relatedError.message);
+      // Continue with user deletion even if some related deletions fail
+    }
+    
+    // Finally delete the user
+    const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+    
+    if (result.length === 0) {
+      return res.status(500).json({ success: false, message: 'Failed to delete user' });
+    }
+    
+    logger.info('User deleted successfully:', userId);
+    
+    res.json({ success: true, message: 'User and all related records deleted successfully' });
   } catch (error) {
     logger.error('Delete user error:', error);
-    res.status(500).json({ success: false, message: 'Error deleting user' });
+    res.status(500).json({ success: false, message: 'Error deleting user: ' + error.message });
+  }
+});
+
+// Toggle user active status
+router.patch('/:id/toggle-status', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await query(
+      `UPDATE users SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1 RETURNING is_active`,
+      [req.params.id]
+    );
+    
+    if (result.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `User ${result[0].is_active ? 'activated' : 'deactivated'} successfully`,
+      data: { is_active: result[0].is_active }
+    });
+  } catch (error) {
+    logger.error('Toggle user status error:', error);
+    res.status(500).json({ success: false, message: 'Error toggling user status' });
+  }
+});
+
+// Reset user password
+router.patch('/:id/reset-password', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    const hashedPassword = await bcrypt.hash(newPassword || 'password123', 10);
+    
+    await query(
+      'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
+      [hashedPassword, req.params.id]
+    );
+    
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    logger.error('Reset password error:', error);
+    res.status(500).json({ success: false, message: 'Error resetting password' });
   }
 });
 

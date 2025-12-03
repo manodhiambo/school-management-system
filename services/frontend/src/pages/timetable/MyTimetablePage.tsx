@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock } from 'lucide-react';
+import { Clock, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
@@ -10,6 +10,8 @@ export function MyTimetablePage() {
   const [timetable, setTimetable] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   useEffect(() => {
     if (user?.id) {
@@ -21,17 +23,19 @@ export function MyTimetablePage() {
     try {
       setLoading(true);
       setError(null);
-      // For students: get their class timetable
-      // For teachers: get their teaching schedule
-      let response;
+      
+      let response: any;
       if (user?.role === 'teacher') {
         response = await api.getTeacherTimetable(user.id);
       } else {
-        // Get student's timetable
-        response = await api.getStudentTimetable(user?.id);
+        response = await api.getStudentTimetable(user?.id || '');
       }
-      console.log('My timetable data:', response);
-      setTimetable(response.timetable || response || []);
+      
+      console.log('My timetable:', response);
+      
+      // Handle the response - it could be { success, data } or direct array
+      const timetableData = response?.data || response || [];
+      setTimetable(Array.isArray(timetableData) ? timetableData : []);
     } catch (error: any) {
       console.error('Error loading timetable:', error);
       setError(error?.message || 'Failed to load timetable');
@@ -39,6 +43,23 @@ export function MyTimetablePage() {
       setLoading(false);
     }
   };
+
+  // Group timetable entries by day
+  const groupedTimetable = daysOfWeek.map(day => {
+    const dayEntries = timetable.filter(entry => {
+      const entryDay = entry.day_of_week?.toLowerCase() || '';
+      return entryDay === day.toLowerCase();
+    });
+    
+    return {
+      day,
+      entries: dayEntries.sort((a, b) => {
+        const timeA = a.start_time || '00:00';
+        const timeB = b.start_time || '00:00';
+        return timeA.localeCompare(timeB);
+      })
+    };
+  });
 
   if (loading) {
     return (
@@ -68,49 +89,74 @@ export function MyTimetablePage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold">My Timetable</h2>
-        <p className="text-gray-500">View your weekly schedule</p>
+        <p className="text-gray-500">
+          {user?.role === 'teacher' ? 'View your teaching schedule' : 'View your weekly class schedule'}
+        </p>
       </div>
 
-      <div className="space-y-4">
-        {timetable.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-gray-500">No timetable data available</p>
-            </CardContent>
-          </Card>
-        ) : (
-          timetable.map((day, index) => (
-            <Card key={index}>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
+      {timetable.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No timetable entries found</p>
+              <p className="text-sm text-gray-400 mt-2">
+                {user?.role === 'teacher' 
+                  ? 'You have no classes assigned yet.' 
+                  : 'Your class timetable has not been set up yet.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {groupedTimetable.map(({ day, entries }) => (
+            <Card key={day}>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center space-x-2 text-lg">
                   <Clock className="h-5 w-5 text-primary" />
-                  <span>{day.day_name || day.day}</span>
+                  <span>{day}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {day.periods && day.periods.length > 0 ? (
-                    day.periods.map((period: any, pIndex: number) => (
-                      <div key={pIndex} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium">{period.subject_name || period.subject}</p>
-                          <p className="text-sm text-gray-500">{period.teacher_name || period.teacher}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{period.start_time} - {period.end_time}</p>
-                          <p className="text-sm text-gray-500">Room {period.room_number || period.room}</p>
+                {entries.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">No classes scheduled</p>
+                ) : (
+                  <div className="space-y-2">
+                    {entries.map((entry: any, index: number) => (
+                      <div 
+                        key={index} 
+                        className="p-3 bg-blue-50 rounded-lg border border-blue-100"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-blue-900">
+                              {entry.subject_name || 'Subject'}
+                            </p>
+                            {user?.role === 'teacher' ? (
+                              <p className="text-sm text-blue-700">{entry.class_name || 'Class'}</p>
+                            ) : (
+                              <p className="text-sm text-blue-700">{entry.teacher_name || 'Teacher'}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-blue-800">
+                              {entry.start_time?.substring(0, 5)} - {entry.end_time?.substring(0, 5)}
+                            </p>
+                            {entry.room && (
+                              <p className="text-xs text-blue-600">Room: {entry.room}</p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500 text-center py-4">No classes scheduled</p>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

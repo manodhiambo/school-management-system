@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Mail, Phone, MapPin } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({

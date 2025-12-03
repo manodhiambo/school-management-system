@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, BookOpen, Calendar, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 
 export function MyChildrenPage() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [children, setChildren] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 
 export function MessagesPage() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

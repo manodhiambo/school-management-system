@@ -1,36 +1,11 @@
 import { query } from '../config/database.js';
 import logger from './logger.js';
 
+// Fee structures should be created by school admins, not auto-seeded
+// This function is kept for reference but not called automatically
 export async function seedFeeStructures() {
-  try {
-    // Check if fee structures exist
-    const existing = await query('SELECT COUNT(*) as count FROM fee_structure');
-    
-    if (parseInt(existing[0].count) === 0) {
-      logger.info('Seeding fee structures...');
-      
-      // Valid frequency values: monthly, quarterly, half_yearly, yearly, one_time
-      await query(`
-        INSERT INTO fee_structure (id, name, amount, frequency, description, due_day, academic_year) VALUES
-        (gen_random_uuid(), 'Tuition Fee', 50000, 'quarterly', 'Term tuition fee', 15, '2025'),
-        (gen_random_uuid(), 'Activity Fee', 5000, 'quarterly', 'Sports and clubs activities', 15, '2025'),
-        (gen_random_uuid(), 'Library Fee', 2000, 'yearly', 'Library access and materials', 1, '2025'),
-        (gen_random_uuid(), 'Lab Fee', 3000, 'quarterly', 'Science laboratory usage', 15, '2025'),
-        (gen_random_uuid(), 'Transport Fee', 10000, 'monthly', 'School bus transport', 15, '2025'),
-        (gen_random_uuid(), 'Lunch Fee', 8000, 'monthly', 'School lunch program', 15, '2025'),
-        (gen_random_uuid(), 'Exam Fee', 2500, 'quarterly', 'Examination and assessment fee', 15, '2025'),
-        (gen_random_uuid(), 'Computer Lab Fee', 3500, 'quarterly', 'Computer and IT resources', 15, '2025'),
-        (gen_random_uuid(), 'Admission Fee', 15000, 'one_time', 'One-time admission fee', 1, '2025'),
-        (gen_random_uuid(), 'Uniform Fee', 5000, 'one_time', 'School uniform', 1, '2025')
-      `);
-      
-      logger.info('Fee structures seeded successfully');
-    } else {
-      logger.info(`Fee structures already exist (${existing[0].count} records)`);
-    }
-  } catch (error) {
-    logger.error('Error seeding fee structures:', error.message);
-  }
+  // Do nothing - schools should create their own fee structures
+  logger.info('Fee structures should be created by school admins via the app');
 }
 
 export async function seedDefaultAdmin() {
@@ -61,7 +36,6 @@ export async function seedDefaultAdmin() {
 
 export async function seedAcademicYears() {
   try {
-    // Check if table exists first
     const tableCheck = await query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -70,7 +44,6 @@ export async function seedAcademicYears() {
     `);
     
     if (!tableCheck[0].exists) {
-      logger.info('academic_years table does not exist, skipping seed');
       return;
     }
     
@@ -81,7 +54,6 @@ export async function seedAcademicYears() {
       
       const currentYear = new Date().getFullYear();
       
-      // Column is 'year' not 'name'
       await query(`
         INSERT INTO academic_years (id, year, start_date, end_date, is_current) VALUES
         (gen_random_uuid(), $1, $2, $3, true),
@@ -100,7 +72,6 @@ export async function seedAcademicYears() {
 
 export async function seedTerms() {
   try {
-    // Check if table exists first
     const tableCheck = await query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -109,7 +80,6 @@ export async function seedTerms() {
     `);
     
     if (!tableCheck[0].exists) {
-      logger.info('terms table does not exist, skipping seed');
       return;
     }
     
@@ -142,9 +112,9 @@ export async function runAllSeeds() {
   logger.info('Running database seeds...');
   
   await seedDefaultAdmin();
-  await seedFeeStructures();
   await seedAcademicYears();
   await seedTerms();
+  // Fee structures are NOT auto-seeded - schools create their own
   
   logger.info('Database seeding complete');
 }

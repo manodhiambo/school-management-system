@@ -17,12 +17,14 @@ export function MyTimetablePage() {
     if (user?.id) {
       loadTimetable();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadTimetable = async () => {
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('Loading timetable for user:', user?.id, 'role:', user?.role);
       
       let response: any;
       if (user?.role === 'teacher') {
@@ -31,10 +33,12 @@ export function MyTimetablePage() {
         response = await api.getStudentTimetable(user?.id || '');
       }
       
-      console.log('My timetable:', response);
+      console.log('Timetable API response:', JSON.stringify(response, null, 2));
       
       // Handle the response - it could be { success, data } or direct array
       const timetableData = response?.data || response || [];
+      console.log('Timetable data extracted:', JSON.stringify(timetableData, null, 2));
+      
       setTimetable(Array.isArray(timetableData) ? timetableData : []);
     } catch (error: any) {
       console.error('Error loading timetable:', error);
@@ -47,7 +51,7 @@ export function MyTimetablePage() {
   // Group timetable entries by day
   const groupedTimetable = daysOfWeek.map(day => {
     const dayEntries = timetable.filter(entry => {
-      const entryDay = entry.day_of_week?.toLowerCase() || '';
+      const entryDay = (entry.day_of_week || '').toLowerCase();
       return entryDay === day.toLowerCase();
     });
     
@@ -60,6 +64,8 @@ export function MyTimetablePage() {
       })
     };
   });
+
+  console.log('Grouped timetable:', groupedTimetable);
 
   if (loading) {
     return (
@@ -92,6 +98,9 @@ export function MyTimetablePage() {
         <p className="text-gray-500">
           {user?.role === 'teacher' ? 'View your teaching schedule' : 'View your weekly class schedule'}
         </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Total entries: {timetable.length}
+        </p>
       </div>
 
       {timetable.length === 0 ? (
@@ -116,6 +125,7 @@ export function MyTimetablePage() {
                 <CardTitle className="flex items-center space-x-2 text-lg">
                   <Clock className="h-5 w-5 text-primary" />
                   <span>{day}</span>
+                  <span className="text-sm font-normal text-gray-400">({entries.length})</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -125,7 +135,7 @@ export function MyTimetablePage() {
                   <div className="space-y-2">
                     {entries.map((entry: any, index: number) => (
                       <div 
-                        key={index} 
+                        key={entry.id || index} 
                         className="p-3 bg-blue-50 rounded-lg border border-blue-100"
                       >
                         <div className="flex justify-between items-start">
@@ -141,7 +151,7 @@ export function MyTimetablePage() {
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-blue-800">
-                              {entry.start_time?.substring(0, 5)} - {entry.end_time?.substring(0, 5)}
+                              {entry.start_time?.substring(0, 5) || '??:??'} - {entry.end_time?.substring(0, 5) || '??:??'}
                             </p>
                             {entry.room && (
                               <p className="text-xs text-blue-600">Room: {entry.room}</p>

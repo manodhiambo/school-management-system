@@ -416,9 +416,6 @@ class ApiService {
   bulkImportTeachers(data: any) {
     return this.api.post('/teachers/bulk-import', data);
   }
-}
-
-export default new ApiService();
 
   // Assignments
   getAssignments(params?: any) {
@@ -464,3 +461,6 @@ export default new ApiService();
   getAssignmentSubmissions(assignmentId: string) {
     return this.api.get('/assignments/' + assignmentId + '/submissions');
   }
+}
+
+export default new ApiService();

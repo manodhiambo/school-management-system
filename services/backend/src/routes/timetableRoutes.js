@@ -9,6 +9,7 @@ const router = express.Router();
 // Helper function to convert day name to number
 const dayToNumber = (day) => {
   if (typeof day === 'number') return day;
+  if (day === null || day === undefined) return null;
   const days = {
     'monday': 1, 'mon': 1,
     'tuesday': 2, 'tue': 2,
@@ -18,7 +19,7 @@ const dayToNumber = (day) => {
     'saturday': 6, 'sat': 6,
     'sunday': 0, 'sun': 0
   };
-  return days[day?.toLowerCase()] || 1;
+  return days[day?.toString().toLowerCase()] ?? null;
 };
 
 // Helper function to convert number to day name
@@ -53,8 +54,12 @@ router.get('/', authenticate, async (req, res) => {
     }
     
     if (teacherId) {
+      // Check if teacherId is a user_id and convert to teacher_id
+      const teacher = await query('SELECT id FROM teachers WHERE id = $1 OR user_id = $1', [teacherId]);
+      const actualTeacherId = teacher.length > 0 ? teacher[0].id : teacherId;
+      
       sql += ` AND t.teacher_id = $${paramIndex}`;
-      params.push(teacherId);
+      params.push(actualTeacherId);
       paramIndex++;
     }
     
@@ -71,6 +76,77 @@ router.get('/', authenticate, async (req, res) => {
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching timetable' });
+  }
+});
+
+// Get teacher timetable - handles both teacher_id and user_id
+router.get('/teacher/:teacherId', authenticate, async (req, res) => {
+  try {
+    // First, resolve the actual teacher_id from either teacher_id or user_id
+    const teacher = await query(
+      'SELECT id FROM teachers WHERE id = $1 OR user_id = $1',
+      [req.params.teacherId]
+    );
+    
+    if (teacher.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const actualTeacherId = teacher[0].id;
+    logger.info(`Getting timetable for teacher: ${actualTeacherId} (requested: ${req.params.teacherId})`);
+    
+    const timetable = await query(
+      `SELECT t.*, c.name as class_name, s.name as subject_name
+       FROM timetable t
+       LEFT JOIN classes c ON t.class_id = c.id
+       LEFT JOIN subjects s ON t.subject_id = s.id
+       WHERE t.teacher_id = $1 AND t.is_active = true
+       ORDER BY t.day_of_week, t.start_time`,
+      [actualTeacherId]
+    );
+    
+    logger.info(`Found ${timetable.length} timetable entries for teacher`);
+    
+    const result = timetable.map(entry => ({
+      ...entry,
+      day_of_week: numberToDay(entry.day_of_week)
+    }));
+    
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Get teacher timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching timetable' });
+  }
+});
+
+// Get student timetable
+router.get('/student/:studentId', authenticate, async (req, res) => {
+  try {
+    const student = await query('SELECT class_id FROM students WHERE id = $1 OR user_id = $1', [req.params.studentId]);
+    
+    if (student.length === 0 || !student[0].class_id) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const timetable = await query(
+      `SELECT t.*, s.name as subject_name, CONCAT(te.first_name, ' ', te.last_name) as teacher_name
+       FROM timetable t
+       LEFT JOIN subjects s ON t.subject_id = s.id
+       LEFT JOIN teachers te ON t.teacher_id = te.id
+       WHERE t.class_id = $1 AND t.is_active = true
+       ORDER BY t.day_of_week, t.start_time`,
+      [student[0].class_id]
+    );
+    
+    const result = timetable.map(entry => ({
+      ...entry,
+      day_of_week: numberToDay(entry.day_of_week)
+    }));
+    
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Get student timetable error:', error);
     res.status(500).json({ success: false, message: 'Error fetching timetable' });
   }
 });
@@ -92,21 +168,19 @@ router.post('/', authenticate, async (req, res) => {
     
     const actualClassId = class_id || classId;
     const actualSubjectId = subject_id || subjectId || null;
-    const actualTeacherId = teacher_id || teacherId || null;
+    let actualTeacherId = teacher_id || teacherId || null;
     const actualDayOfWeek = dayToNumber(day_of_week || dayOfWeek || day);
     const actualStartTime = start_time || startTime;
     const actualEndTime = end_time || endTime;
     const actualRoom = room || roomNumber || null;
     
-    logger.info('Parsed values:', {
-      actualClassId,
-      actualSubjectId,
-      actualTeacherId,
-      actualDayOfWeek,
-      actualStartTime,
-      actualEndTime,
-      actualRoom
-    });
+    // If teacherId is a user_id, convert to teacher_id
+    if (actualTeacherId) {
+      const teacher = await query('SELECT id FROM teachers WHERE id = $1 OR user_id = $1', [actualTeacherId]);
+      if (teacher.length > 0) {
+        actualTeacherId = teacher[0].id;
+      }
+    }
     
     if (!actualClassId) {
       return res.status(400).json({ success: false, message: 'Class ID is required' });
@@ -152,11 +226,19 @@ router.post('/period', authenticate, async (req, res) => {
     }
     
     const actualSubjectId = subject_id || subjectId || null;
-    const actualTeacherId = teacher_id || teacherId || null;
+    let actualTeacherId = teacher_id || teacherId || null;
     const actualDayOfWeek = dayToNumber(day_of_week || dayOfWeek || day);
     const actualStartTime = start_time || startTime;
     const actualEndTime = end_time || endTime;
     const actualRoom = room || roomNumber || null;
+    
+    // If teacherId is a user_id, convert to teacher_id
+    if (actualTeacherId) {
+      const teacher = await query('SELECT id FROM teachers WHERE id = $1 OR user_id = $1', [actualTeacherId]);
+      if (teacher.length > 0) {
+        actualTeacherId = teacher[0].id;
+      }
+    }
     
     const timetableId = uuidv4();
     await query(
@@ -182,59 +264,14 @@ router.post('/substitute', authenticate, async (req, res) => {
   }
 });
 
-// Get teacher timetable
-router.get('/teacher/:teacherId', authenticate, async (req, res) => {
+// Delete timetable entry
+router.delete('/:id', authenticate, async (req, res) => {
   try {
-    const timetable = await query(
-      `SELECT t.*, c.name as class_name, s.name as subject_name
-       FROM timetable t
-       LEFT JOIN classes c ON t.class_id = c.id
-       LEFT JOIN subjects s ON t.subject_id = s.id
-       WHERE t.teacher_id = $1 AND t.is_active = true
-       ORDER BY t.day_of_week, t.start_time`,
-      [req.params.teacherId]
-    );
-    
-    const result = timetable.map(entry => ({
-      ...entry,
-      day_of_week: numberToDay(entry.day_of_week)
-    }));
-    
-    res.json({ success: true, data: result });
+    await query('DELETE FROM timetable WHERE id = $1', [req.params.id]);
+    res.json({ success: true, message: 'Timetable entry deleted' });
   } catch (error) {
-    logger.error('Get teacher timetable error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching timetable' });
-  }
-});
-
-// Get student timetable
-router.get('/student/:studentId', authenticate, async (req, res) => {
-  try {
-    const student = await query('SELECT class_id FROM students WHERE id = $1 OR user_id = $1', [req.params.studentId]);
-    
-    if (student.length === 0 || !student[0].class_id) {
-      return res.json({ success: true, data: [] });
-    }
-    
-    const timetable = await query(
-      `SELECT t.*, s.name as subject_name, CONCAT(te.first_name, ' ', te.last_name) as teacher_name
-       FROM timetable t
-       LEFT JOIN subjects s ON t.subject_id = s.id
-       LEFT JOIN teachers te ON t.teacher_id = te.id
-       WHERE t.class_id = $1 AND t.is_active = true
-       ORDER BY t.day_of_week, t.start_time`,
-      [student[0].class_id]
-    );
-    
-    const result = timetable.map(entry => ({
-      ...entry,
-      day_of_week: numberToDay(entry.day_of_week)
-    }));
-    
-    res.json({ success: true, data: result });
-  } catch (error) {
-    logger.error('Get student timetable error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching timetable' });
+    logger.error('Delete timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error deleting timetable entry' });
   }
 });
 

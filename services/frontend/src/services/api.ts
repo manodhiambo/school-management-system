@@ -419,3 +419,48 @@ class ApiService {
 }
 
 export default new ApiService();
+
+  // Assignments
+  getAssignments(params?: any) {
+    return this.api.get('/assignments', { params });
+  }
+
+  getAssignment(id: string) {
+    return this.api.get('/assignments/' + id);
+  }
+
+  getTeacherAssignments(teacherId: string) {
+    return this.api.get('/assignments/teacher/' + teacherId);
+  }
+
+  getStudentAssignments(studentId: string) {
+    return this.api.get('/assignments/student/' + studentId);
+  }
+
+  getClassAssignments(classId: string) {
+    return this.api.get('/assignments/class/' + classId);
+  }
+
+  createAssignment(data: any) {
+    return this.api.post('/assignments', data);
+  }
+
+  updateAssignment(id: string, data: any) {
+    return this.api.put('/assignments/' + id, data);
+  }
+
+  deleteAssignment(id: string) {
+    return this.api.delete('/assignments/' + id);
+  }
+
+  submitAssignment(id: string, data: any) {
+    return this.api.post('/assignments/' + id + '/submit', data);
+  }
+
+  gradeAssignment(assignmentId: string, submissionId: string, data: any) {
+    return this.api.post('/assignments/' + assignmentId + '/grade/' + submissionId, data);
+  }
+
+  getAssignmentSubmissions(assignmentId: string) {
+    return this.api.get('/assignments/' + assignmentId + '/submissions');
+  }

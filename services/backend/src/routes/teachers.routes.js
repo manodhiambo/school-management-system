@@ -27,6 +27,26 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// Get teacher by user ID
+router.get('/by-user/:userId', authenticate, async (req, res) => {
+  try {
+    const teachers = await query(`
+      SELECT t.*, u.email
+      FROM teachers t
+      LEFT JOIN users u ON t.user_id = u.id
+      WHERE t.user_id = $1
+    `, [req.params.userId]);
+    
+    if (teachers.length === 0) {
+      return res.status(404).json({ success: false, message: 'Teacher not found' });
+    }
+    res.json({ success: true, data: teachers[0] });
+  } catch (error) {
+    logger.error('Get teacher by user error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching teacher' });
+  }
+});
+
 // Get single teacher
 router.get('/:id', authenticate, async (req, res) => {
   try {
@@ -34,7 +54,7 @@ router.get('/:id', authenticate, async (req, res) => {
       SELECT t.*, u.email 
       FROM teachers t
       LEFT JOIN users u ON t.user_id = u.id
-      WHERE t.id = $1
+      WHERE t.id = $1 OR t.user_id = $1
     `, [req.params.id]);
     
     if (teachers.length === 0) {
@@ -44,6 +64,38 @@ router.get('/:id', authenticate, async (req, res) => {
   } catch (error) {
     logger.error('Get teacher error:', error);
     res.status(500).json({ success: false, message: 'Error fetching teacher' });
+  }
+});
+
+// Get teacher's classes (classes they teach based on timetable)
+router.get('/:id/classes', authenticate, async (req, res) => {
+  try {
+    // First try to find teacher by ID or user_id
+    const teacher = await query(
+      'SELECT id FROM teachers WHERE id = $1 OR user_id = $1',
+      [req.params.id]
+    );
+    
+    const teacherId = teacher.length > 0 ? teacher[0].id : req.params.id;
+    
+    // Get classes from timetable where this teacher is assigned
+    const classes = await query(`
+      SELECT DISTINCT c.id, c.name, c.section, c.capacity
+      FROM classes c
+      JOIN timetable t ON c.id = t.class_id
+      WHERE t.teacher_id = $1 AND t.is_active = true
+    `, [teacherId]);
+    
+    // If no classes from timetable, return all classes (for now)
+    if (classes.length === 0) {
+      const allClasses = await query('SELECT id, name, section, capacity FROM classes ORDER BY name');
+      return res.json({ success: true, data: allClasses });
+    }
+    
+    res.json({ success: true, data: classes });
+  } catch (error) {
+    logger.error('Get teacher classes error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching teacher classes' });
   }
 });
 

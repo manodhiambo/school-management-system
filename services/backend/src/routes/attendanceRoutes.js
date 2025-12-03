@@ -11,7 +11,7 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const { classId, date, studentId } = req.query;
-    
+
     let sql = `
       SELECT a.*, s.first_name, s.last_name, s.admission_number, c.name as class_name
       FROM attendance a
@@ -55,14 +55,14 @@ router.get('/statistics', authenticate, async (req, res) => {
   try {
     const stats = await query(`
       SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
-        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late
+        COUNT(*)::int as total,
+        COALESCE(SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END), 0)::int as present,
+        COALESCE(SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END), 0)::int as absent,
+        COALESCE(SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END), 0)::int as late
       FROM attendance
       WHERE DATE(date) = CURRENT_DATE
     `);
-    res.json({ success: true, data: stats[0] || {} });
+    res.json({ success: true, data: stats[0] || { total: 0, present: 0, absent: 0, late: 0 } });
   } catch (error) {
     logger.error('Get attendance statistics error:', error);
     res.status(500).json({ success: false, message: 'Error fetching statistics' });
@@ -80,7 +80,7 @@ router.get('/class/:classId', authenticate, async (req, res) => {
       WHERE s.class_id = $1 AND DATE(a.date) = $2
       ORDER BY s.first_name
     `, [req.params.classId, date || new Date().toISOString().split('T')[0]]);
-    
+
     res.json({ success: true, data: attendance });
   } catch (error) {
     logger.error('Get class attendance error:', error);
@@ -105,13 +105,13 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     logger.info('Mark attendance request:', JSON.stringify(req.body));
-    
-    const { studentId, student_id, date, status, remarks, classId, class_id } = req.body;
-    
+
+    const { studentId, student_id, date, status } = req.body;
+
     const actualStudentId = studentId || student_id;
     const actualDate = date || new Date().toISOString().split('T')[0];
     const actualStatus = status || 'present';
-    
+
     if (!actualStudentId) {
       return res.status(400).json({ success: false, message: 'Student ID is required' });
     }
@@ -125,16 +125,16 @@ router.post('/', authenticate, async (req, res) => {
     if (existing.length > 0) {
       // Update existing
       await query(
-        `UPDATE attendance SET status = $1, remarks = $2, updated_at = NOW() WHERE id = $3`,
-        [actualStatus, remarks || null, existing[0].id]
+        `UPDATE attendance SET status = $1 WHERE id = $2`,
+        [actualStatus, existing[0].id]
       );
     } else {
       // Create new
       const attendanceId = uuidv4();
       await query(
-        `INSERT INTO attendance (id, student_id, date, status, remarks)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [attendanceId, actualStudentId, actualDate, actualStatus, remarks || null]
+        `INSERT INTO attendance (id, student_id, date, status)
+         VALUES ($1, $2, $3, $4)`,
+        [attendanceId, actualStudentId, actualDate, actualStatus]
       );
     }
 
@@ -148,6 +148,8 @@ router.post('/', authenticate, async (req, res) => {
 // Mark bulk attendance
 router.post('/bulk', authenticate, async (req, res) => {
   try {
+    logger.info('Bulk attendance request:', JSON.stringify(req.body));
+    
     const { attendances, classId, date } = req.body;
     const actualDate = date || new Date().toISOString().split('T')[0];
 
@@ -155,10 +157,11 @@ router.post('/bulk', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Attendances array is required' });
     }
 
+    let processed = 0;
     for (const record of attendances) {
       const studentId = record.studentId || record.student_id;
       const status = record.status || 'present';
-      
+
       if (!studentId) continue;
 
       const existing = await query(
@@ -168,37 +171,39 @@ router.post('/bulk', authenticate, async (req, res) => {
 
       if (existing.length > 0) {
         await query(
-          'UPDATE attendance SET status = $1, remarks = $2, updated_at = NOW() WHERE id = $3',
-          [status, record.remarks || null, existing[0].id]
+          'UPDATE attendance SET status = $1 WHERE id = $2',
+          [status, existing[0].id]
         );
       } else {
         const attendanceId = uuidv4();
         await query(
-          `INSERT INTO attendance (id, student_id, date, status, remarks)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [attendanceId, studentId, actualDate, status, record.remarks || null]
+          `INSERT INTO attendance (id, student_id, date, status)
+           VALUES ($1, $2, $3, $4)`,
+          [attendanceId, studentId, actualDate, status]
         );
       }
+      processed++;
     }
 
-    res.json({ success: true, message: 'Bulk attendance marked successfully' });
+    logger.info(`Bulk attendance: processed ${processed} records`);
+    res.json({ success: true, message: `Attendance marked for ${processed} students` });
   } catch (error) {
     logger.error('Bulk attendance error:', error);
-    res.status(500).json({ success: false, message: 'Error marking bulk attendance' });
+    res.status(500).json({ success: false, message: 'Error marking bulk attendance', error: error.message });
   }
 });
 
 // Legacy route for marking attendance
 router.post('/mark', authenticate, async (req, res) => {
   try {
-    const { studentId, date, status, remarks } = req.body;
-    
+    const { studentId, date, status } = req.body;
+
     if (!studentId) {
       return res.status(400).json({ success: false, message: 'Student ID is required' });
     }
 
     const actualDate = date || new Date().toISOString().split('T')[0];
-    
+
     const existing = await query(
       'SELECT id FROM attendance WHERE student_id = $1 AND DATE(date) = $2',
       [studentId, actualDate]
@@ -206,15 +211,15 @@ router.post('/mark', authenticate, async (req, res) => {
 
     if (existing.length > 0) {
       await query(
-        'UPDATE attendance SET status = $1, remarks = $2, updated_at = NOW() WHERE id = $3',
-        [status || 'present', remarks || null, existing[0].id]
+        'UPDATE attendance SET status = $1 WHERE id = $2',
+        [status || 'present', existing[0].id]
       );
     } else {
       const attendanceId = uuidv4();
       await query(
-        `INSERT INTO attendance (id, student_id, date, status, remarks)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [attendanceId, studentId, actualDate, status || 'present', remarks || null]
+        `INSERT INTO attendance (id, student_id, date, status)
+         VALUES ($1, $2, $3, $4)`,
+        [attendanceId, studentId, actualDate, status || 'present']
       );
     }
 

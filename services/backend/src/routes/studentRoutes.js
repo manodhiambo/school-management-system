@@ -21,10 +21,13 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
         s.*,
         u.email,
         u.is_active,
-        c.name as class_name
+        c.name as class_name,
+        p.first_name as parent_first_name,
+        p.last_name as parent_last_name
       FROM students s
       JOIN users u ON s.user_id = u.id
       LEFT JOIN classes c ON s.class_id = c.id
+      LEFT JOIN parents p ON s.parent_id = p.id
       WHERE 1=1
     `;
     const params = [];
@@ -51,7 +54,7 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
     sql += ' ORDER BY s.created_at DESC';
 
     const students = await query(sql, params);
-    
+
     // Return array directly for frontend compatibility
     res.json({
       success: true,
@@ -67,7 +70,7 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
 router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const stats = await query(`
-      SELECT 
+      SELECT
         COUNT(*) as total_students,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_students,
         SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_students
@@ -95,12 +98,15 @@ router.get('/:id', async (req, res) => {
        WHERE s.id = $1`,
       [req.params.id]
     );
-    
+
     if (students.length === 0) {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
-    
-    res.json({ success: true, data: students[0] });
+
+    res.json({
+      success: true,
+      data: students[0]
+    });
   } catch (error) {
     logger.error('Get student error:', error);
     res.status(500).json({ success: false, message: 'Error fetching student' });
@@ -113,12 +119,25 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     logger.info('Create student request body:', JSON.stringify(req.body));
     
     const {
-      email, password, firstName, lastName, dateOfBirth, gender,
-      bloodGroup, classId, parentId, admissionDate, address,
-      city, state, pincode, phonePrimary
+      email, password, firstName, first_name, lastName, last_name, 
+      dateOfBirth, date_of_birth, gender, bloodGroup, blood_group,
+      classId, class_id, parentId, parent_id, admissionDate, admission_date, 
+      address, city, state, pincode, phonePrimary, phone_primary, phone
     } = req.body;
 
-    if (!email || !firstName || !lastName) {
+    // Handle both camelCase and snake_case
+    const actualFirstName = firstName || first_name;
+    const actualLastName = lastName || last_name;
+    const actualEmail = email;
+    const actualClassId = classId || class_id || null;
+    const actualParentId = parentId || parent_id || null;
+    const actualDateOfBirth = dateOfBirth || date_of_birth || null;
+    const actualGender = gender || null;
+    const actualBloodGroup = bloodGroup || blood_group || null;
+    const actualAdmissionDate = admissionDate || admission_date || new Date();
+    const actualPhone = phonePrimary || phone_primary || phone || null;
+
+    if (!actualEmail || !actualFirstName || !actualLastName) {
       return res.status(400).json({
         success: false,
         message: 'Email, firstName, and lastName are required'
@@ -126,7 +145,7 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     }
 
     // Check if email exists
-    const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await query('SELECT id FROM users WHERE email = $1', [actualEmail]);
     if (existing.length > 0) {
       return res.status(400).json({ success: false, message: 'Email already exists' });
     }
@@ -134,12 +153,12 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     // Generate admission number
     const year = new Date().getFullYear();
     const lastStudent = await query(
-      `SELECT admission_number FROM students 
-       WHERE admission_number LIKE $1 
+      `SELECT admission_number FROM students
+       WHERE admission_number LIKE $1
        ORDER BY admission_number DESC LIMIT 1`,
       [`STD${year}%`]
     );
-    
+
     let sequence = 1;
     if (lastStudent.length > 0) {
       sequence = parseInt(lastStudent[0].admission_number.slice(-4)) + 1;
@@ -153,7 +172,7 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     await query(
       `INSERT INTO users (id, email, password, role, is_active, is_verified)
        VALUES ($1, $2, $3, 'student', true, true)`,
-      [userId, email, hashedPassword]
+      [userId, actualEmail, hashedPassword]
     );
 
     // Create student
@@ -162,13 +181,13 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
       `INSERT INTO students (
         id, user_id, admission_number, first_name, last_name, date_of_birth,
         gender, blood_group, class_id, parent_id, admission_date,
-        address, city, state, pincode, phone_primary, status
+        address, city, state, pincode, phone, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'active')`,
       [
-        studentId, userId, admissionNumber, firstName, lastName,
-        dateOfBirth || null, gender || null, bloodGroup || null,
-        classId || null, parentId || null, admissionDate || new Date(),
-        address || null, city || null, state || null, pincode || null, phonePrimary || null
+        studentId, userId, admissionNumber, actualFirstName, actualLastName,
+        actualDateOfBirth, actualGender, actualBloodGroup,
+        actualClassId, actualParentId, actualAdmissionDate,
+        address || null, city || null, state || null, pincode || null, actualPhone
       ]
     );
 
@@ -178,7 +197,7 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     );
 
     logger.info('Student created:', studentId);
-    
+
     res.status(201).json({
       success: true,
       message: 'Student created successfully',
@@ -193,29 +212,44 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
 // Update student
 router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
-    const { firstName, lastName, dateOfBirth, gender, bloodGroup, classId, address, city, state, pincode, phonePrimary, status } = req.body;
-    
+    const {
+      firstName, first_name, lastName, last_name, dateOfBirth, date_of_birth,
+      gender, bloodGroup, blood_group, classId, class_id, parentId, parent_id,
+      address, city, state, pincode, phone, status
+    } = req.body;
+
     await query(
-      `UPDATE students SET 
+      `UPDATE students SET
         first_name = COALESCE($1, first_name),
         last_name = COALESCE($2, last_name),
         date_of_birth = COALESCE($3, date_of_birth),
         gender = COALESCE($4, gender),
         blood_group = COALESCE($5, blood_group),
         class_id = COALESCE($6, class_id),
-        address = COALESCE($7, address),
-        city = COALESCE($8, city),
-        state = COALESCE($9, state),
-        pincode = COALESCE($10, pincode),
-        phone_primary = COALESCE($11, phone_primary),
-        status = COALESCE($12, status),
+        parent_id = COALESCE($7, parent_id),
+        address = COALESCE($8, address),
+        city = COALESCE($9, city),
+        state = COALESCE($10, state),
+        pincode = COALESCE($11, pincode),
+        phone = COALESCE($12, phone),
+        status = COALESCE($13, status),
         updated_at = NOW()
-       WHERE id = $13`,
-      [firstName, lastName, dateOfBirth, gender, bloodGroup, classId, address, city, state, pincode, phonePrimary, status, req.params.id]
+       WHERE id = $14`,
+      [
+        firstName || first_name, lastName || last_name, 
+        dateOfBirth || date_of_birth, gender, 
+        bloodGroup || blood_group, classId || class_id, 
+        parentId || parent_id, address, city, state, pincode, 
+        phone, status, req.params.id
+      ]
     );
 
     const updated = await query(
-      `SELECT s.*, u.email FROM students s JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
+      `SELECT s.*, u.email, c.name as class_name
+       FROM students s
+       JOIN users u ON s.user_id = u.id
+       LEFT JOIN classes c ON s.class_id = c.id
+       WHERE s.id = $1`,
       [req.params.id]
     );
 
@@ -233,12 +267,18 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
 // Delete student
 router.delete('/:id', requireRole(['admin']), async (req, res) => {
   try {
+    // Get user_id before deleting
     const student = await query('SELECT user_id FROM students WHERE id = $1', [req.params.id]);
-    if (student.length > 0 && student[0].user_id) {
-      await query('DELETE FROM users WHERE id = $1', [student[0].user_id]);
-    }
-    await query('DELETE FROM students WHERE id = $1', [req.params.id]);
     
+    if (student.length > 0) {
+      // Delete student first
+      await query('DELETE FROM students WHERE id = $1', [req.params.id]);
+      // Then delete user
+      if (student[0].user_id) {
+        await query('DELETE FROM users WHERE id = $1', [student[0].user_id]);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Student deleted successfully'
@@ -249,51 +289,35 @@ router.delete('/:id', requireRole(['admin']), async (req, res) => {
   }
 });
 
-// Get student attendance
-router.get('/:id/attendance', async (req, res) => {
+// Link student to parent
+router.post('/:id/link-parent', requireRole(['admin']), async (req, res) => {
   try {
-    const attendance = await query(
-      `SELECT * FROM attendance WHERE student_id = $1 ORDER BY date DESC`,
-      [req.params.id]
+    const { parentId, parent_id } = req.body;
+    const actualParentId = parentId || parent_id;
+    
+    if (!actualParentId) {
+      return res.status(400).json({ success: false, message: 'Parent ID is required' });
+    }
+    
+    await query(
+      'UPDATE students SET parent_id = $1, updated_at = NOW() WHERE id = $2',
+      [actualParentId, req.params.id]
     );
     
-    res.json({ success: true, data: attendance });
-  } catch (error) {
-    logger.error('Get attendance error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching attendance' });
-  }
-});
-
-// Get student exam results
-router.get('/:id/exam-results', async (req, res) => {
-  try {
-    const results = await query(
-      `SELECT er.*, e.name as exam_name 
-       FROM exam_results er 
-       JOIN exams e ON er.exam_id = e.id 
-       WHERE er.student_id = $1`,
-      [req.params.id]
-    );
+    // Also add to parent_students junction table if it exists
+    try {
+      await query(
+        'INSERT INTO parent_students (parent_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [actualParentId, req.params.id]
+      );
+    } catch (e) {
+      // Junction table might not exist, ignore
+    }
     
-    res.json({ success: true, data: { results } });
+    res.json({ success: true, message: 'Student linked to parent successfully' });
   } catch (error) {
-    logger.error('Get exam results error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching exam results' });
-  }
-});
-
-// Get student fee account
-router.get('/:id/finance', async (req, res) => {
-  try {
-    const invoices = await query(
-      `SELECT * FROM fee_invoices WHERE student_id = $1 ORDER BY created_at DESC`,
-      [req.params.id]
-    );
-    
-    res.json({ success: true, data: { invoices } });
-  } catch (error) {
-    logger.error('Get finance error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching finance' });
+    logger.error('Link parent error:', error);
+    res.status(500).json({ success: false, message: 'Error linking parent' });
   }
 });
 

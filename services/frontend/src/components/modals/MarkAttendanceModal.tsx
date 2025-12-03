@@ -47,7 +47,7 @@ export function MarkAttendanceModal({ open, onOpenChange, onSuccess }: MarkAtten
       const response: any = await api.getStudents({ classId: selectedClass });
       const studentsList = response.data || [];
       setStudents(studentsList);
-      
+
       // Initialize all as present
       const initialAttendance: Record<string, string> = {};
       studentsList.forEach((student: any) => {
@@ -84,14 +84,21 @@ export function MarkAttendanceModal({ open, onOpenChange, onSuccess }: MarkAtten
 
     setLoading(true);
     try {
-      const attendanceRecords = Object.entries(attendance).map(([studentId, status]) => ({
+      // Format attendance records for bulk endpoint
+      const attendances = Object.entries(attendance).map(([studentId, status]) => ({
         studentId: studentId,
-        
+        student_id: studentId,
         date: date,
         status: status,
       }));
 
-      await api.markAttendance({ attendanceList: attendanceRecords });
+      // Use bulk attendance endpoint
+      await api.markBulkAttendance({ 
+        attendances: attendances,
+        classId: selectedClass,
+        date: date
+      });
+      
       alert('Attendance marked successfully!');
       onSuccess();
       onOpenChange(false);
@@ -137,7 +144,7 @@ export function MarkAttendanceModal({ open, onOpenChange, onSuccess }: MarkAtten
                 <option value="">Select Class</option>
                 {classes.map((cls) => (
                   <option key={cls.id} value={cls.id}>
-                    {cls.name} - {cls.section}
+                    {cls.name} {cls.section ? `- ${cls.section}` : ''}
                   </option>
                 ))}
               </Select>

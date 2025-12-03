@@ -157,8 +157,8 @@ router.get('/payment', authenticate, async (req, res) => {
     const payments = await query(`
       SELECT fp.*, fi.invoice_number, s.first_name, s.last_name
       FROM fee_payments fp
-      JOIN fee_invoices fi ON fp.invoice_id = fi.id
-      JOIN students s ON fi.student_id = s.id
+      LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
+      LEFT JOIN students s ON COALESCE(fp.student_id, fi.student_id) = s.id
       ORDER BY fp.payment_date DESC
     `);
     res.json({ success: true, data: payments });
@@ -168,13 +168,36 @@ router.get('/payment', authenticate, async (req, res) => {
   }
 });
 
-// Record payment
+// Record payment - handles both with and without invoice
 router.post('/payment', authenticate, async (req, res) => {
   try {
-    const { invoice_id, amount, payment_method, transaction_id, remarks } = req.body;
+    logger.info('Record payment request:', JSON.stringify(req.body));
+    
+    const { invoice_id, student_id, amount, payment_method, transaction_id, remarks } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid amount is required' });
+    }
     
     const paymentId = uuidv4();
     
+    // If no invoice_id but have student_id, create a general payment
+    if (!invoice_id && student_id) {
+      // Create payment without invoice
+      await query(
+        `INSERT INTO fee_payments (id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date)
+         VALUES ($1, $2, $3, $4, $5, $6, 'success', NOW())`,
+        [paymentId, student_id, amount, payment_method || 'cash', transaction_id, remarks]
+      );
+      
+      return res.json({ success: true, message: 'Payment recorded successfully' });
+    }
+    
+    if (!invoice_id) {
+      return res.status(400).json({ success: false, message: 'Invoice ID or Student ID is required' });
+    }
+    
+    // Payment with invoice
     await query(
       `INSERT INTO fee_payments (id, invoice_id, amount, payment_method, transaction_id, remarks, status, payment_date)
        VALUES ($1, $2, $3, $4, $5, $6, 'success', NOW())`,
@@ -252,8 +275,8 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
     
     const payments = await query(`
       SELECT fp.* FROM fee_payments fp
-      JOIN fee_invoices fi ON fp.invoice_id = fi.id
-      WHERE fi.student_id = $1
+      LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
+      WHERE fi.student_id = $1 OR fp.student_id = $1
       ORDER BY fp.payment_date DESC
     `, [req.params.studentId]);
     

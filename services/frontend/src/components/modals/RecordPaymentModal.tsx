@@ -17,8 +17,10 @@ interface RecordPaymentModalProps {
 export function RecordPaymentModal({ open, onOpenChange, onSuccess }: RecordPaymentModalProps) {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     student_id: '',
+    invoice_id: '',
     amount: '',
     payment_method: 'cash',
     transaction_id: '',
@@ -32,12 +34,30 @@ export function RecordPaymentModal({ open, onOpenChange, onSuccess }: RecordPaym
     }
   }, [open]);
 
+  useEffect(() => {
+    if (formData.student_id) {
+      loadStudentInvoices(formData.student_id);
+    }
+  }, [formData.student_id]);
+
   const loadStudents = async () => {
     try {
       const response: any = await api.getStudents();
-      setStudents(response.students || []);
+      // API returns { success: true, data: [...] }
+      setStudents(response.data || []);
     } catch (error) {
       console.error('Error loading students:', error);
+      setStudents([]);
+    }
+  };
+
+  const loadStudentInvoices = async (studentId: string) => {
+    try {
+      const response: any = await api.getFeeInvoices({ studentId });
+      setInvoices(response.data || []);
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+      setInvoices([]);
     }
   };
 
@@ -47,18 +67,34 @@ export function RecordPaymentModal({ open, onOpenChange, onSuccess }: RecordPaym
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.student_id) {
+      alert('Please select a student');
+      return;
+    }
+    
+    if (!formData.amount || Number(formData.amount) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      await api.recordPayment({
-        ...formData,
-        amount: Number(formData.amount)
+      await api.recordFeePayment({
+        invoice_id: formData.invoice_id || null,
+        student_id: formData.student_id,
+        amount: Number(formData.amount),
+        payment_method: formData.payment_method,
+        transaction_id: formData.transaction_id || null,
+        remarks: formData.remarks || null,
       });
       alert('Payment recorded successfully!');
       onSuccess();
       onOpenChange(false);
       setFormData({
         student_id: '',
+        invoice_id: '',
         amount: '',
         payment_method: 'cash',
         transaction_id: '',
@@ -104,6 +140,24 @@ export function RecordPaymentModal({ open, onOpenChange, onSuccess }: RecordPaym
                 ))}
               </Select>
             </div>
+
+            {invoices.length > 0 && (
+              <div>
+                <Label htmlFor="invoice_id">Invoice (Optional)</Label>
+                <Select
+                  id="invoice_id"
+                  value={formData.invoice_id}
+                  onChange={(e) => handleChange('invoice_id', e.target.value)}
+                >
+                  <option value="">Select Invoice (or leave blank for general payment)</option>
+                  {invoices.map((invoice) => (
+                    <option key={invoice.id} value={invoice.id}>
+                      {invoice.invoice_number} - KES {invoice.balance_amount || invoice.net_amount} due
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

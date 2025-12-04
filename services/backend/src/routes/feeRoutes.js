@@ -202,8 +202,6 @@ router.put('/structure/:id', authenticate, requireRole(['admin']), async (req, r
 // Delete fee structure
 router.delete('/structure/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    // Check if there are invoices using this structure
-    // For now, just soft delete by setting is_active = false
     await query(
       'UPDATE fee_structure SET is_active = false, updated_at = NOW() WHERE id = $1',
       [req.params.id]
@@ -287,35 +285,36 @@ router.get('/invoice/:id', authenticate, async (req, res) => {
 router.post('/invoice', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { 
-      student_id, studentId, description, 
-      gross_amount, grossAmount, discount, discount_amount, discountAmount,
-      net_amount, netAmount, due_date, dueDate, status 
+      student_id, studentId, 
+      total_amount, totalAmount, amount,
+      discount_amount, discountAmount, discount,
+      due_date, dueDate, status 
     } = req.body;
     
     const actualStudentId = student_id || studentId;
-    const actualGrossAmount = gross_amount || grossAmount;
-    const actualDiscount = discount || discount_amount || discountAmount || 0;
-    const actualNetAmount = net_amount || netAmount || (actualGrossAmount - actualDiscount);
+    const actualTotalAmount = total_amount || totalAmount || amount;
+    const actualDiscount = discount_amount || discountAmount || discount || 0;
+    const actualNetAmount = actualTotalAmount - actualDiscount;
     const actualDueDate = due_date || dueDate;
     
-    if (!actualStudentId || !actualGrossAmount) {
+    if (!actualStudentId || !actualTotalAmount) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Student ID and gross amount are required' 
+        message: 'Student ID and amount are required' 
       });
     }
     
     const invoiceId = uuidv4();
-    const invoiceNumber = `INV-${Date.now()}`;
+    const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
     await query(
       `INSERT INTO fee_invoices (
-        id, invoice_number, student_id, description, gross_amount, 
+        id, invoice_number, student_id, total_amount, 
         discount_amount, net_amount, balance_amount, due_date, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8)`,
       [
-        invoiceId, invoiceNumber, actualStudentId, description,
-        actualGrossAmount, actualDiscount, actualNetAmount, actualDueDate, 
+        invoiceId, invoiceNumber, actualStudentId, actualTotalAmount,
+        actualDiscount, actualNetAmount, actualDueDate, 
         status || 'pending'
       ]
     );
@@ -336,11 +335,11 @@ router.post('/invoice/bulk', authenticate, requireRole(['admin']), async (req, r
   try {
     logger.info('Bulk invoice request:', JSON.stringify(req.body));
     
-    const { studentIds, student_ids, feeStructureId, fee_structure_id, description, dueDate, due_date } = req.body;
+    const { studentIds, student_ids, feeStructureId, fee_structure_id, dueDate, due_date } = req.body;
     
     const actualStudentIds = studentIds || student_ids;
     const actualFeeStructureId = feeStructureId || fee_structure_id;
-    const actualDueDate = dueDate || due_date;
+    const actualDueDate = dueDate || due_date || null;
     
     if (!actualStudentIds || !Array.isArray(actualStudentIds) || actualStudentIds.length === 0) {
       return res.status(400).json({ success: false, message: 'Student IDs array is required' });
@@ -363,21 +362,24 @@ router.post('/invoice/bulk', authenticate, requireRole(['admin']), async (req, r
     for (const studentId of actualStudentIds) {
       try {
         const invoiceId = uuidv4();
-        const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        // Generate unique invoice number
+        const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
         
+        // Use correct column names: total_amount, net_amount, balance_amount (no description)
         await query(
           `INSERT INTO fee_invoices (
-            id, invoice_number, student_id, description, gross_amount, 
+            id, invoice_number, student_id, total_amount, 
             net_amount, balance_amount, due_date, status
-          ) VALUES ($1, $2, $3, $4, $5, $5, $5, $6, 'pending')`,
+          ) VALUES ($1, $2, $3, $4, $4, $4, $5, 'pending')`,
           [
             invoiceId, invoiceNumber, studentId, 
-            description || structure.name, structure.amount, actualDueDate
+            structure.amount, actualDueDate
           ]
         );
         
         created.push({ studentId, invoiceId, invoiceNumber });
       } catch (err) {
+        logger.error('Error creating invoice for student', studentId, err.message);
         errors.push({ studentId, error: err.message });
       }
     }

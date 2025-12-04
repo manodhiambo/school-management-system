@@ -241,6 +241,10 @@ class ApiService {
     return this.api.post('/fee/invoice/bulk', data);
   }
 
+  generateBulkInvoices(data: any) {
+    return this.api.post("/fee/invoice/bulk", data);
+  }
+
   recordFeePayment(data: any) {
     return this.api.post('/fee/payment', data);
   }

@@ -28,12 +28,10 @@ export function FeePage() {
       console.log('Fee stats response:', statsRes);
       console.log('Fee invoices response:', invoicesRes);
       
-      // Handle both response formats (direct data or nested in data property)
-      const statsData = statsRes?.data?.data || statsRes?.data || statsRes || {};
-      const invoicesData = invoicesRes?.data?.data || invoicesRes?.data || [];
-      
-      setStats(statsData);
-      setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
+      // The API returns {success: true, data: ...}
+      // So statsRes.data contains the actual data
+      setStats(statsRes?.data || {});
+      setInvoices(invoicesRes?.data || []);
     } catch (error) {
       console.error('Error loading fee data:', error);
       setStats({});
@@ -46,7 +44,7 @@ export function FeePage() {
   const handleViewDefaulters = async () => {
     try {
       const response: any = await api.getFeeDefaulters();
-      const defaulters = response?.data?.data || response?.data || [];
+      const defaulters = response?.data || [];
       if (defaulters.length === 0) {
         alert('No fee defaulters found!');
       } else {
@@ -157,7 +155,7 @@ export function FeePage() {
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
                 className="bg-primary h-2 rounded-full" 
-                style={{ width: `${collectionPercentage}%` }}
+                style={{ width: `${Math.min(Number(collectionPercentage), 100)}%` }}
               ></div>
             </div>
           </CardContent>

@@ -281,14 +281,72 @@ router.post('/substitute', authenticate, async (req, res) => {
   }
 });
 
-// Delete timetable entry
-router.delete('/:id', authenticate, async (req, res) => {
+// Delete single timetable entry (admin only)
+router.delete("/:id", authenticate, requireRole(["admin"]), async (req, res) => {
   try {
-    await query('DELETE FROM timetable WHERE id = $1', [req.params.id]);
-    res.json({ success: true, message: 'Timetable entry deleted' });
+    const result = await query("DELETE FROM timetable WHERE id = $1 RETURNING id", [req.params.id]);
+    if (result.length === 0) {
+      return res.status(404).json({ success: false, message: "Timetable entry not found" });
+    }
+    res.json({ success: true, message: "Timetable entry deleted successfully" });
   } catch (error) {
-    logger.error('Delete timetable error:', error);
-    res.status(500).json({ success: false, message: 'Error deleting timetable entry' });
+    logger.error("Delete timetable error:", error);
+    res.status(500).json({ success: false, message: "Error deleting timetable entry" });
+  }
+});
+
+// Delete all timetable entries for a class (admin only)
+router.delete("/class/:classId/all", authenticate, requireRole(["admin"]), async (req, res) => {
+  try {
+    const result = await query("DELETE FROM timetable WHERE class_id = $1 RETURNING id", [req.params.classId]);
+    res.json({ 
+      success: true, 
+      message: `Deleted ${result.length} timetable entries for the class` 
+    });
+  } catch (error) {
+    logger.error("Delete class timetable error:", error);
+    res.status(500).json({ success: false, message: "Error deleting class timetable" });
+  }
+});
+
+// Delete all timetable entries for a teacher (admin only)
+router.delete("/teacher/:teacherId/all", authenticate, requireRole(["admin"]), async (req, res) => {
+  try {
+    // Resolve teacher_id from user_id if needed
+    const teacher = await query("SELECT id FROM teachers WHERE id = $1 OR user_id = $1", [req.params.teacherId]);
+    const actualTeacherId = teacher.length > 0 ? teacher[0].id : req.params.teacherId;
+    
+    const result = await query("DELETE FROM timetable WHERE teacher_id = $1 RETURNING id", [actualTeacherId]);
+    res.json({ 
+      success: true, 
+      message: `Deleted ${result.length} timetable entries for the teacher` 
+    });
+  } catch (error) {
+    logger.error("Delete teacher timetable error:", error);
+    res.status(500).json({ success: false, message: "Error deleting teacher timetable" });
+  }
+});
+
+// Reset entire timetable (admin only) - deletes ALL entries
+router.delete("/reset/all", authenticate, requireRole(["admin"]), async (req, res) => {
+  try {
+    const { confirm } = req.query;
+    
+    if (confirm !== "yes") {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please confirm deletion by adding ?confirm=yes to the request" 
+      });
+    }
+    
+    const result = await query("DELETE FROM timetable RETURNING id");
+    res.json({ 
+      success: true, 
+      message: `Timetable reset complete. Deleted ${result.length} entries.` 
+    });
+  } catch (error) {
+    logger.error("Reset timetable error:", error);
+    res.status(500).json({ success: false, message: "Error resetting timetable" });
   }
 });
 

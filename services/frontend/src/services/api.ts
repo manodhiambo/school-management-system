@@ -478,6 +478,23 @@ class ApiService {
   getFeeStructure(id: string) {
     return this.api.get('/fee/structure/' + id);
   }
+
+  // Timetable Delete/Reset (Admin only)
+  deleteTimetableEntry(id: string) {
+    return this.api.delete("/timetable/" + id);
+  }
+
+  deleteClassTimetable(classId: string) {
+    return this.api.delete("/timetable/class/" + classId + "/all");
+  }
+
+  deleteTeacherTimetable(teacherId: string) {
+    return this.api.delete("/timetable/teacher/" + teacherId + "/all");
+  }
+
+  resetAllTimetable() {
+    return this.api.delete("/timetable/reset/all?confirm=yes");
+  }
 }
 
 export default new ApiService();

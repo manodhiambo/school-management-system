@@ -461,6 +461,19 @@ class ApiService {
   getAssignmentSubmissions(assignmentId: string) {
     return this.api.get('/assignments/' + assignmentId + '/submissions');
   }
+
+  // Fee Structure CRUD
+  updateFeeStructure(id: string, data: any) {
+    return this.api.put('/fee/structure/' + id, data);
+  }
+
+  deleteFeeStructure(id: string) {
+    return this.api.delete('/fee/structure/' + id);
+  }
+
+  getFeeStructure(id: string) {
+    return this.api.get('/fee/structure/' + id);
+  }
 }
 
 export default new ApiService();

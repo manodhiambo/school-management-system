@@ -68,6 +68,12 @@ const navigationItems = [
     icon: DollarSign, 
     roles: ['admin'] 
   },
+  {
+    name: 'Fee Structure',
+    href: '/app/fee-structure',
+    icon: DollarSign,
+    roles: ['admin']
+  },
   { 
     name: 'Timetable', 
     href: '/app/timetable', 

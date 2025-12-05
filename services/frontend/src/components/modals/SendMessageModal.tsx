@@ -16,11 +16,8 @@ interface SendMessageModalProps {
 
 export function SendMessageModal({ open, onOpenChange, onSuccess }: SendMessageModalProps) {
   const [loading, setLoading] = useState(false);
-  const [recipientType, setRecipientType] = useState<'individual' | 'class' | 'role'>('individual');
-  const [students, setStudents] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<any[]>([]);
-  const [parents, setParents] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
+  const [recipientType, setRecipientType] = useState<'individual' | 'role'>('individual');
+  const [users, setUsers] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     recipientId: '',
     recipientRole: '',
@@ -31,27 +28,30 @@ export function SendMessageModal({ open, onOpenChange, onSuccess }: SendMessageM
 
   useEffect(() => {
     if (open) {
-      loadRecipients();
+      loadUsers();
     }
-  }, [open, recipientType]);
+  }, [open]);
 
-  const loadRecipients = async () => {
+  const loadUsers = async () => {
     try {
-      if (recipientType === 'individual') {
-        const [studentsRes, teachersRes, parentsRes]: any = await Promise.all([
-          api.getStudents(),
-          api.getTeachers(),
-          api.getParents(),
-        ]);
-        setStudents(studentsRes.students || []);
-        setTeachers(teachersRes.data || []);
-        setParents(parentsRes.data || []);
-      } else if (recipientType === 'class') {
-        const classesRes: any = await api.getClasses();
-        setClasses(classesRes.data || []);
-      }
+      // Get all users directly - this gives us user IDs
+      const response: any = await api.getUsers();
+      const allUsers = response?.data || [];
+      // Filter out the current user and format for display
+      setUsers(allUsers.filter((u: any) => u.role !== 'admin').map((u: any) => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        name: u.first_name && u.last_name 
+          ? `${u.first_name} ${u.last_name}` 
+          : u.email,
+        displayName: u.first_name && u.last_name 
+          ? `${u.first_name} ${u.last_name} (${u.role})` 
+          : `${u.email} (${u.role})`
+      })));
     } catch (error) {
-      console.error('Error loading recipients:', error);
+      console.error('Error loading users:', error);
+      setUsers([]);
     }
   };
 
@@ -66,18 +66,29 @@ export function SendMessageModal({ open, onOpenChange, onSuccess }: SendMessageM
     try {
       const messageData: any = {
         subject: formData.subject,
+        body: formData.message,
         content: formData.message,
         priority: formData.priority,
+        messageType: recipientType === 'individual' ? 'direct' : 'broadcast'
       };
 
       if (recipientType === 'individual') {
+        if (!formData.recipientId) {
+          alert('Please select a recipient');
+          setLoading(false);
+          return;
+        }
         messageData.recipientId = formData.recipientId;
-      } else if (recipientType === 'class') {
-        messageData.classId = formData.recipientId;
       } else if (recipientType === 'role') {
+        if (!formData.recipientRole) {
+          alert('Please select a role');
+          setLoading(false);
+          return;
+        }
         messageData.recipientRole = formData.recipientRole;
       }
 
+      console.log('Sending message:', messageData);
       await api.sendMessage(messageData);
       alert('Message sent successfully!');
       onSuccess();
@@ -91,17 +102,11 @@ export function SendMessageModal({ open, onOpenChange, onSuccess }: SendMessageM
       });
     } catch (error: any) {
       console.error('Send message error:', error);
-      alert(error.message || 'Failed to send message');
+      alert(error?.message || 'Failed to send message');
     } finally {
       setLoading(false);
     }
   };
-
-  const allRecipients = [
-    ...students.map(s => ({ id: s.id, name: `${s.first_name} ${s.last_name} (Student)`, type: 'student' })),
-    ...teachers.map(t => ({ id: t.id, name: `${t.first_name} ${t.last_name} (Teacher)`, type: 'teacher' })),
-    ...parents.map(p => ({ id: p.id, name: `${p.first_name} ${p.last_name} (Parent)`, type: 'parent' })),
-  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,14 +137,6 @@ export function SendMessageModal({ open, onOpenChange, onSuccess }: SendMessageM
                 <Button
                   type="button"
                   size="sm"
-                  variant={recipientType === 'class' ? 'default' : 'outline'}
-                  onClick={() => setRecipientType('class')}
-                >
-                  Class
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
                   variant={recipientType === 'role' ? 'default' : 'outline'}
                   onClick={() => setRecipientType('role')}
                 >
@@ -158,31 +155,15 @@ export function SendMessageModal({ open, onOpenChange, onSuccess }: SendMessageM
                   required
                 >
                   <option value="">Select Recipient</option>
-                  {allRecipients.map((recipient) => (
-                    <option key={recipient.id} value={recipient.id}>
-                      {recipient.name}
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.displayName}
                     </option>
                   ))}
                 </Select>
-              </div>
-            )}
-
-            {recipientType === 'class' && (
-              <div>
-                <Label htmlFor="recipientId">Class *</Label>
-                <Select
-                  id="recipientId"
-                  value={formData.recipientId}
-                  onChange={(e) => handleChange('recipientId', e.target.value)}
-                  required
-                >
-                  <option value="">Select Class</option>
-                  {classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name} - {cls.section}
-                    </option>
-                  ))}
-                </Select>
+                {users.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">Loading users...</p>
+                )}
               </div>
             )}
 
@@ -199,7 +180,7 @@ export function SendMessageModal({ open, onOpenChange, onSuccess }: SendMessageM
                   <option value="student">All Students</option>
                   <option value="teacher">All Teachers</option>
                   <option value="parent">All Parents</option>
-                  <option value="admin">All Admins</option>
+                  <option value="all">Everyone</option>
                 </Select>
               </div>
             )}

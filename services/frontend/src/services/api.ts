@@ -346,15 +346,15 @@ class ApiService {
   }
 
   getMessages(params?: any) {
-    return this.api.get('/communication/messages', { params });
+    return this.api.get("/messages/inbox", { params });
   }
 
   sendMessage(data: any) {
-    return this.api.post('/communication/messages', data);
+    return this.api.post("/messages/send", data);
   }
 
   markMessageAsRead(id: string) {
-    return this.api.put('/communication/messages/' + id + '/read');
+    return this.api.patch("/messages/" + id + "/read");
   }
 
   // Notifications

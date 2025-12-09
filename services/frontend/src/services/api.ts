@@ -495,9 +495,6 @@ class ApiService {
   resetAllTimetable() {
     return this.api.delete("/timetable/reset/all?confirm=yes");
   }
-}
-
-export default new ApiService();
 
   // Gradebook
   getGradebookEntries(params?: any) {

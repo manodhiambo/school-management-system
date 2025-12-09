@@ -321,4 +321,83 @@ router.post('/:id/link-parent', requireRole(['admin']), async (req, res) => {
   }
 });
 
+// Get student exam results
+router.get("/:id/exam-results", authenticate, async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    
+    // First try to find student by user_id or student id
+    const student = await query(
+      "SELECT id FROM students WHERE id = $1 OR user_id = $1",
+      [studentId]
+    );
+    
+    const actualStudentId = student.length > 0 ? student[0].id : studentId;
+    
+    // Get exam results with exam and subject details
+    const results = await query(`
+      SELECT 
+        er.*,
+        e.name as exam_name,
+        e.exam_type,
+        e.academic_year,
+        e.term,
+        s.name as subject_name,
+        s.code as subject_code,
+        ROUND((er.marks_obtained / NULLIF(er.max_marks, 0)) * 100, 1) as percentage
+      FROM exam_results er
+      JOIN exams e ON er.exam_id = e.id
+      LEFT JOIN subjects s ON er.subject_id = s.id
+      WHERE er.student_id = $1
+      ORDER BY e.start_date DESC, s.name
+    `, [actualStudentId]);
+    
+    // Group results by exam
+    const groupedResults = results.reduce((acc: any, result: any) => {
+      const examId = result.exam_id;
+      if (!acc[examId]) {
+        acc[examId] = {
+          exam_id: examId,
+          exam_name: result.exam_name,
+          exam_type: result.exam_type,
+          academic_year: result.academic_year,
+          term: result.term,
+          subjects: [],
+          total_marks: 0,
+          marks_obtained: 0
+        };
+      }
+      acc[examId].subjects.push({
+        subject_name: result.subject_name,
+        subject_code: result.subject_code,
+        marks_obtained: parseFloat(result.marks_obtained),
+        total_marks: parseFloat(result.max_marks),
+        grade: result.grade,
+        percentage: result.percentage,
+        remarks: result.remarks
+      });
+      acc[examId].total_marks += parseFloat(result.max_marks || 0);
+      acc[examId].marks_obtained += parseFloat(result.marks_obtained || 0);
+      return acc;
+    }, {});
+    
+    // Calculate overall percentage and grade for each exam
+    const formattedResults = Object.values(groupedResults).map((exam: any) => ({
+      ...exam,
+      percentage: exam.total_marks > 0 ? ((exam.marks_obtained / exam.total_marks) * 100).toFixed(1) : 0,
+      grade: exam.total_marks > 0 ? (
+        (exam.marks_obtained / exam.total_marks) >= 0.8 ? "A" :
+        (exam.marks_obtained / exam.total_marks) >= 0.7 ? "B" :
+        (exam.marks_obtained / exam.total_marks) >= 0.6 ? "C" :
+        (exam.marks_obtained / exam.total_marks) >= 0.5 ? "D" : "F"
+      ) : "N/A"
+    }));
+    
+    res.json({ success: true, data: formattedResults });
+  } catch (error) {
+    logger.error("Get student exam results error:", error);
+    res.status(500).json({ success: false, message: "Error fetching exam results" });
+  }
+});
+
 export default router;

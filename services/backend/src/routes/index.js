@@ -16,6 +16,7 @@ import notificationRoutes from './notificationRoutes.js';
 import timetableRoutes from './timetableRoutes.js';
 import assignmentRoutes from './assignmentRoutes.js';
 import gradebookRoutes from './gradebookRoutes.js';
+import messageRoutes from './simpleMessageRoutes.js';
 
 const router = express.Router();
 
@@ -37,5 +38,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/timetable', timetableRoutes);
 router.use('/assignments', assignmentRoutes);
 router.use('/gradebook', gradebookRoutes);
+router.use('/messages', messageRoutes);
 
 export default router;

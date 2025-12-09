@@ -498,3 +498,31 @@ class ApiService {
 }
 
 export default new ApiService();
+
+  // Gradebook
+  getGradebookEntries(params?: any) {
+    return this.api.get('/gradebook', { params });
+  }
+
+  createGradebookEntry(data: any) {
+    return this.api.post('/gradebook', data);
+  }
+
+  saveBulkGrades(data: any) {
+    return this.api.post('/gradebook/bulk', data);
+  }
+
+  updateGradebookEntry(id: string, data: any) {
+    return this.api.put('/gradebook/' + id, data);
+  }
+
+  deleteGradebookEntry(id: string) {
+    return this.api.delete('/gradebook/' + id);
+  }
+
+  getStudentGrades(studentId: string) {
+    return this.api.get('/gradebook/student/' + studentId);
+  }
+}
+
+export default new ApiService();

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Award, BookOpen, Users, Plus, Save, X } from 'lucide-react';
+import { Award, BookOpen, Users, Plus, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,24 +14,21 @@ export function GradeBookPage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<any>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [students, setStudents] = useState<any[]>([]);
+  const [gradebookEntries, setGradebookEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Modal states
-  const [showAddAssessmentModal, setShowAddAssessmentModal] = useState(false);
-  const [showEnterGradesModal, setShowEnterGradesModal] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [showBulkGradeModal, setShowBulkGradeModal] = useState(false);
   
   // Form states
-  const [assessmentData, setAssessmentData] = useState({
-    name: '',
-    subjectId: '',
-    maxScore: '100',
-    date: new Date().toISOString().split('T')[0]
-  });
-  
-  const [gradesData, setGradesData] = useState<Record<string, { score: string; grade: string }>>({});
+  const [assessmentTitle, setAssessmentTitle] = useState('');
+  const [assessmentType, setAssessmentType] = useState('quiz');
+  const [maxMarks, setMaxMarks] = useState('100');
+  const [gradesData, setGradesData] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user?.id) {
@@ -43,8 +40,9 @@ export function GradeBookPage() {
   useEffect(() => {
     if (selectedClass) {
       loadStudents(selectedClass.id);
+      loadGradebookEntries();
     }
-  }, [selectedClass]);
+  }, [selectedClass, selectedSubject]);
 
   const loadClasses = async () => {
     try {
@@ -76,101 +74,106 @@ export function GradeBookPage() {
   const loadStudents = async (classId: string) => {
     try {
       const response: any = await api.getClassStudents(classId);
-      console.log('Class students:', response);
-      setStudents(response?.data || response?.students || []);
+      setStudents(response?.data || []);
     } catch (error: any) {
       console.error('Error loading students:', error);
     }
   };
 
-  const handleAddAssessment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadGradebookEntries = async () => {
     try {
-      // In a full implementation, this would create an exam/assessment
-      alert(`Assessment "${assessmentData.name}" created successfully!\n\nNote: Full exam management coming soon.`);
-      setShowAddAssessmentModal(false);
-      setAssessmentData({
-        name: '',
-        subjectId: '',
-        maxScore: '100',
-        date: new Date().toISOString().split('T')[0]
-      });
-    } catch (error: any) {
-      alert(error?.message || 'Failed to create assessment');
-    }
-  };
-
-  const handleEnterGrades = (student: any) => {
-    setSelectedStudent(student);
-    // Initialize grades data for the student
-    setGradesData({
-      score: '',
-      grade: ''
-    });
-    setShowEnterGradesModal(true);
-  };
-
-  const handleSaveGrades = async () => {
-    try {
-      // In a full implementation, this would save to the results/grades table
-      const score = parseFloat(gradesData.score || '0');
-      let grade = gradesData.grade;
+      if (!selectedClass) return;
       
-      // Auto-calculate grade if not provided
-      if (!grade && score) {
-        if (score >= 80) grade = 'A';
-        else if (score >= 70) grade = 'B';
-        else if (score >= 60) grade = 'C';
-        else if (score >= 50) grade = 'D';
-        else grade = 'F';
+      const params: any = { classId: selectedClass.id };
+      if (selectedSubject) {
+        params.subjectId = selectedSubject;
       }
       
-      alert(`Grades saved for ${selectedStudent.first_name} ${selectedStudent.last_name}!\n\nScore: ${score}\nGrade: ${grade}\n\nNote: Full grade management coming soon.`);
-      setShowEnterGradesModal(false);
-      setSelectedStudent(null);
-    } catch (error: any) {
-      alert(error?.message || 'Failed to save grades');
+      const response: any = await api.getGradebookEntries(params);
+      setGradebookEntries(response?.data || []);
+    } catch (error) {
+      console.error('Error loading gradebook entries:', error);
     }
   };
 
-  const handleBulkGradeEntry = () => {
+  const handleOpenBulkGrade = () => {
     if (students.length === 0) {
       alert('No students in this class');
       return;
     }
-    
-    // Initialize grades for all students
-    const initialGrades: Record<string, { score: string; grade: string }> = {};
+    if (!selectedSubject) {
+      alert('Please select a subject first');
+      return;
+    }
+    // Initialize grades data
+    const initialGrades: Record<string, string> = {};
     students.forEach(student => {
-      initialGrades[student.id] = { score: '', grade: '' };
+      initialGrades[student.id] = '';
     });
     setGradesData(initialGrades);
-    setShowEnterGradesModal(true);
-    setSelectedStudent(null); // null means bulk entry
+    setShowBulkGradeModal(true);
   };
 
-  const handleBulkSaveGrades = async () => {
+  const handleSaveBulkGrades = async () => {
     try {
-      const entries = Object.entries(gradesData).filter(([_, data]) => data.score);
-      if (entries.length === 0) {
-        alert('Please enter at least one score');
+      setSaving(true);
+      
+      // Filter out empty grades
+      const gradesToSave = Object.entries(gradesData)
+        .filter(([_, score]) => score !== '' && score !== null)
+        .map(([studentId, score]) => ({
+          studentId,
+          score: parseFloat(score)
+        }));
+      
+      if (gradesToSave.length === 0) {
+        alert('Please enter at least one grade');
+        setSaving(false);
         return;
       }
       
-      alert(`Saved grades for ${entries.length} students!\n\nNote: Full grade management coming soon.`);
-      setShowEnterGradesModal(false);
+      const response: any = await api.saveBulkGrades({
+        classId: selectedClass.id,
+        subjectId: selectedSubject,
+        assessmentType,
+        title: assessmentTitle || 'Assessment',
+        maxMarks: parseFloat(maxMarks),
+        date: new Date().toISOString().split('T')[0],
+        grades: gradesToSave
+      });
+      
+      alert(`Successfully saved ${response?.data?.created?.length || gradesToSave.length} grades!`);
+      setShowBulkGradeModal(false);
       setGradesData({});
+      setAssessmentTitle('');
+      loadGradebookEntries();
     } catch (error: any) {
+      console.error('Error saving grades:', error);
       alert(error?.message || 'Failed to save grades');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const calculateGrade = (score: number): string => {
-    if (score >= 80) return 'A';
-    if (score >= 70) return 'B';
-    if (score >= 60) return 'C';
-    if (score >= 50) return 'D';
+  const calculateGrade = (score: number, max: number = 100): string => {
+    const percentage = (score / max) * 100;
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B';
+    if (percentage >= 60) return 'C';
+    if (percentage >= 50) return 'D';
     return 'F';
+  };
+
+  // Get student's average from gradebook entries
+  const getStudentAverage = (studentId: string) => {
+    const studentEntries = gradebookEntries.filter(e => e.student_id === studentId);
+    if (studentEntries.length === 0) return null;
+    
+    const totalMarks = studentEntries.reduce((sum, e) => sum + parseFloat(e.marks || 0), 0);
+    const totalMaxMarks = studentEntries.reduce((sum, e) => sum + parseFloat(e.max_marks || 0), 0);
+    
+    if (totalMaxMarks === 0) return null;
+    return ((totalMarks / totalMaxMarks) * 100).toFixed(1);
   };
 
   if (loading) {
@@ -205,9 +208,6 @@ export function GradeBookPage() {
             <div className="text-center py-8">
               <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No classes assigned yet</p>
-              <p className="text-sm text-gray-400 mt-2">
-                Contact an administrator to assign classes to you.
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -222,34 +222,41 @@ export function GradeBookPage() {
           <h2 className="text-3xl font-bold">Grade Book</h2>
           <p className="text-gray-500">Manage student grades and assessments</p>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={handleBulkGradeEntry} disabled={students.length === 0}>
-            <Save className="h-4 w-4 mr-2" />
-            Bulk Grade Entry
-          </Button>
-          <Button onClick={() => setShowAddAssessmentModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Assessment
-          </Button>
-        </div>
+        <Button onClick={handleOpenBulkGrade} disabled={!selectedSubject}>
+          <Plus className="h-4 w-4 mr-2" />
+          Enter Grades
+        </Button>
       </div>
 
-      {/* Class Selector */}
-      <div className="flex gap-2 flex-wrap">
-        {classes.map((classItem) => (
-          <Button
-            key={classItem.id}
-            variant={selectedClass?.id === classItem.id ? "default" : "outline"}
-            onClick={() => setSelectedClass(classItem)}
+      {/* Filters */}
+      <div className="flex gap-4 flex-wrap">
+        <div className="flex gap-2">
+          {classes.map((classItem) => (
+            <Button
+              key={classItem.id}
+              variant={selectedClass?.id === classItem.id ? "default" : "outline"}
+              onClick={() => setSelectedClass(classItem)}
+            >
+              {classItem.name} {classItem.section || ''}
+            </Button>
+          ))}
+        </div>
+        <div className="w-48">
+          <Select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value)}
           >
-            {classItem.name} {classItem.section || ''}
-          </Button>
-        ))}
+            <option value="">All Subjects</option>
+            {subjects.map((sub) => (
+              <option key={sub.id} value={sub.id}>{sub.name}</option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       {selectedClass && (
         <>
-          {/* Class Summary */}
+          {/* Summary Cards */}
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -263,21 +270,25 @@ export function GradeBookPage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Grade</CardTitle>
+                <CardTitle className="text-sm font-medium">Grade Entries</CardTitle>
                 <Award className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{selectedClass.average_grade || '-'}</div>
+                <div className="text-2xl font-bold">{gradebookEntries.length}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
+                <CardTitle className="text-sm font-medium">Class Average</CardTitle>
                 <Award className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{selectedClass.pass_rate || '-'}%</div>
+                <div className="text-2xl font-bold">
+                  {gradebookEntries.length > 0
+                    ? (gradebookEntries.reduce((sum, e) => sum + ((parseFloat(e.marks) / parseFloat(e.max_marks)) * 100), 0) / gradebookEntries.length).toFixed(1) + '%'
+                    : '-'}
+                </div>
               </CardContent>
             </Card>
 
@@ -287,7 +298,7 @@ export function GradeBookPage() {
                 <BookOpen className="h-4 w-4 text-purple-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{selectedClass.total_subjects || '-'}</div>
+                <div className="text-2xl font-bold">{subjects.length}</div>
               </CardContent>
             </Card>
           </div>
@@ -301,7 +312,7 @@ export function GradeBookPage() {
               {students.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No students enrolled in this class</p>
+                  <p className="text-gray-500">No students in this class</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -311,199 +322,147 @@ export function GradeBookPage() {
                         <th className="text-left py-3 px-4 font-medium">#</th>
                         <th className="text-left py-3 px-4 font-medium">Adm No.</th>
                         <th className="text-left py-3 px-4 font-medium">Name</th>
-                        <th className="text-left py-3 px-4 font-medium">Current Grade</th>
-                        <th className="text-left py-3 px-4 font-medium">Attendance</th>
-                        <th className="text-left py-3 px-4 font-medium">Actions</th>
+                        <th className="text-left py-3 px-4 font-medium">Entries</th>
+                        <th className="text-left py-3 px-4 font-medium">Average</th>
+                        <th className="text-left py-3 px-4 font-medium">Grade</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {students.map((student: any, index: number) => (
-                        <tr key={student.id} className="border-b hover:bg-gray-50">
-                          <td className="py-3 px-4">{index + 1}</td>
-                          <td className="py-3 px-4 font-mono text-sm">
-                            {student.admission_number || student.roll_number || '-'}
-                          </td>
-                          <td className="py-3 px-4 font-medium">
-                            {student.first_name} {student.last_name}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                              {student.current_grade || '-'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">{student.attendance_percentage || '-'}%</td>
-                          <td className="py-3 px-4">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleEnterGrades(student)}
-                            >
-                              <Award className="h-4 w-4 mr-1" />
-                              Enter Grades
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {students.map((student: any, index: number) => {
+                        const studentEntries = gradebookEntries.filter(e => e.student_id === student.id);
+                        const average = getStudentAverage(student.id);
+                        
+                        return (
+                          <tr key={student.id} className="border-b hover:bg-gray-50">
+                            <td className="py-3 px-4">{index + 1}</td>
+                            <td className="py-3 px-4 font-mono text-sm">
+                              {student.admission_number || '-'}
+                            </td>
+                            <td className="py-3 px-4 font-medium">
+                              {student.first_name} {student.last_name}
+                            </td>
+                            <td className="py-3 px-4">{studentEntries.length}</td>
+                            <td className="py-3 px-4">
+                              {average ? `${average}%` : '-'}
+                            </td>
+                            <td className="py-3 px-4">
+                              {average ? (
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  parseFloat(average) >= 80 ? 'bg-green-100 text-green-800' :
+                                  parseFloat(average) >= 70 ? 'bg-blue-100 text-blue-800' :
+                                  parseFloat(average) >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                  parseFloat(average) >= 50 ? 'bg-orange-100 text-orange-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {calculateGrade(parseFloat(average), 100)}
+                                </span>
+                              ) : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Recent Entries */}
+          {gradebookEntries.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Grade Entries</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left py-2 px-3 font-medium">Date</th>
+                        <th className="text-left py-2 px-3 font-medium">Student</th>
+                        <th className="text-left py-2 px-3 font-medium">Subject</th>
+                        <th className="text-left py-2 px-3 font-medium">Title</th>
+                        <th className="text-left py-2 px-3 font-medium">Score</th>
+                        <th className="text-left py-2 px-3 font-medium">Grade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gradebookEntries.slice(0, 10).map((entry) => (
+                        <tr key={entry.id} className="border-b">
+                          <td className="py-2 px-3 text-sm">
+                            {new Date(entry.date).toLocaleDateString()}
+                          </td>
+                          <td className="py-2 px-3">
+                            {entry.student_first_name} {entry.student_last_name}
+                          </td>
+                          <td className="py-2 px-3">{entry.subject_name}</td>
+                          <td className="py-2 px-3">{entry.title}</td>
+                          <td className="py-2 px-3">
+                            {entry.marks}/{entry.max_marks}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              {entry.grade}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 
-      {/* Add Assessment Modal */}
-      <Dialog open={showAddAssessmentModal} onOpenChange={setShowAddAssessmentModal}>
-        <DialogContent>
+      {/* Bulk Grade Entry Modal */}
+      <Dialog open={showBulkGradeModal} onOpenChange={setShowBulkGradeModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Assessment</DialogTitle>
+            <DialogTitle>Enter Grades - {selectedClass?.name} {selectedClass?.section || ''}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddAssessment}>
-            <div className="space-y-4">
-              <div>
-                <Label>Assessment Name</Label>
-                <Input
-                  value={assessmentData.name}
-                  onChange={(e) => setAssessmentData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Mid-Term Exam, Quiz 1"
-                  required
-                />
-              </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Subject</Label>
-                <Select
-                  value={assessmentData.subjectId}
-                  onChange={(e) => setAssessmentData(prev => ({ ...prev, subjectId: e.target.value }))}
-                  required
-                >
-                  <option value="">Select Subject</option>
+                <Select value={selectedSubject} disabled>
                   {subjects.map((sub) => (
                     <option key={sub.id} value={sub.id}>{sub.name}</option>
                   ))}
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Max Score</Label>
-                  <Input
-                    type="number"
-                    value={assessmentData.maxScore}
-                    onChange={(e) => setAssessmentData(prev => ({ ...prev, maxScore: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>Date</Label>
-                  <Input
-                    type="date"
-                    value={assessmentData.date}
-                    onChange={(e) => setAssessmentData(prev => ({ ...prev, date: e.target.value }))}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter className="mt-4">
-              <Button type="button" variant="outline" onClick={() => setShowAddAssessmentModal(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Create Assessment</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Enter Grades Modal - Single Student */}
-      <Dialog open={showEnterGradesModal && selectedStudent !== null} onOpenChange={(open) => {
-        if (!open) {
-          setShowEnterGradesModal(false);
-          setSelectedStudent(null);
-        }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Enter Grades - {selectedStudent?.first_name} {selectedStudent?.last_name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Subject</Label>
-              <Select defaultValue="">
-                <option value="">Select Subject</option>
-                {subjects.map((sub) => (
-                  <option key={sub.id} value={sub.id}>{sub.name}</option>
-                ))}
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Score (out of 100)</Label>
+                <Label>Assessment Type</Label>
+                <Select 
+                  value={assessmentType} 
+                  onChange={(e) => setAssessmentType(e.target.value)}
+                >
+                  <option value="quiz">Quiz</option>
+                  <option value="homework">Homework</option>
+                  <option value="classwork">Classwork</option>
+                  <option value="project">Project</option>
+                  <option value="exam">Exam</option>
+                </Select>
+              </div>
+              <div>
+                <Label>Max Marks</Label>
                 <Input
                   type="number"
-                  min="0"
-                  max="100"
-                  value={gradesData.score || ''}
-                  onChange={(e) => setGradesData(prev => ({ ...prev, score: e.target.value }))}
-                  placeholder="Enter score"
-                />
-              </div>
-              <div>
-                <Label>Grade (auto-calculated)</Label>
-                <Input
-                  value={gradesData.score ? calculateGrade(parseFloat(gradesData.score)) : '-'}
-                  readOnly
-                  className="bg-gray-50"
+                  value={maxMarks}
+                  onChange={(e) => setMaxMarks(e.target.value)}
                 />
               </div>
             </div>
-            <div className="p-3 bg-blue-50 rounded-lg text-sm">
-              <p className="font-medium">Grading Scale:</p>
-              <p>A: 80-100 | B: 70-79 | C: 60-69 | D: 50-59 | F: Below 50</p>
-            </div>
-          </div>
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => {
-              setShowEnterGradesModal(false);
-              setSelectedStudent(null);
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveGrades}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Grade
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bulk Grade Entry Modal */}
-      <Dialog open={showEnterGradesModal && selectedStudent === null} onOpenChange={(open) => {
-        if (!open) {
-          setShowEnterGradesModal(false);
-          setGradesData({});
-        }
-      }}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Bulk Grade Entry - {selectedClass?.name} {selectedClass?.section || ''}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Subject</Label>
-                <Select defaultValue="">
-                  <option value="">Select Subject</option>
-                  {subjects.map((sub) => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label>Assessment</Label>
-                <Input placeholder="e.g., Mid-Term Exam" />
-              </div>
+            
+            <div>
+              <Label>Assessment Title</Label>
+              <Input
+                value={assessmentTitle}
+                onChange={(e) => setAssessmentTitle(e.target.value)}
+                placeholder="e.g., Chapter 5 Quiz, Mid-Term Exam"
+              />
             </div>
             
             <div className="border rounded-lg overflow-hidden">
@@ -528,27 +487,24 @@ export function GradeBookPage() {
                         <Input
                           type="number"
                           min="0"
-                          max="100"
+                          max={maxMarks}
                           className="w-24 h-8"
-                          placeholder="0-100"
-                          value={gradesData[student.id]?.score || ''}
+                          placeholder={`0-${maxMarks}`}
+                          value={gradesData[student.id] || ''}
                           onChange={(e) => setGradesData(prev => ({
                             ...prev,
-                            [student.id]: { 
-                              score: e.target.value, 
-                              grade: e.target.value ? calculateGrade(parseFloat(e.target.value)) : '' 
-                            }
+                            [student.id]: e.target.value
                           }))}
                         />
                       </td>
                       <td className="py-2 px-3">
                         <span className={`px-2 py-1 rounded text-sm font-medium ${
-                          gradesData[student.id]?.score 
+                          gradesData[student.id] 
                             ? 'bg-blue-100 text-blue-700' 
                             : 'text-gray-400'
                         }`}>
-                          {gradesData[student.id]?.score 
-                            ? calculateGrade(parseFloat(gradesData[student.id].score)) 
+                          {gradesData[student.id] 
+                            ? calculateGrade(parseFloat(gradesData[student.id]), parseFloat(maxMarks)) 
                             : '-'}
                         </span>
                       </td>
@@ -557,17 +513,19 @@ export function GradeBookPage() {
                 </tbody>
               </table>
             </div>
+            
+            <div className="p-3 bg-blue-50 rounded-lg text-sm">
+              <p className="font-medium">Grading Scale:</p>
+              <p>A: 80-100% | B: 70-79% | C: 60-69% | D: 50-59% | F: Below 50%</p>
+            </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => {
-              setShowEnterGradesModal(false);
-              setGradesData({});
-            }}>
+            <Button type="button" variant="outline" onClick={() => setShowBulkGradeModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleBulkSaveGrades}>
+            <Button onClick={handleSaveBulkGrades} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
-              Save All Grades
+              {saving ? 'Saving...' : 'Save Grades'}
             </Button>
           </DialogFooter>
         </DialogContent>

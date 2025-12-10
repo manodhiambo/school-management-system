@@ -91,9 +91,20 @@ router.get('/class/:classId', authenticate, async (req, res) => {
 // Get student attendance
 router.get('/student/:studentId', authenticate, async (req, res) => {
   try {
+    const studentId = req.params.studentId;
+    
+    // First try to find student by user_id or student id
+    const student = await query(
+      'SELECT id FROM students WHERE id = $1 OR user_id = $1',
+      [studentId]
+    );
+    
+    const actualStudentId = student.length > 0 ? student[0].id : studentId;
+    
     const attendance = await query(`
       SELECT * FROM attendance WHERE student_id = $1 ORDER BY date DESC
-    `, [req.params.studentId]);
+    `, [actualStudentId]);
+    
     res.json({ success: true, data: attendance });
   } catch (error) {
     logger.error('Get student attendance error:', error);

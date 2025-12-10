@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import api from '@/services/api';
 
 interface AddParentModalProps {
@@ -25,24 +25,20 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
     relationship: 'father',
     phonePrimary: '',
     phoneSecondary: '',
-    emailSecondary: '',
     occupation: '',
-    annualIncome: '',
-    education: '',
-    idNumber: '',
     address: '',
     city: '',
     state: '',
-
     pincode: '',
-    studentIds: [],
+    studentIds: [] as string[],
   });
 
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        const response = await api.getStudents();
-        setStudents(Array.isArray(response.data) ? response.data : []);
+        const response: any = await api.getStudents();
+        const studentsData = response?.students || response?.data || [];
+        setStudents(Array.isArray(studentsData) ? studentsData : []);
       } catch (error) {
         console.error("Error fetching students:", error);
       }
@@ -54,12 +50,20 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const toggleStudent = (studentId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      studentIds: prev.studentIds.includes(studentId)
+        ? prev.studentIds.filter(id => id !== studentId)
+        : [...prev.studentIds, studentId]
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Convert annualIncome to number if provided, remove empty optional fields
       const submitData: any = {
         email: formData.email,
         password: formData.password,
@@ -67,24 +71,23 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
         lastName: formData.lastName,
         relationship: formData.relationship,
         phonePrimary: formData.phonePrimary,
+        studentIds: formData.studentIds, // Include student IDs
       };
 
       // Add optional fields only if they have values
       if (formData.phoneSecondary) submitData.phoneSecondary = formData.phoneSecondary;
-      if (formData.emailSecondary) submitData.emailSecondary = formData.emailSecondary;
       if (formData.occupation) submitData.occupation = formData.occupation;
-      if (formData.annualIncome) submitData.annualIncome = Number(formData.annualIncome);
-      if (formData.education) submitData.education = formData.education;
-      if (formData.idNumber) submitData.idNumber = formData.idNumber;
       if (formData.address) submitData.address = formData.address;
       if (formData.city) submitData.city = formData.city;
       if (formData.state) submitData.state = formData.state;
       if (formData.pincode) submitData.pincode = formData.pincode;
-      
+
+      console.log('Creating parent with data:', submitData);
       await api.createParent(submitData);
       alert('Parent added successfully!');
       onSuccess();
       onOpenChange(false);
+      
       // Reset form
       setFormData({
         email: '',
@@ -94,27 +97,16 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
         relationship: 'father',
         phonePrimary: '',
         phoneSecondary: '',
-        emailSecondary: '',
         occupation: '',
-        annualIncome: '',
-        education: '',
-        idNumber: '',
         address: '',
         city: '',
         state: '',
         pincode: '',
-    studentIds: [],
+        studentIds: [],
       });
     } catch (error: any) {
       console.error('Create parent error:', error);
-      
-      // Show detailed validation errors if available
-      if (error.errors && Array.isArray(error.errors)) {
-        const errorMessages = error.errors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
-        alert(`Validation failed:\n${errorMessages}`);
-      } else {
-        alert(error.message || 'Failed to add parent');
-      }
+      alert(error.message || 'Failed to add parent');
     } finally {
       setLoading(false);
     }
@@ -122,7 +114,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Add New Parent</DialogTitle>
           <button
@@ -133,11 +125,11 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
           </button>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="space-y-4 overflow-y-auto flex-1 px-1 pb-4">
             {/* Personal Information */}
             <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Personal Information</h3>
+              <h3 className="font-semibold mb-3 text-blue-600">Personal Information</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="firstName">First Name *</Label>
@@ -172,22 +164,11 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="education">Education</Label>
+                  <Label htmlFor="occupation">Occupation</Label>
                   <Input
-                    id="education"
-                    value={formData.education}
-                    onChange={(e) => handleChange('education', e.target.value)}
-                    placeholder="e.g., Bachelor's Degree"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="idNumber">ID Number (8 digits)</Label>
-                  <Input
-                    id="idNumber"
-                    value={formData.idNumber}
-                    onChange={(e) => handleChange('idNumber', e.target.value)}
-                    pattern="[0-9]{8}"
-                    placeholder="12345678"
+                    id="occupation"
+                    value={formData.occupation}
+                    onChange={(e) => handleChange('occupation', e.target.value)}
                   />
                 </div>
               </div>
@@ -195,7 +176,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
 
             {/* Contact Information */}
             <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Contact Information</h3>
+              <h3 className="font-semibold mb-3 text-blue-600">Contact & Login</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="email">Email *</Label>
@@ -205,15 +186,6 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                     value={formData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
                     required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="emailSecondary">Secondary Email</Label>
-                  <Input
-                    id="emailSecondary"
-                    type="email"
-                    value={formData.emailSecondary}
-                    onChange={(e) => handleChange('emailSecondary', e.target.value)}
                   />
                 </div>
                 <div>
@@ -227,59 +199,31 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                   />
                   <p className="text-xs text-gray-500 mt-1">Default: parent123</p>
                 </div>
-                <div></div>
                 <div>
-                  <Label htmlFor="phonePrimary">Primary Phone * (10 digits)</Label>
+                  <Label htmlFor="phonePrimary">Primary Phone *</Label>
                   <Input
                     id="phonePrimary"
                     value={formData.phonePrimary}
                     onChange={(e) => handleChange('phonePrimary', e.target.value)}
-                    pattern="[0-9]{10}"
                     placeholder="0712345678"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="phoneSecondary">Secondary Phone (10 digits)</Label>
+                  <Label htmlFor="phoneSecondary">Secondary Phone</Label>
                   <Input
                     id="phoneSecondary"
                     value={formData.phoneSecondary}
                     onChange={(e) => handleChange('phoneSecondary', e.target.value)}
-                    pattern="[0-9]{10}"
                     placeholder="0712345678"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Professional & Financial Information */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Professional Information</h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="occupation">Occupation</Label>
-                  <Input
-                    id="occupation"
-                    value={formData.occupation}
-                    onChange={(e) => handleChange('occupation', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="annualIncome">Annual Income (KSH)</Label>
-                  <Input
-                    id="annualIncome"
-                    type="number"
-                    value={formData.annualIncome}
-                    onChange={(e) => handleChange('annualIncome', e.target.value)}
-                    placeholder="e.g., 500000"
                   />
                 </div>
               </div>
             </div>
 
             {/* Address Information */}
-            <div className="pb-4">
-              <h3 className="font-semibold mb-3">Address Information</h3>
+            <div className="border-b pb-4">
+              <h3 className="font-semibold mb-3 text-blue-600">Address (Optional)</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <Label htmlFor="address">Address</Label>
@@ -304,55 +248,62 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                     id="state"
                     value={formData.state}
                     onChange={(e) => handleChange('state', e.target.value)}
-                    placeholder="e.g., Nyeri"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="pincode">Postal Code</Label>
-                  <Input
-                    id="pincode"
-                    value={formData.pincode}
-                    onChange={(e) => handleChange('pincode', e.target.value)}
                   />
                 </div>
               </div>
             </div>
 
             {/* Student Association */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Associate with Students</h3>
-              <div className="space-y-2">
-                <Label>Select Students (Children) *</Label>
-                <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
-                  {students.map((student: any) => (
-                    <div key={student.id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`student-${student.id}`}
-                        checked={formData.studentIds.includes(student.id)}
-                        onChange={(e) => {
-                          const newStudentIds = e.target.checked
-                            ? [...formData.studentIds, student.id]
-                            : formData.studentIds.filter(id => id !== student.id);
-                          handleChange('studentIds', newStudentIds);
-                        }}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <label htmlFor={`student-${student.id}`} className="text-sm cursor-pointer">
-                        {student.first_name} {student.last_name} - {student.admission_number}
-                        {student.class_name && ` (${student.class_name})`}
-                      </label>
-                    </div>
-                  ))}
-                  {students.length === 0 && (
-                    <p className="text-sm text-gray-500">No students available. Add students first.</p>
-                  )}
+            <div className="pb-4">
+              <h3 className="font-semibold mb-3 text-blue-600">Link Children (Students)</h3>
+              <p className="text-sm text-gray-500 mb-3">Select the students who are children of this parent</p>
+              
+              {students.length > 0 ? (
+                <div className="grid gap-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                  {students.map((student: any) => {
+                    const isSelected = formData.studentIds.includes(student.id);
+                    return (
+                      <div 
+                        key={student.id} 
+                        onClick={() => toggleStudent(student.id)}
+                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                          isSelected 
+                            ? 'bg-blue-100 border-2 border-blue-500' 
+                            : 'bg-white border border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-medium">{student.first_name} {student.last_name}</p>
+                          <p className="text-sm text-gray-500">
+                            {student.admission_number} 
+                            {student.class_name && ` • ${student.class_name}`}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <div className="h-6 w-6 bg-blue-500 rounded-full flex items-center justify-center">
+                            <Check className="h-4 w-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
+              ) : (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border">
+                  <p className="text-gray-500">No students available</p>
+                  <p className="text-sm text-gray-400">Add students first to link them to parents</p>
+                </div>
+              )}
+              
+              {formData.studentIds.length > 0 && (
+                <p className="text-sm text-blue-600 mt-2">
+                  {formData.studentIds.length} student(s) selected
+                </p>
+              )}
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

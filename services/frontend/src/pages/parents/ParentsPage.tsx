@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, Users, UserPlus, Eye } from 'lucide-react';
 import { AddParentModal } from '@/components/modals/AddParentModal';
-import { LinkStudentModal } from '@/components/modals/LinkStudentModal';
+import { EditParentModal } from '@/components/modals/EditParentModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import api from '@/services/api';
 
@@ -25,7 +25,7 @@ export function ParentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedParent, setSelectedParent] = useState<any>(null);
   const [parentDetails, setParentDetails] = useState<any>(null);
@@ -59,9 +59,9 @@ export function ParentsPage() {
     }
   };
 
-  const handleLinkStudent = (parent: any) => {
+  const handleEditParent = (parent: any) => {
     setSelectedParent(parent);
-    setShowLinkModal(true);
+    setShowEditModal(true);
   };
 
   const handleViewParent = async (parent: any) => {
@@ -211,13 +211,10 @@ export function ParentsPage() {
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            title="Link Student"
-                            onClick={() => handleLinkStudent(parent)}
+                            title="Edit & Link Students"
+                            onClick={() => handleEditParent(parent)}
                           >
-                            <UserPlus className="h-4 w-4 text-blue-500" />
-                          </Button>
-                          <Button variant="ghost" size="icon" title="Edit">
-                            <Edit className="h-4 w-4 text-gray-500" />
+                            <Edit className="h-4 w-4 text-blue-500" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -245,11 +242,11 @@ export function ParentsPage() {
         onSuccess={loadParents}
       />
 
-      {/* Link Student Modal */}
+      {/* Edit Parent Modal */}
       {selectedParent && (
-        <LinkStudentModal
-          open={showLinkModal}
-          onOpenChange={setShowLinkModal}
+        <EditParentModal
+          open={showEditModal}
+          onOpenChange={setShowEditModal}
           parent={selectedParent}
           onSuccess={loadParents}
         />
@@ -322,12 +319,11 @@ export function ParentsPage() {
                       className="mt-2"
                       onClick={() => {
                         setShowViewModal(false);
-                        setSelectedParent(parentDetails);
-                        setShowLinkModal(true);
+                        handleEditParent(parentDetails);
                       }}
                     >
                       <UserPlus className="h-4 w-4 mr-2" />
-                      Link Student
+                      Link Students
                     </Button>
                   </div>
                 )}

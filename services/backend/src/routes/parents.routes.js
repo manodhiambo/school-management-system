@@ -243,3 +243,23 @@ router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => 
 });
 
 export default router;
+
+// Unlink student from parent
+router.delete('/:id/unlink-student/:studentId', authenticate, async (req, res) => {
+  try {
+    const { id: parentId, studentId } = req.params;
+    
+    await query(
+      'DELETE FROM parent_students WHERE parent_id = $1 AND student_id = $2',
+      [parentId, studentId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Student unlinked successfully'
+    });
+  } catch (error) {
+    logger.error('Unlink student error:', error);
+    res.status(500).json({ success: false, message: 'Error unlinking student' });
+  }
+});

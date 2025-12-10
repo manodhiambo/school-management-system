@@ -145,6 +145,14 @@ class ApiService {
     return this.api.post('/parents/' + parentId + '/link-student', data);
   }
 
+  unlinkStudentFromParent(parentId: string, studentId: string) {
+    return this.api.delete('/parents/' + parentId + '/unlink-student/' + studentId);
+  }
+
+  getParentByUser(userId: string) {
+    return this.api.get('/parents/by-user/' + userId);
+  }
+
   // Classes
   getClasses(params?: any) {
     return this.api.get('/classes', { params });

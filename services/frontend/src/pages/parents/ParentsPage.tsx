@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, Users, UserPlus, Eye } from 'lucide-react';
@@ -27,7 +27,7 @@ export function ParentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedParent, setSelectedParent] = useState<any>(null);
+  const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
   const [parentDetails, setParentDetails] = useState<any>(null);
 
   useEffect(() => {
@@ -59,12 +59,13 @@ export function ParentsPage() {
     }
   };
 
-  const handleEditParent = (parent: any) => {
+  const handleEditParent = (parent: Parent) => {
+    console.log('Edit clicked for parent:', parent);
     setSelectedParent(parent);
     setShowEditModal(true);
   };
 
-  const handleViewParent = async (parent: any) => {
+  const handleViewParent = async (parent: Parent) => {
     try {
       const response: any = await api.getParent(parent.id);
       setParentDetails(response.data);
@@ -72,6 +73,18 @@ export function ParentsPage() {
       setShowViewModal(true);
     } catch (error) {
       console.error('Error loading parent details:', error);
+    }
+  };
+
+  const handleCloseEditModal = (open: boolean) => {
+    setShowEditModal(open);
+    if (!open) {
+      // Delay clearing selectedParent to allow modal to close gracefully
+      setTimeout(() => {
+        if (!showEditModal) {
+          setSelectedParent(null);
+        }
+      }, 200);
     }
   };
 
@@ -212,7 +225,11 @@ export function ParentsPage() {
                             variant="ghost" 
                             size="icon"
                             title="Edit & Link Students"
-                            onClick={() => handleEditParent(parent)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleEditParent(parent);
+                            }}
                           >
                             <Edit className="h-4 w-4 text-blue-500" />
                           </Button>
@@ -242,15 +259,15 @@ export function ParentsPage() {
         onSuccess={loadParents}
       />
 
-      {/* Edit Parent Modal */}
-      {selectedParent && (
-        <EditParentModal
-          open={showEditModal}
-          onOpenChange={setShowEditModal}
-          parent={selectedParent}
-          onSuccess={loadParents}
-        />
-      )}
+      {/* Edit Parent Modal - Always render, control visibility with open prop */}
+      <EditParentModal
+        open={showEditModal && selectedParent !== null}
+        onOpenChange={handleCloseEditModal}
+        parent={selectedParent}
+        onSuccess={() => {
+          loadParents();
+        }}
+      />
 
       {/* View Parent Details Modal */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
@@ -319,7 +336,10 @@ export function ParentsPage() {
                       className="mt-2"
                       onClick={() => {
                         setShowViewModal(false);
-                        handleEditParent(parentDetails);
+                        setTimeout(() => {
+                          setSelectedParent(parentDetails);
+                          setShowEditModal(true);
+                        }, 100);
                       }}
                     >
                       <UserPlus className="h-4 w-4 mr-2" />

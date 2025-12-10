@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Check, UserPlus, Trash2 } from 'lucide-react';
+import { X, UserPlus, Trash2 } from 'lucide-react';
 import api from '@/services/api';
 
 interface EditParentModalProps {
@@ -35,6 +35,7 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
 
   useEffect(() => {
     if (open && parent) {
+      console.log('EditParentModal opened for:', parent);
       // Pre-fill form with parent data
       setFormData({
         firstName: parent.first_name || '',
@@ -48,11 +49,14 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
         state: parent.state || '',
         pincode: parent.pincode || '',
       });
+      setActiveTab('details');
       fetchData();
     }
   }, [open, parent]);
 
   const fetchData = async () => {
+    if (!parent?.id) return;
+    
     try {
       // Get all students
       const studentsRes: any = await api.getStudents();
@@ -60,10 +64,8 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
       setStudents(Array.isArray(allStudents) ? allStudents : []);
 
       // Get parent details with children
-      if (parent?.id) {
-        const parentRes: any = await api.getParent(parent.id);
-        setLinkedChildren(parentRes?.data?.children || []);
-      }
+      const parentRes: any = await api.getParent(parent.id);
+      setLinkedChildren(parentRes?.data?.children || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -75,8 +77,9 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
 
   const handleUpdateDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!parent?.id) return;
+    
     setLoading(true);
-
     try {
       await api.updateParent(parent.id, formData);
       alert('Parent updated successfully!');
@@ -90,13 +93,15 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
   };
 
   const handleLinkStudent = async (studentId: string) => {
+    if (!parent?.id) return;
+    
     try {
       await api.linkStudentToParent(parent.id, {
         studentId,
         relationship: formData.relationship
       });
       alert('Student linked successfully!');
-      fetchData(); // Refresh
+      fetchData();
       onSuccess();
     } catch (error: any) {
       console.error('Link student error:', error);
@@ -105,12 +110,13 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
   };
 
   const handleUnlinkStudent = async (studentId: string) => {
+    if (!parent?.id) return;
     if (!confirm('Are you sure you want to unlink this student?')) return;
     
     try {
       await api.unlinkStudentFromParent(parent.id, studentId);
       alert('Student unlinked successfully!');
-      fetchData(); // Refresh
+      fetchData();
       onSuccess();
     } catch (error: any) {
       console.error('Unlink student error:', error);
@@ -122,6 +128,8 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
   const linkedStudentIds = linkedChildren.map((c: any) => c.id);
   const availableStudents = students.filter(s => !linkedStudentIds.includes(s.id));
 
+  if (!parent) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -130,6 +138,7 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
           <button
             onClick={() => onOpenChange(false)}
             className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100"
+            type="button"
           >
             <X className="h-4 w-4" />
           </button>
@@ -138,13 +147,23 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
         {/* Tabs */}
         <div className="flex border-b">
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'details' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+            type="button"
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'details' 
+                ? 'border-b-2 border-blue-500 text-blue-600' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
             onClick={() => setActiveTab('details')}
           >
             Parent Details
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'children' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+            type="button"
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'children' 
+                ? 'border-b-2 border-blue-500 text-blue-600' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
             onClick={() => setActiveTab('children')}
           >
             Linked Children ({linkedChildren.length})
@@ -291,6 +310,7 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
                         <Button
                           variant="ghost"
                           size="sm"
+                          type="button"
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
                           onClick={() => handleUnlinkStudent(child.id)}
                         >
@@ -329,6 +349,7 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
                         </div>
                         <Button
                           size="sm"
+                          type="button"
                           onClick={() => handleLinkStudent(student.id)}
                         >
                           <UserPlus className="h-4 w-4 mr-1" />
@@ -349,7 +370,7 @@ export function EditParentModal({ open, onOpenChange, parent, onSuccess }: EditP
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Close
                 </Button>
               </DialogFooter>

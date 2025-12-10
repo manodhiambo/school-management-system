@@ -549,9 +549,17 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
   try {
     const studentId = req.params.studentId;
     
+    // First try to find student by user_id or student id
+    const student = await query(
+      'SELECT id FROM students WHERE id = $1 OR user_id = $1',
+      [studentId]
+    );
+    
+    const actualStudentId = student.length > 0 ? student[0].id : studentId;
+    
     const invoices = await query(
       'SELECT * FROM fee_invoices WHERE student_id = $1 ORDER BY created_at DESC',
-      [studentId]
+      [actualStudentId]
     );
     
     const payments = await query(`
@@ -559,22 +567,33 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
       LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
       WHERE fi.student_id = $1 OR fp.student_id = $1
       ORDER BY fp.payment_date DESC
-    `, [studentId]);
+    `, [actualStudentId]);
     
     const summary = await query(`
       SELECT
-        COALESCE(SUM(net_amount), 0)::numeric as total_amount,
-        COALESCE(SUM(paid_amount), 0)::numeric as total_paid,
+        COALESCE(SUM(total_amount), 0)::numeric as total_amount,
+        COALESCE(SUM(total_amount - balance_amount), 0)::numeric as total_paid,
         COALESCE(SUM(balance_amount), 0)::numeric as total_balance
       FROM fee_invoices WHERE student_id = $1
-    `, [studentId]);
+    `, [actualStudentId]);
     
     res.json({
       success: true,
       data: {
-        invoices,
-        payments,
-        summary: summary[0] || { total_amount: 0, total_paid: 0, total_balance: 0 }
+        total_fees: summary[0]?.total_amount || 0,
+        paid: summary[0]?.total_paid || 0,
+        pending: summary[0]?.total_balance || 0,
+        invoices: invoices.map(inv => ({
+          id: inv.id,
+          invoice_number: inv.invoice_number,
+          amount: inv.total_amount,
+          paid: parseFloat(inv.total_amount) - parseFloat(inv.balance_amount),
+          balance: inv.balance_amount,
+          due_date: inv.due_date,
+          status: inv.status,
+          description: inv.description || `Invoice ${inv.invoice_number}`
+        })),
+        payments
       }
     });
   } catch (error) {

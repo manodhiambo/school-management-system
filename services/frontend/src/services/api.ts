@@ -141,8 +141,8 @@ class ApiService {
     return this.api.delete('/parents/' + id);
   }
 
-  linkStudentToParent(parentId: string, studentId: string) {
-    return this.api.post('/parents/' + parentId + '/link-student', { studentId });
+  linkStudentToParent(parentId: string, data: any) {
+    return this.api.post('/parents/' + parentId + '/link-student', data);
   }
 
   // Classes

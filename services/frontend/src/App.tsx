@@ -38,7 +38,7 @@ import { MyClassesPage } from './pages/teacher/MyClassesPage';
 import { GradeBookPage } from './pages/teacher/GradeBookPage';
 
 // Shared Pages
-import { ProfilePage } from './pages/shared/ProfilePage';
+import { ProfilePage } from './pages/settings/ProfilePage';
 
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';

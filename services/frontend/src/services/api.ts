@@ -316,7 +316,7 @@ class ApiService {
     return this.api.post('/academic/results', data);
   }
 
-  // Timetable - FIXED: handle both classId string and params object
+  // Timetable
   getTimetable(classIdOrParams?: string | any) {
     if (typeof classIdOrParams === 'string') {
       return this.api.get('/timetable', { params: { classId: classIdOrParams } });
@@ -528,7 +528,10 @@ class ApiService {
   getStudentGrades(studentId: string) {
     return this.api.get('/gradebook/student/' + studentId);
   }
-}
+
+  // --------------------------
+  // Password & Notifications
+  // --------------------------
 
   // Password Management
   changePassword(data: { currentPassword: string; newPassword: string }) {

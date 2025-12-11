@@ -530,4 +530,49 @@ class ApiService {
   }
 }
 
+  // Password Management
+  changePassword(data: { currentPassword: string; newPassword: string }) {
+    return this.api.post('/password/change', data);
+  }
+
+  resetUserPassword(userId: string, data?: { newPassword?: string; sendEmail?: boolean }) {
+    return this.api.post('/password/reset/' + userId, data || {});
+  }
+
+  bulkResetPasswords(data: { userIds: string[]; sendEmail?: boolean }) {
+    return this.api.post('/password/reset-bulk', data);
+  }
+
+  // Enhanced Notifications
+  sendNotification(data: {
+    title: string;
+    message: string;
+    type?: string;
+    targetRole?: string;
+    targetUserIds?: string[];
+    sendEmailNotification?: boolean;
+    priority?: string;
+  }) {
+    return this.api.post('/notifications', data);
+  }
+
+  sendAnnouncement(data: {
+    title: string;
+    message: string;
+    targetRole?: string;
+    priority?: string;
+    sendEmail?: boolean;
+  }) {
+    return this.api.post('/notifications/announcement', data);
+  }
+
+  getUnreadNotificationCount() {
+    return this.api.get('/notifications/unread-count');
+  }
+
+  deleteNotification(id: string) {
+    return this.api.delete('/notifications/' + id);
+  }
+}
+
 export default new ApiService();

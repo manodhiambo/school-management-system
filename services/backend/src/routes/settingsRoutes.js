@@ -26,28 +26,28 @@ router.put('/', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const {
       school_name, school_code, phone, email, address, city, state, pincode,
-      website, current_academic_year, timezone, currency, date_format,
-      logo_url, principal_name, principal_signature
+      website, current_academic_year, timezone, currency, date_format, time_format,
+      school_logo_url
     } = req.body;
 
     // Check if settings exist
     const existing = await query('SELECT * FROM settings LIMIT 1');
-    
+
     if (existing.length === 0) {
       // Create settings
       const settingsId = uuidv4();
       await query(
-        `INSERT INTO settings (id, school_name, school_code, phone, email, address, city, state, pincode, 
-          website, current_academic_year, timezone, currency, date_format, logo_url, principal_name, principal_signature)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+        `INSERT INTO settings (id, school_name, school_code, phone, email, address, city, state, pincode,
+          website, current_academic_year, timezone, currency, date_format, time_format, school_logo_url, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())`,
         [settingsId, school_name, school_code, phone, email, address, city, state, pincode,
-          website, current_academic_year, timezone || 'Africa/Nairobi', currency || 'KES', 
-          date_format || 'DD/MM/YYYY', logo_url, principal_name, principal_signature]
+          website, current_academic_year, timezone || 'Africa/Nairobi', currency || 'KES',
+          date_format || 'DD/MM/YYYY', time_format || '12h', school_logo_url]
       );
     } else {
-      // Update settings
+      // Update settings - only update fields that are provided
       await query(
-        `UPDATE settings SET 
+        `UPDATE settings SET
           school_name = COALESCE($1, school_name),
           school_code = COALESCE($2, school_code),
           phone = COALESCE($3, phone),
@@ -61,19 +61,18 @@ router.put('/', authenticate, requireRole(['admin']), async (req, res) => {
           timezone = COALESCE($11, timezone),
           currency = COALESCE($12, currency),
           date_format = COALESCE($13, date_format),
-          logo_url = COALESCE($14, logo_url),
-          principal_name = COALESCE($15, principal_name),
-          principal_signature = COALESCE($16, principal_signature),
+          time_format = COALESCE($14, time_format),
+          school_logo_url = COALESCE($15, school_logo_url),
           updated_at = NOW()
-         WHERE id = $17`,
+         WHERE id = $16`,
         [school_name, school_code, phone, email, address, city, state, pincode,
-          website, current_academic_year, timezone, currency, date_format,
-          logo_url, principal_name, principal_signature, existing[0].id]
+          website, current_academic_year, timezone, currency, date_format, time_format,
+          school_logo_url, existing[0].id]
       );
     }
 
     const settings = await query('SELECT * FROM settings LIMIT 1');
-    
+
     res.json({
       success: true,
       message: 'Settings updated successfully',
@@ -103,19 +102,19 @@ router.get('/academic-years', authenticate, async (req, res) => {
 router.post('/academic-years', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { year, start_date, end_date, is_current } = req.body;
-    
+
     const yearId = uuidv4();
-    
+
     if (is_current) {
       await query('UPDATE academic_years SET is_current = false');
     }
-    
+
     await query(
       `INSERT INTO academic_years (id, year, start_date, end_date, is_current)
        VALUES ($1, $2, $3, $4, $5)`,
       [yearId, year, start_date, end_date, is_current || false]
     );
-    
+
     res.status(201).json({
       success: true,
       message: 'Academic year created successfully'

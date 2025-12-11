@@ -1,39 +1,17 @@
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import logger from '../utils/logger.js';
 
-// Create transporter - configure based on your email provider
-const createTransporter = () => {
-  // For production, use your SMTP provider (Gmail, SendGrid, etc.)
-  // For development/testing, you can use Ethereal or Mailtrap
-  
-  const config = {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USER || '',
-      pass: process.env.SMTP_PASS || '',
-    },
-  };
+// Initialize SendGrid with API key from environment
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@skulmanager.org';
+const FROM_NAME = process.env.FROM_NAME || 'Skul Manager';
 
-  // Only create transporter if credentials are provided
-  if (!config.auth.user || !config.auth.pass) {
-    logger.warn('Email credentials not configured. Emails will be logged but not sent.');
-    return null;
-  }
-
-  return nodemailer.createTransport(config);
-};
-
-let transporter = null;
-
-// Initialize transporter
-const initTransporter = () => {
-  if (!transporter) {
-    transporter = createTransporter();
-  }
-  return transporter;
-};
+// Set API key if available
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
+} else {
+  logger.warn('SENDGRID_API_KEY not configured. Emails will be logged but not sent.');
+}
 
 // Email templates
 const templates = {
@@ -43,205 +21,216 @@ const templates = {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 10px 10px; }
-          .button { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
+          .header { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+          .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; }
+          .footer { background: #f3f4f6; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 12px 12px; }
+          .button { display: inline-block; background: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; margin-top: 20px; font-weight: 600; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>📚 School Management System</h1>
+            <h1>📚 Skul Manager</h1>
           </div>
           <div class="content">
-            <h2>${data.title || 'Notification'}</h2>
-            <p>${data.message}</p>
+            <h2 style="color: #1f2937; margin-top: 0;">${data.title || 'Notification'}</h2>
+            <p style="color: #4b5563;">${data.message}</p>
             ${data.actionUrl ? `<a href="${data.actionUrl}" class="button">View Details</a>` : ''}
           </div>
           <div class="footer">
-            <p>This is an automated message from your School Management System.</p>
-            <p>Please do not reply to this email.</p>
+            <p>This is an automated message from Skul Manager.</p>
           </div>
         </div>
       </body>
       </html>
     `,
-    text: `${data.title || 'Notification'}\n\n${data.message}\n\n${data.actionUrl ? `View details: ${data.actionUrl}` : ''}`
+    text: `${data.title || 'Notification'}\n\n${data.message}`
   }),
 
   passwordReset: (data) => ({
-    subject: 'Password Reset - School Management System',
+    subject: 'Password Reset - Skul Manager',
     html: `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 10px 10px; }
-          .code { background: #e5e7eb; padding: 15px; font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 5px; border-radius: 6px; margin: 20px 0; }
-          .warning { color: #dc2626; font-size: 14px; }
+          .header { background: #f59e0b; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+          .code { background: #1f2937; color: #10b981; padding: 15px; font-size: 24px; text-align: center; letter-spacing: 4px; border-radius: 8px; margin: 20px 0; font-family: monospace; }
+          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
         </style>
       </head>
       <body>
         <div class="container">
-          <div class="header">
-            <h1>🔐 Password Reset</h1>
-          </div>
+          <div class="header"><h1>Password Reset</h1></div>
           <div class="content">
-            <p>Hello ${data.name || 'User'},</p>
-            <p>Your password has been ${data.isNewPassword ? 'set' : 'reset'} by the administrator.</p>
-            <p>Your new temporary password is:</p>
+            <p>Hello <strong>${data.name || 'User'}</strong>,</p>
+            <p>Your password has been reset. Your new temporary password is:</p>
             <div class="code">${data.tempPassword}</div>
-            <p class="warning">⚠️ Please change this password immediately after logging in for security reasons.</p>
-            <p>If you did not request this change, please contact the school administrator immediately.</p>
+            <p style="color: #dc2626;">Please change this password immediately after logging in.</p>
+            <p><a href="https://skulmanager.org/login" style="background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Login Now</a></p>
           </div>
-          <div class="footer">
-            <p>This is an automated message from your School Management System.</p>
-          </div>
+          <div class="footer"><p>Skul Manager - School Management System</p></div>
         </div>
       </body>
       </html>
     `,
-    text: `Hello ${data.name || 'User'},\n\nYour password has been ${data.isNewPassword ? 'set' : 'reset'}.\n\nYour new temporary password is: ${data.tempPassword}\n\nPlease change this password immediately after logging in.\n\nIf you did not request this change, please contact the school administrator.`
+    text: `Hello ${data.name || 'User'},\n\nYour password has been reset.\nNew password: ${data.tempPassword}\n\nPlease change it after logging in.\n\nLogin: https://skulmanager.org/login`
   }),
 
   welcome: (data) => ({
-    subject: 'Welcome to School Management System',
+    subject: 'Welcome to Skul Manager!',
     html: `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 10px 10px; }
-          .credentials { background: #e5e7eb; padding: 15px; border-radius: 6px; margin: 20px 0; }
-          .button { display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
+          .header { background: #10b981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+          .credentials { background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; }
+          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
         </style>
       </head>
       <body>
         <div class="container">
-          <div class="header">
-            <h1>🎉 Welcome!</h1>
-          </div>
+          <div class="header"><h1>Welcome to Skul Manager!</h1></div>
           <div class="content">
-            <p>Hello ${data.name},</p>
-            <p>Your account has been created on the School Management System.</p>
+            <p>Hello <strong>${data.name}</strong>,</p>
+            <p>Your account has been created.</p>
             <div class="credentials">
               <p><strong>Email:</strong> ${data.email}</p>
-              <p><strong>Temporary Password:</strong> ${data.password}</p>
+              <p><strong>Password:</strong> ${data.password}</p>
               <p><strong>Role:</strong> ${data.role}</p>
             </div>
-            <p>Please login and change your password immediately.</p>
-            ${data.loginUrl ? `<a href="${data.loginUrl}" class="button">Login Now</a>` : ''}
+            <p>Please login and change your password.</p>
+            <p><a href="https://skulmanager.org/login" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Login Now</a></p>
           </div>
-          <div class="footer">
-            <p>This is an automated message from your School Management System.</p>
-          </div>
+          <div class="footer"><p>Skul Manager - School Management System</p></div>
         </div>
       </body>
       </html>
     `,
-    text: `Hello ${data.name},\n\nYour account has been created.\n\nEmail: ${data.email}\nTemporary Password: ${data.password}\nRole: ${data.role}\n\nPlease login and change your password immediately.`
+    text: `Welcome ${data.name}!\n\nEmail: ${data.email}\nPassword: ${data.password}\nRole: ${data.role}\n\nLogin: https://skulmanager.org/login`
   }),
 
   announcement: (data) => ({
-    subject: `📢 ${data.title}`,
+    subject: `Announcement: ${data.title}`,
     html: `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 10px 10px; }
-          .priority-high { border-left: 4px solid #dc2626; padding-left: 15px; }
-          .priority-normal { border-left: 4px solid #3b82f6; padding-left: 15px; }
+          .header { background: #8b5cf6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+          .message { background: ${data.priority === 'high' ? '#fef2f2' : '#eff6ff'}; padding: 20px; border-left: 4px solid ${data.priority === 'high' ? '#dc2626' : '#3b82f6'}; border-radius: 0 8px 8px 0; }
+          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
         </style>
       </head>
       <body>
         <div class="container">
-          <div class="header">
-            <h1>📢 Announcement</h1>
-          </div>
+          <div class="header"><h1>School Announcement</h1></div>
           <div class="content">
-            <div class="${data.priority === 'high' ? 'priority-high' : 'priority-normal'}">
+            <div class="message">
               <h2>${data.title}</h2>
               <p>${data.message}</p>
             </div>
-            <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
-              Posted by: ${data.sender || 'Administration'}<br>
-              Date: ${new Date().toLocaleDateString()}
-            </p>
+            <p style="margin-top: 20px; color: #666;">Posted by: ${data.sender || 'Administration'}</p>
           </div>
-          <div class="footer">
-            <p>This is an automated message from your School Management System.</p>
-          </div>
+          <div class="footer"><p>Skul Manager - School Management System</p></div>
         </div>
       </body>
       </html>
     `,
-    text: `ANNOUNCEMENT: ${data.title}\n\n${data.message}\n\nPosted by: ${data.sender || 'Administration'}\nDate: ${new Date().toLocaleDateString()}`
+    text: `ANNOUNCEMENT: ${data.title}\n\n${data.message}\n\nFrom: ${data.sender || 'Administration'}`
   }),
 
   feeReminder: (data) => ({
-    subject: '💰 Fee Payment Reminder',
+    subject: 'Fee Payment Reminder',
     html: `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 10px 10px; }
-          .amount { font-size: 28px; font-weight: bold; color: #dc2626; text-align: center; margin: 20px 0; }
-          .details { background: #fef2f2; padding: 15px; border-radius: 6px; }
+          .header { background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+          .amount { font-size: 32px; color: #dc2626; text-align: center; margin: 20px 0; font-weight: bold; }
+          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
         </style>
       </head>
       <body>
         <div class="container">
-          <div class="header">
-            <h1>💰 Fee Payment Reminder</h1>
-          </div>
+          <div class="header"><h1>Fee Payment Reminder</h1></div>
           <div class="content">
             <p>Dear Parent/Guardian,</p>
-            <p>This is a reminder that there is an outstanding fee balance for:</p>
-            <div class="details">
-              <p><strong>Student:</strong> ${data.studentName}</p>
-              <p><strong>Class:</strong> ${data.className || 'N/A'}</p>
-              <p><strong>Due Date:</strong> ${data.dueDate}</p>
-            </div>
+            <p>This is a reminder about outstanding fees for:</p>
+            <p><strong>Student:</strong> ${data.studentName}<br><strong>Class:</strong> ${data.className || 'N/A'}<br><strong>Due:</strong> ${data.dueDate}</p>
             <div class="amount">KES ${data.amount.toLocaleString()}</div>
-            <p>Please make the payment at your earliest convenience to avoid any inconvenience.</p>
+            <p><a href="https://skulmanager.org/app/my-fees" style="background: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Pay Now</a></p>
           </div>
-          <div class="footer">
-            <p>This is an automated message from your School Management System.</p>
-          </div>
+          <div class="footer"><p>Skul Manager - School Management System</p></div>
         </div>
       </body>
       </html>
     `,
-    text: `Fee Payment Reminder\n\nStudent: ${data.studentName}\nClass: ${data.className || 'N/A'}\nAmount Due: KES ${data.amount.toLocaleString()}\nDue Date: ${data.dueDate}\n\nPlease make the payment at your earliest convenience.`
+    text: `Fee Reminder\n\nStudent: ${data.studentName}\nAmount: KES ${data.amount.toLocaleString()}\nDue: ${data.dueDate}`
+  }),
+
+  message: (data) => ({
+    subject: `New Message: ${data.subject || 'You have a message'}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #06b6d4; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+          .message-box { background: #f0fdfa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>New Message</h1></div>
+          <div class="content">
+            <p>Hello ${data.recipientName || 'there'},</p>
+            <p>You have a new message:</p>
+            <div class="message-box">
+              <p><strong>From:</strong> ${data.senderName || 'A user'}</p>
+              <p>${data.message}</p>
+            </div>
+            <p><a href="https://skulmanager.org/app/communication" style="background: #06b6d4; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View & Reply</a></p>
+          </div>
+          <div class="footer"><p>Skul Manager - School Management System</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `New Message\n\nFrom: ${data.senderName}\n\n${data.message}\n\nReply at: https://skulmanager.org/app/communication`
   })
 };
 
-// Send email function
+// Send email using SendGrid
 export const sendEmail = async (to, templateName, data) => {
-  const trans = initTransporter();
-  
   const template = templates[templateName];
   if (!template) {
     logger.error(`Email template '${templateName}' not found`);
@@ -250,30 +239,25 @@ export const sendEmail = async (to, templateName, data) => {
 
   const { subject, html, text } = template(data);
 
-  const mailOptions = {
-    from: process.env.SMTP_FROM || '"School Management System" <noreply@school.com>',
-    to: Array.isArray(to) ? to.join(', ') : to,
+  if (!SENDGRID_API_KEY) {
+    logger.info('Email logged (SendGrid not configured):', { to, subject, templateName });
+    return { success: true, simulated: true };
+  }
+
+  const msg = {
+    to: Array.isArray(to) ? to : [to],
+    from: { email: FROM_EMAIL, name: FROM_NAME },
     subject,
     html,
     text
   };
 
-  // If no transporter (credentials not configured), log the email
-  if (!trans) {
-    logger.info('Email would be sent (no SMTP configured):', {
-      to: mailOptions.to,
-      subject: mailOptions.subject,
-      templateName
-    });
-    return { success: true, simulated: true };
-  }
-
   try {
-    const info = await trans.sendMail(mailOptions);
-    logger.info('Email sent:', { messageId: info.messageId, to: mailOptions.to });
-    return { success: true, messageId: info.messageId };
+    const response = await sgMail.send(msg);
+    logger.info('Email sent via SendGrid:', { to: msg.to, subject, statusCode: response[0].statusCode });
+    return { success: true, statusCode: response[0].statusCode };
   } catch (error) {
-    logger.error('Email send error:', error);
+    logger.error('SendGrid error:', { message: error.message, response: error.response?.body });
     return { success: false, error: error.message };
   }
 };
@@ -282,21 +266,11 @@ export const sendEmail = async (to, templateName, data) => {
 export const sendBulkEmails = async (recipients, templateName, data) => {
   const results = [];
   for (const recipient of recipients) {
-    const result = await sendEmail(
-      recipient.email,
-      templateName,
-      { ...data, name: recipient.name || recipient.email }
-    );
+    const result = await sendEmail(recipient.email, templateName, { ...data, name: recipient.name || recipient.email });
     results.push({ email: recipient.email, ...result });
-    
-    // Add small delay between emails to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
   return results;
 };
 
-export default {
-  sendEmail,
-  sendBulkEmails,
-  templates: Object.keys(templates)
-};
+export default { sendEmail, sendBulkEmails, templates: Object.keys(templates) };

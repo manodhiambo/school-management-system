@@ -3,14 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings, Save, School, Bell, Lock, FileText } from 'lucide-react';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Settings, Save, School, Bell, Lock, Globe, Clock } from 'lucide-react';
 import api from '@/services/api';
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'security' | 'academic'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system'>('general');
 
   useEffect(() => {
     loadSettings();
@@ -20,7 +22,7 @@ export function SettingsPage() {
     try {
       setLoading(true);
       const response: any = await api.getSettings();
-      setSettings(response.data);
+      setSettings(response.data || {});
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
@@ -31,48 +33,13 @@ export function SettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      
-      // Convert snake_case to camelCase for backend
-      const backendSettings = {
-        schoolName: settings?.school_name,
-        schoolCode: settings?.school_code,
-        schoolLogoUrl: settings?.school_logo_url,
-        address: settings?.address,
-        city: settings?.city,
-        state: settings?.state,
-        pincode: settings?.pincode,
-        phone: settings?.phone,
-        email: settings?.email,
-        website: settings?.website,
-        currentAcademicYear: settings?.current_academic_year,
-        timezone: settings?.timezone,
-        currency: settings?.currency,
-        dateFormat: settings?.date_format,
-        timeFormat: settings?.time_format,
-        attendanceMethod: settings?.attendance_method,
-        feeLateeFeeApplicable: settings?.fee_late_fee_applicable,
-        smsEnabled: settings?.sms_enabled,
-        emailEnabled: settings?.email_enabled,
-        pushNotificationEnabled: settings?.push_notification_enabled,
-      };
-      
-      // Remove undefined values
-      Object.keys(backendSettings).forEach(key => 
-        backendSettings[key] === undefined && delete backendSettings[key]
-      );
-      
-      await api.updateSettings(backendSettings);
+      // Send snake_case directly as backend expects
+      await api.updateSettings(settings);
       alert('Settings saved successfully!');
-      loadSettings(); // Reload to get updated data
+      loadSettings();
     } catch (error: any) {
-      console.log("Validation errors:", error.errors);
       console.error('Error saving settings:', error);
-      if (error.errors && Array.isArray(error.errors)) {
-        const errorMessages = error.errors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
-        alert(`Validation failed:\n${errorMessages}`);
-      } else {
-        alert(error.message || 'Failed to save settings');
-      }
+      alert(error.message || 'Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -103,304 +70,236 @@ export function SettingsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-sm">Categories</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button
-              className="w-full justify-start"
-              variant={activeTab === 'general' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('general')}
-            >
-              <School className="mr-2 h-4 w-4" />
-              General
-            </Button>
-            <Button
-              className="w-full justify-start"
-              variant={activeTab === 'academic' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('academic')}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Academic
-            </Button>
-            <Button
-              className="w-full justify-start"
-              variant={activeTab === 'notifications' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('notifications')}
-            >
-              <Bell className="mr-2 h-4 w-4" />
-              Notifications
-            </Button>
-            <Button
-              className="w-full justify-start"
-              variant={activeTab === 'security' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('security')}
-            >
-              <Lock className="mr-2 h-4 w-4" />
-              Security
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-3">
-          <CardHeader>
-            <CardTitle>
-              {activeTab === 'general' && 'General Settings'}
-              {activeTab === 'academic' && 'Academic Settings'}
-              {activeTab === 'notifications' && 'Notification Settings'}
-              {activeTab === 'security' && 'Security Settings'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activeTab === 'general' && (
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="school_name">School Name</Label>
-                    <Input
-                      id="school_name"
-                      value={settings?.school_name || ''}
-                      onChange={(e) => handleChange('school_name', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="school_code">School Code</Label>
-                    <Input
-                      id="school_code"
-                      value={settings?.school_code || ''}
-                      onChange={(e) => handleChange('school_code', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      value={settings?.phone || ''}
-                      onChange={(e) => handleChange('phone', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={settings?.email || ''}
-                      onChange={(e) => handleChange('email', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="address">Address</Label>
-                  <textarea
-                    id="address"
-                    className="w-full border rounded-md p-3"
-                    rows={3}
-                    value={settings?.address || ''}
-                    onChange={(e) => handleChange('address', e.target.value)}
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={settings?.city || ''}
-                      onChange={(e) => handleChange('city', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">State</Label>
-                    <Input
-                      id="state"
-                      value={settings?.state || ''}
-                      onChange={(e) => handleChange('state', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pincode">Pincode</Label>
-                    <Input
-                      id="pincode"
-                      value={settings?.pincode || ''}
-                      onChange={(e) => handleChange('pincode', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'academic' && (
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="current_academic_year">Current Academic Year</Label>
-                    <Input
-                      id="current_academic_year"
-                      value={settings?.current_academic_year || ''}
-                      onChange={(e) => handleChange('current_academic_year', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Input
-                      id="timezone"
-                      value={settings?.timezone || ''}
-                      onChange={(e) => handleChange('timezone', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="date_format">Date Format</Label>
-                    <select
-                      id="date_format"
-                      className="w-full border rounded-md p-2"
-                      value={settings?.date_format || 'DD/MM/YYYY'}
-                      onChange={(e) => handleChange('date_format', e.target.value)}
-                    >
-                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="time_format">Time Format</Label>
-                    <select
-                      id="time_format"
-                      className="w-full border rounded-md p-2"
-                      value={settings?.time_format || '12'}
-                      onChange={(e) => handleChange('time_format', e.target.value)}
-                    >
-                      <option value="12">12 Hour</option>
-                      <option value="24">24 Hour</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="currency">Currency</Label>
-                  <Input
-                    id="currency"
-                    value={settings?.currency || 'INR'}
-                    onChange={(e) => handleChange('currency', e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'notifications' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded">
-                  <div>
-                    <p className="font-medium">SMS Notifications</p>
-                    <p className="text-sm text-gray-500">Enable SMS notifications for important alerts</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings?.sms_enabled || false}
-                    onChange={(e) => handleChange('sms_enabled', e.target.checked)}
-                    className="h-5 w-5"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded">
-                  <div>
-                    <p className="font-medium">Email Notifications</p>
-                    <p className="text-sm text-gray-500">Enable email notifications for system updates</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings?.email_enabled || false}
-                    onChange={(e) => handleChange('email_enabled', e.target.checked)}
-                    className="h-5 w-5"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded">
-                  <div>
-                    <p className="font-medium">Push Notifications</p>
-                    <p className="text-sm text-gray-500">Enable push notifications for mobile app</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings?.push_notification_enabled || false}
-                    onChange={(e) => handleChange('push_notification_enabled', e.target.checked)}
-                    className="h-5 w-5"
-                  />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'security' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded">
-                  <div>
-                    <p className="font-medium">Late Fee Applicable</p>
-                    <p className="text-sm text-gray-500">Automatically apply late fees on overdue payments</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings?.fee_late_fee_applicable || false}
-                    onChange={(e) => handleChange('fee_late_fee_applicable', e.target.checked)}
-                    className="h-5 w-5"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="attendance_method">Attendance Method</Label>
-                  <select
-                    id="attendance_method"
-                    className="w-full border rounded-md p-2"
-                    value={settings?.attendance_method || 'all'}
-                    onChange={(e) => handleChange('attendance_method', e.target.value)}
-                  >
-                    <option value="manual">Manual Only</option>
-                    <option value="biometric">Biometric Only</option>
-                    <option value="qr">QR Code Only</option>
-                    <option value="all">All Methods</option>
-                  </select>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
-                  <p className="font-medium text-yellow-800">Security Information</p>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    For advanced security settings, please contact system administrator.
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Tabs */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'general' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <School className="h-4 w-4 inline mr-2" />
+          School Info
+        </button>
+        <button
+          onClick={() => setActiveTab('contact')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'contact' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Globe className="h-4 w-4 inline mr-2" />
+          Contact & Address
+        </button>
+        <button
+          onClick={() => setActiveTab('system')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'system' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Clock className="h-4 w-4 inline mr-2" />
+          System
+        </button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>System Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <p className="text-sm text-gray-500">School ID</p>
-              <p className="font-medium">{settings?.id}</p>
+      {/* General Tab */}
+      {activeTab === 'general' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <School className="h-5 w-5 mr-2" />
+              School Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="school_name">School Name *</Label>
+                <Input
+                  id="school_name"
+                  value={settings?.school_name || ''}
+                  onChange={(e) => handleChange('school_name', e.target.value)}
+                  placeholder="Enter school name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="school_code">School Code</Label>
+                <Input
+                  id="school_code"
+                  value={settings?.school_code || ''}
+                  onChange={(e) => handleChange('school_code', e.target.value)}
+                  placeholder="e.g., SCH001"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="school_logo_url">Logo URL</Label>
+                <Input
+                  id="school_logo_url"
+                  value={settings?.school_logo_url || ''}
+                  onChange={(e) => handleChange('school_logo_url', e.target.value)}
+                  placeholder="https://example.com/logo.png"
+                />
+              </div>
+              <div>
+                <Label htmlFor="current_academic_year">Current Academic Year</Label>
+                <Input
+                  id="current_academic_year"
+                  value={settings?.current_academic_year || ''}
+                  onChange={(e) => handleChange('current_academic_year', e.target.value)}
+                  placeholder="e.g., 2024-2025"
+                />
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Created At</p>
-              <p className="font-medium">{new Date(settings?.created_at).toLocaleDateString()}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Contact Tab */}
+      {activeTab === 'contact' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Globe className="h-5 w-5 mr-2" />
+              Contact & Address
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={settings?.phone || ''}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  placeholder="+254 712 345 678"
+                />
+              </div>
+              <div>
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={settings?.email || ''}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  placeholder="info@school.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={settings?.website || ''}
+                  onChange={(e) => handleChange('website', e.target.value)}
+                  placeholder="https://www.school.com"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={settings?.address || ''}
+                  onChange={(e) => handleChange('address', e.target.value)}
+                  placeholder="School physical address"
+                  rows={2}
+                />
+              </div>
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={settings?.city || ''}
+                  onChange={(e) => handleChange('city', e.target.value)}
+                  placeholder="Nairobi"
+                />
+              </div>
+              <div>
+                <Label htmlFor="state">County/State</Label>
+                <Input
+                  id="state"
+                  value={settings?.state || ''}
+                  onChange={(e) => handleChange('state', e.target.value)}
+                  placeholder="Nairobi County"
+                />
+              </div>
+              <div>
+                <Label htmlFor="pincode">Postal Code</Label>
+                <Input
+                  id="pincode"
+                  value={settings?.pincode || ''}
+                  onChange={(e) => handleChange('pincode', e.target.value)}
+                  placeholder="00100"
+                />
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Last Updated</p>
-              <p className="font-medium">{new Date(settings?.updated_at).toLocaleDateString()}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* System Tab */}
+      {activeTab === 'system' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Clock className="h-5 w-5 mr-2" />
+              System Preferences
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="timezone">Timezone</Label>
+                <Select
+                  id="timezone"
+                  value={settings?.timezone || 'Africa/Nairobi'}
+                  onChange={(e) => handleChange('timezone', e.target.value)}
+                >
+                  <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
+                  <option value="Africa/Lagos">Africa/Lagos (WAT)</option>
+                  <option value="Africa/Johannesburg">Africa/Johannesburg (SAST)</option>
+                  <option value="UTC">UTC</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="currency">Currency</Label>
+                <Select
+                  id="currency"
+                  value={settings?.currency || 'KES'}
+                  onChange={(e) => handleChange('currency', e.target.value)}
+                >
+                  <option value="KES">KES - Kenyan Shilling</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="GBP">GBP - British Pound</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="UGX">UGX - Ugandan Shilling</option>
+                  <option value="TZS">TZS - Tanzanian Shilling</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="date_format">Date Format</Label>
+                <Select
+                  id="date_format"
+                  value={settings?.date_format || 'DD/MM/YYYY'}
+                  onChange={(e) => handleChange('date_format', e.target.value)}
+                >
+                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="time_format">Time Format</Label>
+                <Select
+                  id="time_format"
+                  value={settings?.time_format || '12h'}
+                  onChange={(e) => handleChange('time_format', e.target.value)}
+                >
+                  <option value="12h">12 Hour (AM/PM)</option>
+                  <option value="24h">24 Hour</option>
+                </Select>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

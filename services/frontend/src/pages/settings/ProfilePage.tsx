@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Phone, MapPin, Lock, Shield } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Lock, Shield, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/authStore';
-import { ChangePasswordModal } from '@/components/modals/ChangePasswordModal';
 import api from '@/services/api';
 
 export function ProfilePage() {
@@ -13,38 +13,26 @@ export function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [profileData, setProfileData] = useState<any>(null);
   const [formData, setFormData] = useState({
     email: user?.email || '',
     phone: '',
     address: '',
   });
 
-  useEffect(() => {
-    loadProfile();
-  }, [user]);
-
-  const loadProfile = async () => {
-    try {
-      // Try to load additional profile data based on role
-      if (user?.role === 'student') {
-        // Get student profile
-      } else if (user?.role === 'teacher') {
-        // Get teacher profile
-      } else if (user?.role === 'parent') {
-        // Get parent profile
-      }
-      // For now, use the user data from auth store
-      setProfileData(user);
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    }
-  };
+  // Password change state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<any>({});
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      // Update profile with real endpoint when available
       await api.updateUser(user?.id || '', formData);
       alert('Profile updated successfully!');
       setEditing(false);
@@ -53,6 +41,58 @@ export function ProfilePage() {
       alert(error?.message || 'Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate
+    const errors: any = {};
+    
+    if (!passwordData.currentPassword) {
+      errors.currentPassword = 'Current password is required';
+    }
+    
+    if (!passwordData.newPassword) {
+      errors.newPassword = 'New password is required';
+    } else if (passwordData.newPassword.length < 6) {
+      errors.newPassword = 'Password must be at least 6 characters';
+    }
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      errors.newPassword = 'New password must be different from current password';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setPasswordErrors(errors);
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      
+      alert('Password changed successfully!');
+      setShowPasswordModal(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordErrors({});
+    } catch (error: any) {
+      console.error('Change password error:', error);
+      if (error?.message?.toLowerCase().includes('incorrect')) {
+        setPasswordErrors({ currentPassword: 'Current password is incorrect' });
+      } else {
+        alert(error?.message || 'Failed to change password');
+      }
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -188,7 +228,7 @@ export function ProfilePage() {
                   <Lock className="h-5 w-5 text-gray-400 mr-3" />
                   <div>
                     <p className="font-medium">Password</p>
-                    <p className="text-sm text-gray-500">Last changed: Unknown</p>
+                    <p className="text-sm text-gray-500">Keep your account secure</p>
                   </div>
                 </div>
               </div>
@@ -218,10 +258,109 @@ export function ProfilePage() {
       </div>
 
       {/* Change Password Modal */}
-      <ChangePasswordModal
-        open={showPasswordModal}
-        onOpenChange={setShowPasswordModal}
-      />
+      <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Lock className="h-5 w-5 mr-2 text-blue-600" />
+              Change Password
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handlePasswordChange} className="space-y-4 py-4">
+            {/* Current Password */}
+            <div>
+              <Label htmlFor="currentPassword">Current Password</Label>
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={passwordData.currentPassword}
+                  onChange={(e) => {
+                    setPasswordData({...passwordData, currentPassword: e.target.value});
+                    setPasswordErrors({...passwordErrors, currentPassword: null});
+                  }}
+                  className={passwordErrors.currentPassword ? 'border-red-500' : ''}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordErrors.currentPassword && (
+                <p className="text-sm text-red-500 mt-1">{passwordErrors.currentPassword}</p>
+              )}
+            </div>
+
+            {/* New Password */}
+            <div>
+              <Label htmlFor="newPassword">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={passwordData.newPassword}
+                  onChange={(e) => {
+                    setPasswordData({...passwordData, newPassword: e.target.value});
+                    setPasswordErrors({...passwordErrors, newPassword: null});
+                  }}
+                  className={passwordErrors.newPassword ? 'border-red-500' : ''}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordErrors.newPassword && (
+                <p className="text-sm text-red-500 mt-1">{passwordErrors.newPassword}</p>
+              )}
+              {passwordData.newPassword && passwordData.newPassword.length >= 6 && (
+                <p className="text-sm text-green-600 mt-1 flex items-center">
+                  <CheckCircle className="h-3 w-3 mr-1" /> Password strength: Good
+                </p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => {
+                  setPasswordData({...passwordData, confirmPassword: e.target.value});
+                  setPasswordErrors({...passwordErrors, confirmPassword: null});
+                }}
+                className={passwordErrors.confirmPassword ? 'border-red-500' : ''}
+              />
+              {passwordErrors.confirmPassword && (
+                <p className="text-sm text-red-500 mt-1">{passwordErrors.confirmPassword}</p>
+              )}
+              {passwordData.confirmPassword && passwordData.newPassword === passwordData.confirmPassword && (
+                <p className="text-sm text-green-600 mt-1 flex items-center">
+                  <CheckCircle className="h-3 w-3 mr-1" /> Passwords match
+                </p>
+              )}
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowPasswordModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={changingPassword}>
+                {changingPassword ? 'Changing...' : 'Change Password'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

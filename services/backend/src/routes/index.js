@@ -18,6 +18,7 @@ import assignmentRoutes from './assignmentRoutes.js';
 import gradebookRoutes from './gradebookRoutes.js';
 import messageRoutes from './simpleMessageRoutes.js';
 import passwordRoutes from './passwordRoutes.js';
+import libraryRoutes from './libraryRoutes.js';   // <-- FIXED (ESM import)
 
 const router = express.Router();
 
@@ -41,13 +42,6 @@ router.use('/assignments', assignmentRoutes);
 router.use('/gradebook', gradebookRoutes);
 router.use('/messages', messageRoutes);
 router.use('/password', passwordRoutes);
+router.use('/library', libraryRoutes);  // <-- KEEP ONLY ONE
 
 export default router;
-
-// Library routes
-const libraryRoutes = require('./libraryRoutes');
-router.use('/library', libraryRoutes);
-
-// Library routes
-const libraryRoutes = require('./libraryRoutes');
-router.use('/library', libraryRoutes);

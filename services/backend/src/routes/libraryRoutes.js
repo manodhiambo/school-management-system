@@ -1,6 +1,6 @@
 import express from 'express';
 import libraryController from '../controllers/libraryController.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

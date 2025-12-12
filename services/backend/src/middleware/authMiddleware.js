@@ -7,21 +7,19 @@ import logger from '../utils/logger.js';
 export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new ApiError(401, 'No token provided');
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     if (!token) {
       throw new ApiError(401, 'No token provided');
     }
 
-    // Verify token
     const decoded = jwt.verify(token, config.jwt.secret);
-    
-    // Get user from database
+
     const users = await query(
       'SELECT id, email, role, is_active, is_verified FROM users WHERE id = $1',
       [decoded.userId]
@@ -37,7 +35,6 @@ export const authenticate = async (req, res, next) => {
       throw new ApiError(401, 'Account is deactivated');
     }
 
-    // Attach user to request
     req.user = {
       id: user.id,
       email: user.email,
@@ -63,19 +60,19 @@ export const authenticate = async (req, res, next) => {
 export const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     if (!token) {
       return next();
     }
 
     const decoded = jwt.verify(token, config.jwt.secret);
-    
+
     const users = await query(
       'SELECT id, email, role, is_active FROM users WHERE id = $1',
       [decoded.userId]
@@ -92,9 +89,21 @@ export const optionalAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
-    // Token invalid, but that's okay for optional auth
     next();
   }
 };
 
-export default { authenticate, optionalAuth };
+/**
+ * ROLE-BASED AUTHORIZATION
+ * authorize(['admin', 'teacher'])
+ */
+export const authorize = (roles = []) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return next(new ApiError(403, 'Access denied'));
+    }
+    next();
+  };
+};
+
+export default { authenticate, optionalAuth, authorize };

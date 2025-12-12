@@ -190,31 +190,6 @@ const navigationItems = [
   {
     name: 'Library Catalog',
     href: '/app/library',
-    icon: BookOpen,
-    roles: ['admin', 'teacher', 'student', 'parent']
-  },
-  {
-    name: 'My Borrowed Books',
-    href: '/app/my-books',
-    icon: BookOpen,
-    roles: ['teacher', 'student']
-  },
-  {
-    name: 'Library Management',
-    href: '/app/library-management',
-    icon: BookOpen,
-    roles: ['admin']
-  },
-  {
-    name: 'Issue/Return Books',
-    href: '/app/library-borrowings',
-    icon: BookOpen,
-    roles: ['admin', 'teacher']
-  },
-  // Library routes
-  {
-    name: 'Library Catalog',
-    href: '/app/library',
     icon: Library,
     roles: ['admin', 'teacher', 'student', 'parent']
   },

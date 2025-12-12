@@ -43,3 +43,11 @@ router.use('/messages', messageRoutes);
 router.use('/password', passwordRoutes);
 
 export default router;
+
+// Library routes
+const libraryRoutes = require('./libraryRoutes');
+router.use('/library', libraryRoutes);
+
+// Library routes
+const libraryRoutes = require('./libraryRoutes');
+router.use('/library', libraryRoutes);

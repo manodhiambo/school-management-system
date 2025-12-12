@@ -46,12 +46,6 @@ import { MyBorrowingsPage } from './pages/library/MyBorrowingsPage';
 import { LibraryManagementPage } from './pages/library/LibraryManagementPage';
 import { BorrowingsPage } from './pages/library/BorrowingsPage';
 
-// Library Pages
-import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
-import { MyBorrowingsPage } from './pages/library/MyBorrowingsPage';
-import { LibraryManagementPage } from './pages/library/LibraryManagementPage';
-import { BorrowingsPage } from './pages/library/BorrowingsPage';
-
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
@@ -120,12 +114,6 @@ function App() {
               <Route path="gradebook" element={<GradeBookPage />} />
               
               {/* Shared Routes */}
-
-              {/* Library Routes */}
-              <Route path="library" element={<LibraryCatalogPage />} />
-              <Route path="my-books" element={<MyBorrowingsPage />} />
-              <Route path="library-management" element={<LibraryManagementPage />} />
-              <Route path="library-borrowings" element={<BorrowingsPage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />

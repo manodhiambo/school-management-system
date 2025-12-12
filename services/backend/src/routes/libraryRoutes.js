@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import libraryController from '../controllers/libraryController.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+
 const router = express.Router();
-const libraryController = require('../controllers/libraryController');
-const { authenticate, authorize } = require('../middleware/auth');
 
 // Public routes (authenticated users)
 router.use(authenticate);
@@ -25,4 +26,4 @@ router.put('/return/:id', authorize(['admin', 'teacher']), libraryController.ret
 router.get('/borrowings', authorize(['admin', 'teacher']), libraryController.getAllBorrowings);
 router.get('/statistics', authorize(['admin', 'teacher']), libraryController.getStatistics);
 
-module.exports = router;
+export default router;

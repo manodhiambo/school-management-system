@@ -1,8 +1,8 @@
-const pool = require('../config/database');
-const logger = require('../utils/logger');
+import pool from '../config/database.js';
+import logger from '../utils/logger.js';
 
 // Get all books with filters
-exports.getBooks = async (req, res) => {
+export const getBooks = async (req, res) => {
   try {
     const { 
       search, category, author, available, 
@@ -68,8 +68,7 @@ exports.getBooks = async (req, res) => {
   }
 };
 
-// Get single book
-exports.getBook = async (req, res) => {
+export const getBook = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -88,8 +87,7 @@ exports.getBook = async (req, res) => {
   }
 };
 
-// Add new book
-exports.addBook = async (req, res) => {
+export const addBook = async (req, res) => {
   try {
     const {
       isbn, title, subtitle, author, co_authors, publisher,
@@ -122,8 +120,7 @@ exports.addBook = async (req, res) => {
   }
 };
 
-// Update book
-exports.updateBook = async (req, res) => {
+export const updateBook = async (req, res) => {
   try {
     const { id } = req.params;
     const fields = req.body;
@@ -151,8 +148,7 @@ exports.updateBook = async (req, res) => {
   }
 };
 
-// Delete book
-exports.deleteBook = async (req, res) => {
+export const deleteBook = async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query(
@@ -167,8 +163,7 @@ exports.deleteBook = async (req, res) => {
   }
 };
 
-// Get library member
-exports.getMember = async (req, res) => {
+export const getMember = async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -185,8 +180,7 @@ exports.getMember = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      // Auto-create member
-      return await exports.createMemberAuto(req, res);
+      return await createMemberAuto(req, res);
     }
 
     res.json({ success: true, data: result.rows[0] });
@@ -196,8 +190,7 @@ exports.getMember = async (req, res) => {
   }
 };
 
-// Auto-create library member
-exports.createMemberAuto = async (req, res) => {
+export const createMemberAuto = async (req, res) => {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
@@ -238,8 +231,7 @@ exports.createMemberAuto = async (req, res) => {
   }
 };
 
-// Issue book
-exports.issueBook = async (req, res) => {
+export const issueBook = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -247,7 +239,6 @@ exports.issueBook = async (req, res) => {
     const { book_id, member_id, due_date } = req.body;
     const userId = req.user.id;
 
-    // Check book availability
     const book = await client.query(
       'SELECT * FROM library_books WHERE id = $1 AND available_copies > 0',
       [book_id]
@@ -261,7 +252,6 @@ exports.issueBook = async (req, res) => {
       throw new Error('This is a reference book and cannot be borrowed');
     }
 
-    // Check member limits
     const member = await client.query(
       'SELECT * FROM library_members WHERE id = $1 AND status = $2',
       [member_id, 'active']
@@ -284,7 +274,6 @@ exports.issueBook = async (req, res) => {
       throw new Error('Member has reached maximum borrowing limit');
     }
 
-    // Issue book
     const borrowing = await client.query(
       `INSERT INTO library_borrowings (
         book_id, member_id, due_date, issued_by
@@ -292,7 +281,6 @@ exports.issueBook = async (req, res) => {
       [book_id, member_id, due_date, userId]
     );
 
-    // Update book availability
     await client.query(
       'UPDATE library_books SET available_copies = available_copies - 1 WHERE id = $1',
       [book_id]
@@ -310,8 +298,7 @@ exports.issueBook = async (req, res) => {
   }
 };
 
-// Return book
-exports.returnBook = async (req, res) => {
+export const returnBook = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -334,15 +321,12 @@ exports.returnBook = async (req, res) => {
     const today = new Date();
     
     let fineAmount = 0;
-    let status = 'returned';
 
-    // Calculate fine for overdue
     if (today > dueDate) {
       const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
-      fineAmount = daysOverdue * 10; // KES 10 per day
+      fineAmount = daysOverdue * 10;
     }
 
-    // Update borrowing
     await client.query(
       `UPDATE library_borrowings SET 
         return_date = CURRENT_DATE,
@@ -353,16 +337,14 @@ exports.returnBook = async (req, res) => {
         returned_to = $5,
         updated_at = CURRENT_TIMESTAMP
        WHERE id = $6`,
-      [status, condition_on_return, fineAmount, remarks, userId, id]
+      ['returned', condition_on_return, fineAmount, remarks, userId, id]
     );
 
-    // Update book availability
     await client.query(
       'UPDATE library_books SET available_copies = available_copies + 1 WHERE id = $1',
       [bookId]
     );
 
-    // Create fine record if applicable
     if (fineAmount > 0) {
       await client.query(
         `INSERT INTO library_fines (
@@ -384,8 +366,7 @@ exports.returnBook = async (req, res) => {
   }
 };
 
-// Get my borrowings
-exports.getMyBorrowings = async (req, res) => {
+export const getMyBorrowings = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -414,8 +395,7 @@ exports.getMyBorrowings = async (req, res) => {
   }
 };
 
-// Get all borrowings (admin/librarian)
-exports.getAllBorrowings = async (req, res) => {
+export const getAllBorrowings = async (req, res) => {
   try {
     const { status, page = 1, limit = 50 } = req.query;
 
@@ -454,8 +434,7 @@ exports.getAllBorrowings = async (req, res) => {
   }
 };
 
-// Get library statistics
-exports.getStatistics = async (req, res) => {
+export const getStatistics = async (req, res) => {
   try {
     const stats = await pool.query(`
       SELECT 
@@ -475,8 +454,7 @@ exports.getStatistics = async (req, res) => {
   }
 };
 
-// Get book categories
-exports.getCategories = async (req, res) => {
+export const getCategories = async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT category, COUNT(*) as count

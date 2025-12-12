@@ -122,7 +122,7 @@ const navigationItems = [
     name: 'My Fees', 
     href: '/app/my-fees', 
     icon: DollarSign, 
-    roles: ['student', 'parent'] 
+    roles: ['student'] 
   },
   { 
     name: 'My Timetable', 
@@ -140,7 +140,7 @@ const navigationItems = [
     name: 'Messages', 
     href: '/app/messages', 
     icon: MessageSquare, 
-    roles: ['student', 'parent'] 
+    roles: ['student'] 
   },
   
   // Parent routes

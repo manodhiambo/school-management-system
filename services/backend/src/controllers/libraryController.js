@@ -9,10 +9,7 @@ export const getBooks = async (req, res) => {
       page = 1, limit = 20 
     } = req.query;
 
-    let sql = `
-      SELECT * FROM library_books 
-      WHERE is_active = TRUE
-    `;
+    let sql = `SELECT * FROM library_books WHERE is_active = TRUE`;
     const params = [];
 
     if (search) {
@@ -34,21 +31,24 @@ export const getBooks = async (req, res) => {
       sql += ` AND available_copies > 0`;
     }
 
-    sql += ` ORDER BY title ASC LIMIT ? OFFSET ?`;
-    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
+    sql += ` ORDER BY title ASC`;
 
-    const books = await query(sql, params);
-
-    // Get total count
-    const countResult = await query('SELECT COUNT(*) as count FROM library_books WHERE is_active = TRUE');
+    // Get all books first
+    const allBooks = await query(sql, params);
+    
+    // Manual pagination
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 20;
+    const offset = (pageNum - 1) * limitNum;
+    const paginatedBooks = allBooks.slice(offset, offset + limitNum);
 
     res.json({
       success: true,
-      data: books,
+      data: paginatedBooks,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(countResult[0].count)
+        page: pageNum,
+        limit: limitNum,
+        total: allBooks.length
       }
     });
   } catch (error) {
@@ -91,10 +91,10 @@ export const addBook = async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *`,
       [
-        isbn, title, subtitle, author, co_authors, publisher,
-        edition, publication_year, language, pages, category,
-        sub_category, description, cover_image_url, location,
-        total_copies, total_copies, price, condition, is_reference_only
+        isbn || null, title, subtitle || null, author, co_authors || null, publisher || null,
+        edition || null, publication_year || null, language || 'English', pages || null, category || null,
+        sub_category || null, description || null, cover_image_url || null, location || null,
+        total_copies || 1, total_copies || 1, price || null, condition || 'good', is_reference_only || false
       ]
     );
 
@@ -365,7 +365,7 @@ export const getMyBorrowings = async (req, res) => {
 
 export const getAllBorrowings = async (req, res) => {
   try {
-    const { status, page = 1, limit = 50 } = req.query;
+    const { status } = req.query;
 
     let sql = `
       SELECT lb.*, lbk.title, lbk.author, lbk.isbn,
@@ -387,8 +387,7 @@ export const getAllBorrowings = async (req, res) => {
       params.push(status);
     }
 
-    sql += ` ORDER BY lb.issue_date DESC LIMIT ? OFFSET ?`;
-    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
+    sql += ` ORDER BY lb.issue_date DESC`;
 
     const result = await query(sql, params);
 
@@ -404,8 +403,8 @@ export const getStatistics = async (req, res) => {
     const stats = await query(`
       SELECT 
         (SELECT COUNT(*) FROM library_books WHERE is_active = TRUE) as total_books,
-        (SELECT SUM(total_copies) FROM library_books WHERE is_active = TRUE) as total_copies,
-        (SELECT SUM(available_copies) FROM library_books WHERE is_active = TRUE) as available_copies,
+        (SELECT COALESCE(SUM(total_copies), 0) FROM library_books WHERE is_active = TRUE) as total_copies,
+        (SELECT COALESCE(SUM(available_copies), 0) FROM library_books WHERE is_active = TRUE) as available_copies,
         (SELECT COUNT(*) FROM library_members WHERE status = 'active') as active_members,
         (SELECT COUNT(*) FROM library_borrowings WHERE status = 'issued') as books_issued,
         (SELECT COUNT(*) FROM library_borrowings WHERE status = 'overdue') as overdue_books,

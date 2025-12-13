@@ -185,6 +185,12 @@ const navigationItems = [
   },
   
   // Profile (all roles)
+  {
+    name: 'Library Members',
+    href: '/app/library-members',
+    icon: Users,
+    roles: ['admin']
+  },
 
   // Library routes
   {

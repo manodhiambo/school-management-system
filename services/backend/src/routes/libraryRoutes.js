@@ -4,17 +4,24 @@ import { authenticate, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Public routes (authenticated users)
 router.use(authenticate);
 
 // Books catalog
 router.get('/books', libraryController.getBooks);
 router.get('/books/:id', libraryController.getBook);
 router.get('/categories', libraryController.getCategories);
+router.get('/barcode/:barcode', libraryController.searchByBarcode);
 
 // Member routes
 router.get('/member', libraryController.getMember);
 router.get('/my-borrowings', libraryController.getMyBorrowings);
+
+// Members management (admin only)
+router.get('/members', authorize(['admin']), libraryController.getAllMembers);
+router.get('/users-without-membership', authorize(['admin']), libraryController.getUsersWithoutMembership);
+router.post('/members', authorize(['admin']), libraryController.createMember);
+router.put('/members/:id', authorize(['admin']), libraryController.updateMember);
+router.delete('/members/:id', authorize(['admin']), libraryController.deleteMember);
 
 // Admin/Librarian only routes
 router.post('/books', authorize(['admin']), libraryController.addBook);

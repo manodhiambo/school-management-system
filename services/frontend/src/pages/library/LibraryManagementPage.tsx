@@ -1,84 +1,242 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Book, Plus, BookOpen, Users, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Book, Plus, Edit, Trash2, BookOpen, Users, AlertCircle, Search, Scan, Upload, X } from 'lucide-react';
 import libraryAPI from '@/services/library-api';
 
 export function LibraryManagementPage() {
   const [books, setBooks] = useState<any[]>([]);
+  const [filteredBooks, setFilteredBooks] = useState<any[]>([]);
   const [statistics, setStatistics] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [editingBook, setEditingBook] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [barcodeInput, setBarcodeInput] = useState('');
+  
+  const [formData, setFormData] = useState({
+    isbn: '',
+    title: '',
+    subtitle: '',
+    author: '',
+    co_authors: '',
+    publisher: '',
+    edition: '',
+    publication_year: '',
+    language: 'English',
+    pages: '',
+    category: '',
+    sub_category: '',
+    description: '',
+    cover_image_url: '',
+    location: '',
+    total_copies: 1,
+    price: '',
+    condition: 'good',
+    is_reference_only: false
+  });
 
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    filterBooks();
+  }, [searchTerm, filterCategory, books]);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      setDebugInfo('Starting to load data...');
       
-      console.log('=== LOADING LIBRARY DATA ===');
-      
-      const booksRes = await libraryAPI.getBooks({ limit: 100 });
-      console.log('RAW books response:', booksRes);
-      console.log('Response type:', typeof booksRes);
-      console.log('Response keys:', Object.keys(booksRes || {}));
-      
-      // Try different ways to extract the data
-      let booksData = null;
-      
-      if (booksRes?.data?.data) {
-        booksData = booksRes.data.data;
-        setDebugInfo(`Found data at: response.data.data (${booksData.length} books)`);
-      } else if (booksRes?.data) {
-        booksData = booksRes.data;
-        setDebugInfo(`Found data at: response.data (${Array.isArray(booksData) ? booksData.length : 'not array'} books)`);
-      } else if (Array.isArray(booksRes)) {
-        booksData = booksRes;
-        setDebugInfo(`Response is directly an array (${booksData.length} books)`);
-      } else {
-        setDebugInfo(`Could not find books array. Response structure: ${JSON.stringify(Object.keys(booksRes || {}))}`);
-      }
-      
-      console.log('Extracted books data:', booksData);
-      console.log('Is array?', Array.isArray(booksData));
-      console.log('Length:', booksData?.length);
-      
-      if (Array.isArray(booksData)) {
-        console.log('First book:', booksData[0]);
-        setBooks(booksData);
-      } else {
-        console.error('Books data is not an array!', booksData);
-        setBooks([]);
-      }
+      const [booksRes, statsRes, catsRes] = await Promise.all([
+        libraryAPI.getBooks({ limit: 1000 }),
+        libraryAPI.getStatistics(),
+        libraryAPI.getCategories()
+      ]);
 
-      // Load stats
-      const statsRes = await libraryAPI.getStatistics();
-      console.log('Stats response:', statsRes);
-      const statsData = statsRes?.data?.data || statsRes?.data;
+      const booksData = booksRes?.data?.data || booksRes?.data || [];
+      const statsData = statsRes?.data?.data || statsRes?.data || null;
+      const catsData = catsRes?.data?.data || catsRes?.data || [];
+
+      setBooks(Array.isArray(booksData) ? booksData : []);
       setStatistics(statsData);
-      
+      setCategories(Array.isArray(catsData) ? catsData : []);
     } catch (error: any) {
-      console.error('=== ERROR LOADING DATA ===');
-      console.error('Error object:', error);
-      console.error('Error message:', error?.message);
-      console.error('Error response:', error?.response);
-      setDebugInfo(`ERROR: ${error?.message || 'Unknown error'}`);
-      alert('Failed to load library data. Check console for details.');
+      console.error('Error loading library data:', error);
+      alert('Failed to load library data');
     } finally {
       setLoading(false);
     }
   };
 
+  const filterBooks = () => {
+    let filtered = [...books];
+
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(book => 
+        book.title?.toLowerCase().includes(search) ||
+        book.author?.toLowerCase().includes(search) ||
+        book.isbn?.toLowerCase().includes(search) ||
+        book.category?.toLowerCase().includes(search)
+      );
+    }
+
+    if (filterCategory) {
+      filtered = filtered.filter(book => book.category === filterCategory);
+    }
+
+    setFilteredBooks(filtered);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingBook) {
+        await libraryAPI.updateBook(editingBook.id, formData);
+        alert('Book updated successfully!');
+      } else {
+        await libraryAPI.addBook(formData);
+        alert('Book added successfully!');
+      }
+      
+      setShowAddModal(false);
+      setEditingBook(null);
+      resetForm();
+      await loadData();
+    } catch (error: any) {
+      console.error('Error saving book:', error);
+      alert(error?.response?.data?.message || error?.message || 'Failed to save book');
+    }
+  };
+
+  const handleEdit = (book: any) => {
+    setEditingBook(book);
+    setFormData({
+      isbn: book.isbn || '',
+      title: book.title || '',
+      subtitle: book.subtitle || '',
+      author: book.author || '',
+      co_authors: book.co_authors || '',
+      publisher: book.publisher || '',
+      edition: book.edition || '',
+      publication_year: book.publication_year || '',
+      language: book.language || 'English',
+      pages: book.pages || '',
+      category: book.category || '',
+      sub_category: book.sub_category || '',
+      description: book.description || '',
+      cover_image_url: book.cover_image_url || '',
+      location: book.location || '',
+      total_copies: book.total_copies || 1,
+      price: book.price || '',
+      condition: book.condition || 'good',
+      is_reference_only: book.is_reference_only || false
+    });
+    setShowAddModal(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this book?')) return;
+    
+    try {
+      await libraryAPI.deleteBook(id);
+      alert('Book deleted successfully!');
+      await loadData();
+    } catch (error: any) {
+      console.error('Error deleting book:', error);
+      alert('Failed to delete book');
+    }
+  };
+
+  const handleBarcodeSearch = async () => {
+    if (!barcodeInput.trim()) {
+      alert('Please enter a barcode or ISBN');
+      return;
+    }
+
+    try {
+      const response = await libraryAPI.searchByBarcode(barcodeInput);
+      const book = response?.data?.data || response?.data;
+      
+      if (book) {
+        handleEdit(book);
+        setShowBarcodeModal(false);
+        setBarcodeInput('');
+      } else {
+        // Book not found, pre-fill ISBN for new book
+        resetForm();
+        setFormData(prev => ({ ...prev, isbn: barcodeInput }));
+        setShowBarcodeModal(false);
+        setShowAddModal(true);
+        setBarcodeInput('');
+      }
+    } catch (error: any) {
+      console.error('Barcode search error:', error);
+      // If not found, offer to add new book with this ISBN
+      if (confirm('Book not found. Would you like to add it?')) {
+        resetForm();
+        setFormData(prev => ({ ...prev, isbn: barcodeInput }));
+        setShowBarcodeModal(false);
+        setShowAddModal(true);
+      }
+      setBarcodeInput('');
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // For now, we'll just use a placeholder. In production, you'd upload to S3/Cloudinary
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, cover_image_url: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      isbn: '',
+      title: '',
+      subtitle: '',
+      author: '',
+      co_authors: '',
+      publisher: '',
+      edition: '',
+      publication_year: '',
+      language: 'English',
+      pages: '',
+      category: '',
+      sub_category: '',
+      description: '',
+      cover_image_url: '',
+      location: '',
+      total_copies: 1,
+      price: '',
+      condition: 'good',
+      is_reference_only: false
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading library data...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -90,13 +248,22 @@ export function LibraryManagementPage() {
           <h2 className="text-3xl font-bold">Library Management</h2>
           <p className="text-gray-500">Manage books, borrowings, and library operations</p>
         </div>
-        <Button onClick={() => alert('Add book modal - coming soon')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Book
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setShowBarcodeModal(true)}
+          >
+            <Scan className="h-4 w-4 mr-2" />
+            Scan Barcode
+          </Button>
+          <Button onClick={() => { resetForm(); setEditingBook(null); setShowAddModal(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Book
+          </Button>
+        </div>
       </div>
 
-      {/* Statistics */}
+      {/* Statistics Cards */}
       {statistics && (
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
@@ -147,81 +314,422 @@ export function LibraryManagementPage() {
         </div>
       )}
 
-      {/* Debug Info - PROMINENT */}
-      <Card className="border-4 border-blue-500 bg-blue-50">
+      {/* Search and Filter */}
+      <Card>
         <CardContent className="pt-6">
-          <h3 className="font-bold text-lg mb-2">🔍 DEBUG INFO</h3>
-          <div className="space-y-1 font-mono text-sm">
-            <p><strong>Books loaded:</strong> {books.length}</p>
-            <p><strong>Books is array:</strong> {Array.isArray(books) ? '✅ YES' : '❌ NO'}</p>
-            <p><strong>Books type:</strong> {typeof books}</p>
-            <p><strong>Debug message:</strong> {debugInfo}</p>
-            {books.length > 0 && (
-              <p><strong>First book title:</strong> {books[0]?.title || 'N/A'}</p>
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by title, author, ISBN..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="px-4 py-2 border rounded-md"
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat) => (
+                <option key={cat.category} value={cat.category}>
+                  {cat.category} ({cat.count})
+                </option>
+              ))}
+            </select>
+            {(searchTerm || filterCategory) && (
+              <Button 
+                variant="outline" 
+                onClick={() => { setSearchTerm(''); setFilterCategory(''); }}
+              >
+                Clear
+              </Button>
             )}
           </div>
-          <Button onClick={loadData} className="mt-4" size="sm">🔄 Reload Data</Button>
         </CardContent>
       </Card>
 
       {/* Books Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Books Inventory ({books.length} books)</CardTitle>
+          <CardTitle>Books Inventory ({filteredBooks.length} books)</CardTitle>
         </CardHeader>
         <CardContent>
-          {books.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">Title</th>
-                    <th className="text-left py-3 px-4">Author</th>
-                    <th className="text-left py-3 px-4">Category</th>
-                    <th className="text-center py-3 px-4">Available/Total</th>
-                    <th className="text-left py-3 px-4">Location</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {books.map((book, index) => (
-                    <tr key={book.id || index} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <div>
-                          <p className="font-medium">{book.title || 'No title'}</p>
-                          {book.subtitle && (
-                            <p className="text-sm text-gray-500">{book.subtitle}</p>
-                          )}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4">Cover</th>
+                  <th className="text-left py-3 px-4">Title</th>
+                  <th className="text-left py-3 px-4">Author</th>
+                  <th className="text-left py-3 px-4">Category</th>
+                  <th className="text-left py-3 px-4">ISBN</th>
+                  <th className="text-center py-3 px-4">Available/Total</th>
+                  <th className="text-left py-3 px-4">Location</th>
+                  <th className="text-right py-3 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBooks.map((book) => (
+                  <tr key={book.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4">
+                      {book.cover_image_url ? (
+                        <img 
+                          src={book.cover_image_url} 
+                          alt={book.title}
+                          className="h-12 w-8 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="h-12 w-8 bg-gray-200 rounded flex items-center justify-center">
+                          <Book className="h-4 w-4 text-gray-400" />
                         </div>
-                      </td>
-                      <td className="py-3 px-4">{book.author || 'Unknown'}</td>
-                      <td className="py-3 px-4">
-                        {book.category ? (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                            {book.category}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`font-medium ${(book.available_copies || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {book.available_copies || 0} / {book.total_copies || 0}
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div>
+                        <p className="font-medium">{book.title}</p>
+                        {book.subtitle && (
+                          <p className="text-sm text-gray-500">{book.subtitle}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">{book.author}</td>
+                    <td className="py-3 px-4">
+                      {book.category && (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                          {book.category}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm">{book.location || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">{book.isbn || '-'}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`font-medium ${book.available_copies > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {book.available_copies || 0} / {book.total_copies || 0}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-sm">{book.location || '-'}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(book)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(book.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredBooks.length === 0 && (
             <div className="text-center py-12">
               <Book className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 font-bold">No books found!</p>
-              <p className="text-sm text-gray-400 mt-2">Database has 8 books but they're not displaying</p>
-              <p className="text-xs text-red-600 mt-2">Check the debug info above and browser console</p>
+              <p className="text-gray-500">No books found</p>
+              <p className="text-sm text-gray-400 mt-1">
+                {searchTerm || filterCategory ? 'Try adjusting your filters' : 'Click "Add Book" to get started'}
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Barcode Scanner Modal */}
+      <Dialog open={showBarcodeModal} onOpenChange={setShowBarcodeModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scan className="h-5 w-5" />
+              Scan Barcode or ISBN
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="barcode">Enter Barcode/ISBN</Label>
+              <Input
+                id="barcode"
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                placeholder="Scan or type barcode..."
+                autoFocus
+                onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSearch()}
+              />
+              <p className="text-xs text-gray-500">
+                Use a barcode scanner or type the ISBN manually
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBarcodeModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBarcodeSearch}>
+              Search
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Book Modal */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingBook ? 'Edit Book' : 'Add New Book'}</DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Book Cover Upload */}
+            <div className="flex gap-4 items-start">
+              <div className="flex-shrink-0">
+                {formData.cover_image_url ? (
+                  <div className="relative">
+                    <img 
+                      src={formData.cover_image_url} 
+                      alt="Book cover"
+                      className="h-48 w-32 object-cover rounded border"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="absolute top-1 right-1"
+                      onClick={() => setFormData({...formData, cover_image_url: ''})}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="h-48 w-32 border-2 border-dashed rounded flex flex-col items-center justify-center bg-gray-50">
+                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                    <p className="text-xs text-gray-500 text-center px-2">Upload Cover</p>
+                  </div>
+                )}
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="mt-2"
+                />
+              </div>
+
+              {/* Basic Info */}
+              <div className="flex-1 grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title *</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="subtitle">Subtitle</Label>
+                  <Input
+                    id="subtitle"
+                    value={formData.subtitle}
+                    onChange={(e) => setFormData({...formData, subtitle: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="author">Author *</Label>
+                  <Input
+                    id="author"
+                    value={formData.author}
+                    onChange={(e) => setFormData({...formData, author: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="isbn">ISBN</Label>
+                  <Input
+                    id="isbn"
+                    value={formData.isbn}
+                    onChange={(e) => setFormData({...formData, isbn: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Info */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="publisher">Publisher</Label>
+                <Input
+                  id="publisher"
+                  value={formData.publisher}
+                  onChange={(e) => setFormData({...formData, publisher: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edition">Edition</Label>
+                <Input
+                  id="edition"
+                  value={formData.edition}
+                  onChange={(e) => setFormData({...formData, edition: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="publication_year">Publication Year</Label>
+                <Input
+                  id="publication_year"
+                  type="number"
+                  value={formData.publication_year}
+                  onChange={(e) => setFormData({...formData, publication_year: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="language">Language</Label>
+                <Input
+                  id="language"
+                  value={formData.language}
+                  onChange={(e) => setFormData({...formData, language: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pages">Pages</Label>
+                <Input
+                  id="pages"
+                  type="number"
+                  value={formData.pages}
+                  onChange={(e) => setFormData({...formData, pages: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <select
+                  id="category"
+                  value={formData.category}
+                  onChange={(e) => setFormData({...formData, category: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="">Select Category</option>
+                  <option value="Fiction">Fiction</option>
+                  <option value="Non-Fiction">Non-Fiction</option>
+                  <option value="Science">Science</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="History">History</option>
+                  <option value="Geography">Geography</option>
+                  <option value="Literature">Literature</option>
+                  <option value="Biography">Biography</option>
+                  <option value="Reference">Reference</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sub_category">Sub-Category</Label>
+                <Input
+                  id="sub_category"
+                  value={formData.sub_category}
+                  onChange={(e) => setFormData({...formData, sub_category: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">Shelf Location</Label>
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) => setFormData({...formData, location: e.target.value})}
+                  placeholder="e.g., A-12, B-5"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="total_copies">Total Copies</Label>
+                <Input
+                  id="total_copies"
+                  type="number"
+                  min="1"
+                  value={formData.total_copies}
+                  onChange={(e) => setFormData({...formData, total_copies: parseInt(e.target.value)})}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (KES)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({...formData, price: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="condition">Condition</Label>
+                <select
+                  id="condition"
+                  value={formData.condition}
+                  onChange={(e) => setFormData({...formData, condition: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="excellent">Excellent</option>
+                  <option value="good">Good</option>
+                  <option value="fair">Fair</option>
+                  <option value="poor">Poor</option>
+                  <option value="damaged">Damaged</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_reference_only}
+                  onChange={(e) => setFormData({...formData, is_reference_only: e.target.checked})}
+                  className="rounded"
+                />
+                <span>Reference Only (Cannot be borrowed)</span>
+              </label>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {editingBook ? 'Update Book' : 'Add Book'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

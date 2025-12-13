@@ -56,3 +56,7 @@ class LibraryAPI {
 }
 
 export default new LibraryAPI();
+
+  searchByBarcode(barcode: string) {
+    return api.api.get(`/library/barcode/${barcode}`);
+  }

@@ -17,6 +17,7 @@ import libraryAPI from '@/services/library-api';
 export function BorrowingsPage() {
   const [borrowings, setBorrowings] = useState<any[]>([]);
   const [books, setBooks] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -38,13 +39,24 @@ export function BorrowingsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
+      console.log('Loading borrowings data...');
+      
       const [borrowingsRes, booksRes] = await Promise.all([
         libraryAPI.getAllBorrowings({ limit: 100 }),
-        libraryAPI.getBooks({ available: 'true' })
+        libraryAPI.getBooks({ available: 'true', limit: 100 })
       ]);
 
-      setBorrowings(borrowingsRes.data.data || []);
-      setBooks(booksRes.data.data || []);
+      console.log('Borrowings response:', borrowingsRes);
+      console.log('Books response:', booksRes);
+
+      const borrowingsData = borrowingsRes?.data?.data || borrowingsRes?.data || [];
+      const booksData = booksRes?.data?.data || booksRes?.data || [];
+
+      console.log('Extracted borrowings:', borrowingsData);
+      console.log('Extracted books:', booksData);
+
+      setBorrowings(Array.isArray(borrowingsData) ? borrowingsData : []);
+      setBooks(Array.isArray(booksData) ? booksData : []);
     } catch (error: any) {
       console.error('Error loading borrowings:', error);
     } finally {
@@ -54,15 +66,22 @@ export function BorrowingsPage() {
 
   const handleIssue = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!issueForm.book_id || !issueForm.member_id || !issueForm.due_date) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
     try {
+      console.log('Issuing book:', issueForm);
       await libraryAPI.issueBook(issueForm);
       alert('Book issued successfully!');
       setShowIssueModal(false);
       setIssueForm({ book_id: '', member_id: '', due_date: '' });
-      loadData();
+      await loadData();
     } catch (error: any) {
       console.error('Error issuing book:', error);
-      alert(error?.response?.data?.message || 'Failed to issue book');
+      alert(error?.response?.data?.message || error?.message || 'Failed to issue book');
     }
   };
 
@@ -71,19 +90,30 @@ export function BorrowingsPage() {
     if (!selectedBorrowing) return;
 
     try {
-      await libraryAPI.returnBook(selectedBorrowing.id, returnForm);
-      alert('Book returned successfully!');
+      console.log('Returning book:', selectedBorrowing.id);
+      const response = await libraryAPI.returnBook(selectedBorrowing.id, returnForm);
+      console.log('Return response:', response);
+      
+      const fineAmount = response?.data?.fine_amount || 0;
+      
+      if (fineAmount > 0) {
+        alert(`Book returned successfully! Fine: KES ${fineAmount}`);
+      } else {
+        alert('Book returned successfully!');
+      }
+      
       setShowReturnModal(false);
       setSelectedBorrowing(null);
       setReturnForm({ condition_on_return: 'good', remarks: '' });
-      loadData();
+      await loadData();
     } catch (error: any) {
       console.error('Error returning book:', error);
-      alert(error?.response?.data?.message || 'Failed to return book');
+      alert(error?.response?.data?.message || error?.message || 'Failed to return book');
     }
   };
 
   const openReturnModal = (borrowing: any) => {
+    console.log('Opening return modal for:', borrowing);
     setSelectedBorrowing(borrowing);
     setShowReturnModal(true);
   };
@@ -105,6 +135,10 @@ export function BorrowingsPage() {
     return date.toISOString().split('T')[0];
   };
 
+  const isOverdue = (dueDate: string) => {
+    return new Date(dueDate) < new Date();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -113,7 +147,7 @@ export function BorrowingsPage() {
     );
   }
 
-  const activeBorrowings = borrowings.filter(b => b.status === 'issued' || b.status === 'overdue');
+  const activeBorrowings = borrowings.filter(b => b.status === 'issued' || (b.status === 'issued' && isOverdue(b.due_date)));
   const completedBorrowings = borrowings.filter(b => b.status === 'returned');
 
   return (
@@ -123,68 +157,95 @@ export function BorrowingsPage() {
           <h2 className="text-3xl font-bold">Book Borrowings</h2>
           <p className="text-gray-500">Issue and return books</p>
         </div>
-        <Button onClick={() => { setIssueForm({ ...issueForm, due_date: calculateDefaultDueDate() }); setShowIssueModal(true); }}>
+        <Button onClick={() => { 
+          setIssueForm({ ...issueForm, due_date: calculateDefaultDueDate() }); 
+          setShowIssueModal(true); 
+        }}>
           <BookOpen className="h-4 w-4 mr-2" />
           Issue Book
         </Button>
       </div>
 
+      {/* Debug Info */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="pt-4">
+          <p className="text-sm">
+            <strong>Total Borrowings:</strong> {borrowings.length} | 
+            <strong className="ml-2">Active:</strong> {activeBorrowings.length} | 
+            <strong className="ml-2">Returned:</strong> {completedBorrowings.length}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Active Borrowings */}
       <Card>
         <CardHeader>
-          <CardTitle>Active Borrowings</CardTitle>
+          <CardTitle>Active Borrowings ({activeBorrowings.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {activeBorrowings.map((borrowing) => (
-              <div key={borrowing.id} className="p-4 border rounded-lg hover:bg-gray-50">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-semibold">{borrowing.title}</h4>
-                      {getStatusBadge(borrowing.status)}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">{borrowing.author}</p>
-                    
-                    <div className="grid gap-2 md:grid-cols-3 text-sm">
-                      <div className="flex items-center text-gray-600">
-                        <User className="h-4 w-4 mr-2" />
-                        <span>{borrowing.first_name} {borrowing.last_name} ({borrowing.membership_number})</span>
+            {activeBorrowings.map((borrowing) => {
+              const isLate = isOverdue(borrowing.due_date);
+              return (
+                <div key={borrowing.id} className="p-4 border rounded-lg hover:bg-gray-50">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold">{borrowing.title}</h4>
+                        {getStatusBadge(isLate ? 'overdue' : borrowing.status)}
                       </div>
-                      <div className="flex items-center text-gray-600">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        <span>Issued: {new Date(borrowing.issue_date).toLocaleDateString()}</span>
+                      <p className="text-sm text-gray-600 mb-2">{borrowing.author}</p>
+                      
+                      <div className="grid gap-2 md:grid-cols-3 text-sm">
+                        <div className="flex items-center text-gray-600">
+                          <User className="h-4 w-4 mr-2" />
+                          <span>{borrowing.first_name} {borrowing.last_name} ({borrowing.membership_number})</span>
+                        </div>
+                        <div className="flex items-center text-gray-600">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          <span>Issued: {new Date(borrowing.issue_date).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center text-gray-600">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          <span className={isLate ? 'text-red-600 font-medium' : ''}>
+                            Due: {new Date(borrowing.due_date).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center text-gray-600">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        <span>Due: {new Date(borrowing.due_date).toLocaleDateString()}</span>
-                      </div>
+
+                      {borrowing.fine_amount > 0 && (
+                        <div className="mt-2 flex items-center text-red-600 text-sm">
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          <span>Fine: KES {parseFloat(borrowing.fine_amount).toLocaleString()}</span>
+                        </div>
+                      )}
                     </div>
 
-                    {borrowing.fine_amount > 0 && (
-                      <div className="mt-2 flex items-center text-red-600 text-sm">
-                        <AlertCircle className="h-4 w-4 mr-1" />
-                        <span>Fine: KES {parseFloat(borrowing.fine_amount).toLocaleString()}</span>
-                      </div>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openReturnModal(borrowing)}
+                    >
+                      Return Book
+                    </Button>
                   </div>
-
-                  <Button variant="outline" size="sm" onClick={() => openReturnModal(borrowing)}>
-                    Return Book
-                  </Button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {activeBorrowings.length === 0 && (
-              <div className="text-center py-8 text-gray-500">No active borrowings</div>
+              <div className="text-center py-8 text-gray-500">
+                No active borrowings
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Completed Borrowings */}
       <Card>
         <CardHeader>
-          <CardTitle>Recently Returned</CardTitle>
+          <CardTitle>Recently Returned ({completedBorrowings.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -193,7 +254,8 @@ export function BorrowingsPage() {
                 <div>
                   <p className="font-medium">{borrowing.title}</p>
                   <p className="text-sm text-gray-500">
-                    {borrowing.first_name} {borrowing.last_name} • Returned: {new Date(borrowing.return_date).toLocaleDateString()}
+                    {borrowing.first_name} {borrowing.last_name} • 
+                    Returned: {borrowing.return_date ? new Date(borrowing.return_date).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
                 {getStatusBadge(borrowing.status)}
@@ -201,12 +263,15 @@ export function BorrowingsPage() {
             ))}
 
             {completedBorrowings.length === 0 && (
-              <div className="text-center py-8 text-gray-500">No completed borrowings</div>
+              <div className="text-center py-8 text-gray-500">
+                No completed borrowings
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Issue Book Modal */}
       <Dialog open={showIssueModal} onOpenChange={setShowIssueModal}>
         <DialogContent>
           <DialogHeader>
@@ -230,18 +295,23 @@ export function BorrowingsPage() {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500">
+                {books.length} books available for borrowing
+              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="member">Member ID *</Label>
+              <Label htmlFor="member">Library Member ID *</Label>
               <Input
                 id="member"
                 value={issueForm.member_id}
                 onChange={(e) => setIssueForm({...issueForm, member_id: e.target.value})}
-                placeholder="Enter library member ID"
+                placeholder="Enter library member ID (e.g., LIB1234567890)"
                 required
               />
-              <p className="text-xs text-gray-500">You can find member ID in the member's profile</p>
+              <p className="text-xs text-gray-500">
+                Get the member ID from the user's profile or My Borrowed Books page
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -251,18 +321,25 @@ export function BorrowingsPage() {
                 type="date"
                 value={issueForm.due_date}
                 onChange={(e) => setIssueForm({...issueForm, due_date: e.target.value})}
+                min={new Date().toISOString().split('T')[0]}
                 required
               />
+              <p className="text-xs text-gray-500">
+                Default: 14 days from today
+              </p>
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowIssueModal(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setShowIssueModal(false)}>
+                Cancel
+              </Button>
               <Button type="submit">Issue Book</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* Return Book Modal */}
       <Dialog open={showReturnModal} onOpenChange={setShowReturnModal}>
         <DialogContent>
           <DialogHeader>
@@ -272,7 +349,18 @@ export function BorrowingsPage() {
           {selectedBorrowing && (
             <div className="mb-4 p-3 bg-gray-50 rounded">
               <p className="font-medium">{selectedBorrowing.title}</p>
-              <p className="text-sm text-gray-600">{selectedBorrowing.first_name} {selectedBorrowing.last_name}</p>
+              <p className="text-sm text-gray-600">
+                {selectedBorrowing.first_name} {selectedBorrowing.last_name}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Issued: {new Date(selectedBorrowing.issue_date).toLocaleDateString()} | 
+                Due: {new Date(selectedBorrowing.due_date).toLocaleDateString()}
+              </p>
+              {isOverdue(selectedBorrowing.due_date) && (
+                <p className="text-xs text-red-600 mt-1 font-medium">
+                  ⚠️ This book is overdue. Fine will be calculated automatically.
+                </p>
+              )}
             </div>
           )}
 
@@ -303,8 +391,15 @@ export function BorrowingsPage() {
               />
             </div>
 
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+              <p className="font-medium text-blue-900">Fine Calculation:</p>
+              <p className="text-blue-700">KES 10 per day for overdue books</p>
+            </div>
+
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowReturnModal(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setShowReturnModal(false)}>
+                Cancel
+              </Button>
               <Button type="submit">Confirm Return</Button>
             </DialogFooter>
           </form>

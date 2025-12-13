@@ -6,9 +6,9 @@ export const getAllMembers = async (req, res) => {
   try {
     const result = await query(`
       SELECT lm.*, u.email, u.role,
-        COALESCE(s.first_name, t.first_name) as first_name,
-        COALESCE(s.last_name, t.last_name) as last_name,
-        COALESCE(s.admission_number, t.employee_id) as reference_number
+        COALESCE(s.first_name, t.first_name) AS first_name,
+        COALESCE(s.last_name, t.last_name) AS last_name,
+        COALESCE(s.admission_number, t.employee_id) AS reference_number
       FROM library_members lm
       JOIN users u ON lm.user_id = u.id
       LEFT JOIN students s ON lm.student_id = s.id
@@ -28,10 +28,10 @@ export const getUsersWithoutMembership = async (req, res) => {
   try {
     const result = await query(`
       SELECT u.id, u.email, u.role,
-        COALESCE(s.first_name, t.first_name) as first_name,
-        COALESCE(s.last_name, t.last_name) as last_name,
-        COALESCE(s.admission_number, t.employee_id) as reference_number,
-        COALESCE(s.id, t.id) as profile_id
+        COALESCE(s.first_name, t.first_name) AS first_name,
+        COALESCE(s.last_name, t.last_name) AS last_name,
+        COALESCE(s.admission_number, t.employee_id) AS reference_number,
+        COALESCE(s.id, t.id) AS profile_id
       FROM users u
       LEFT JOIN students s ON u.id = s.user_id AND u.role = 'student'
       LEFT JOIN teachers t ON u.id = t.user_id AND u.role = 'teacher'
@@ -159,7 +159,7 @@ export const deleteMember = async (req, res) => {
     const { id } = req.params;
 
     const activeBorrowings = await query(
-      'SELECT COUNT(*) as count FROM library_borrowings WHERE member_id = ? AND status = ?',
+      'SELECT COUNT(*) AS count FROM library_borrowings WHERE member_id = ? AND status = ?',
       [id, 'issued']
     );
 
@@ -183,7 +183,7 @@ export const deleteMember = async (req, res) => {
 export const getCategories = async (req, res) => {
   try {
     const result = await query(`
-      SELECT category, COUNT(*) as count
+      SELECT category, COUNT(*) AS count
       FROM library_books
       WHERE is_active = TRUE AND category IS NOT NULL
       GROUP BY category
@@ -220,3 +220,4 @@ export const searchByBarcode = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+

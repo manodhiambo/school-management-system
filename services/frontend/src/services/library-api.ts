@@ -53,10 +53,11 @@ class LibraryAPI {
   getStatistics() {
     return api.api.get('/library/statistics');
   }
-}
 
-export default new LibraryAPI();
-
+  // Barcode search
   searchByBarcode(barcode: string) {
     return api.api.get(`/library/barcode/${barcode}`);
   }
+}
+
+export default new LibraryAPI();

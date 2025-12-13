@@ -33,10 +33,8 @@ export const getBooks = async (req, res) => {
 
     sql += ` ORDER BY title ASC`;
 
-    // Get all books first
     const allBooks = await query(sql, params);
     
-    // Manual pagination
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 20;
     const offset = (pageNum - 1) * limitNum;
@@ -79,7 +77,7 @@ export const addBook = async (req, res) => {
       isbn, title, subtitle, author, co_authors, publisher,
       edition, publication_year, language, pages, category,
       sub_category, description, cover_image_url, location,
-      total_copies, price, condition, is_reference_only
+      total_copies, price, condition, is_reference_only, barcode
     } = req.body;
 
     const result = await query(
@@ -87,14 +85,15 @@ export const addBook = async (req, res) => {
         isbn, title, subtitle, author, co_authors, publisher,
         edition, publication_year, language, pages, category,
         sub_category, description, cover_image_url, location,
-        total_copies, available_copies, price, condition, is_reference_only
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total_copies, available_copies, price, condition, is_reference_only, keywords
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *`,
       [
         isbn || null, title, subtitle || null, author, co_authors || null, publisher || null,
         edition || null, publication_year || null, language || 'English', pages || null, category || null,
         sub_category || null, description || null, cover_image_url || null, location || null,
-        total_copies || 1, total_copies || 1, price || null, condition || 'good', is_reference_only || false
+        total_copies || 1, total_copies || 1, price || null, condition || 'good', is_reference_only || false,
+        `${title} ${author} ${isbn || ''} ${category || ''} ${barcode || ''}`.toLowerCase()
       ]
     );
 
@@ -110,6 +109,15 @@ export const updateBook = async (req, res) => {
   try {
     const { id } = req.params;
     const fields = req.body;
+    
+    // Update keywords if title, author, or category changed
+    if (fields.title || fields.author || fields.category || fields.isbn) {
+      const current = await query('SELECT * FROM library_books WHERE id = ?', [id]);
+      if (current.length > 0) {
+        const book = current[0];
+        fields.keywords = `${fields.title || book.title} ${fields.author || book.author} ${fields.isbn || book.isbn || ''} ${fields.category || book.category || ''}`.toLowerCase();
+      }
+    }
     
     const setClause = Object.keys(fields).map(key => `${key} = ?`).join(', ');
     const values = [...Object.values(fields), id];
@@ -431,6 +439,30 @@ export const getCategories = async (req, res) => {
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get categories error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Barcode/QR code search
+export const searchByBarcode = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    
+    const result = await query(
+      `SELECT * FROM library_books 
+       WHERE is_active = TRUE 
+       AND (isbn = ? OR keywords ILIKE ?)
+       LIMIT 1`,
+      [barcode, `%${barcode}%`]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ success: false, message: 'Book not found' });
+    }
+
+    res.json({ success: true, data: result[0] });
+  } catch (error) {
+    logger.error('Search by barcode error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

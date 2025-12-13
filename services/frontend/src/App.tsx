@@ -45,12 +45,14 @@ import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
 import { MyBorrowingsPage } from './pages/library/MyBorrowingsPage';
 import { LibraryManagementPage } from './pages/library/LibraryManagementPage';
 import { BorrowingsPage } from './pages/library/BorrowingsPage';
+import { LibraryMembersPage } from './pages/library/LibraryMembersPage';
 
 // Library Pages
 import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
 import { MyBorrowingsPage } from './pages/library/MyBorrowingsPage';
 import { LibraryManagementPage } from './pages/library/LibraryManagementPage';
 import { BorrowingsPage } from './pages/library/BorrowingsPage';
+import { LibraryMembersPage } from './pages/library/LibraryMembersPage';
 
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -126,12 +128,14 @@ function App() {
               <Route path="my-books" element={<MyBorrowingsPage />} />
               <Route path="library-management" element={<LibraryManagementPage />} />
               <Route path="library-borrowings" element={<BorrowingsPage />} />
+              <Route path="library-members" element={<LibraryMembersPage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />
               <Route path="my-books" element={<MyBorrowingsPage />} />
               <Route path="library-management" element={<LibraryManagementPage />} />
               <Route path="library-borrowings" element={<BorrowingsPage />} />
+              <Route path="library-members" element={<LibraryMembersPage />} />
               <Route path="profile" element={<ProfilePage />} />
               
               <Route path="*" element={<Navigate to="/app/dashboard" replace />} />

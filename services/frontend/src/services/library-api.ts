@@ -36,6 +36,27 @@ class LibraryAPI {
     return api.api.get('/library/my-borrowings');
   }
 
+  // Members Management (Admin)
+  getAllMembers() {
+    return api.api.get('/library/members');
+  }
+
+  getUsersWithoutMembership() {
+    return api.api.get('/library/users-without-membership');
+  }
+
+  createMember(data: any) {
+    return api.api.post('/library/members', data);
+  }
+
+  updateMember(id: string, data: any) {
+    return api.api.put(`/library/members/${id}`, data);
+  }
+
+  deleteMember(id: string) {
+    return api.api.delete(`/library/members/${id}`);
+  }
+
   // Borrowings (admin/librarian)
   getAllBorrowings(params?: any) {
     return api.api.get('/library/borrowings', { params });

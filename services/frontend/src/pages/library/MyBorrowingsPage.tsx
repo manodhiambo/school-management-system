@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Book, Calendar, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Book, Calendar, AlertCircle, Clock, Copy, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import libraryAPI from '@/services/library-api';
 
 export function MyBorrowingsPage() {
   const [borrowings, setBorrowings] = useState<any[]>([]);
   const [member, setMember] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -21,12 +23,23 @@ export function MyBorrowingsPage() {
         libraryAPI.getMember()
       ]);
 
-      setBorrowings(borrowingsRes.data.data || []);
-      setMember(memberRes.data.data || null);
+      const borrowingsData = borrowingsRes?.data?.data || borrowingsRes?.data || [];
+      const memberData = memberRes?.data?.data || memberRes?.data || null;
+
+      setBorrowings(Array.isArray(borrowingsData) ? borrowingsData : []);
+      setMember(memberData);
     } catch (error: any) {
       console.error('Error loading borrowings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const copyMemberId = () => {
+    if (member?.id) {
+      navigator.clipboard.writeText(member.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -72,11 +85,42 @@ export function MyBorrowingsPage() {
         <p className="text-gray-500">View your borrowing history and active loans</p>
       </div>
 
-      {/* Member Info */}
+      {/* Member Info with ID */}
       {member && (
-        <Card>
+        <Card className="border-2 border-blue-500">
           <CardContent className="pt-6">
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Library Member ID</p>
+                <div className="flex items-center gap-2">
+                  <code className="text-2xl font-bold bg-blue-50 px-4 py-2 rounded border-2 border-blue-200">
+                    {member.id}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyMemberId}
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 Use this ID when a librarian issues you a book
+                </p>
+              </div>
+            </div>
+            
+            <div className="grid gap-4 md:grid-cols-4 pt-4 border-t">
               <div>
                 <p className="text-sm text-gray-500">Member Number</p>
                 <p className="font-semibold">{member.membership_number}</p>
@@ -111,9 +155,17 @@ export function MyBorrowingsPage() {
                 <CardContent className="pt-6">
                   <div className="flex gap-4">
                     <div className="flex-shrink-0">
-                      <div className="h-24 w-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded flex items-center justify-center text-white">
-                        <Book className="h-8 w-8" />
-                      </div>
+                      {borrowing.cover_image_url ? (
+                        <img 
+                          src={borrowing.cover_image_url}
+                          alt={borrowing.title}
+                          className="h-32 w-24 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="h-32 w-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded flex items-center justify-center text-white">
+                          <Book className="h-8 w-8" />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="flex justify-between items-start mb-2">

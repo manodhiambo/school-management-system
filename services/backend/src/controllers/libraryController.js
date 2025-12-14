@@ -19,7 +19,7 @@ export const getAllMembers = async (req, res) => {
       ORDER BY lm.created_at DESC
     `);
 
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get all members error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -61,7 +61,7 @@ export const getUsersWithoutMembership = async (req, res) => {
       AND t.status = 'active'
     `);
 
-    const combined = [...students.rows, ...teachers.rows];
+    const combined = [...students, ...teachers];
     res.json({ success: true, data: combined });
   } catch (error) {
     logger.error('Get users without membership error:', error);
@@ -88,7 +88,7 @@ export const createMember = async (req, res) => {
       [student_id || null, teacher_id || null, 'active']
     );
 
-    if (existing.rows.length > 0) {
+    if (existing.length > 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'User already has an active library membership' 
@@ -97,7 +97,7 @@ export const createMember = async (req, res) => {
 
     // Generate membership number
     const memberCount = await query('SELECT COUNT(*) as count FROM library_members');
-    const membershipNumber = `LIB${String(parseInt(memberCount.rows[0].count) + 1).padStart(6, '0')}`;
+    const membershipNumber = `LIB${String(parseInt(memberCount[0].count) + 1).padStart(6, '0')}`;
 
     // Calculate dates
     const start_date = new Date();
@@ -118,7 +118,7 @@ export const createMember = async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: 'Library member created successfully',
-      data: { id: result.rows[0].id, membership_number: membershipNumber }
+      data: { id: result[0].id, membership_number: membershipNumber }
     });
   } catch (error) {
     logger.error('Create member error:', error);
@@ -172,7 +172,7 @@ export const deleteMember = async (req, res) => {
       [id]
     );
 
-    if (activeBorrowings.rows[0].count > 0) {
+    if (activeBorrowings[0].count > 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'Cannot deactivate member with active borrowings' 
@@ -206,11 +206,11 @@ export const getMember = async (req, res) => {
       WHERE lm.user_id = $1 AND lm.status = 'active'
     `, [req.user.id]);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ success: false, message: 'No active membership found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: result[0] });
   } catch (error) {
     logger.error('Get member error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -225,7 +225,7 @@ export const getMyBorrowings = async (req, res) => {
       [req.user.id, 'active']
     );
 
-    if (member.rows.length === 0) {
+    if (member.length === 0) {
       return res.json({ success: true, data: [] });
     }
 
@@ -249,9 +249,9 @@ export const getMyBorrowings = async (req, res) => {
       JOIN library_books book ON lb.book_id = book.id
       WHERE lb.member_id = $1
       ORDER BY lb.created_at DESC
-    `, [member.rows[0].id]);
+    `, [member[0].id]);
 
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get my borrowings error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -269,7 +269,7 @@ export const getCategories = async (req, res) => {
       ORDER BY category
     `);
 
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: result });
   } catch (error) {
     logger.error('Get categories error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -289,11 +289,11 @@ export const searchByBarcode = async (req, res) => {
       [barcode, `%${barcode}%`]
     );
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: result[0] });
   } catch (error) {
     logger.error('Search by barcode error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -369,11 +369,11 @@ export const getBooks = async (req, res) => {
     }
 
     const totalResult = await query(countSql, countParams);
-    const total = parseInt(totalResult.rows[0].total);
+    const total = parseInt(totalResult[0].total);
 
     res.json({ 
       success: true, 
-      data: books.rows,
+      data: books,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -397,11 +397,11 @@ export const getBook = async (req, res) => {
       WHERE id = $1 AND is_active = true
     `, [id]);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: result[0] });
   } catch (error) {
     logger.error('Get book by ID error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -441,7 +441,7 @@ export const addBook = async (req, res) => {
         [isbn]
       );
 
-      if (existing.rows.length > 0) {
+      if (existing.length > 0) {
         return res.status(400).json({ 
           success: false, 
           message: 'Book with this ISBN already exists' 
@@ -464,7 +464,7 @@ export const addBook = async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: 'Book added successfully',
-      data: { id: result.rows[0].id }
+      data: { id: result[0].id }
     });
   } catch (error) {
     logger.error('Add book error:', error);
@@ -521,7 +521,7 @@ export const deleteBook = async (req, res) => {
       [id]
     );
 
-    if (activeBorrowings.rows[0].count > 0) {
+    if (activeBorrowings[0].count > 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'Cannot delete book with active borrowings' 
@@ -553,11 +553,11 @@ export const issueBook = async (req, res) => {
       [member_id, 'active']
     );
 
-    if (member.rows.length === 0) {
+    if (member.length === 0) {
       return res.status(404).json({ success: false, message: 'Member not found or inactive' });
     }
 
-    const memberData = member.rows[0];
+    const memberData = member[0];
 
     // Check if membership is expired
     if (new Date(memberData.membership_end_date) < new Date()) {
@@ -575,7 +575,7 @@ export const issueBook = async (req, res) => {
       [member_id]
     );
 
-    if (currentBorrowings.rows[0].count >= memberData.max_books_allowed) {
+    if (currentBorrowings[0].count >= memberData.max_books_allowed) {
       return res.status(400).json({ 
         success: false, 
         message: `Member has reached maximum borrowing limit of ${memberData.max_books_allowed} books` 
@@ -588,15 +588,15 @@ export const issueBook = async (req, res) => {
       [book_id]
     );
 
-    if (book.rows.length === 0) {
+    if (book.length === 0) {
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
 
-    if (book.rows[0].available_copies <= 0) {
+    if (book[0].available_copies <= 0) {
       return res.status(400).json({ success: false, message: 'Book is not available' });
     }
 
-    if (book.rows[0].is_reference_only) {
+    if (book[0].is_reference_only) {
       return res.status(400).json({ success: false, message: 'This book is reference only and cannot be borrowed' });
     }
 
@@ -606,7 +606,7 @@ export const issueBook = async (req, res) => {
       [member_id, book_id]
     );
 
-    if (existingBorrowing.rows.length > 0) {
+    if (existingBorrowing.length > 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'Member has already borrowed this book' 
@@ -639,7 +639,7 @@ export const issueBook = async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: 'Book issued successfully',
-      data: { id: result.rows[0].id }
+      data: { id: result[0].id }
     });
   } catch (error) {
     logger.error('Issue book error:', error);
@@ -659,11 +659,11 @@ export const returnBook = async (req, res) => {
       [id]
     );
 
-    if (borrowing.rows.length === 0) {
+    if (borrowing.length === 0) {
       return res.status(404).json({ success: false, message: 'Active borrowing not found' });
     }
 
-    const borrowData = borrowing.rows[0];
+    const borrowData = borrowing[0];
 
     // Calculate fine if overdue
     let fine_amount = 0;
@@ -805,11 +805,11 @@ export const getAllBorrowings = async (req, res) => {
     }
 
     const totalResult = await query(countSql, countParams);
-    const total = parseInt(totalResult.rows[0].total);
+    const total = parseInt(totalResult[0].total);
 
     res.json({ 
       success: true, 
-      data: borrowings.rows,
+      data: borrowings,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -832,55 +832,79 @@ export const getStatistics = async (req, res) => {
         COUNT(CASE WHEN status = 'returned' THEN 1 END) as total_returns,
         COUNT(CASE WHEN status = 'issued' AND due_date < CURRENT_DATE THEN 1 END) as overdue_books,
         SUM(CASE WHEN status = 'returned' THEN fine_paid ELSE 0 END) as total_fines_collected,
-        SUM(CASE WHEN status = 'issued' AND due_date < CURRENT_DATE 
-                 THEN (CURRENT_DATE - due_date) * 5 
-                 ELSE 0 END) as pending_fines
-      FROM library_borrowings
-    `);
+SUM(
+  CASE
+    WHEN status = 'issued'
+      AND due_date < CURRENT_DATE
+    THEN (CURRENT_DATE - due_date) * 5
+    ELSE 0
+  END
+) as pending_fines
+FROM library_borrowings
+`);
 
-    const bookStats = await query(`
-      SELECT 
-        COUNT(*) as total_books,
-        SUM(total_copies) as total_copies,
-        SUM(available_copies) as available_copies,
-        COUNT(DISTINCT category) as total_categories
-      FROM library_books
-      WHERE is_active = true
-    `);
+const bookStats = await query(`
+  SELECT 
+    COUNT(*) as total_books,
+    SUM(total_copies) as total_copies,
+    SUM(available_copies) as available_copies,
+    COUNT(DISTINCT category) as total_categories
+  FROM library_books
+  WHERE is_active = true
+`);
 
-    const memberStats = await query(`
-      SELECT 
-        COUNT(*) as total_members,
-        COUNT(CASE WHEN membership_end_date > CURRENT_DATE THEN 1 END) as active_members,
-        COUNT(CASE WHEN membership_end_date <= CURRENT_DATE THEN 1 END) as expired_members,
-        COUNT(CASE WHEN is_blocked = true THEN 1 END) as blocked_members
-      FROM library_members
-      WHERE status = 'active'
-    `);
+const memberStats = await query(`
+  SELECT 
+    COUNT(*) as total_members,
+    COUNT(
+      CASE
+        WHEN membership_end_date > CURRENT_DATE THEN 1
+      END
+    ) as active_members,
+    COUNT(
+      CASE
+        WHEN membership_end_date <= CURRENT_DATE THEN 1
+      END
+    ) as expired_members,
+    COUNT(
+      CASE
+        WHEN is_blocked = true THEN 1
+      END
+    ) as blocked_members
+  FROM library_members
+  WHERE status = 'active'
+`);
 
-    const topBooks = await query(`
-      SELECT 
-        book.title,
-        book.author,
-        COUNT(lb.id) as borrow_count
-      FROM library_borrowings lb
-      JOIN library_books book ON lb.book_id = book.id
-      GROUP BY book.id, book.title, book.author
-      ORDER BY borrow_count DESC
-      LIMIT 10
-    `);
+const topBooks = await query(`
+  SELECT 
+    book.title,
+    book.author,
+    COUNT(lb.id) as borrow_count
+  FROM library_borrowings lb
+  JOIN library_books book
+    ON lb.book_id = book.id
+  GROUP BY
+    book.id,
+    book.title,
+    book.author
+  ORDER BY borrow_count DESC
+  LIMIT 10
+`);
 
-    res.json({ 
-      success: true, 
-      data: {
-        borrowings: borrowingStats.rows[0],
-        books: bookStats.rows[0],
-        members: memberStats.rows[0],
-        topBooks: topBooks.rows
-      }
-    });
-  } catch (error) {
-    logger.error('Get statistics error:', error);
-    res.status(500).json({ success: false, message: error.message });
+res.json({
+  success: true,
+  data: {
+    borrowings: borrowingStats[0],
+    books: bookStats[0],
+    members: memberStats[0],
+    topBooks: topBooks
   }
+});
+} catch (error) {
+  logger.error('Get statistics error:', error);
+  res.status(500).json({
+    success: false,
+    message: error.message
+  });
+}
 };

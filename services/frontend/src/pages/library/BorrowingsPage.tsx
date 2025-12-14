@@ -40,10 +40,11 @@ export function BorrowingsPage() {
     try {
       setLoading(true);
       console.log('Loading borrowings data...');
-      
-      const [borrowingsRes, booksRes] = await Promise.all([
+
+      const [borrowingsRes, booksRes, membersRes] = await Promise.all([
         libraryAPI.getAllBorrowings({ limit: 100 }),
-        libraryAPI.getBooks({ available: 'true', limit: 100 })
+        libraryAPI.getBooks({ limit: 100 }),
+        libraryAPI.getAllMembers()
       ]);
 
       console.log('Borrowings response:', borrowingsRes);
@@ -51,12 +52,14 @@ export function BorrowingsPage() {
 
       const borrowingsData = borrowingsRes?.data?.data || borrowingsRes?.data || [];
       const booksData = booksRes?.data?.data || booksRes?.data || [];
+      const membersData = membersRes?.data?.data || membersRes?.data || [];
 
       console.log('Extracted borrowings:', borrowingsData);
       console.log('Extracted books:', booksData);
 
       setBorrowings(Array.isArray(borrowingsData) ? borrowingsData : []);
       setBooks(Array.isArray(booksData) ? booksData : []);
+      setMembers(Array.isArray(membersData) ? membersData : []);
     } catch (error: any) {
       console.error('Error loading borrowings:', error);
     } finally {
@@ -66,7 +69,7 @@ export function BorrowingsPage() {
 
   const handleIssue = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!issueForm.book_id || !issueForm.member_id || !issueForm.due_date) {
       alert('Please fill in all required fields');
       return;
@@ -93,15 +96,15 @@ export function BorrowingsPage() {
       console.log('Returning book:', selectedBorrowing.id);
       const response = await libraryAPI.returnBook(selectedBorrowing.id, returnForm);
       console.log('Return response:', response);
-      
-      const fineAmount = response?.data?.fine_amount || 0;
-      
+
+      const fineAmount = response?.data?.data?.fine_amount || 0;
+
       if (fineAmount > 0) {
         alert(`Book returned successfully! Fine: KES ${fineAmount}`);
       } else {
         alert('Book returned successfully!');
       }
-      
+
       setShowReturnModal(false);
       setSelectedBorrowing(null);
       setReturnForm({ condition_on_return: 'good', remarks: '' });
@@ -118,7 +121,10 @@ export function BorrowingsPage() {
     setShowReturnModal(true);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, isOverdue: boolean = false) => {
+    if (isOverdue && status === 'issued') {
+      return <Badge className="bg-red-100 text-red-700">Overdue</Badge>;
+    }
     const colors: any = {
       issued: 'bg-blue-100 text-blue-700',
       returned: 'bg-green-100 text-green-700',
@@ -147,8 +153,9 @@ export function BorrowingsPage() {
     );
   }
 
-  const activeBorrowings = borrowings.filter(b => b.status === 'issued' || (b.status === 'issued' && isOverdue(b.due_date)));
+  const activeBorrowings = borrowings.filter(b => b.status === 'issued');
   const completedBorrowings = borrowings.filter(b => b.status === 'returned');
+  const availableBooks = books.filter(b => b.available_copies > 0);
 
   return (
     <div className="space-y-6">
@@ -157,25 +164,53 @@ export function BorrowingsPage() {
           <h2 className="text-3xl font-bold">Book Borrowings</h2>
           <p className="text-gray-500">Issue and return books</p>
         </div>
-        <Button onClick={() => { 
-          setIssueForm({ ...issueForm, due_date: calculateDefaultDueDate() }); 
-          setShowIssueModal(true); 
+        <Button onClick={() => {
+          setIssueForm({ ...issueForm, due_date: calculateDefaultDueDate() });
+          setShowIssueModal(true);
         }}>
           <BookOpen className="h-4 w-4 mr-2" />
           Issue Book
         </Button>
       </div>
 
-      {/* Debug Info */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardContent className="pt-4">
-          <p className="text-sm">
-            <strong>Total Borrowings:</strong> {borrowings.length} | 
-            <strong className="ml-2">Active:</strong> {activeBorrowings.length} | 
-            <strong className="ml-2">Returned:</strong> {completedBorrowings.length}
-          </p>
-        </CardContent>
-      </Card>
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Borrowings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{borrowings.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{activeBorrowings.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Returned</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{completedBorrowings.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Available Books</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{availableBooks.length}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Active Borrowings */}
       <Card>
@@ -191,15 +226,15 @@ export function BorrowingsPage() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold">{borrowing.title}</h4>
-                        {getStatusBadge(isLate ? 'overdue' : borrowing.status)}
+                        <h4 className="font-semibold">{borrowing.book_title}</h4>
+                        {getStatusBadge(borrowing.status, isLate)}
                       </div>
-                      <p className="text-sm text-gray-600 mb-2">{borrowing.author}</p>
-                      
+                      <p className="text-sm text-gray-600 mb-2">{borrowing.book_author}</p>
+
                       <div className="grid gap-2 md:grid-cols-3 text-sm">
                         <div className="flex items-center text-gray-600">
                           <User className="h-4 w-4 mr-2" />
-                          <span>{borrowing.first_name} {borrowing.last_name} ({borrowing.membership_number})</span>
+                          <span>{borrowing.member_name} ({borrowing.membership_number})</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Calendar className="h-4 w-4 mr-2" />
@@ -213,10 +248,12 @@ export function BorrowingsPage() {
                         </div>
                       </div>
 
-                      {borrowing.fine_amount > 0 && (
+                      {isLate && (
                         <div className="mt-2 flex items-center text-red-600 text-sm">
                           <AlertCircle className="h-4 w-4 mr-1" />
-                          <span>Fine: KES {parseFloat(borrowing.fine_amount).toLocaleString()}</span>
+                          <span>
+                            Overdue by {Math.floor((new Date().getTime() - new Date(borrowing.due_date).getTime()) / (1000 * 60 * 60 * 24))} days
+                          </span>
                         </div>
                       )}
                     </div>
@@ -252,9 +289,9 @@ export function BorrowingsPage() {
             {completedBorrowings.slice(0, 10).map((borrowing) => (
               <div key={borrowing.id} className="p-3 border rounded flex justify-between items-center">
                 <div>
-                  <p className="font-medium">{borrowing.title}</p>
+                  <p className="font-medium">{borrowing.book_title}</p>
                   <p className="text-sm text-gray-500">
-                    {borrowing.first_name} {borrowing.last_name} • 
+                    {borrowing.member_name} •
                     Returned: {borrowing.return_date ? new Date(borrowing.return_date).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
@@ -273,14 +310,14 @@ export function BorrowingsPage() {
 
       {/* Issue Book Modal */}
       <Dialog open={showIssueModal} onOpenChange={setShowIssueModal}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Issue Book</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleIssue} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="book">Book *</Label>
+              <Label htmlFor="book">Select Book *</Label>
               <select
                 id="book"
                 value={issueForm.book_id}
@@ -288,29 +325,36 @@ export function BorrowingsPage() {
                 className="w-full px-3 py-2 border rounded-md"
                 required
               >
-                <option value="">Select a book</option>
-                {books.map((book) => (
+                <option value="">Choose a book...</option>
+                {availableBooks.map((book) => (
                   <option key={book.id} value={book.id}>
                     {book.title} - {book.author} ({book.available_copies} available)
                   </option>
                 ))}
               </select>
               <p className="text-xs text-gray-500">
-                {books.length} books available for borrowing
+                {availableBooks.length} books available for borrowing
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="member">Library Member ID *</Label>
-              <Input
+              <Label htmlFor="member">Select Library Member *</Label>
+              <select
                 id="member"
                 value={issueForm.member_id}
                 onChange={(e) => setIssueForm({...issueForm, member_id: e.target.value})}
-                placeholder="Enter library member ID (e.g., LIB1234567890)"
+                className="w-full px-3 py-2 border rounded-md"
                 required
-              />
+              >
+                <option value="">Choose a member...</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.member_name} - {member.membership_number} ({member.member_type})
+                  </option>
+                ))}
+              </select>
               <p className="text-xs text-gray-500">
-                Get the member ID from the user's profile or My Borrowed Books page
+                {members.length} active library members
               </p>
             </div>
 
@@ -327,6 +371,15 @@ export function BorrowingsPage() {
               <p className="text-xs text-gray-500">
                 Default: 14 days from today
               </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+              <p className="font-medium text-blue-900">Important:</p>
+              <ul className="text-blue-700 list-disc list-inside mt-1 space-y-1">
+                <li>Ensure member has not exceeded their borrowing limit</li>
+                <li>Check if member's membership is active and not expired</li>
+                <li>Fine: KES 5 per day for overdue books</li>
+              </ul>
             </div>
 
             <DialogFooter>
@@ -348,17 +401,17 @@ export function BorrowingsPage() {
 
           {selectedBorrowing && (
             <div className="mb-4 p-3 bg-gray-50 rounded">
-              <p className="font-medium">{selectedBorrowing.title}</p>
+              <p className="font-medium">{selectedBorrowing.book_title}</p>
               <p className="text-sm text-gray-600">
-                {selectedBorrowing.first_name} {selectedBorrowing.last_name}
+                {selectedBorrowing.member_name}
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                Issued: {new Date(selectedBorrowing.issue_date).toLocaleDateString()} | 
+                Issued: {new Date(selectedBorrowing.issue_date).toLocaleDateString()} |
                 Due: {new Date(selectedBorrowing.due_date).toLocaleDateString()}
               </p>
               {isOverdue(selectedBorrowing.due_date) && (
                 <p className="text-xs text-red-600 mt-1 font-medium">
-                  ⚠️ This book is overdue. Fine will be calculated automatically.
+                  ⚠️ This book is overdue. Fine will be calculated automatically (KES 5/day).
                 </p>
               )}
             </div>
@@ -393,7 +446,7 @@ export function BorrowingsPage() {
 
             <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
               <p className="font-medium text-blue-900">Fine Calculation:</p>
-              <p className="text-blue-700">KES 10 per day for overdue books</p>
+              <p className="text-blue-700">KES 5 per day for overdue books</p>
             </div>
 
             <DialogFooter>

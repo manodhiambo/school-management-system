@@ -22,7 +22,7 @@ export function LibraryMembersPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingMember, setEditingMember] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const [memberForm, setMemberForm] = useState({
     max_books_allowed: 3,
@@ -64,21 +64,36 @@ export function LibraryMembersPage() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedUserId) {
+
+    if (!selectedUser) {
       alert('Please select a user');
       return;
     }
 
     try {
-      await libraryAPI.createMember({
-        user_id: selectedUserId,
-        ...memberForm
-      });
+      // FIXED: Send the correct data structure
+      const memberData: any = {
+        user_id: selectedUser.user_id,
+        member_type: selectedUser.member_type,
+        max_books_allowed: memberForm.max_books_allowed,
+        max_days_allowed: memberForm.max_days_allowed
+      };
+
+      // Send student_id or teacher_id based on member_type
+      if (selectedUser.member_type === 'student') {
+        memberData.student_id = selectedUser.id;
+        memberData.teacher_id = null;
+      } else if (selectedUser.member_type === 'teacher') {
+        memberData.teacher_id = selectedUser.id;
+        memberData.student_id = null;
+      }
+
+      console.log('Creating member with data:', memberData);
+      await libraryAPI.createMember(memberData);
 
       alert('Library member created successfully!');
       setShowAddModal(false);
-      setSelectedUserId('');
+      setSelectedUser(null);
       setMemberForm({ max_books_allowed: 3, max_days_allowed: 14 });
       await loadData();
     } catch (error: any) {
@@ -89,7 +104,7 @@ export function LibraryMembersPage() {
 
   const handleEditMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!editingMember) return;
 
     try {
@@ -131,18 +146,21 @@ export function LibraryMembersPage() {
 
   const handleUserSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const userId = e.target.value;
-    setSelectedUserId(userId);
-
-    // Auto-set limits based on user role
     const user = usersWithoutMembership.find(u => u.id === userId);
+    
     if (user) {
-      if (user.role === 'student') {
+      setSelectedUser(user);
+      
+      // Auto-set limits based on member type
+      if (user.member_type === 'student') {
         setMemberForm({ max_books_allowed: 3, max_days_allowed: 14 });
-      } else if (user.role === 'teacher') {
+      } else if (user.member_type === 'teacher') {
         setMemberForm({ max_books_allowed: 5, max_days_allowed: 30 });
       } else {
         setMemberForm({ max_books_allowed: 3, max_days_allowed: 14 });
       }
+    } else {
+      setSelectedUser(null);
     }
   };
 
@@ -169,11 +187,10 @@ export function LibraryMembersPage() {
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (
-      member.first_name?.toLowerCase().includes(search) ||
-      member.last_name?.toLowerCase().includes(search) ||
+      member.member_name?.toLowerCase().includes(search) ||
       member.email?.toLowerCase().includes(search) ||
       member.membership_number?.toLowerCase().includes(search) ||
-      member.reference_number?.toLowerCase().includes(search)
+      member.member_id_number?.toLowerCase().includes(search)
     );
   });
 
@@ -275,17 +292,15 @@ export function LibraryMembersPage() {
                   <tr key={member.id} className="border-b hover:bg-gray-50">
                     <td className="py-3 px-4">
                       <div>
-                        <p className="font-medium">
-                          {member.first_name} {member.last_name}
-                        </p>
+                        <p className="font-medium">{member.member_name}</p>
                         <p className="text-sm text-gray-500">{member.email}</p>
-                        {member.reference_number && (
-                          <p className="text-xs text-gray-400">{member.reference_number}</p>
+                        {member.member_id_number && (
+                          <p className="text-xs text-gray-400">{member.member_id_number}</p>
                         )}
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      {getRoleBadge(member.role)}
+                      {getRoleBadge(member.role || member.member_type)}
                     </td>
                     <td className="py-3 px-4">
                       <code className="text-sm bg-gray-100 px-2 py-1 rounded">
@@ -343,7 +358,7 @@ export function LibraryMembersPage() {
               <Label htmlFor="user">Select User *</Label>
               <select
                 id="user"
-                value={selectedUserId}
+                value={selectedUser?.id || ''}
                 onChange={handleUserSelection}
                 className="w-full px-3 py-2 border rounded-md"
                 required
@@ -351,7 +366,7 @@ export function LibraryMembersPage() {
                 <option value="">Choose a user...</option>
                 {usersWithoutMembership.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.first_name} {user.last_name} ({user.role}) - {user.email}
+                    {user.name} ({user.member_type}) - {user.email}
                   </option>
                 ))}
               </select>
@@ -409,7 +424,7 @@ export function LibraryMembersPage() {
 
           {editingMember && (
             <div className="mb-4 p-3 bg-gray-50 rounded">
-              <p className="font-medium">{editingMember.first_name} {editingMember.last_name}</p>
+              <p className="font-medium">{editingMember.member_name}</p>
               <p className="text-sm text-gray-600">{editingMember.membership_number}</p>
             </div>
           )}

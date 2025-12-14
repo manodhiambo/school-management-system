@@ -4,16 +4,15 @@ import { authenticate, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Apply authentication to all routes
 router.use(authenticate);
 
-// Books catalog (public to authenticated users)
+// Books catalog
 router.get('/books', libraryController.getBooks);
 router.get('/books/:id', libraryController.getBook);
 router.get('/categories', libraryController.getCategories);
 router.get('/barcode/:barcode', libraryController.searchByBarcode);
 
-// Member routes (current user)
+// Member routes
 router.get('/member', libraryController.getMember);
 router.get('/my-borrowings', libraryController.getMyBorrowings);
 

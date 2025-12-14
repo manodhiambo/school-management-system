@@ -167,6 +167,68 @@ export const deleteMember = async (req, res) => {
   }
 };
 
+// Get current user's membership info
+export const getMember = async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT 
+        lm.*,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM library_members lm
+      JOIN users u ON lm.user_id = u.id
+      WHERE lm.user_id = ? AND lm.is_active = TRUE
+    `, [req.user.id]);
+
+    if (result.length === 0) {
+      return res.status(404).json({ success: false, message: 'No active membership found' });
+    }
+
+    res.json({ success: true, data: result[0] });
+  } catch (error) {
+    logger.error('Get member error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get current user's borrowings
+export const getMyBorrowings = async (req, res) => {
+  try {
+    const member = await query(
+      'SELECT id FROM library_members WHERE user_id = ? AND is_active = TRUE',
+      [req.user.id]
+    );
+
+    if (member.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const result = await query(`
+      SELECT 
+        lr.*,
+        lb.title,
+        lb.author,
+        lb.isbn,
+        lb.cover_image,
+        CASE 
+          WHEN lr.status = 'borrowed' AND lr.due_date < NOW() THEN TRUE
+          ELSE FALSE
+        END as is_overdue,
+        DATEDIFF(NOW(), lr.due_date) as days_overdue
+      FROM library_rentals lr
+      JOIN library_books lb ON lr.book_id = lb.id
+      WHERE lr.member_id = ?
+      ORDER BY lr.created_at DESC
+    `, [member[0].id]);
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Get my borrowings error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Get all categories
 export const getCategories = async (req, res) => {
   try {
@@ -296,7 +358,7 @@ export const getBooks = async (req, res) => {
 };
 
 // Get single book by ID
-export const getBookById = async (req, res) => {
+export const getBook = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -437,8 +499,115 @@ export const deleteBook = async (req, res) => {
 
 // ==================== RENTAL MANAGEMENT ====================
 
-// Get all rentals with filters
-export const getRentals = async (req, res) => {
+// Issue/Borrow a book
+export const issueBook = async (req, res) => {
+  try {
+    const { member_id, book_id, due_date, notes } = req.body;
+
+    // Check if member exists and is active
+    const member = await query(
+      'SELECT * FROM library_members WHERE id = ? AND is_active = TRUE',
+      [member_id]
+    );
+
+    if (member.length === 0) {
+      return res.status(404).json({ success: false, message: 'Member not found or inactive' });
+    }
+
+    // Check if membership is expired
+    if (new Date(member[0].expiry_date) < new Date()) {
+      return res.status(400).json({ success: false, message: 'Membership has expired' });
+    }
+
+    // Check if book is available
+    const bookAvailability = await query(`
+      SELECT 
+        lb.total_copies,
+        COUNT(lr.id) as borrowed_count
+      FROM library_books lb
+      LEFT JOIN library_rentals lr ON lb.id = lr.book_id AND lr.status = 'borrowed'
+      WHERE lb.id = ? AND lb.is_active = TRUE
+      GROUP BY lb.id
+    `, [book_id]);
+
+    if (bookAvailability.length === 0) {
+      return res.status(404).json({ success: false, message: 'Book not found' });
+    }
+
+    const available = bookAvailability[0].total_copies - bookAvailability[0].borrowed_count;
+    if (available <= 0) {
+      return res.status(400).json({ success: false, message: 'Book is not available' });
+    }
+
+    // Check if member already borrowed this book
+    const existingRental = await query(
+      'SELECT id FROM library_rentals WHERE member_id = ? AND book_id = ? AND status = ?',
+      [member_id, book_id, 'borrowed']
+    );
+
+    if (existingRental.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Member has already borrowed this book' 
+      });
+    }
+
+    // Create rental record
+    const result = await query(
+      `INSERT INTO library_rentals 
+      (member_id, book_id, borrowed_date, due_date, notes, issued_by)
+      VALUES (?, ?, NOW(), ?, ?, ?)`,
+      [member_id, book_id, due_date, notes, req.user.id]
+    );
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Book issued successfully',
+      data: { id: result.insertId }
+    });
+  } catch (error) {
+    logger.error('Issue book error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Return a book
+export const returnBook = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { condition, fine_amount, notes } = req.body;
+
+    // Get rental details
+    const rental = await query(
+      'SELECT * FROM library_rentals WHERE id = ? AND status = ?',
+      [id, 'borrowed']
+    );
+
+    if (rental.length === 0) {
+      return res.status(404).json({ success: false, message: 'Active rental not found' });
+    }
+
+    // Update rental record
+    await query(
+      `UPDATE library_rentals 
+      SET status = 'returned', 
+          returned_date = NOW(), 
+          return_condition = ?,
+          fine_amount = ?,
+          notes = CONCAT(COALESCE(notes, ''), '\nReturn: ', ?)
+      WHERE id = ?`,
+      [condition, fine_amount || 0, notes || '', id]
+    );
+
+    res.json({ success: true, message: 'Book returned successfully' });
+  } catch (error) {
+    logger.error('Return book error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get all borrowings/rentals (admin view)
+export const getAllBorrowings = async (req, res) => {
   try {
     const { 
       status, 
@@ -535,151 +704,13 @@ export const getRentals = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Get rentals error:', error);
+    logger.error('Get all borrowings error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Borrow a book
-export const borrowBook = async (req, res) => {
-  try {
-    const { member_id, book_id, due_date, notes } = req.body;
-
-    // Check if member exists and is active
-    const member = await query(
-      'SELECT * FROM library_members WHERE id = ? AND is_active = TRUE',
-      [member_id]
-    );
-
-    if (member.length === 0) {
-      return res.status(404).json({ success: false, message: 'Member not found or inactive' });
-    }
-
-    // Check if membership is expired
-    if (new Date(member[0].expiry_date) < new Date()) {
-      return res.status(400).json({ success: false, message: 'Membership has expired' });
-    }
-
-    // Check if book is available
-    const bookAvailability = await query(`
-      SELECT 
-        lb.total_copies,
-        COUNT(lr.id) as borrowed_count
-      FROM library_books lb
-      LEFT JOIN library_rentals lr ON lb.id = lr.book_id AND lr.status = 'borrowed'
-      WHERE lb.id = ? AND lb.is_active = TRUE
-      GROUP BY lb.id
-    `, [book_id]);
-
-    if (bookAvailability.length === 0) {
-      return res.status(404).json({ success: false, message: 'Book not found' });
-    }
-
-    const available = bookAvailability[0].total_copies - bookAvailability[0].borrowed_count;
-    if (available <= 0) {
-      return res.status(400).json({ success: false, message: 'Book is not available' });
-    }
-
-    // Check if member already borrowed this book
-    const existingRental = await query(
-      'SELECT id FROM library_rentals WHERE member_id = ? AND book_id = ? AND status = ?',
-      [member_id, book_id, 'borrowed']
-    );
-
-    if (existingRental.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Member has already borrowed this book' 
-      });
-    }
-
-    // Create rental record
-    const result = await query(
-      `INSERT INTO library_rentals 
-      (member_id, book_id, borrowed_date, due_date, notes, issued_by)
-      VALUES (?, ?, NOW(), ?, ?, ?)`,
-      [member_id, book_id, due_date, notes, req.user.id]
-    );
-
-    res.status(201).json({ 
-      success: true, 
-      message: 'Book borrowed successfully',
-      data: { id: result.insertId }
-    });
-  } catch (error) {
-    logger.error('Borrow book error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Return a book
-export const returnBook = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { condition, fine_amount, notes } = req.body;
-
-    // Get rental details
-    const rental = await query(
-      'SELECT * FROM library_rentals WHERE id = ? AND status = ?',
-      [id, 'borrowed']
-    );
-
-    if (rental.length === 0) {
-      return res.status(404).json({ success: false, message: 'Active rental not found' });
-    }
-
-    // Update rental record
-    await query(
-      `UPDATE library_rentals 
-      SET status = 'returned', 
-          returned_date = NOW(), 
-          return_condition = ?,
-          fine_amount = ?,
-          notes = CONCAT(COALESCE(notes, ''), '\nReturn: ', ?)
-      WHERE id = ?`,
-      [condition, fine_amount || 0, notes || '', id]
-    );
-
-    res.json({ success: true, message: 'Book returned successfully' });
-  } catch (error) {
-    logger.error('Return book error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Renew a book rental
-export const renewBook = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { new_due_date } = req.body;
-
-    // Check if rental exists and is active
-    const rental = await query(
-      'SELECT * FROM library_rentals WHERE id = ? AND status = ?',
-      [id, 'borrowed']
-    );
-
-    if (rental.length === 0) {
-      return res.status(404).json({ success: false, message: 'Active rental not found' });
-    }
-
-    // Check if book is reserved by someone else
-    // (You might want to add reservation functionality)
-
-    await query(
-      'UPDATE library_rentals SET due_date = ? WHERE id = ?',
-      [new_due_date, id]
-    );
-
-    res.json({ success: true, message: 'Book rental renewed successfully' });
-  } catch (error) {
-    logger.error('Renew book error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Get rental statistics
-export const getRentalStats = async (req, res) => {
+// Get library statistics
+export const getStatistics = async (req, res) => {
   try {
     const stats = await query(`
       SELECT 
@@ -688,6 +719,24 @@ export const getRentalStats = async (req, res) => {
         COUNT(CASE WHEN status = 'borrowed' AND due_date < NOW() THEN 1 END) as overdue_books,
         SUM(CASE WHEN status = 'returned' THEN fine_amount ELSE 0 END) as total_fines_collected
       FROM library_rentals
+    `);
+
+    const bookStats = await query(`
+      SELECT 
+        COUNT(*) as total_books,
+        SUM(total_copies) as total_copies,
+        COUNT(DISTINCT category) as total_categories
+      FROM library_books
+      WHERE is_active = TRUE
+    `);
+
+    const memberStats = await query(`
+      SELECT 
+        COUNT(*) as total_members,
+        COUNT(CASE WHEN expiry_date > NOW() THEN 1 END) as active_members,
+        COUNT(CASE WHEN expiry_date <= NOW() THEN 1 END) as expired_members
+      FROM library_members
+      WHERE is_active = TRUE
     `);
 
     const topBooks = await query(`
@@ -705,12 +754,14 @@ export const getRentalStats = async (req, res) => {
     res.json({ 
       success: true, 
       data: {
-        overview: stats[0],
+        rentals: stats[0],
+        books: bookStats[0],
+        members: memberStats[0],
         topBooks: topBooks
       }
     });
   } catch (error) {
-    logger.error('Get rental stats error:', error);
+    logger.error('Get statistics error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

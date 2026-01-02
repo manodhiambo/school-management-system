@@ -1,85 +1,42 @@
-import pg from 'pg';
-import { config } from './env.js';
-import logger from '../utils/logger.js';
+import pkg from 'pg';
+const { Pool } = pkg;
+import dotenv from 'dotenv';
 
-const { Pool } = pg;
+dotenv.config();
 
-let pool = null;
-
-export const createDatabasePool = () => {
-  if (pool) return pool;
-
-  // Use DATABASE_URL if available, otherwise build from individual config
-  const connectionConfig = config.databaseUrl
-    ? {
-        connectionString: config.databaseUrl,
-        ssl: { rejectUnauthorized: false }
-      }
-    : {
-        host: config.db.host,
-        port: config.db.port,
-        user: config.db.user,
-        password: config.db.password,
-        database: config.db.name,
-        ssl: config.env === 'production' ? { rejectUnauthorized: false } : false
-      };
-
-  pool = new Pool({
-    ...connectionConfig,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  });
-
-  pool.on('error', (err) => {
-    logger.error('Unexpected database pool error:', err);
-  });
-
-  logger.info('Database pool created');
-  return pool;
-};
-
-export const getPool = () => {
-  if (!pool) {
-    createDatabasePool();
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_eO1vxZ6fhqtU@ep-empty-bush-afudt9bn-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require',
+  ssl: {
+    rejectUnauthorized: false
   }
-  return pool;
+});
+
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+  process.exit(-1);
+});
+
+// Export a query function that wraps pool.query and returns rows
+export const query = async (text, params) => {
+  const result = await pool.query(text, params);
+  return result.rows;
 };
 
-// Query function compatible with MySQL-style placeholders (?)
-// Converts ? to $1, $2, etc. for PostgreSQL
-export const query = async (sql, params = []) => {
-  const connection = getPool();
-  
-  // Convert MySQL-style ? placeholders to PostgreSQL $1, $2, etc.
-  let paramIndex = 0;
-  const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
-  
+// Test database connection
+export const testConnection = async () => {
   try {
-    const result = await connection.query(pgSql, params);
-    return result.rows;
+    const result = await pool.query('SELECT NOW()');
+    console.log('Database connection successful:', result.rows[0].now);
+    return true;
   } catch (error) {
-    logger.error('Database query error:', { sql: pgSql, error: error.message });
+    console.error('Database connection failed:', error.message);
     throw error;
   }
 };
 
-export const testConnection = async () => {
-  try {
-    const connection = getPool();
-    await connection.query('SELECT 1');
-    logger.info('Database connection test successful');
-    return true;
-  } catch (error) {
-    logger.error('Database connection test failed:', error);
-    return false;
-  }
-};
-
-// Get a client for transactions
-export const getClient = async () => {
-  const connection = getPool();
-  return await connection.connect();
-};
-
-export default { createDatabasePool, getPool, query, testConnection, getClient };
+// Also export the pool as default for backward compatibility
+export default pool;

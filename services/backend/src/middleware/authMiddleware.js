@@ -1,36 +1,34 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
-import { query } from '../config/database.js';
+import pool from '../config/database.js';
 import ApiError from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
 
 export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new ApiError(401, 'No token provided');
     }
 
     const token = authHeader.split(' ')[1];
-
     if (!token) {
       throw new ApiError(401, 'No token provided');
     }
 
     const decoded = jwt.verify(token, config.jwt.secret);
-
-    const users = await query(
+    
+    const result = await pool.query(
       'SELECT id, email, role, is_active, is_verified FROM users WHERE id = $1',
       [decoded.userId]
     );
 
-    if (users.length === 0) {
+    if (result.rows.length === 0) {
       throw new ApiError(401, 'User not found');
     }
 
-    const user = users[0];
-
+    const user = result.rows[0];
+    
     if (!user.is_active) {
       throw new ApiError(401, 'Account is deactivated');
     }
@@ -60,30 +58,28 @@ export const authenticate = async (req, res, next) => {
 export const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }
 
     const token = authHeader.split(' ')[1];
-
     if (!token) {
       return next();
     }
 
     const decoded = jwt.verify(token, config.jwt.secret);
-
-    const users = await query(
+    
+    const result = await pool.query(
       'SELECT id, email, role, is_active FROM users WHERE id = $1',
       [decoded.userId]
     );
 
-    if (users.length > 0 && users[0].is_active) {
+    if (result.rows.length > 0 && result.rows[0].is_active) {
       req.user = {
-        id: users[0].id,
-        email: users[0].email,
-        role: users[0].role,
-        isActive: users[0].is_active
+        id: result.rows[0].id,
+        email: result.rows[0].email,
+        role: result.rows[0].role,
+        isActive: result.rows[0].is_active
       };
     }
 

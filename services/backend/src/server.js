@@ -7,6 +7,7 @@ import logger from './utils/logger.js';
 import { testConnection } from './config/database.js';
 import runAllSeeds from './utils/seedData.js';
 import ensureTablesExist from './utils/createTables.js';
+import financeRoutes from './routes/financeRoutes.js';
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(helmet());
+app.use('/api/v1/finance', financeRoutes);
 app.use(cors({
   origin: [
     'http://localhost:5173',

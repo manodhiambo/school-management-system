@@ -1,31 +1,31 @@
-import pg from 'pg';
-
-const { Pool } = pg;
+import pool from './src/config/database.js';
 
 async function checkSchema() {
-  const pool = new Pool({
-    connectionString: 'postgresql://neondb_owner:npg_eO1vxZ6fhqtU@ep-empty-bush-afudt9bn-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require',
-    ssl: { rejectUnauthorized: false }
-  });
-
+  const client = await pool.connect();
   try {
-    console.log('=== Timetable Table Schema ===\n');
-    
-    const result = await pool.query(`
-      SELECT column_name, data_type, is_nullable
-      FROM information_schema.columns
-      WHERE table_name = 'timetable'
-      ORDER BY ordinal_position
-    `);
-    
-    console.log('Columns:');
-    result.rows.forEach(col => {
-      console.log(`  - ${col.column_name}: ${col.data_type} (nullable: ${col.is_nullable})`);
-    });
+    console.log('Checking existing table structures...\n');
 
+    const tables = ['users', 'students', 'teachers', 'academic_years', 'classes', 'fee_payments'];
+    
+    for (const table of tables) {
+      const result = await client.query(`
+        SELECT column_name, data_type, character_maximum_length
+        FROM information_schema.columns
+        WHERE table_name = $1
+        ORDER BY ordinal_position
+      `, [table]);
+      
+      if (result.rows.length > 0) {
+        console.log(`\n=== ${table.toUpperCase()} ===`);
+        result.rows.forEach(col => {
+          console.log(`  ${col.column_name}: ${col.data_type}${col.character_maximum_length ? `(${col.character_maximum_length})` : ''}`);
+        });
+      }
+    }
   } catch (error) {
     console.error('Error:', error.message);
   } finally {
+    client.release();
     await pool.end();
   }
 }

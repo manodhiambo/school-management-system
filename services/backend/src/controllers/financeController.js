@@ -480,6 +480,146 @@ class FinanceController {
     }
   }
 
+  // Petty Cash
+  async getPettyCash(req, res) {
+    try {
+      const { dateFrom, dateTo, transaction_type } = req.query;
+      
+      let query = `
+        SELECT 
+          pc.*,
+          u.username as created_by_name
+        FROM petty_cash pc
+        LEFT JOIN users u ON pc.created_by = u.id
+        WHERE 1=1
+      `;
+      const params = [];
+      let paramCount = 1;
+      
+      if (transaction_type) {
+        query += ` AND pc.transaction_type = $${paramCount}`;
+        params.push(transaction_type);
+        paramCount++;
+      }
+      
+      if (dateFrom) {
+        query += ` AND pc.transaction_date >= $${paramCount}`;
+        params.push(dateFrom);
+        paramCount++;
+      }
+      
+      if (dateTo) {
+        query += ` AND pc.transaction_date <= $${paramCount}`;
+        params.push(dateTo);
+        paramCount++;
+      }
+      
+      query += ` ORDER BY pc.transaction_date DESC, pc.created_at DESC`;
+      
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Error fetching petty cash:', error);
+      res.status(500).json({ error: 'Failed to fetch petty cash transactions' });
+    }
+  }
+
+  async createPettyCash(req, res) {
+    try {
+      const {
+        transaction_date,
+        transaction_type,
+        amount,
+        description,
+        custodian,
+        receipt_number,
+        category,
+      } = req.body;
+      
+      const result = await pool.query(`
+        INSERT INTO petty_cash (
+          transaction_date, transaction_type, amount, description,
+          custodian, receipt_number, category, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+        RETURNING *
+      `, [
+        transaction_date,
+        transaction_type,
+        amount,
+        description,
+        custodian,
+        receipt_number,
+        category,
+        req.user.id,
+      ]);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error('Error creating petty cash transaction:', error);
+      res.status(500).json({ error: 'Failed to create petty cash transaction' });
+    }
+  }
+
+  async getPettyCashSummary(req, res) {
+    try {
+      const summary = await pool.query(`
+        SELECT 
+          COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE 0 END), 0) as total_replenished,
+          COALESCE(SUM(CASE WHEN transaction_type = 'disbursement' THEN amount ELSE 0 END), 0) as total_disbursed,
+          COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) as current_balance,
+          COALESCE(SUM(CASE 
+            WHEN transaction_type = 'disbursement' 
+            AND transaction_date >= date_trunc('month', CURRENT_DATE)
+            THEN amount ELSE 0 
+          END), 0) as monthly_disbursed,
+          COALESCE(SUM(CASE 
+            WHEN transaction_type = 'replenishment' 
+            AND transaction_date >= date_trunc('month', CURRENT_DATE)
+            THEN amount ELSE 0 
+          END), 0) as monthly_replenished
+        FROM petty_cash
+      `);
+      
+      const custodians = await pool.query(`
+        SELECT 
+          custodian,
+          COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) as balance
+        FROM petty_cash
+        GROUP BY custodian
+        HAVING COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) > 0
+      `);
+      
+      res.json({
+        ...summary.rows[0],
+        custodians: custodians.rows,
+      });
+    } catch (error) {
+      console.error('Error fetching petty cash summary:', error);
+      res.status(500).json({ error: 'Failed to fetch petty cash summary' });
+    }
+  }
+
+  async deletePettyCash(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const result = await pool.query(`
+        DELETE FROM petty_cash 
+        WHERE id = $1
+        RETURNING *
+      `, [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      
+      res.json({ message: 'Transaction deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting petty cash transaction:', error);
+      res.status(500).json({ error: 'Failed to delete transaction' });
+    }
+  }
+
   // Reports
   async getIncomeByCategory(req, res) {
     try {

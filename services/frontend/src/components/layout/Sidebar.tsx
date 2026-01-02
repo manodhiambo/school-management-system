@@ -22,52 +22,109 @@ import {
   Bell,
   TrendingUp,
   Library,
+  Wallet,
+  Receipt,
+  CreditCard,
+  Building2,
+  TrendingDown,
 } from 'lucide-react';
 
 // Define navigation items with role-based access
 const navigationItems = [
   // Admin routes
-  { 
-    name: 'Dashboard', 
-    href: '/app/dashboard', 
-    icon: LayoutDashboard, 
-    roles: ['admin', 'teacher', 'student', 'parent'] 
+  {
+    name: 'Dashboard',
+    href: '/app/dashboard',
+    icon: LayoutDashboard,
+    roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer']
   },
-  { 
-    name: 'Students', 
-    href: '/app/students', 
-    icon: Users, 
-    roles: ['admin', 'teacher'] 
+  {
+    name: 'Students',
+    href: '/app/students',
+    icon: Users,
+    roles: ['admin', 'teacher']
   },
-  { 
-    name: 'Teachers', 
-    href: '/app/teachers', 
-    icon: GraduationCap, 
-    roles: ['admin'] 
+  {
+    name: 'Teachers',
+    href: '/app/teachers',
+    icon: GraduationCap,
+    roles: ['admin']
   },
-  { 
-    name: 'Parents', 
-    href: '/app/parents', 
-    icon: UserCheck, 
-    roles: ['admin', 'teacher'] 
+  {
+    name: 'Parents',
+    href: '/app/parents',
+    icon: UserCheck,
+    roles: ['admin', 'teacher']
   },
-  { 
-    name: 'Academic', 
-    href: '/app/academic', 
-    icon: BookOpen, 
-    roles: ['admin', 'teacher'] 
+  {
+    name: 'Academic',
+    href: '/app/academic',
+    icon: BookOpen,
+    roles: ['admin', 'teacher']
   },
-  { 
-    name: 'Attendance', 
-    href: '/app/attendance', 
-    icon: Calendar, 
-    roles: ['admin', 'teacher'] 
+  {
+    name: 'Attendance',
+    href: '/app/attendance',
+    icon: Calendar,
+    roles: ['admin', 'teacher']
   },
-  { 
-    name: 'Fee Management', 
-    href: '/app/fee', 
-    icon: DollarSign, 
-    roles: ['admin'] 
+  
+  // Finance Section
+  {
+    name: 'Finance',
+    href: '/app/finance',
+    icon: Wallet,
+    roles: ['admin', 'finance_officer'],
+    badge: 'New'
+  },
+  {
+    name: 'Income & Expenses',
+    href: '/app/finance/transactions',
+    icon: Receipt,
+    roles: ['admin', 'finance_officer']
+  },
+  {
+    name: 'Budgets',
+    href: '/app/finance/budgets',
+    icon: TrendingUp,
+    roles: ['admin', 'finance_officer']
+  },
+  {
+    name: 'Vendors & POs',
+    href: '/app/finance/vendors',
+    icon: Building2,
+    roles: ['admin', 'finance_officer']
+  },
+  {
+    name: 'Bank Accounts',
+    href: '/app/finance/bank-accounts',
+    icon: CreditCard,
+    roles: ['admin', 'finance_officer']
+  },
+  {
+    name: 'Petty Cash',
+    href: '/app/finance/petty-cash',
+    icon: DollarSign,
+    roles: ['admin', 'finance_officer']
+  },
+  {
+    name: 'Assets',
+    href: '/app/finance/assets',
+    icon: Building2,
+    roles: ['admin', 'finance_officer']
+  },
+  {
+    name: 'Financial Reports',
+    href: '/app/finance/reports',
+    icon: FileText,
+    roles: ['admin', 'finance_officer']
+  },
+  
+  {
+    name: 'Fee Management',
+    href: '/app/fee',
+    icon: DollarSign,
+    roles: ['admin']
   },
   {
     name: 'Fee Structure',
@@ -75,124 +132,122 @@ const navigationItems = [
     icon: DollarSign,
     roles: ['admin']
   },
-  { 
-    name: 'Timetable', 
-    href: '/app/timetable', 
-    icon: Clock, 
-    roles: ['admin', 'teacher'] 
+  {
+    name: 'Timetable',
+    href: '/app/timetable',
+    icon: Clock,
+    roles: ['admin', 'teacher']
   },
-  { 
-    name: 'Communication', 
-    href: '/app/communication', 
-    icon: MessageSquare, 
-    roles: ['admin', 'teacher'] 
+  {
+    name: 'Communication',
+    href: '/app/communication',
+    icon: MessageSquare,
+    roles: ['admin', 'teacher']
   },
-  { 
-    name: 'User Management', 
-    href: '/app/users', 
-    icon: Shield, 
-    roles: ['admin'] 
+  {
+    name: 'User Management',
+    href: '/app/users',
+    icon: Shield,
+    roles: ['admin']
   },
-  { 
-    name: 'Settings', 
-    href: '/app/settings', 
-    icon: Settings, 
-    roles: ['admin'] 
+  {
+    name: 'Settings',
+    href: '/app/settings',
+    icon: Settings,
+    roles: ['admin']
   },
-  
+
   // Student routes
-  { 
-    name: 'My Courses', 
-    href: '/app/my-courses', 
-    icon: BookOpen, 
-    roles: ['student'] 
+  {
+    name: 'My Courses',
+    href: '/app/my-courses',
+    icon: BookOpen,
+    roles: ['student']
   },
-  { 
-    name: 'My Attendance', 
-    href: '/app/my-attendance', 
-    icon: Calendar, 
-    roles: ['student'] 
+  {
+    name: 'My Attendance',
+    href: '/app/my-attendance',
+    icon: Calendar,
+    roles: ['student']
   },
-  { 
-    name: 'My Results', 
-    href: '/app/my-results', 
-    icon: Award, 
-    roles: ['student'] 
+  {
+    name: 'My Results',
+    href: '/app/my-results',
+    icon: Award,
+    roles: ['student']
   },
-  { 
-    name: 'My Fees', 
-    href: '/app/my-fees', 
-    icon: DollarSign, 
-    roles: ['student'] 
+  {
+    name: 'My Fees',
+    href: '/app/my-fees',
+    icon: DollarSign,
+    roles: ['student']
   },
-  { 
-    name: 'My Timetable', 
-    href: '/app/my-timetable', 
-    icon: Clock, 
-    roles: ['student', 'teacher'] 
+  {
+    name: 'My Timetable',
+    href: '/app/my-timetable',
+    icon: Clock,
+    roles: ['student', 'teacher']
   },
-  { 
-    name: 'Assignments', 
-    href: '/app/assignments', 
-    icon: FileText, 
-    roles: ['student', 'teacher'] 
+  {
+    name: 'Assignments',
+    href: '/app/assignments',
+    icon: FileText,
+    roles: ['student', 'teacher']
   },
-  { 
-    name: 'Messages', 
-    href: '/app/messages', 
-    icon: MessageSquare, 
-    roles: ['student'] 
+  {
+    name: 'Messages',
+    href: '/app/messages',
+    icon: MessageSquare,
+    roles: ['student']
   },
-  
+
   // Parent routes
-  { 
-    name: 'My Children', 
-    href: '/app/my-children', 
-    icon: Users, 
-    roles: ['parent'] 
+  {
+    name: 'My Children',
+    href: '/app/my-children',
+    icon: Users,
+    roles: ['parent']
   },
-  { 
-    name: 'Children Progress', 
-    href: '/app/children-progress', 
-    icon: TrendingUp, 
-    roles: ['parent'] 
+  {
+    name: 'Children Progress',
+    href: '/app/children-progress',
+    icon: TrendingUp,
+    roles: ['parent']
   },
-  { 
-    name: 'Fee Payments', 
-    href: '/app/fee-payments', 
-    icon: DollarSign, 
-    roles: ['parent'] 
+  {
+    name: 'Fee Payments',
+    href: '/app/fee-payments',
+    icon: DollarSign,
+    roles: ['parent']
   },
-  { 
-    name: 'Notifications', 
-    href: '/app/notifications', 
-    icon: Bell, 
-    roles: ['parent', 'student'] 
+  {
+    name: 'Notifications',
+    href: '/app/notifications',
+    icon: Bell,
+    roles: ['parent', 'student']
   },
-  
+
   // Teacher routes
-  { 
-    name: 'My Classes', 
-    href: '/app/my-classes', 
-    icon: Users, 
-    roles: ['teacher'] 
+  {
+    name: 'My Classes',
+    href: '/app/my-classes',
+    icon: Users,
+    roles: ['teacher']
   },
-  { 
-    name: 'Grade Book', 
-    href: '/app/gradebook', 
-    icon: Award, 
-    roles: ['teacher'] 
+  {
+    name: 'Grade Book',
+    href: '/app/gradebook',
+    icon: Award,
+    roles: ['teacher']
   },
-  
-  // Profile (all roles)
+
+  // Library routes
   {
     name: 'Library Members',
     href: '/app/library-members',
     icon: Users,
     roles: ['admin']
   },
-
-  // Library routes
   {
     name: 'Library Catalog',
     href: '/app/library',
@@ -218,11 +273,11 @@ const navigationItems = [
     roles: ['admin', 'teacher']
   },
 
-  { 
-    name: 'My Profile', 
-    href: '/app/profile', 
-    icon: User, 
-    roles: ['admin', 'teacher', 'student', 'parent'] 
+  {
+    name: 'My Profile',
+    href: '/app/profile',
+    icon: User,
+    roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer']
   },
 ];
 
@@ -245,11 +300,13 @@ export function Sidebar() {
       case 'teacher': return 'bg-blue-600';
       case 'student': return 'bg-green-600';
       case 'parent': return 'bg-purple-600';
+      case 'finance_officer': return 'bg-yellow-600';
       default: return 'bg-gray-600';
     }
   };
 
   const getRoleLabel = (role: string) => {
+    if (role === 'finance_officer') return 'Finance Officer';
     return role.charAt(0).toUpperCase() + role.slice(1);
   };
 
@@ -311,14 +368,14 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
           {filteredNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
+            const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
             return (
               <Link
                 key={item.name}
                 to={item.href}
                 onClick={() => setIsOpen(false)}
                 className={cn(
-                  'group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors',
+                  'group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors relative',
                   isActive
                     ? 'bg-gray-800 text-white'
                     : 'text-gray-300 hover:bg-gray-800 hover:text-white'
@@ -326,6 +383,11 @@ export function Sidebar() {
               >
                 <item.icon className={cn('mr-3 h-5 w-5 flex-shrink-0', isActive ? 'text-white' : 'text-gray-400')} />
                 {item.name}
+                {item.badge && (
+                  <span className="ml-auto bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

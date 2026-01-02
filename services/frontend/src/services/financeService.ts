@@ -97,132 +97,108 @@ export interface PettyCashSummary {
 class FinanceService {
   // Chart of Accounts
   async getChartOfAccounts() {
-    const response = await api.get(`${BASE_URL}/chart-of-accounts`);
-    return response.data;
+    return api.get(`${BASE_URL}/chart-of-accounts`);
   }
 
   async createAccount(data: Partial<ChartOfAccount>) {
-    const response = await api.post(`${BASE_URL}/chart-of-accounts`, data);
-    return response.data;
+    return api.post(`${BASE_URL}/chart-of-accounts`, data);
   }
 
   // Financial Years
   async getFinancialYears() {
-    const response = await api.get(`${BASE_URL}/financial-years`);
-    return response.data;
+    return api.get(`${BASE_URL}/financial-years`);
   }
 
   async createFinancialYear(data: Partial<FinancialYear>) {
-    const response = await api.post(`${BASE_URL}/financial-years`, data);
-    return response.data;
+    return api.post(`${BASE_URL}/financial-years`, data);
   }
 
   // Income
   async getIncomeRecords(params?: any) {
-    const response = await api.get(`${BASE_URL}/income`, { params });
-    return response.data;
+    return api.get(`${BASE_URL}/income`, { params });
   }
 
   async createIncome(data: Partial<IncomeRecord>) {
-    const response = await api.post(`${BASE_URL}/income`, data);
-    return response.data;
+    return api.post(`${BASE_URL}/income`, data);
   }
 
   // Expenses
   async getExpenseRecords(params?: any) {
-    const response = await api.get(`${BASE_URL}/expenses`, { params });
-    return response.data;
+    return api.get(`${BASE_URL}/expenses`, { params });
   }
 
   async createExpense(data: Partial<ExpenseRecord>) {
-    const response = await api.post(`${BASE_URL}/expenses`, data);
-    return response.data;
+    return api.post(`${BASE_URL}/expenses`, data);
   }
 
   async approveExpense(id: string) {
-    const response = await api.put(`${BASE_URL}/expenses/${id}/approve`);
-    return response.data;
+    return api.put(`${BASE_URL}/expenses/${id}/approve`);
   }
 
   async rejectExpense(id: string, reason: string) {
-    const response = await api.put(`${BASE_URL}/expenses/${id}/reject`, { reason });
-    return response.data;
+    return api.put(`${BASE_URL}/expenses/${id}/reject`, { reason });
   }
 
   async payExpense(id: string) {
-    const response = await api.put(`${BASE_URL}/expenses/${id}/pay`);
-    return response.data;
+    return api.put(`${BASE_URL}/expenses/${id}/pay`);
   }
 
   // Vendors
   async getVendors() {
-    const response = await api.get(`${BASE_URL}/vendors`);
-    return response.data;
+    return api.get(`${BASE_URL}/vendors`);
   }
 
   async createVendor(data: Partial<Vendor>) {
-    const response = await api.post(`${BASE_URL}/vendors`, data);
-    return response.data;
+    return api.post(`${BASE_URL}/vendors`, data);
   }
 
   // Bank Accounts
   async getBankAccounts() {
-    const response = await api.get(`${BASE_URL}/bank-accounts`);
-    return response.data;
+    return api.get(`${BASE_URL}/bank-accounts`);
   }
 
   async createBankAccount(data: Partial<BankAccount>) {
-    const response = await api.post(`${BASE_URL}/bank-accounts`, data);
-    return response.data;
+    return api.post(`${BASE_URL}/bank-accounts`, data);
   }
 
   // Petty Cash
   async getPettyCash(params?: any) {
-    const response = await api.get(`${BASE_URL}/petty-cash`, { params });
-    return response.data;
+    return api.get(`${BASE_URL}/petty-cash`, { params });
   }
 
   async createPettyCash(data: Partial<PettyCashTransaction>) {
-    const response = await api.post(`${BASE_URL}/petty-cash`, data);
-    return response.data;
+    return api.post(`${BASE_URL}/petty-cash`, data);
   }
 
   async getPettyCashSummary() {
-    const response = await api.get(`${BASE_URL}/petty-cash/summary`);
-    return response.data;
+    return api.get(`${BASE_URL}/petty-cash/summary`);
   }
 
   async deletePettyCash(id: string) {
-    const response = await api.delete(`${BASE_URL}/petty-cash/${id}`);
-    return response.data;
+    return api.delete(`${BASE_URL}/petty-cash/${id}`);
   }
 
   // Dashboard
   async getDashboard() {
-    const response = await api.get(`${BASE_URL}/dashboard`);
-    return response.data;
+    return api.get(`${BASE_URL}/dashboard`);
   }
 
   // Reports
   async getIncomeByCategory(params?: any) {
-    const response = await api.get(`${BASE_URL}/reports/income-by-category`, { params });
-    return response.data;
+    return api.get(`${BASE_URL}/reports/income-by-category`, { params });
   }
 
   async getExpensesByCategory(params?: any) {
-    const response = await api.get(`${BASE_URL}/reports/expenses-by-category`, { params });
-    return response.data;
+    return api.get(`${BASE_URL}/reports/expenses-by-category`, { params });
   }
 
   // Settings
   async getSettings() {
-    const response = await api.get(`${BASE_URL}/settings`);
-    return response.data;
+    return api.get(`${BASE_URL}/settings`);
   }
 
   async updateSetting(key: string, value: any) {
-    const response = await api.put(`${BASE_URL}/settings/${key}`, { value });
-    return response.data;
+    return api.put(`${BASE_URL}/settings/${key}`, { value });
   }
 
   // Calculate VAT (16% for Kenya)

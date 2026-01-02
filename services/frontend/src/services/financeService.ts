@@ -69,6 +69,31 @@ export interface BankAccount {
   is_active: boolean;
 }
 
+export interface PettyCashTransaction {
+  id: string;
+  transaction_date: Date;
+  transaction_type: 'disbursement' | 'replenishment';
+  amount: number;
+  description: string;
+  custodian: string;
+  receipt_number?: string;
+  category?: string;
+  created_by?: string;
+  created_by_name?: string;
+}
+
+export interface PettyCashSummary {
+  total_replenished: number;
+  total_disbursed: number;
+  current_balance: number;
+  monthly_disbursed: number;
+  monthly_replenished: number;
+  custodians: Array<{
+    custodian: string;
+    balance: number;
+  }>;
+}
+
 class FinanceService {
   // Chart of Accounts
   async getChartOfAccounts() {
@@ -148,6 +173,27 @@ class FinanceService {
 
   async createBankAccount(data: Partial<BankAccount>) {
     const response = await api.post(`${BASE_URL}/bank-accounts`, data);
+    return response.data;
+  }
+
+  // Petty Cash
+  async getPettyCash(params?: any) {
+    const response = await api.get(`${BASE_URL}/petty-cash`, { params });
+    return response.data;
+  }
+
+  async createPettyCash(data: Partial<PettyCashTransaction>) {
+    const response = await api.post(`${BASE_URL}/petty-cash`, data);
+    return response.data;
+  }
+
+  async getPettyCashSummary() {
+    const response = await api.get(`${BASE_URL}/petty-cash/summary`);
+    return response.data;
+  }
+
+  async deletePettyCash(id: string) {
+    const response = await api.delete(`${BASE_URL}/petty-cash/${id}`);
     return response.data;
   }
 

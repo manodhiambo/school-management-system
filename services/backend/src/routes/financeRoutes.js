@@ -38,6 +38,12 @@ router.post('/vendors', financeController.createVendor);
 router.get('/bank-accounts', financeController.getBankAccounts);
 router.post('/bank-accounts', financeController.createBankAccount);
 
+// Petty Cash
+router.get('/petty-cash', financeController.getPettyCash);
+router.post('/petty-cash', financeController.createPettyCash);
+router.get('/petty-cash/summary', financeController.getPettyCashSummary);
+router.delete('/petty-cash/:id', financeController.deletePettyCash);
+
 // Reports
 router.get('/reports/income-by-category', financeController.getIncomeByCategory);
 router.get('/reports/expenses-by-category', financeController.getExpensesByCategory);

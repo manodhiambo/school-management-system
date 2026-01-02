@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Building2, FileText, Search } from 'lucide-react';
+import { Plus, Building2, FileText, Search, XCircle, Edit, Trash } from 'lucide-react';
 import financeService, { Vendor } from '@/services/financeService';
 
 export default function Vendors() {
@@ -9,10 +9,21 @@ export default function Vendors() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    vendor_name: '',
+    contact_person: '',
+    email: '',
+    phone: '',
+    address: '',
+    tax_id: '',
+  });
 
   useEffect(() => {
-    loadVendors();
-  }, []);
+    if (activeTab === 'vendors') {
+      loadVendors();
+    }
+  }, [activeTab]);
 
   const loadVendors = async () => {
     try {
@@ -21,14 +32,42 @@ export default function Vendors() {
       setVendors(data);
     } catch (error) {
       console.error('Failed to load vendors:', error);
+      alert('Failed to load vendors');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      await financeService.createVendor(formData);
+      alert('Vendor created successfully!');
+      setShowModal(false);
+      resetForm();
+      loadVendors();
+    } catch (error) {
+      console.error('Failed to create vendor:', error);
+      alert('Failed to create vendor');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      vendor_name: '',
+      contact_person: '',
+      email: '',
+      phone: '',
+      address: '',
+      tax_id: '',
+    });
+  };
+
   const filteredVendors = vendors.filter(vendor =>
     vendor.vendor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    vendor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    vendor.phone?.includes(searchTerm)
   );
 
   return (
@@ -38,7 +77,10 @@ export default function Vendors() {
           <h1 className="text-3xl font-bold text-gray-900">Vendors & Purchase Orders</h1>
           <p className="text-gray-600 mt-1">Manage suppliers and purchase orders</p>
         </div>
-        <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <button 
+          onClick={() => setShowModal(true)}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
           <Plus className="h-5 w-5 mr-2" />
           {activeTab === 'vendors' ? 'Add Vendor' : 'Create PO'}
         </button>
@@ -107,16 +149,24 @@ export default function Vendors() {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">{vendor.vendor_name}</h3>
                   {vendor.contact_person && (
-                    <p className="text-sm text-gray-600 mb-1">Contact: {vendor.contact_person}</p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      <span className="font-medium">Contact:</span> {vendor.contact_person}
+                    </p>
                   )}
                   {vendor.email && (
-                    <p className="text-sm text-gray-600 mb-1">Email: {vendor.email}</p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      <span className="font-medium">Email:</span> {vendor.email}
+                    </p>
                   )}
                   {vendor.phone && (
-                    <p className="text-sm text-gray-600 mb-1">Phone: {vendor.phone}</p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      <span className="font-medium">Phone:</span> {vendor.phone}
+                    </p>
                   )}
                   {vendor.tax_id && (
-                    <p className="text-sm text-gray-600">Tax ID: {vendor.tax_id}</p>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">Tax ID:</span> {vendor.tax_id}
+                    </p>
                   )}
                 </div>
               ))
@@ -134,6 +184,130 @@ export default function Vendors() {
           <p className="text-center text-gray-500 py-8">
             Purchase Orders feature coming soon!
           </p>
+        </div>
+      )}
+
+      {/* Vendor Modal */}
+      {showModal && activeTab === 'vendors' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Add New Vendor</h2>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Vendor Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.vendor_name}
+                  onChange={(e) => setFormData({ ...formData, vendor_name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  placeholder="e.g., ABC Suppliers Ltd"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Contact Person
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.contact_person}
+                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    placeholder="John Doe"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    placeholder="vendor@example.com"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    placeholder="+254 700 000000"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tax ID / PIN
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.tax_id}
+                    onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    placeholder="A000000000A"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <textarea
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  rows={3}
+                  placeholder="Physical address"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Create Vendor
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

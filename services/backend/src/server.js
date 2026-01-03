@@ -1,107 +1,93 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import dotenv from 'dotenv';
-import routes from './routes/index.js';
-import logger from './utils/logger.js';
 import { testConnection } from './config/database.js';
-import runAllSeeds from './utils/seedData.js';
-import ensureTablesExist from './utils/createTables.js';
+
+// Import routes
+import authRoutes from './routes/authRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
+import parentRoutes from './routes/parentRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
+import feeRoutes from './routes/feeRoutes.js';
+import timetableRoutes from './routes/timetableRoutes.js';
+import communicationRoutes from './routes/communicationRoutes.js';
+import assignmentRoutes from './routes/assignmentRoutes.js';
+import gradebookRoutes from './routes/gradebookRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
+import passwordRoutes from './routes/passwordRoutes.js';
 import financeRoutes from './routes/financeRoutes.js';
+import academicRoutes from './routes/academicRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import libraryRoutes from './routes/libraryRoutes.js';
+
+// Import routes with different naming
+import classesRoutes from './routes/classes.routes.js';
+import subjectsRoutes from './routes/subjects.routes.js';
+import examsRoutes from './routes/exams.routes.js';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(helmet());
-app.use('/api/v1/finance', financeRoutes);
-app.use(cors({
+// CORS configuration - allow production domain
+const corsOptions = {
   origin: [
-    'http://localhost:5173',
     'http://localhost:3000',
+    'http://localhost:5173',
     'https://skulmanager.org',
-    'https://www.skulmanager.org',
-    'https://school-management-system-fhbwful50.vercel.app',
-    /\.vercel\.app$/
+    'https://www.skulmanager.org'
   ],
-  credentials: true
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+  credentials: true,
+  optionsSuccessStatus: 200
+};
 
-// Request logging (skip health checks)
-app.use((req, res, next) => {
-  if (req.path !== '/' && req.path !== '/health') {
-    logger.info(`${req.method} ${req.path}`);
-  }
-  next();
-});
+app.use(cors(corsOptions));
+app.use(express.json());
 
-// Root route - for health checks
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'School Management API',
-    version: '1.0.0',
-    timestamp: new Date().toISOString() 
-  });
-});
+// Test database connection
+testConnection();
 
-// Also handle HEAD requests for health checks
-app.head('/', (req, res) => {
-  res.status(200).end();
-});
-
-// Health check
+// Health check route
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'OK', message: 'Server is running' });
 });
 
 // API routes
-app.use('/api/v1', routes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/students', studentRoutes);
+app.use('/api/v1/teachers', teacherRoutes);
+app.use('/api/v1/parents', parentRoutes);
+app.use('/api/v1/classes', classesRoutes);
+app.use('/api/v1/subjects', subjectsRoutes);
+app.use('/api/v1/attendance', attendanceRoutes);
+app.use('/api/v1/fee', feeRoutes);
+app.use('/api/v1/exams', examsRoutes);
+app.use('/api/v1/timetable', timetableRoutes);
+app.use('/api/v1/communication', communicationRoutes);
+app.use('/api/v1/admin', dashboardRoutes);
+app.use('/api/v1/assignments', assignmentRoutes);
+app.use('/api/v1/gradebook', gradebookRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/password', passwordRoutes);
+app.use('/api/v1/finance', financeRoutes);
+app.use('/api/v1/academic', academicRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/library', libraryRoutes);
 
-// 404 handler
-app.use((req, res) => {
-  logger.error(`Error: Route ${req.method} ${req.originalUrl} not found`);
-  res.status(404).json({
-    success: false,
-    statusCode: 404,
-    message: `Route ${req.originalUrl} not found`
-  });
-});
-
-// Error handler
+// Error handling middleware
 app.use((err, req, res, next) => {
-  logger.error('Server error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server
-async function startServer() {
-  try {
-    // Test database connection
-    await testConnection();
-    logger.info('Database connected successfully');
-    
-    // Ensure all tables exist
-    await ensureTablesExist();
-    
-    // Run seeds
-    await runAllSeeds();
-    
-    app.listen(PORT, () => {
-      logger.info(`Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
+const PORT = process.env.PORT || 5000;
 
-startServer();
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+export default app;

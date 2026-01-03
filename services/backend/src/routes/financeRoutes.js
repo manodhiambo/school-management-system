@@ -44,6 +44,13 @@ router.post('/petty-cash', financeController.createPettyCash);
 router.get('/petty-cash/summary', financeController.getPettyCashSummary);
 router.delete('/petty-cash/:id', financeController.deletePettyCash);
 
+// Assets
+router.get('/assets', financeController.getAssets);
+router.post('/assets', financeController.createAsset);
+router.put('/assets/:id', financeController.updateAsset);
+router.delete('/assets/:id', financeController.deleteAsset);
+router.get('/assets/summary', financeController.getAssetsSummary);
+
 // Reports
 router.get('/reports/income-by-category', financeController.getIncomeByCategory);
 router.get('/reports/expenses-by-category', financeController.getExpensesByCategory);

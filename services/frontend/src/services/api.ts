@@ -797,6 +797,25 @@ class ApiService {
   getBudgetVarianceById(id: string) {
     return this.api.get('/budgets/' + id + '/variance');
   }
+
+  // ======================
+  // FEE COLLECTION (Finance Integration)
+  // ======================
+  getFeeCollectionSummary() {
+    return this.api.get('/finance/fee-collection/summary');
+  }
+
+  getFeeCollectionByMonth(params?: any) {
+    return this.api.get('/finance/fee-collection/by-month', { params });
+  }
+
+  getFeeCollectionByClass() {
+    return this.api.get('/finance/fee-collection/by-class');
+  }
+
+  getFeeDefaulters(params?: any) {
+    return this.api.get('/finance/fee-collection/defaulters', { params });
+  }
 }
 
 export default new ApiService();

@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// All finance routes require authentication and finance role
+// All finance routes require authentication
 router.use(authenticate);
 router.use(authorize(['admin', 'finance_officer']));
 
@@ -51,20 +51,6 @@ router.put('/assets/:id', financeController.updateAsset);
 router.delete('/assets/:id', financeController.deleteAsset);
 router.get('/assets/summary', financeController.getAssetsSummary);
 
-// Budgets
-router.get('/budgets', financeController.getBudgets);
-router.post('/budgets', financeController.createBudget);
-router.put('/budgets/:id', financeController.updateBudget);
-router.delete('/budgets/:id', financeController.deleteBudget);
-router.put('/budgets/:id/approve', financeController.approveBudget);
-
-// Purchase Orders
-router.get('/purchase-orders', financeController.getPurchaseOrders);
-router.post('/purchase-orders', financeController.createPurchaseOrder);
-router.put('/purchase-orders/:id', financeController.updatePurchaseOrder);
-router.delete('/purchase-orders/:id', financeController.deletePurchaseOrder);
-router.put('/purchase-orders/:id/approve', financeController.approvePurchaseOrder);
-
 // Reports
 router.get('/reports/income-by-category', financeController.getIncomeByCategory);
 router.get('/reports/expenses-by-category', financeController.getExpensesByCategory);
@@ -72,5 +58,11 @@ router.get('/reports/expenses-by-category', financeController.getExpensesByCateg
 // Settings
 router.get('/settings', financeController.getSettings);
 router.put('/settings/:key', financeController.updateSetting);
+
+// Fee Collection Integration
+router.get('/fee-collection/summary', financeController.getFeeCollectionSummary);
+router.get('/fee-collection/by-month', financeController.getFeeCollectionByMonth);
+router.get('/fee-collection/by-class', financeController.getFeeCollectionByClass);
+router.get('/fee-collection/defaulters', financeController.getFeeDefaulters);
 
 export default router;

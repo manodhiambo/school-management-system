@@ -24,7 +24,17 @@ class FinanceController {
     try {
       const client = await pool.connect();
       
-        let financialYear = null;
+      try {
+//         const currentYear = await client.query(`
+//           SELECT * FROM financial_years 
+//           WHERE is_active = true 
+//           ORDER BY start_date DESC 
+//           LIMIT 1
+//         `);
+//         
+//         const financialYear = currentYear.rows[0];
+        const financialYear = null;
+        
         const incomeResult = await client.query(`
           SELECT 
             COALESCE(SUM(total_amount), 0) as total,

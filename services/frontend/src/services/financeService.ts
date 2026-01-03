@@ -20,25 +20,29 @@ export interface FinancialYear {
 
 export interface IncomeRecord {
   id: string;
-  transaction_date: Date;
+  income_number: string;
+  income_date: Date;
   account_id: string;
   amount: number;
   vat_amount?: number;
+  total_amount: number;
   description: string;
-  reference_number?: string;
+  payment_reference?: string;
   payment_method: string;
   status: string;
 }
 
 export interface ExpenseRecord {
   id: string;
-  transaction_date: Date;
+  expense_number: string;
+  expense_date: Date;
   account_id: string;
   vendor_id?: string;
   amount: number;
   vat_amount?: number;
+  total_amount: number;
   description: string;
-  reference_number?: string;
+  payment_reference?: string;
   payment_method: string;
   status: 'pending' | 'approved' | 'rejected' | 'paid';
   approval_status?: string;
@@ -46,12 +50,13 @@ export interface ExpenseRecord {
 
 export interface Vendor {
   id: string;
+  vendor_code: string;
   vendor_name: string;
   contact_person?: string;
   email?: string;
   phone?: string;
   address?: string;
-  tax_id?: string;
+  kra_pin?: string;
   is_active: boolean;
 }
 
@@ -69,11 +74,12 @@ export interface BankAccount {
 
 export interface PettyCashTransaction {
   id: string;
+  transaction_number: string;
   transaction_date: Date;
   transaction_type: 'disbursement' | 'replenishment';
   amount: number;
   description: string;
-  custodian: string;
+  payee_name: string;
   receipt_number?: string;
   category?: string;
   created_by?: string;
@@ -90,6 +96,50 @@ export interface PettyCashSummary {
     custodian: string;
     balance: number;
   }>;
+}
+
+export interface Budget {
+  id: string;
+  budget_name: string;
+  financial_year_id: string;
+  financial_year_name?: string;
+  start_date: string;
+  end_date: string;
+  total_amount: number;
+  spent_amount: number;
+  status: 'draft' | 'approved' | 'active' | 'closed';
+  description?: string;
+  created_at: string;
+  created_by_name?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  po_number: string;
+  po_date: string;
+  vendor_id: string;
+  vendor_name?: string;
+  expected_delivery_date: string;
+  subtotal: number;
+  vat_amount: number;
+  total_amount: number;
+  terms_conditions?: string;
+  notes?: string;
+  status: 'draft' | 'approved' | 'sent' | 'received' | 'cancelled';
+  created_at: string;
+  created_by_name?: string;
+}
+
+export interface Asset {
+  id: string;
+  asset_name: string;
+  category: string;
+  purchase_date: string;
+  purchase_cost: number;
+  current_value: number;
+  location?: string;
+  status: 'active' | 'disposed' | 'under_maintenance';
+  created_at: string;
 }
 
 class FinanceService {
@@ -174,6 +224,69 @@ class FinanceService {
 
   deletePettyCash(id: string) {
     return api.deletePettyCash(id);
+  }
+
+  // Assets
+  getAssets(params?: any) {
+    return api.getAssets(params);
+  }
+
+  createAsset(data: Partial<Asset>) {
+    return api.createAsset(data);
+  }
+
+  updateAsset(id: string, data: Partial<Asset>) {
+    return api.updateAsset(id, data);
+  }
+
+  deleteAsset(id: string) {
+    return api.deleteAsset(id);
+  }
+
+  getAssetsSummary() {
+    return api.getAssetsSummary();
+  }
+
+  // Budgets
+  getBudgets(params?: any) {
+    return api.getBudgets(params);
+  }
+
+  createBudget(data: Partial<Budget>) {
+    return api.createBudget(data);
+  }
+
+  updateBudget(id: string, data: Partial<Budget>) {
+    return api.updateBudget(id, data);
+  }
+
+  deleteBudget(id: string) {
+    return api.deleteBudget(id);
+  }
+
+  approveBudget(id: string) {
+    return api.approveBudget(id);
+  }
+
+  // Purchase Orders
+  getPurchaseOrders(params?: any) {
+    return api.getPurchaseOrders(params);
+  }
+
+  createPurchaseOrder(data: Partial<PurchaseOrder>) {
+    return api.createPurchaseOrder(data);
+  }
+
+  updatePurchaseOrder(id: string, data: Partial<PurchaseOrder>) {
+    return api.updatePurchaseOrder(id, data);
+  }
+
+  deletePurchaseOrder(id: string) {
+    return api.deletePurchaseOrder(id);
+  }
+
+  approvePurchaseOrder(id: string) {
+    return api.approvePurchaseOrder(id);
   }
 
   // Dashboard

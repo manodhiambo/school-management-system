@@ -4,7 +4,7 @@ import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { LoginPage } from './pages/auth/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 
-// Admin & Teacher Pages
+// Dashboard & Main Pages
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { StudentsPage } from './pages/students/StudentsPage';
 import { TeachersPage } from './pages/teachers/TeachersPage';
@@ -37,14 +37,27 @@ import { FeePaymentsPage } from './pages/parent/FeePaymentsPage';
 import { MyClassesPage } from './pages/teacher/MyClassesPage';
 import { GradeBookPage } from './pages/teacher/GradeBookPage';
 
-// Shared Pages
-import { ProfilePage } from './pages/settings/ProfilePage';
-
 // Library Pages
 import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
 import { MyBorrowingsPage } from './pages/library/MyBorrowingsPage';
 import { LibraryManagementPage } from './pages/library/LibraryManagementPage';
 import { BorrowingsPage } from './pages/library/BorrowingsPage';
+import { LibraryMembersPage } from './pages/library/LibraryMembersPage';
+
+// Finance Pages
+import {
+  FinanceDashboard,
+  Transactions,
+  Budgets,
+  Vendors,
+  BankAccounts,
+  PettyCash,
+  Assets,
+  Reports,
+} from './pages/finance';
+
+// Shared Pages
+import { ProfilePage } from './pages/shared/ProfilePage';
 
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -80,7 +93,7 @@ function App() {
             >
               <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
-              
+
               {/* Admin & Teacher Routes */}
               <Route path="students" element={<StudentsPage />} />
               <Route path="teachers" element={<TeachersPage />} />
@@ -93,7 +106,17 @@ function App() {
               <Route path="communication" element={<CommunicationPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="settings" element={<SettingsPage />} />
-              
+
+              {/* Finance Routes - Admin & Finance Officer */}
+              <Route path="finance" element={<FinanceDashboard />} />
+              <Route path="finance/transactions" element={<Transactions />} />
+              <Route path="finance/budgets" element={<Budgets />} />
+              <Route path="finance/vendors" element={<Vendors />} />
+              <Route path="finance/bank-accounts" element={<BankAccounts />} />
+              <Route path="finance/petty-cash" element={<PettyCash />} />
+              <Route path="finance/assets" element={<Assets />} />
+              <Route path="finance/reports" element={<Reports />} />
+
               {/* Student Routes */}
               <Route path="my-courses" element={<MyCoursesPage />} />
               <Route path="my-attendance" element={<MyAttendancePage />} />
@@ -103,25 +126,26 @@ function App() {
               <Route path="assignments" element={<AssignmentsPage />} />
               <Route path="messages" element={<MessagesPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
-              
+
               {/* Parent Routes */}
               <Route path="my-children" element={<MyChildrenPage />} />
               <Route path="children-progress" element={<ChildrenProgressPage />} />
               <Route path="fee-payments" element={<FeePaymentsPage />} />
-              
+
               {/* Teacher Routes */}
               <Route path="my-classes" element={<MyClassesPage />} />
               <Route path="gradebook" element={<GradeBookPage />} />
-              
-              {/* Shared Routes */}
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />
               <Route path="my-books" element={<MyBorrowingsPage />} />
               <Route path="library-management" element={<LibraryManagementPage />} />
               <Route path="library-borrowings" element={<BorrowingsPage />} />
+              <Route path="library-members" element={<LibraryMembersPage />} />
+
+              {/* Shared Routes */}
               <Route path="profile" element={<ProfilePage />} />
-              
+
               <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
             </Route>
           </Routes>

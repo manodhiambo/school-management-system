@@ -855,6 +855,7 @@ class FinanceController {
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Setting not found' });
+      res.json(result.rows[0]);
       }
     } catch (error) {
       console.error('Error updating setting:', error);

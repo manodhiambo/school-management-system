@@ -1,13 +1,30 @@
 import pool from '../config/database.js';
 
 class FinanceController {
-  // Dashboard - Get financial overview
+  // Helper function to generate unique numbers
+  async generateNumber(prefix, table, column) {
+    const result = await pool.query(`
+      SELECT ${column} FROM ${table} 
+      WHERE ${column} LIKE $1 
+      ORDER BY ${column} DESC 
+      LIMIT 1
+    `, [`${prefix}%`]);
+    
+    if (result.rows.length === 0) {
+      return `${prefix}00001`;
+    }
+    
+    const lastNumber = result.rows[0][column];
+    const numPart = parseInt(lastNumber.replace(prefix, '')) + 1;
+    return `${prefix}${String(numPart).padStart(5, '0')}`;
+  }
+
+  // Dashboard
   async getDashboard(req, res) {
     try {
       const client = await pool.connect();
       
       try {
-        // Get current financial year
         const currentYear = await client.query(`
           SELECT * FROM financial_years 
           WHERE is_active = true 
@@ -17,7 +34,6 @@ class FinanceController {
         
         const financialYear = currentYear.rows[0];
         
-        // Get total income
         const incomeResult = await client.query(`
           SELECT 
             COALESCE(SUM(total_amount), 0) as total,
@@ -30,7 +46,6 @@ class FinanceController {
           WHERE status = 'completed'
         `);
         
-        // Get total expenses
         const expenseResult = await client.query(`
           SELECT 
             COALESCE(SUM(total_amount), 0) as total,
@@ -43,7 +58,6 @@ class FinanceController {
           FROM expense_records
         `);
         
-        // Get bank balance
         const bankResult = await client.query(`
           SELECT COALESCE(SUM(current_balance), 0) as total
           FROM bank_accounts
@@ -75,7 +89,6 @@ class FinanceController {
     }
   }
 
-  // Chart of Accounts
   async getChartOfAccounts(req, res) {
     try {
       const result = await pool.query(`
@@ -107,7 +120,6 @@ class FinanceController {
     }
   }
 
-  // Financial Years
   async getFinancialYears(req, res) {
     try {
       const result = await pool.query(`
@@ -138,7 +150,6 @@ class FinanceController {
     }
   }
 
-  // Income Records
   async getIncomeRecords(req, res) {
     try {
       const { status, dateFrom, dateTo } = req.query;
@@ -195,6 +206,9 @@ class FinanceController {
         payment_method,
       } = req.body;
       
+      // Generate income number
+      const incomeNumber = await this.generateNumber('INC-', 'income_records', 'income_number');
+      
       // Calculate VAT if not provided
       const vatRate = vat_amount ? 0 : 16;
       const finalVatAmount = vat_amount || (amount * 16 / 100);
@@ -202,12 +216,13 @@ class FinanceController {
       
       const result = await pool.query(`
         INSERT INTO income_records (
-          income_date, account_id, amount, vat_rate, vat_amount, total_amount,
+          income_number, income_date, account_id, amount, vat_rate, vat_amount, total_amount,
           description, payment_reference, payment_method,
           status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, NOW(), NOW())
         RETURNING *
       `, [
+        incomeNumber,
         transaction_date,
         account_id,
         amount,
@@ -227,7 +242,6 @@ class FinanceController {
     }
   }
 
-  // Expense Records
   async getExpenseRecords(req, res) {
     try {
       const { status, dateFrom, dateTo } = req.query;
@@ -287,6 +301,9 @@ class FinanceController {
         payment_method,
       } = req.body;
       
+      // Generate expense number
+      const expenseNumber = await this.generateNumber('EXP-', 'expense_records', 'expense_number');
+      
       // Calculate VAT and total
       const vatRate = vat_amount ? 0 : 16;
       const finalVatAmount = vat_amount || (amount * 16 / 100);
@@ -304,12 +321,13 @@ class FinanceController {
       
       const result = await pool.query(`
         INSERT INTO expense_records (
-          expense_date, account_id, vendor_id, amount, vat_rate, vat_amount, total_amount,
+          expense_number, expense_date, account_id, vendor_id, amount, vat_rate, vat_amount, total_amount,
           description, payment_reference, payment_method,
           approval_status, status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
         RETURNING *
       `, [
+        expenseNumber,
         transaction_date,
         account_id,
         vendor_id,
@@ -409,7 +427,6 @@ class FinanceController {
     }
   }
 
-  // Vendors
   async getVendors(req, res) {
     try {
       const result = await pool.query(`
@@ -434,12 +451,15 @@ class FinanceController {
         tax_id,
       } = req.body;
       
+      // Generate vendor code
+      const vendorCode = await this.generateNumber('VEN-', 'vendors', 'vendor_code');
+      
       const result = await pool.query(`
         INSERT INTO vendors (
-          vendor_name, contact_person, email, phone, address, kra_pin, is_active, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, true, $7, NOW(), NOW())
+          vendor_code, vendor_name, contact_person, email, phone, address, kra_pin, is_active, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, NOW(), NOW())
         RETURNING *
-      `, [vendor_name, contact_person, email, phone, address, tax_id, req.user.id]);
+      `, [vendorCode, vendor_name, contact_person, email, phone, address, tax_id, req.user.id]);
       
       res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -448,7 +468,6 @@ class FinanceController {
     }
   }
 
-  // Bank Accounts
   async getBankAccounts(req, res) {
     try {
       const result = await pool.query(`
@@ -497,7 +516,6 @@ class FinanceController {
     }
   }
 
-  // Petty Cash
   async getPettyCash(req, res) {
     try {
       const { dateFrom, dateTo, transaction_type } = req.query;
@@ -553,13 +571,17 @@ class FinanceController {
         category,
       } = req.body;
       
+      // Generate transaction number
+      const transactionNumber = await this.generateNumber('PC-', 'petty_cash', 'transaction_number');
+      
       const result = await pool.query(`
         INSERT INTO petty_cash (
-          transaction_date, transaction_type, amount, description,
+          transaction_number, transaction_date, transaction_type, amount, description,
           payee_name, receipt_number, category, created_by, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         RETURNING *
       `, [
+        transactionNumber,
         transaction_date,
         transaction_type,
         amount,

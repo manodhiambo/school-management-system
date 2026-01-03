@@ -671,6 +671,75 @@ class ApiService {
   updateFinanceSetting(key: string, value: any) {
     return this.api.put('/finance/settings/' + key, { value });
   }
+
+  // ======================
+  // FINANCE ASSETS
+  // ======================
+  getAssets(params?: any) {
+    return this.api.get('/finance/assets', { params });
+  }
+
+  createAsset(data: any) {
+    return this.api.post('/finance/assets', data);
+  }
+
+  updateAsset(id: string, data: any) {
+    return this.api.put('/finance/assets/' + id, data);
+  }
+
+  deleteAsset(id: string) {
+    return this.api.delete('/finance/assets/' + id);
+  }
+
+  getAssetsSummary() {
+    return this.api.get('/finance/assets/summary');
+  }
+
+  // ======================
+  // FINANCE BUDGETS
+  // ======================
+  getBudgets(params?: any) {
+    return this.api.get('/finance/budgets', { params });
+  }
+
+  createBudget(data: any) {
+    return this.api.post('/finance/budgets', data);
+  }
+
+  updateBudget(id: string, data: any) {
+    return this.api.put('/finance/budgets/' + id, data);
+  }
+
+  deleteBudget(id: string) {
+    return this.api.delete('/finance/budgets/' + id);
+  }
+
+  approveBudget(id: string) {
+    return this.api.put('/finance/budgets/' + id + '/approve');
+  }
+
+  // ======================
+  // PURCHASE ORDERS
+  // ======================
+  getPurchaseOrders(params?: any) {
+    return this.api.get('/finance/purchase-orders', { params });
+  }
+
+  createPurchaseOrder(data: any) {
+    return this.api.post('/finance/purchase-orders', data);
+  }
+
+  updatePurchaseOrder(id: string, data: any) {
+    return this.api.put('/finance/purchase-orders/' + id, data);
+  }
+
+  deletePurchaseOrder(id: string) {
+    return this.api.delete('/finance/purchase-orders/' + id);
+  }
+
+  approvePurchaseOrder(id: string) {
+    return this.api.put('/finance/purchase-orders/' + id + '/approve');
+  }
 }
 
 export default new ApiService();

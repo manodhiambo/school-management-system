@@ -51,6 +51,20 @@ router.put('/assets/:id', financeController.updateAsset);
 router.delete('/assets/:id', financeController.deleteAsset);
 router.get('/assets/summary', financeController.getAssetsSummary);
 
+// Budgets
+router.get('/budgets', financeController.getBudgets);
+router.post('/budgets', financeController.createBudget);
+router.put('/budgets/:id', financeController.updateBudget);
+router.delete('/budgets/:id', financeController.deleteBudget);
+router.put('/budgets/:id/approve', financeController.approveBudget);
+
+// Purchase Orders
+router.get('/purchase-orders', financeController.getPurchaseOrders);
+router.post('/purchase-orders', financeController.createPurchaseOrder);
+router.put('/purchase-orders/:id', financeController.updatePurchaseOrder);
+router.delete('/purchase-orders/:id', financeController.deletePurchaseOrder);
+router.put('/purchase-orders/:id/approve', financeController.approvePurchaseOrder);
+
 // Reports
 router.get('/reports/income-by-category', financeController.getIncomeByCategory);
 router.get('/reports/expenses-by-category', financeController.getExpensesByCategory);

@@ -20,10 +20,10 @@ class FinanceController {
         // Get total income
         const incomeResult = await client.query(`
           SELECT 
-            COALESCE(SUM(amount + COALESCE(vat_amount, 0)), 0) as total,
+            COALESCE(SUM(total_amount), 0) as total,
             COALESCE(SUM(CASE 
-              WHEN transaction_date >= date_trunc('month', CURRENT_DATE) 
-              THEN amount + COALESCE(vat_amount, 0) 
+              WHEN income_date >= date_trunc('month', CURRENT_DATE) 
+              THEN total_amount 
               ELSE 0 
             END), 0) as monthly
           FROM income_records
@@ -59,7 +59,7 @@ class FinanceController {
           totalIncome,
           totalExpenses,
           netProfit: totalIncome - totalExpenses,
-          pendingApprovals: parseInt(expenseResult.rows[0].pending_approvals),
+          pendingApprovals: parseInt(expenseResult.rows[0].pending_approvals || 0),
           bankBalance: parseFloat(bankResult.rows[0].total),
           monthlyIncome,
           monthlyExpenses,
@@ -162,18 +162,18 @@ class FinanceController {
       }
       
       if (dateFrom) {
-        query += ` AND ir.transaction_date >= $${paramCount}`;
+        query += ` AND ir.income_date >= $${paramCount}`;
         params.push(dateFrom);
         paramCount++;
       }
       
       if (dateTo) {
-        query += ` AND ir.transaction_date <= $${paramCount}`;
+        query += ` AND ir.income_date <= $${paramCount}`;
         params.push(dateTo);
         paramCount++;
       }
       
-      query += ` ORDER BY ir.transaction_date DESC`;
+      query += ` ORDER BY ir.income_date DESC`;
       
       const result = await pool.query(query, params);
       res.json(result.rows);
@@ -195,18 +195,25 @@ class FinanceController {
         payment_method,
       } = req.body;
       
+      // Calculate VAT if not provided
+      const vatRate = vat_amount ? 0 : 16;
+      const finalVatAmount = vat_amount || (amount * 16 / 100);
+      const totalAmount = parseFloat(amount) + parseFloat(finalVatAmount);
+      
       const result = await pool.query(`
         INSERT INTO income_records (
-          transaction_date, account_id, amount, vat_amount,
-          description, reference_number, payment_method,
+          income_date, account_id, amount, vat_rate, vat_amount, total_amount,
+          description, payment_reference, payment_method,
           status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, NOW(), NOW())
         RETURNING *
       `, [
         transaction_date,
         account_id,
         amount,
-        vat_amount,
+        vatRate,
+        finalVatAmount,
+        totalAmount,
         description,
         reference_number,
         payment_method,
@@ -488,7 +495,7 @@ class FinanceController {
       let query = `
         SELECT 
           pc.*,
-          u.username as created_by_name
+          u.email as created_by_name
         FROM petty_cash pc
         LEFT JOIN users u ON pc.created_by = u.id
         WHERE 1=1
@@ -539,8 +546,8 @@ class FinanceController {
       const result = await pool.query(`
         INSERT INTO petty_cash (
           transaction_date, transaction_type, amount, description,
-          custodian, receipt_number, category, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+          payee_name, receipt_number, category, created_by, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
         RETURNING *
       `, [
         transaction_date,
@@ -582,10 +589,11 @@ class FinanceController {
       
       const custodians = await pool.query(`
         SELECT 
-          custodian,
+          payee_name as custodian,
           COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) as balance
         FROM petty_cash
-        GROUP BY custodian
+        WHERE payee_name IS NOT NULL
+        GROUP BY payee_name
         HAVING COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) > 0
       `);
       
@@ -620,33 +628,10 @@ class FinanceController {
     }
   }
 
-  // Assets
+  // Assets - simplified for now
   async getAssets(req, res) {
     try {
-      const { category, status } = req.query;
-      
-      let query = `
-        SELECT * FROM assets
-        WHERE 1=1
-      `;
-      const params = [];
-      let paramCount = 1;
-      
-      if (category) {
-        query += ` AND category = $${paramCount}`;
-        params.push(category);
-        paramCount++;
-      }
-      
-      if (status) {
-        query += ` AND status = $${paramCount}`;
-        params.push(status);
-        paramCount++;
-      }
-      
-      query += ` ORDER BY purchase_date DESC`;
-      
-      const result = await pool.query(query, params);
+      const result = await pool.query(`SELECT * FROM assets ORDER BY purchase_date DESC`);
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching assets:', error);
@@ -656,40 +641,21 @@ class FinanceController {
 
   async createAsset(req, res) {
     try {
-      const {
-        asset_name,
-        category,
-        purchase_date,
-        purchase_cost,
-        current_value,
-        depreciation_method,
-        useful_life_years,
-        salvage_value,
-        location,
-        serial_number,
-        status,
-      } = req.body;
-      
+      const data = req.body;
       const result = await pool.query(`
         INSERT INTO assets (
           asset_name, category, purchase_date, purchase_cost,
-          current_value, depreciation_method, useful_life_years,
-          salvage_value, location, serial_number, status,
-          created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+          current_value, location, status, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
         RETURNING *
       `, [
-        asset_name,
-        category,
-        purchase_date,
-        purchase_cost,
-        current_value || purchase_cost,
-        depreciation_method || 'straight_line',
-        useful_life_years,
-        salvage_value || 0,
-        location,
-        serial_number,
-        status || 'active',
+        data.asset_name,
+        data.category,
+        data.purchase_date,
+        data.purchase_cost,
+        data.current_value || data.purchase_cost,
+        data.location,
+        data.status || 'active',
         req.user.id,
       ]);
       
@@ -703,13 +669,7 @@ class FinanceController {
   async updateAsset(req, res) {
     try {
       const { id } = req.params;
-      const {
-        asset_name,
-        category,
-        current_value,
-        location,
-        status,
-      } = req.body;
+      const data = req.body;
       
       const result = await pool.query(`
         UPDATE assets 
@@ -722,7 +682,7 @@ class FinanceController {
           updated_at = NOW()
         WHERE id = $6
         RETURNING *
-      `, [asset_name, category, current_value, location, status, id]);
+      `, [data.asset_name, data.category, data.current_value, data.location, data.status, id]);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Asset not found' });
@@ -738,10 +698,7 @@ class FinanceController {
   async deleteAsset(req, res) {
     try {
       const { id } = req.params;
-      
-      const result = await pool.query(`
-        DELETE FROM assets WHERE id = $1 RETURNING *
-      `, [id]);
+      const result = await pool.query(`DELETE FROM assets WHERE id = $1 RETURNING *`, [id]);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Asset not found' });
@@ -759,12 +716,9 @@ class FinanceController {
       const summary = await pool.query(`
         SELECT 
           COUNT(*) as total_assets,
-          SUM(purchase_cost) as total_purchase_cost,
-          SUM(current_value) as total_current_value,
-          SUM(purchase_cost - current_value) as total_depreciation,
-          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_assets,
-          COUNT(CASE WHEN status = 'disposed' THEN 1 END) as disposed_assets,
-          COUNT(CASE WHEN status = 'under_maintenance' THEN 1 END) as under_maintenance
+          COALESCE(SUM(purchase_cost), 0) as total_purchase_cost,
+          COALESCE(SUM(current_value), 0) as total_current_value,
+          COALESCE(SUM(purchase_cost - current_value), 0) as total_depreciation
         FROM assets
       `);
       
@@ -772,7 +726,7 @@ class FinanceController {
         SELECT 
           category,
           COUNT(*) as count,
-          SUM(current_value) as total_value
+          COALESCE(SUM(current_value), 0) as total_value
         FROM assets
         WHERE status = 'active'
         GROUP BY category
@@ -795,7 +749,7 @@ class FinanceController {
       const result = await pool.query(`
         SELECT 
           coa.account_name as category,
-          SUM(ir.amount + COALESCE(ir.vat_amount, 0)) as total
+          COALESCE(SUM(ir.total_amount), 0) as total
         FROM income_records ir
         JOIN chart_of_accounts coa ON ir.account_id = coa.id
         WHERE ir.status = 'completed'
@@ -815,7 +769,7 @@ class FinanceController {
       const result = await pool.query(`
         SELECT 
           coa.account_name as category,
-          SUM(er.amount + COALESCE(er.vat_amount, 0)) as total
+          COALESCE(SUM(er.amount + COALESCE(er.vat_amount, 0)), 0) as total
         FROM expense_records er
         JOIN chart_of_accounts coa ON er.account_id = coa.id
         WHERE er.status IN ('approved', 'paid')

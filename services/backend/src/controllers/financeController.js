@@ -865,3 +865,314 @@ class FinanceController {
 }
 
 export default new FinanceController();
+
+// Extend the FinanceController class with Budget and Purchase Order methods
+const FinanceControllerExtension = {
+  // ==================
+  // BUDGETS
+  // ==================
+  async getBudgets(req, res) {
+    try {
+      const result = await pool.query(`
+        SELECT 
+          b.*,
+          fy.name as financial_year_name,
+          u.email as created_by_name
+        FROM budgets b
+        LEFT JOIN financial_years fy ON b.financial_year_id = fy.id
+        LEFT JOIN users u ON b.created_by = u.id
+        ORDER BY b.created_at DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Error fetching budgets:', error);
+      res.status(500).json({ error: 'Failed to fetch budgets' });
+    }
+  },
+
+  async createBudget(req, res) {
+    try {
+      const {
+        budget_name,
+        financial_year_id,
+        start_date,
+        end_date,
+        total_amount,
+        description,
+      } = req.body;
+      
+      const result = await pool.query(`
+        INSERT INTO budgets (
+          budget_name, financial_year_id, start_date, end_date,
+          total_amount, spent_amount, status, description,
+          created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, 0, 'draft', $6, $7, NOW(), NOW())
+        RETURNING *
+      `, [
+        budget_name,
+        financial_year_id,
+        start_date,
+        end_date,
+        total_amount,
+        description,
+        req.user.id,
+      ]);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error('Error creating budget:', error);
+      res.status(500).json({ error: 'Failed to create budget' });
+    }
+  },
+
+  async updateBudget(req, res) {
+    try {
+      const { id } = req.params;
+      const {
+        budget_name,
+        financial_year_id,
+        start_date,
+        end_date,
+        total_amount,
+        status,
+        description,
+      } = req.body;
+      
+      const result = await pool.query(`
+        UPDATE budgets 
+        SET 
+          budget_name = COALESCE($1, budget_name),
+          financial_year_id = COALESCE($2, financial_year_id),
+          start_date = COALESCE($3, start_date),
+          end_date = COALESCE($4, end_date),
+          total_amount = COALESCE($5, total_amount),
+          status = COALESCE($6, status),
+          description = COALESCE($7, description),
+          updated_at = NOW()
+        WHERE id = $8
+        RETURNING *
+      `, [budget_name, financial_year_id, start_date, end_date, total_amount, status, description, id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Budget not found' });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating budget:', error);
+      res.status(500).json({ error: 'Failed to update budget' });
+    }
+  },
+
+  async deleteBudget(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const result = await pool.query(`
+        DELETE FROM budgets WHERE id = $1 RETURNING *
+      `, [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Budget not found' });
+      }
+      
+      res.json({ message: 'Budget deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting budget:', error);
+      res.status(500).json({ error: 'Failed to delete budget' });
+    }
+  },
+
+  async approveBudget(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const result = await pool.query(`
+        UPDATE budgets 
+        SET status = 'approved',
+            approved_by = $1,
+            approved_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $2 AND status = 'draft'
+        RETURNING *
+      `, [req.user.id, id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Budget not found or already approved' });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error approving budget:', error);
+      res.status(500).json({ error: 'Failed to approve budget' });
+    }
+  },
+
+  // ==================
+  // PURCHASE ORDERS
+  // ==================
+  async getPurchaseOrders(req, res) {
+    try {
+      const { status } = req.query;
+      
+      let query = `
+        SELECT 
+          po.*,
+          v.vendor_name,
+          v.contact_person,
+          u.email as created_by_name
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN users u ON po.created_by = u.id
+        WHERE 1=1
+      `;
+      const params = [];
+      
+      if (status) {
+        query += ` AND po.status = $1`;
+        params.push(status);
+      }
+      
+      query += ` ORDER BY po.created_at DESC`;
+      
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Error fetching purchase orders:', error);
+      res.status(500).json({ error: 'Failed to fetch purchase orders' });
+    }
+  },
+
+  async createPurchaseOrder(req, res) {
+    try {
+      const {
+        vendor_id,
+        po_date,
+        expected_delivery_date,
+        subtotal,
+        vat_amount,
+        total_amount,
+        terms_conditions,
+        notes,
+      } = req.body;
+      
+      // Generate PO number
+      const poNumber = await this.generateNumber('PO-', 'purchase_orders', 'po_number');
+      
+      const result = await pool.query(`
+        INSERT INTO purchase_orders (
+          po_number, po_date, vendor_id, expected_delivery_date,
+          subtotal, vat_amount, total_amount, terms_conditions,
+          notes, status, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft', $10, NOW(), NOW())
+        RETURNING *
+      `, [
+        poNumber,
+        po_date,
+        vendor_id,
+        expected_delivery_date,
+        subtotal,
+        vat_amount,
+        total_amount,
+        terms_conditions,
+        notes,
+        req.user.id,
+      ]);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error('Error creating purchase order:', error);
+      res.status(500).json({ error: 'Failed to create purchase order' });
+    }
+  },
+
+  async updatePurchaseOrder(req, res) {
+    try {
+      const { id } = req.params;
+      const {
+        vendor_id,
+        po_date,
+        expected_delivery_date,
+        subtotal,
+        vat_amount,
+        total_amount,
+        terms_conditions,
+        notes,
+        status,
+      } = req.body;
+      
+      const result = await pool.query(`
+        UPDATE purchase_orders 
+        SET 
+          vendor_id = COALESCE($1, vendor_id),
+          po_date = COALESCE($2, po_date),
+          expected_delivery_date = COALESCE($3, expected_delivery_date),
+          subtotal = COALESCE($4, subtotal),
+          vat_amount = COALESCE($5, vat_amount),
+          total_amount = COALESCE($6, total_amount),
+          terms_conditions = COALESCE($7, terms_conditions),
+          notes = COALESCE($8, notes),
+          status = COALESCE($9, status),
+          updated_at = NOW()
+        WHERE id = $10
+        RETURNING *
+      `, [vendor_id, po_date, expected_delivery_date, subtotal, vat_amount, total_amount, terms_conditions, notes, status, id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Purchase order not found' });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating purchase order:', error);
+      res.status(500).json({ error: 'Failed to update purchase order' });
+    }
+  },
+
+  async deletePurchaseOrder(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const result = await pool.query(`
+        DELETE FROM purchase_orders WHERE id = $1 RETURNING *
+      `, [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Purchase order not found' });
+      }
+      
+      res.json({ message: 'Purchase order deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting purchase order:', error);
+      res.status(500).json({ error: 'Failed to delete purchase order' });
+    }
+  },
+
+  async approvePurchaseOrder(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const result = await pool.query(`
+        UPDATE purchase_orders 
+        SET status = 'approved',
+            approved_by = $1,
+            approved_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $2 AND status = 'draft'
+        RETURNING *
+      `, [req.user.id, id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Purchase order not found or already approved' });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error approving purchase order:', error);
+      res.status(500).json({ error: 'Failed to approve purchase order' });
+    }
+  },
+};
+
+// Merge the extension methods into FinanceController
+Object.assign(FinanceController.prototype, FinanceControllerExtension);

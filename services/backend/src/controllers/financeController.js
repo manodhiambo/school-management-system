@@ -1,39 +1,40 @@
+
 import pool from '../config/database.js';
 
-class FinanceController {
-  // Helper function to generate unique numbers
-  async generateNumber(prefix, table, column) {
-    const result = await pool.query(`
-      SELECT ${column} FROM ${table} 
-      WHERE ${column} LIKE $1 
-      ORDER BY ${column} DESC 
-      LIMIT 1
-    `, [`${prefix}%`]);
-    
-    if (result.rows.length === 0) {
-      return `${prefix}00001`;
-    }
-    
-    const lastNumber = result.rows[0][column];
-    const numPart = parseInt(lastNumber.replace(prefix, '')) + 1;
-    return `${prefix}${String(numPart).padStart(5, '0')}`;
+// Helper function to generate unique numbers (standalone)
+async function generateNumber(prefix, table, column) {
+  const result = await pool.query(`
+    SELECT ${column} FROM ${table}
+    WHERE ${column} LIKE $1
+    ORDER BY ${column} DESC
+    LIMIT 1
+  `, [`${prefix}%`]);
+
+  if (result.rows.length === 0) {
+    return `${prefix}00001`;
   }
 
+  const lastNumber = result.rows[0][column];
+  const numPart = parseInt(lastNumber.replace(prefix, '')) + 1;
+  return `${prefix}${String(numPart).padStart(5, '0')}`;
+}
+
+
+class FinanceController {
   // Dashboard
   async getDashboard(req, res) {
     try {
       const client = await pool.connect();
       
       try {
-//         const currentYear = await client.query(`
-//           SELECT * FROM financial_years 
-//           WHERE is_active = true 
-//           ORDER BY start_date DESC 
-//           LIMIT 1
-//         `);
-//         
-//         const financialYear = currentYear.rows[0];
-        const financialYear = null;
+        const currentYear = await client.query(`
+          SELECT * FROM financial_years 
+          WHERE is_active = true 
+          ORDER BY start_date DESC 
+          LIMIT 1
+        `);
+        
+        const financialYear = currentYear.rows[0];
         
         const incomeResult = await client.query(`
           SELECT 
@@ -208,7 +209,7 @@ class FinanceController {
       } = req.body;
       
       // Generate income number
-      const incomeNumber = await this.generateNumber('INC-', 'income_records', 'income_number');
+      const incomeNumber = await generateNumber('INC-', 'income_records', 'income_number');
       
       // Calculate VAT if not provided
       const vatRate = vat_amount ? 0 : 16;
@@ -303,7 +304,7 @@ class FinanceController {
       } = req.body;
       
       // Generate expense number
-      const expenseNumber = await this.generateNumber('EXP-', 'expense_records', 'expense_number');
+      const expenseNumber = await generateNumber('EXP-', 'expense_records', 'expense_number');
       
       // Calculate VAT and total
       const vatRate = vat_amount ? 0 : 16;
@@ -453,7 +454,7 @@ class FinanceController {
       } = req.body;
       
       // Generate vendor code
-      const vendorCode = await this.generateNumber('VEN-', 'vendors', 'vendor_code');
+      const vendorCode = await generateNumber('VEN-', 'vendors', 'vendor_code');
       
       const result = await pool.query(`
         INSERT INTO vendors (
@@ -573,7 +574,7 @@ class FinanceController {
       } = req.body;
       
       // Generate transaction number
-      const transactionNumber = await this.generateNumber('PC-', 'petty_cash', 'transaction_number');
+      const transactionNumber = await generateNumber('PC-', 'petty_cash', 'transaction_number');
       
       const result = await pool.query(`
         INSERT INTO petty_cash (
@@ -855,7 +856,6 @@ class FinanceController {
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Setting not found' });
-      res.json(result.rows[0]);
       }
     } catch (error) {
       console.error('Error updating setting:', error);

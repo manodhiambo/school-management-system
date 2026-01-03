@@ -1,7 +1,5 @@
 import api from './api';
 
-const BASE_URL = '/finance';
-
 export interface ChartOfAccount {
   id: string;
   account_code: string;
@@ -96,109 +94,109 @@ export interface PettyCashSummary {
 
 class FinanceService {
   // Chart of Accounts
-  async getChartOfAccounts() {
-    return api.get(`${BASE_URL}/chart-of-accounts`);
+  getChartOfAccounts() {
+    return api.getChartOfAccounts();
   }
 
-  async createAccount(data: Partial<ChartOfAccount>) {
-    return api.post(`${BASE_URL}/chart-of-accounts`, data);
+  createAccount(data: Partial<ChartOfAccount>) {
+    return api.createChartOfAccount(data);
   }
 
   // Financial Years
-  async getFinancialYears() {
-    return api.get(`${BASE_URL}/financial-years`);
+  getFinancialYears() {
+    return api.getFinancialYears();
   }
 
-  async createFinancialYear(data: Partial<FinancialYear>) {
-    return api.post(`${BASE_URL}/financial-years`, data);
+  createFinancialYear(data: Partial<FinancialYear>) {
+    return api.createFinancialYear(data);
   }
 
   // Income
-  async getIncomeRecords(params?: any) {
-    return api.get(`${BASE_URL}/income`, { params });
+  getIncomeRecords(params?: any) {
+    return api.getIncomeRecords(params);
   }
 
-  async createIncome(data: Partial<IncomeRecord>) {
-    return api.post(`${BASE_URL}/income`, data);
+  createIncome(data: Partial<IncomeRecord>) {
+    return api.createIncome(data);
   }
 
   // Expenses
-  async getExpenseRecords(params?: any) {
-    return api.get(`${BASE_URL}/expenses`, { params });
+  getExpenseRecords(params?: any) {
+    return api.getExpenseRecords(params);
   }
 
-  async createExpense(data: Partial<ExpenseRecord>) {
-    return api.post(`${BASE_URL}/expenses`, data);
+  createExpense(data: Partial<ExpenseRecord>) {
+    return api.createExpense(data);
   }
 
-  async approveExpense(id: string) {
-    return api.put(`${BASE_URL}/expenses/${id}/approve`);
+  approveExpense(id: string) {
+    return api.approveExpense(id);
   }
 
-  async rejectExpense(id: string, reason: string) {
-    return api.put(`${BASE_URL}/expenses/${id}/reject`, { reason });
+  rejectExpense(id: string, reason: string) {
+    return api.rejectExpense(id, reason);
   }
 
-  async payExpense(id: string) {
-    return api.put(`${BASE_URL}/expenses/${id}/pay`);
+  payExpense(id: string) {
+    return api.payExpense(id);
   }
 
   // Vendors
-  async getVendors() {
-    return api.get(`${BASE_URL}/vendors`);
+  getVendors() {
+    return api.getVendors();
   }
 
-  async createVendor(data: Partial<Vendor>) {
-    return api.post(`${BASE_URL}/vendors`, data);
+  createVendor(data: Partial<Vendor>) {
+    return api.createVendor(data);
   }
 
   // Bank Accounts
-  async getBankAccounts() {
-    return api.get(`${BASE_URL}/bank-accounts`);
+  getBankAccounts() {
+    return api.getBankAccounts();
   }
 
-  async createBankAccount(data: Partial<BankAccount>) {
-    return api.post(`${BASE_URL}/bank-accounts`, data);
+  createBankAccount(data: Partial<BankAccount>) {
+    return api.createBankAccount(data);
   }
 
   // Petty Cash
-  async getPettyCash(params?: any) {
-    return api.get(`${BASE_URL}/petty-cash`, { params });
+  getPettyCash(params?: any) {
+    return api.getPettyCash(params);
   }
 
-  async createPettyCash(data: Partial<PettyCashTransaction>) {
-    return api.post(`${BASE_URL}/petty-cash`, data);
+  createPettyCash(data: Partial<PettyCashTransaction>) {
+    return api.createPettyCash(data);
   }
 
-  async getPettyCashSummary() {
-    return api.get(`${BASE_URL}/petty-cash/summary`);
+  getPettyCashSummary() {
+    return api.getPettyCashSummary();
   }
 
-  async deletePettyCash(id: string) {
-    return api.delete(`${BASE_URL}/petty-cash/${id}`);
+  deletePettyCash(id: string) {
+    return api.deletePettyCash(id);
   }
 
   // Dashboard
-  async getDashboard() {
-    return api.get(`${BASE_URL}/dashboard`);
+  getDashboard() {
+    return api.getFinanceDashboard();
   }
 
   // Reports
-  async getIncomeByCategory(params?: any) {
-    return api.get(`${BASE_URL}/reports/income-by-category`, { params });
+  getIncomeByCategory(params?: any) {
+    return api.getIncomeByCategory(params);
   }
 
-  async getExpensesByCategory(params?: any) {
-    return api.get(`${BASE_URL}/reports/expenses-by-category`, { params });
+  getExpensesByCategory(params?: any) {
+    return api.getExpensesByCategory(params);
   }
 
   // Settings
-  async getSettings() {
-    return api.get(`${BASE_URL}/settings`);
+  getSettings() {
+    return api.getFinanceSettings();
   }
 
-  async updateSetting(key: string, value: any) {
-    return api.put(`${BASE_URL}/settings/${key}`, { value });
+  updateSetting(key: string, value: any) {
+    return api.updateFinanceSetting(key, value);
   }
 
   // Calculate VAT (16% for Kenya)

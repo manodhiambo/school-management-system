@@ -529,11 +529,7 @@ class ApiService {
     return this.api.get('/gradebook/student/' + studentId);
   }
 
-  // --------------------------
   // Password & Notifications
-  // --------------------------
-
-  // Password Management
   changePassword(data: { currentPassword: string; newPassword: string }) {
     return this.api.post('/password/change', data);
   }
@@ -546,7 +542,6 @@ class ApiService {
     return this.api.post('/password/reset-bulk', data);
   }
 
-  // Enhanced Notifications
   sendNotification(data: {
     title: string;
     message: string;
@@ -575,6 +570,106 @@ class ApiService {
 
   deleteNotification(id: string) {
     return this.api.delete('/notifications/' + id);
+  }
+
+  // ======================
+  // FINANCE MODULE
+  // ======================
+
+  getFinanceDashboard() {
+    return this.api.get('/finance/dashboard');
+  }
+
+  getChartOfAccounts() {
+    return this.api.get('/finance/chart-of-accounts');
+  }
+
+  createChartOfAccount(data: any) {
+    return this.api.post('/finance/chart-of-accounts', data);
+  }
+
+  getFinancialYears() {
+    return this.api.get('/finance/financial-years');
+  }
+
+  createFinancialYear(data: any) {
+    return this.api.post('/finance/financial-years', data);
+  }
+
+  getIncomeRecords(params?: any) {
+    return this.api.get('/finance/income', { params });
+  }
+
+  createIncome(data: any) {
+    return this.api.post('/finance/income', data);
+  }
+
+  getExpenseRecords(params?: any) {
+    return this.api.get('/finance/expenses', { params });
+  }
+
+  createExpense(data: any) {
+    return this.api.post('/finance/expenses', data);
+  }
+
+  approveExpense(id: string) {
+    return this.api.put('/finance/expenses/' + id + '/approve');
+  }
+
+  rejectExpense(id: string, reason: string) {
+    return this.api.put('/finance/expenses/' + id + '/reject', { reason });
+  }
+
+  payExpense(id: string) {
+    return this.api.put('/finance/expenses/' + id + '/pay');
+  }
+
+  getVendors() {
+    return this.api.get('/finance/vendors');
+  }
+
+  createVendor(data: any) {
+    return this.api.post('/finance/vendors', data);
+  }
+
+  getBankAccounts() {
+    return this.api.get('/finance/bank-accounts');
+  }
+
+  createBankAccount(data: any) {
+    return this.api.post('/finance/bank-accounts', data);
+  }
+
+  getPettyCash(params?: any) {
+    return this.api.get('/finance/petty-cash', { params });
+  }
+
+  createPettyCash(data: any) {
+    return this.api.post('/finance/petty-cash', data);
+  }
+
+  getPettyCashSummary() {
+    return this.api.get('/finance/petty-cash/summary');
+  }
+
+  deletePettyCash(id: string) {
+    return this.api.delete('/finance/petty-cash/' + id);
+  }
+
+  getIncomeByCategory(params?: any) {
+    return this.api.get('/finance/reports/income-by-category', { params });
+  }
+
+  getExpensesByCategory(params?: any) {
+    return this.api.get('/finance/reports/expenses-by-category', { params });
+  }
+
+  getFinanceSettings() {
+    return this.api.get('/finance/settings');
+  }
+
+  updateFinanceSetting(key: string, value: any) {
+    return this.api.put('/finance/settings/' + key, { value });
   }
 }
 

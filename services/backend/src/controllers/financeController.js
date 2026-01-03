@@ -33,13 +33,13 @@ class FinanceController {
         // Get total expenses
         const expenseResult = await client.query(`
           SELECT 
-            COALESCE(SUM(amount + COALESCE(vat_amount, 0)), 0) as total,
+            COALESCE(SUM(total_amount), 0) as total,
             COALESCE(SUM(CASE 
-              WHEN transaction_date >= date_trunc('month', CURRENT_DATE) 
-              THEN amount + COALESCE(vat_amount, 0) 
+              WHEN expense_date >= date_trunc('month', CURRENT_DATE) 
+              THEN total_amount 
               ELSE 0 
             END), 0) as monthly,
-            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals
+            COUNT(CASE WHEN approval_status = 'pending' THEN 1 END) as pending_approvals
           FROM expense_records
         `);
         
@@ -253,18 +253,18 @@ class FinanceController {
       }
       
       if (dateFrom) {
-        query += ` AND er.transaction_date >= $${paramCount}`;
+        query += ` AND er.expense_date >= $${paramCount}`;
         params.push(dateFrom);
         paramCount++;
       }
       
       if (dateTo) {
-        query += ` AND er.transaction_date <= $${paramCount}`;
+        query += ` AND er.expense_date <= $${paramCount}`;
         params.push(dateTo);
         paramCount++;
       }
       
-      query += ` ORDER BY er.transaction_date DESC`;
+      query += ` ORDER BY er.expense_date DESC`;
       
       const result = await pool.query(query, params);
       res.json(result.rows);
@@ -287,31 +287,40 @@ class FinanceController {
         payment_method,
       } = req.body;
       
-      // Check if approval required based on settings
+      // Calculate VAT and total
+      const vatRate = vat_amount ? 0 : 16;
+      const finalVatAmount = vat_amount || (amount * 16 / 100);
+      const totalAmount = parseFloat(amount) + parseFloat(finalVatAmount);
+      
+      // Check if approval required
       const settingsResult = await pool.query(`
         SELECT setting_value FROM finance_settings 
         WHERE setting_key = 'expense_approval_threshold'
       `);
       
       const threshold = settingsResult.rows[0]?.setting_value || 10000;
+      const approvalStatus = amount >= threshold ? 'pending' : 'approved';
       const status = amount >= threshold ? 'pending' : 'approved';
       
       const result = await pool.query(`
         INSERT INTO expense_records (
-          transaction_date, account_id, vendor_id, amount, vat_amount,
-          description, reference_number, payment_method,
-          status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+          expense_date, account_id, vendor_id, amount, vat_rate, vat_amount, total_amount,
+          description, payment_reference, payment_method,
+          approval_status, status, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
         RETURNING *
       `, [
         transaction_date,
         account_id,
         vendor_id,
         amount,
-        vat_amount,
+        vatRate,
+        finalVatAmount,
+        totalAmount,
         description,
         reference_number,
         payment_method,
+        approvalStatus,
         status,
         req.user.id,
       ]);
@@ -329,11 +338,12 @@ class FinanceController {
       
       const result = await pool.query(`
         UPDATE expense_records 
-        SET status = 'approved', 
+        SET approval_status = 'approved',
+            status = 'approved', 
             approved_by = $1,
             approved_at = NOW(),
             updated_at = NOW()
-        WHERE id = $2 AND status = 'pending'
+        WHERE id = $2 AND approval_status = 'pending'
         RETURNING *
       `, [req.user.id, id]);
       
@@ -355,14 +365,14 @@ class FinanceController {
       
       const result = await pool.query(`
         UPDATE expense_records 
-        SET status = 'rejected', 
-            rejection_reason = $1,
-            approved_by = $2,
+        SET approval_status = 'rejected',
+            status = 'rejected', 
+            approved_by = $1,
             approved_at = NOW(),
             updated_at = NOW()
-        WHERE id = $3 AND status = 'pending'
+        WHERE id = $2 AND approval_status = 'pending'
         RETURNING *
-      `, [reason, req.user.id, id]);
+      `, [req.user.id, id]);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Expense not found or already processed' });
@@ -384,7 +394,7 @@ class FinanceController {
         SET status = 'paid',
             paid_at = NOW(),
             updated_at = NOW()
-        WHERE id = $1 AND status = 'approved'
+        WHERE id = $1 AND approval_status = 'approved'
         RETURNING *
       `, [id]);
       
@@ -426,10 +436,10 @@ class FinanceController {
       
       const result = await pool.query(`
         INSERT INTO vendors (
-          vendor_name, contact_person, email, phone, address, tax_id, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, true)
+          vendor_name, contact_person, email, phone, address, kra_pin, is_active, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, true, $7, NOW(), NOW())
         RETURNING *
-      `, [vendor_name, contact_person, email, phone, address, tax_id]);
+      `, [vendor_name, contact_person, email, phone, address, tax_id, req.user.id]);
       
       res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -628,7 +638,7 @@ class FinanceController {
     }
   }
 
-  // Assets - simplified for now
+  // Assets
   async getAssets(req, res) {
     try {
       const result = await pool.query(`SELECT * FROM assets ORDER BY purchase_date DESC`);
@@ -769,7 +779,7 @@ class FinanceController {
       const result = await pool.query(`
         SELECT 
           coa.account_name as category,
-          COALESCE(SUM(er.amount + COALESCE(er.vat_amount, 0)), 0) as total
+          COALESCE(SUM(er.total_amount), 0) as total
         FROM expense_records er
         JOIN chart_of_accounts coa ON er.account_id = coa.id
         WHERE er.status IN ('approved', 'paid')

@@ -218,10 +218,10 @@ class FinanceController {
       
       const result = await pool.query(`
         INSERT INTO income_records (
-          income_number, income_date, account_id, amount, vat_rate, vat_amount, total_amount,
+          income_number, income_date, income_category, account_id, amount, vat_rate, vat_amount, total_amount,
           description, payment_reference, payment_method,
           status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, NOW(), NOW())
+        ) VALUES ($1, $2, 'Other Income', $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, NOW(), NOW())
         RETURNING *
       `, [
         incomeNumber,
@@ -323,10 +323,10 @@ class FinanceController {
       
       const result = await pool.query(`
         INSERT INTO expense_records (
-          expense_number, expense_date, account_id, vendor_id, amount, vat_rate, vat_amount, total_amount,
+          expense_number, expense_date, expense_category, account_id, vendor_id, amount, vat_rate, vat_amount, total_amount,
           description, payment_reference, payment_method,
           approval_status, status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+        ) VALUES ($1, $2, 'General Expense', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
         RETURNING *
       `, [
         expenseNumber,

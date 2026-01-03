@@ -27,7 +27,7 @@ class BudgetController {
       let query = `
         SELECT 
           b.*,
-          fy.name as financial_year_name,
+          fy.year_name as financial_year_name,
           fy.start_date as fy_start_date,
           fy.end_date as fy_end_date,
           u.email as created_by_name,
@@ -84,7 +84,7 @@ class BudgetController {
       const budgetResult = await pool.query(`
         SELECT 
           b.*,
-          fy.name as financial_year_name,
+          fy.year_name as financial_year_name,
           u.email as created_by_name,
           au.email as approved_by_name
         FROM budgets b
@@ -183,7 +183,7 @@ class BudgetController {
       const completeResult = await pool.query(`
         SELECT 
           b.*,
-          fy.name as financial_year_name
+          fy.year_name as financial_year_name
         FROM budgets b
         LEFT JOIN financial_years fy ON b.financial_year_id = fy.id
         WHERE b.id = $1

@@ -19,61 +19,47 @@ class FinanceController {
     return `${prefix}${String(numPart).padStart(5, '0')}`;
   }
 
-    // Dashboard
+  // Dashboard
   async getDashboard(req, res) {
     try {
       const client = await pool.connect();
-
-      try {
-        // Get current financial year (optional - won't fail if missing)
+      
         let financialYear = null;
-        try {
-          const currentYear = await client.query(`
-            SELECT * FROM financial_years
-            WHERE is_current = true
-            ORDER BY start_date DESC
-            LIMIT 1
-          `);
-          financialYear = currentYear.rows[0] || null;
-        } catch (err) {
-          console.log('Financial year query failed, continuing without it');
-        }
-
         const incomeResult = await client.query(`
-          SELECT
+          SELECT 
             COALESCE(SUM(total_amount), 0) as total,
-            COALESCE(SUM(CASE
-              WHEN income_date >= date_trunc('month', CURRENT_DATE)
-              THEN total_amount
-              ELSE 0
+            COALESCE(SUM(CASE 
+              WHEN income_date >= date_trunc('month', CURRENT_DATE) 
+              THEN total_amount 
+              ELSE 0 
             END), 0) as monthly
           FROM income_records
           WHERE status = 'completed'
         `);
-
+        
         const expenseResult = await client.query(`
-          SELECT
+          SELECT 
             COALESCE(SUM(total_amount), 0) as total,
-            COALESCE(SUM(CASE
-              WHEN expense_date >= date_trunc('month', CURRENT_DATE)
-              THEN total_amount
-              ELSE 0
+            COALESCE(SUM(CASE 
+              WHEN expense_date >= date_trunc('month', CURRENT_DATE) 
+              THEN total_amount 
+              ELSE 0 
             END), 0) as monthly,
             COUNT(CASE WHEN approval_status = 'pending' THEN 1 END) as pending_approvals
           FROM expense_records
         `);
-
+        
         const bankResult = await client.query(`
           SELECT COALESCE(SUM(current_balance), 0) as total
           FROM bank_accounts
           WHERE is_active = true
         `);
-
+        
         const totalIncome = parseFloat(incomeResult.rows[0].total);
         const totalExpenses = parseFloat(expenseResult.rows[0].total);
         const monthlyIncome = parseFloat(incomeResult.rows[0].monthly);
         const monthlyExpenses = parseFloat(expenseResult.rows[0].monthly);
-
+        
         res.json({
           totalIncome,
           totalExpenses,
@@ -83,17 +69,12 @@ class FinanceController {
           monthlyIncome,
           monthlyExpenses,
           cashFlow: monthlyIncome - monthlyExpenses,
-          financialYear: financialYear,
+          financialYear: financialYear || null,
         });
       } finally {
         client.release();
       }
     } catch (error) {
-      console.error('Dashboard error:', error);
-      res.status(500).json({ error: 'Failed to fetch dashboard data' });
-    }
-  }
- catch (error) {
       console.error('Dashboard error:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard data' });
     }

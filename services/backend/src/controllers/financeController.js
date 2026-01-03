@@ -620,6 +620,175 @@ class FinanceController {
     }
   }
 
+  // Assets
+  async getAssets(req, res) {
+    try {
+      const { category, status } = req.query;
+      
+      let query = `
+        SELECT * FROM assets
+        WHERE 1=1
+      `;
+      const params = [];
+      let paramCount = 1;
+      
+      if (category) {
+        query += ` AND category = $${paramCount}`;
+        params.push(category);
+        paramCount++;
+      }
+      
+      if (status) {
+        query += ` AND status = $${paramCount}`;
+        params.push(status);
+        paramCount++;
+      }
+      
+      query += ` ORDER BY purchase_date DESC`;
+      
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+      res.status(500).json({ error: 'Failed to fetch assets' });
+    }
+  }
+
+  async createAsset(req, res) {
+    try {
+      const {
+        asset_name,
+        category,
+        purchase_date,
+        purchase_cost,
+        current_value,
+        depreciation_method,
+        useful_life_years,
+        salvage_value,
+        location,
+        serial_number,
+        status,
+      } = req.body;
+      
+      const result = await pool.query(`
+        INSERT INTO assets (
+          asset_name, category, purchase_date, purchase_cost,
+          current_value, depreciation_method, useful_life_years,
+          salvage_value, location, serial_number, status,
+          created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+        RETURNING *
+      `, [
+        asset_name,
+        category,
+        purchase_date,
+        purchase_cost,
+        current_value || purchase_cost,
+        depreciation_method || 'straight_line',
+        useful_life_years,
+        salvage_value || 0,
+        location,
+        serial_number,
+        status || 'active',
+        req.user.id,
+      ]);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error('Error creating asset:', error);
+      res.status(500).json({ error: 'Failed to create asset' });
+    }
+  }
+
+  async updateAsset(req, res) {
+    try {
+      const { id } = req.params;
+      const {
+        asset_name,
+        category,
+        current_value,
+        location,
+        status,
+      } = req.body;
+      
+      const result = await pool.query(`
+        UPDATE assets 
+        SET 
+          asset_name = COALESCE($1, asset_name),
+          category = COALESCE($2, category),
+          current_value = COALESCE($3, current_value),
+          location = COALESCE($4, location),
+          status = COALESCE($5, status),
+          updated_at = NOW()
+        WHERE id = $6
+        RETURNING *
+      `, [asset_name, category, current_value, location, status, id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Asset not found' });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating asset:', error);
+      res.status(500).json({ error: 'Failed to update asset' });
+    }
+  }
+
+  async deleteAsset(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const result = await pool.query(`
+        DELETE FROM assets WHERE id = $1 RETURNING *
+      `, [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Asset not found' });
+      }
+      
+      res.json({ message: 'Asset deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting asset:', error);
+      res.status(500).json({ error: 'Failed to delete asset' });
+    }
+  }
+
+  async getAssetsSummary(req, res) {
+    try {
+      const summary = await pool.query(`
+        SELECT 
+          COUNT(*) as total_assets,
+          SUM(purchase_cost) as total_purchase_cost,
+          SUM(current_value) as total_current_value,
+          SUM(purchase_cost - current_value) as total_depreciation,
+          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_assets,
+          COUNT(CASE WHEN status = 'disposed' THEN 1 END) as disposed_assets,
+          COUNT(CASE WHEN status = 'under_maintenance' THEN 1 END) as under_maintenance
+        FROM assets
+      `);
+      
+      const byCategory = await pool.query(`
+        SELECT 
+          category,
+          COUNT(*) as count,
+          SUM(current_value) as total_value
+        FROM assets
+        WHERE status = 'active'
+        GROUP BY category
+        ORDER BY total_value DESC
+      `);
+      
+      res.json({
+        ...summary.rows[0],
+        by_category: byCategory.rows,
+      });
+    } catch (error) {
+      console.error('Error fetching assets summary:', error);
+      res.status(500).json({ error: 'Failed to fetch assets summary' });
+    }
+  }
+
   // Reports
   async getIncomeByCategory(req, res) {
     try {

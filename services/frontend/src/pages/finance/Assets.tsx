@@ -1,228 +1,455 @@
-import { useState, useEffect } from 'react';
-import { Plus, Building2, Search, TrendingDown, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  PlusIcon,
+  TrashIcon,
+  PencilIcon,
+} from '@heroicons/react/24/outline';
+import financeService, { Asset } from '../../services/financeService';
 
-interface Asset {
-  id: string;
-  asset_name: string;
-  asset_code: string;
-  category: string;
-  purchase_date: Date;
-  purchase_cost: number;
-  current_value: number;
-  depreciation_method: string;
-  useful_life_years: number;
-  status: 'active' | 'disposed' | 'under_maintenance';
-}
-
-export default function Assets() {
+const Assets: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [formData, setFormData] = useState({
+    asset_name: '',
+    category: '',
+    purchase_date: '',
+    purchase_cost: '',
+    current_value: '',
+    location: '',
+    status: 'active',
+  });
 
-  const categories = ['Furniture', 'Equipment', 'Computers', 'Vehicles', 'Buildings', 'Land'];
-  
-  const totalAssetValue = 5000000; // Mock data
-  const totalDepreciation = 1250000; // Mock data
-  const activeAssets = 45; // Mock data
+  const categories = [
+    'Furniture',
+    'Electronics',
+    'Vehicles',
+    'Equipment',
+    'Buildings',
+    'Land',
+    'Other',
+  ];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 0,
-    }).format(amount);
+  useEffect(() => {
+    loadAssets();
+  }, []);
+
+  const loadAssets = async () => {
+    try {
+      setLoading(true);
+      const data = await financeService.getAssets();
+      setAssets(data);
+    } catch (error) {
+      console.error('Failed to load assets:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingAsset) {
+        await financeService.updateAsset(editingAsset.id, {
+          ...formData,
+          purchase_cost: parseFloat(formData.purchase_cost),
+          current_value: parseFloat(formData.current_value),
+        });
+      } else {
+        await financeService.createAsset({
+          ...formData,
+          purchase_cost: parseFloat(formData.purchase_cost),
+          current_value: parseFloat(formData.current_value),
+        });
+      }
+      setShowModal(false);
+      setEditingAsset(null);
+      resetForm();
+      loadAssets();
+    } catch (error) {
+      console.error('Failed to save asset:', error);
+      alert('Failed to save asset');
+    }
+  };
+
+  const handleEdit = (asset: Asset) => {
+    setEditingAsset(asset);
+    setFormData({
+      asset_name: asset.asset_name,
+      category: asset.category,
+      purchase_date: asset.purchase_date,
+      purchase_cost: asset.purchase_cost.toString(),
+      current_value: asset.current_value.toString(),
+      location: asset.location || '',
+      status: asset.status,
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this asset?')) return;
+    
+    try {
+      await financeService.deleteAsset(id);
+      loadAssets();
+    } catch (error) {
+      console.error('Failed to delete asset:', error);
+      alert('Failed to delete asset');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      asset_name: '',
+      category: '',
+      purchase_date: '',
+      purchase_cost: '',
+      current_value: '',
+      location: '',
+      status: 'active',
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors = {
-      active: 'bg-green-100 text-green-800',
-      disposed: 'bg-red-100 text-red-800',
-      under_maintenance: 'bg-yellow-100 text-yellow-800',
-    };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'disposed':
+        return 'bg-red-100 text-red-800';
+      case 'under_maintenance':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const getStatusLabel = (status: string) => {
-    const labels = {
-      active: 'Active',
-      disposed: 'Disposed',
-      under_maintenance: 'Under Maintenance',
-    };
-    return labels[status as keyof typeof labels] || status;
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading assets...</div>
+      </div>
+    );
+  }
+
+  const totalPurchaseCost = assets.reduce((sum, asset) => sum + Number(asset.purchase_cost), 0);
+  const totalCurrentValue = assets.reduce((sum, asset) => sum + Number(asset.current_value), 0);
+  const totalDepreciation = totalPurchaseCost - totalCurrentValue;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Asset Register</h1>
-          <p className="text-gray-600 mt-1">Track and manage school assets</p>
-        </div>
-        <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-          <Plus className="h-5 w-5 mr-2" />
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">Asset Registry</h1>
+        <button
+          onClick={() => {
+            setEditingAsset(null);
+            resetForm();
+            setShowModal(true);
+          }}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          <PlusIcon className="h-5 w-5 mr-2" />
           Add Asset
         </button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Asset Value</p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">
-                {formatCurrency(totalAssetValue)}
-              </p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <Building2 className="h-8 w-8 text-blue-600" />
-            </div>
+          <div className="text-sm text-gray-500">Total Assets</div>
+          <div className="text-2xl font-bold text-gray-900 mt-2">
+            {assets.length}
           </div>
-          <p className="text-xs text-gray-500 mt-2">Purchase cost</p>
         </div>
-
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Depreciation</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">
-                {formatCurrency(totalDepreciation)}
-              </p>
-            </div>
-            <div className="bg-red-100 p-3 rounded-full">
-              <TrendingDown className="h-8 w-8 text-red-600" />
-            </div>
+          <div className="text-sm text-gray-500">Purchase Cost</div>
+          <div className="text-2xl font-bold text-gray-900 mt-2">
+            KES {totalPurchaseCost.toLocaleString()}
           </div>
-          <p className="text-xs text-gray-500 mt-2">Accumulated</p>
         </div>
-
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Net Book Value</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">
-                {formatCurrency(totalAssetValue - totalDepreciation)}
-              </p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-full">
-              <Building2 className="h-8 w-8 text-green-600" />
-            </div>
+          <div className="text-sm text-gray-500">Current Value</div>
+          <div className="text-2xl font-bold text-gray-900 mt-2">
+            KES {totalCurrentValue.toLocaleString()}
           </div>
-          <p className="text-xs text-gray-500 mt-2">{activeAssets} active assets</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-sm text-gray-500">Total Depreciation</div>
+          <div className="text-2xl font-bold text-red-600 mt-2">
+            KES {totalDepreciation.toLocaleString()}
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by name or code..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="all">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+      {/* Assets List */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Asset Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Purchase Date
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Purchase Cost
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Current Value
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Location
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {assets.map((asset) => (
+                <tr key={asset.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {asset.asset_name}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {asset.category}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(asset.purchase_date).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    KES {Number(asset.purchase_cost).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    KES {Number(asset.current_value).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {asset.location || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                        asset.status
+                      )}`}
+                    >
+                      {asset.status.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => handleEdit(asset)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(asset.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="disposed">Disposed</option>
-              <option value="under_maintenance">Under Maintenance</option>
-            </select>
-          </div>
+            </tbody>
+          </table>
         </div>
+
+        {assets.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500">No assets found. Add your first asset to get started.</p>
+          </div>
+        )}
       </div>
 
-      {/* Assets Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset Code</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Cost</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Value</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            <tr>
-              <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-                <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                <p>No assets registered yet</p>
-                <p className="text-sm mt-1">Click "Add Asset" to register your first asset</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Asset Categories Overview */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Assets by Category</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {categories.map((category) => (
-            <div key={category} className="text-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
-              <Building2 className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-              <p className="font-medium text-gray-900">{category}</p>
-              <p className="text-sm text-gray-600">0 items</p>
+      {/* Add/Edit Asset Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">
+                {editingAsset ? 'Edit Asset' : 'Add New Asset'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setEditingAsset(null);
+                  resetForm();
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Depreciation Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-900 mb-3">Depreciation Methods</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
-          <div>
-            <p className="font-medium mb-1">Straight Line Method</p>
-            <p>Equal depreciation amount each year over the useful life of the asset.</p>
-          </div>
-          <div>
-            <p className="font-medium mb-1">Reducing Balance Method</p>
-            <p>Higher depreciation in early years, declining over time.</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Asset Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.asset_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, asset_name: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Category *
+                  </label>
+                  <select
+                    required
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Purchase Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.purchase_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, purchase_date: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Purchase Cost (KES) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={formData.purchase_cost}
+                    onChange={(e) =>
+                      setFormData({ 
+                        ...formData, 
+                        purchase_cost: e.target.value,
+                        current_value: formData.current_value || e.target.value
+                      })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Current Value (KES) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={formData.current_value}
+                    onChange={(e) =>
+                      setFormData({ ...formData, current_value: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) =>
+                    setFormData({ ...formData, location: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="Building, Room, etc."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Status *
+                </label>
+                <select
+                  required
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="under_maintenance">Under Maintenance</option>
+                  <option value="disposed">Disposed</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingAsset(null);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  {editingAsset ? 'Update Asset' : 'Add Asset'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
-}
+};
+
+export default Assets;

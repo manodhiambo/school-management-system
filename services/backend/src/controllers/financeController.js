@@ -319,7 +319,7 @@ class FinanceController {
       
       const threshold = settingsResult.rows[0]?.setting_value || 10000;
       const approvalStatus = amount >= threshold ? 'pending' : 'approved';
-      const status = amount >= threshold ? 'pending' : 'approved';
+      const status = 'pending';
       
       const result = await pool.query(`
         INSERT INTO expense_records (

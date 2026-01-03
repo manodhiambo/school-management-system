@@ -740,6 +740,63 @@ class ApiService {
   approvePurchaseOrder(id: string) {
     return this.api.put('/finance/purchase-orders/' + id + '/approve');
   }
+
+  // ======================
+  // BUDGET MANAGEMENT (Dedicated)
+  // ======================
+  getAllBudgets(params?: any) {
+    return this.api.get('/budgets', { params });
+  }
+
+  getBudgetById(id: string) {
+    return this.api.get('/budgets/' + id);
+  }
+
+  createNewBudget(data: any) {
+    return this.api.post('/budgets', data);
+  }
+
+  updateBudgetById(id: string, data: any) {
+    return this.api.put('/budgets/' + id, data);
+  }
+
+  deleteBudgetById(id: string) {
+    return this.api.delete('/budgets/' + id);
+  }
+
+  approveBudgetById(id: string) {
+    return this.api.put('/budgets/' + id + '/approve');
+  }
+
+  closeBudget(id: string) {
+    return this.api.put('/budgets/' + id + '/close');
+  }
+
+  // Budget Items
+  getBudgetItemsById(budgetId: string) {
+    return this.api.get('/budgets/' + budgetId + '/items');
+  }
+
+  addBudgetItem(budgetId: string, data: any) {
+    return this.api.post('/budgets/' + budgetId + '/items', data);
+  }
+
+  updateBudgetItemById(id: string, data: any) {
+    return this.api.put('/budgets/items/' + id, data);
+  }
+
+  deleteBudgetItemById(id: string) {
+    return this.api.delete('/budgets/items/' + id);
+  }
+
+  // Budget Analytics
+  getBudgetSummaryById(id: string) {
+    return this.api.get('/budgets/' + id + '/summary');
+  }
+
+  getBudgetVarianceById(id: string) {
+    return this.api.get('/budgets/' + id + '/variance');
+  }
 }
 
 export default new ApiService();

@@ -137,13 +137,13 @@ class FinanceController {
 
   async createFinancialYear(req, res) {
     try {
-      const { name, start_date, end_date } = req.body;
+      const { year_name, start_date, end_date } = req.body;
       
       const result = await pool.query(`
-        INSERT INTO financial_years (name, start_date, end_date, is_active)
-        VALUES ($1, $2, $3, false)
+        INSERT INTO financial_years (year_name, start_date, end_date, status, is_current, is_active)
+        VALUES ($1, $2, $3, 'draft', false, true)
         RETURNING *
-      `, [name, start_date, end_date]);
+      `, [year_name, start_date, end_date]);
       
       res.status(201).json(result.rows[0]);
     } catch (error) {

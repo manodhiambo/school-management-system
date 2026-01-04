@@ -27,6 +27,7 @@ router.post('/income', financeController.createIncome);
 router.get('/expenses', financeController.getExpenseRecords);
 router.post('/expenses', financeController.createExpense);
 router.put('/expenses/:id/approve', financeController.approveExpense);
+// Expense approval workflow routes
 router.put('/expenses/:id/reject', financeController.rejectExpense);
 router.put('/expenses/:id/pay', financeController.payExpense);
 

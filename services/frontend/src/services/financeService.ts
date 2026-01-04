@@ -320,7 +320,24 @@ class FinanceService {
   calculateTotalWithVAT(amount: number, rate: number = 16): number {
     return amount + this.calculateVAT(amount, rate);
   }
-}
 
+  // Bank Account Management
+  updateBankAccount(id: string, data: any) {
+    return api.updateBankAccount(id, data);
+  }
+
+  deleteBankAccount(id: string) {
+    return api.deleteBankAccount(id);
+  }
+
+  createBankTransaction(data: any) {
+    return api.createBankTransaction(data);
+  }
+
+  getBankTransactions(accountId?: string) {
+    return api.getBankTransactions(accountId);
+  }
+
+}
 
 export default new FinanceService();

@@ -30,6 +30,7 @@ router.put('/expenses/:id/approve', financeController.approveExpense);
 router.put('/expenses/:id/reject', financeController.rejectExpense);
 router.put('/expenses/:id/pay', financeController.payExpense);
 
+console.log("Finance routes loaded with approve/reject/pay endpoints");
 // Vendors
 router.get('/vendors', financeController.getVendors);
 router.post('/vendors', financeController.createVendor);

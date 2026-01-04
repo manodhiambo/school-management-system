@@ -548,7 +548,7 @@ const BudgetManagement: React.FC = () => {
                         <option value="">Select Financial Year</option>
                         {financialYears.map((year) => (
                           <option key={year.id} value={year.id}>
-                            {year.name}
+                            {year.year_name}
                           </option>
                         ))}
                       </select>

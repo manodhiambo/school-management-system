@@ -88,6 +88,10 @@ export default function Transactions() {
     setShowDetailsModal(true);
   };
 
+  const handlePrintReceipt = () => {
+    window.print();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -204,7 +208,34 @@ export default function Transactions() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <style>
+        {`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .print-content, .print-content * {
+              visibility: visible;
+            }
+            .print-content {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              padding: 40px;
+              background: white;
+            }
+            .print\:hidden {
+              display: none !important;
+            }
+            @page {
+              margin: 20mm;
+            }
+          }
+        `}
+      </style>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -413,7 +444,11 @@ export default function Transactions() {
                           Mark as Paid
                         </button>
                       )}
-                      <button className="text-gray-600 hover:text-gray-800">
+                      <button
+                        onClick={() => handleViewDetails(record)}
+                        className="text-gray-600 hover:text-gray-800"
+                        title="View Details"
+                      >
                         <Eye className="h-5 w-5" />
                       </button>
                     </div>
@@ -633,6 +668,12 @@ export default function Transactions() {
                 {activeTab === "income" ? "Income" : "Expense"} Details
               </h2>
               <button
+                onClick={handlePrintReceipt}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 print:hidden"
+              >
+                Print Receipt
+              </button>
+              <button
                 onClick={() => {
                   setShowDetailsModal(false);
                   setSelectedRecord(null);
@@ -643,7 +684,7 @@ export default function Transactions() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 print-content">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Number</label>
@@ -721,5 +762,7 @@ export default function Transactions() {
       )}
 
     </div>
+  );
+    </>
   );
 }

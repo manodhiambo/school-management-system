@@ -55,6 +55,7 @@ import {
   Assets,
   Reports,
 } from './pages/finance';
+import FinancialYears from "./pages/finance/FinancialYears";
 
 // Shared Pages
 import { ProfilePage } from './pages/shared/ProfilePage';

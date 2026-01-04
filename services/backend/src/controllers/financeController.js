@@ -565,13 +565,16 @@ class FinanceController {
     try {
       const {
         transaction_date,
-        transaction_type,
+        transaction_type: raw_transaction_type,
         amount,
         description,
         custodian,
         receipt_number,
         category,
       } = req.body;
+
+      // Map frontend transaction_type to database constraint
+      const transaction_type = raw_transaction_type === 'disbursement' ? 'expense' : raw_transaction_type;
 
       // Get current balance
       const balanceResult = await pool.query(`

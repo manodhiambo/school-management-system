@@ -357,9 +357,8 @@ class FinanceController {
       const { id } = req.params;
       
       const result = await pool.query(`
-        UPDATE expense_records 
-        SET approval_status = 'approved',
-            status = 'approved', 
+        UPDATE expense_records
+        SET status = 'paid', 
             approved_by = $1,
             approved_at = NOW(),
             updated_at = NOW()

@@ -23,13 +23,12 @@ router.post('/financial-years', financeController.createFinancialYear);
 router.get('/income', financeController.getIncomeRecords);
 router.post('/income', financeController.createIncome);
 
-// Expenses
-router.get('/expenses', financeController.getExpenseRecords);
-router.post('/expenses', financeController.createExpense);
+// Expenses - specific routes MUST come before general routes
 router.put('/expenses/:id/approve', financeController.approveExpense);
-// Expense approval workflow routes
 router.put('/expenses/:id/reject', financeController.rejectExpense);
 router.put('/expenses/:id/pay', financeController.payExpense);
+router.get('/expenses', financeController.getExpenseRecords);
+router.post('/expenses', financeController.createExpense);
 
 console.log("Finance routes loaded with approve/reject/pay endpoints");
 // Vendors

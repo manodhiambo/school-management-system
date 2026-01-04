@@ -617,7 +617,6 @@ class FinanceController {
       res.status(500).json({ error: 'Failed to create petty cash transaction' });
     }
   }
-  }
 
   async getPettyCashSummary(req, res) {
     try {

@@ -813,9 +813,6 @@ class ApiService {
     return this.api.get('/finance/fee-collection/by-class');
   }
 
-  getFeeDefaulters(params?: any) {
-    return this.api.get('/finance/fee-collection/defaulters', { params });
-  }
 }
 
 export default new ApiService();

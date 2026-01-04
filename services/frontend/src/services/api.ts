@@ -812,6 +812,23 @@ class ApiService {
   getFeeCollectionByClass() {
     return this.api.get('/finance/fee-collection/by-class');
   }
+  
+  // Bank Account Operations
+  updateBankAccount(id: string, data: any) {
+    return this.api.put(`/finance/bank-accounts/${id}`, data);
+  }
+
+  deleteBankAccount(id: string) {
+    return this.api.delete(`/finance/bank-accounts/${id}`);
+  }
+
+  createBankTransaction(data: any) {
+    return this.api.post('/finance/bank-transactions', data);
+  }
+
+  getBankTransactions(accountId?: string) {
+    return this.api.get('/finance/bank-transactions', { params: { accountId } });
+  }
 
 }
 

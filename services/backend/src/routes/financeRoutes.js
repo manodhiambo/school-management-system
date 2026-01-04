@@ -66,4 +66,11 @@ router.get('/fee-collection/by-month', financeController.getFeeCollectionByMonth
 router.get('/fee-collection/by-class', financeController.getFeeCollectionByClass);
 router.get('/fee-collection/defaulters', financeController.getFeeDefaulters);
 
+
+// Bank Account Management
+router.put('/bank-accounts/:id', financeController.updateBankAccount);
+router.delete('/bank-accounts/:id', financeController.deleteBankAccount);
+router.post('/bank-transactions', financeController.createBankTransaction);
+router.get('/bank-transactions', financeController.getBankTransactions);
+
 export default router;

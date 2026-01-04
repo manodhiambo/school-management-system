@@ -1,24 +1,26 @@
 import pool from '../config/database.js';
 
-class BudgetController {
-  // Helper to generate budget number
-  async generateBudgetNumber() {
-    const result = await pool.query(`
-      SELECT budget_name FROM budgets 
-      WHERE budget_name LIKE 'BDG-%' 
-      ORDER BY budget_name DESC 
-      LIMIT 1
-    `);
-    
-    if (result.rows.length === 0) {
-      return 'BDG-00001';
-    }
-    
-    const lastNumber = result.rows[0].budget_name;
-    const numPart = parseInt(lastNumber.replace('BDG-', '')) + 1;
-    return `BDG-${String(numPart).padStart(5, '0')}`;
+// Helper to generate budget number
+async function generateBudgetNumber() {
+  const result = await pool.query(`
+    SELECT budget_name FROM budgets
+    WHERE budget_name LIKE 'BDG-%'
+    ORDER BY budget_name DESC
+    LIMIT 1
+  `);
+
+  if (result.rows.length === 0) {
+    return 'BDG-00001';
   }
 
+  const lastNumber = result.rows[0].budget_name;
+  const numPart = parseInt(lastNumber.replace('BDG-', '')) + 1;
+  return `BDG-${String(numPart).padStart(5, '0')}`;
+}
+
+
+
+class BudgetController {
   // Get all budgets with detailed information
   async getBudgets(req, res) {
     try {
@@ -137,7 +139,7 @@ class BudgetController {
       } = req.body;
       
       // Generate budget number if not provided
-      const finalBudgetName = budget_name || await this.generateBudgetNumber();
+      const finalBudgetName = budget_name || await generateBudgetNumber();
       
       // Create budget
       const budgetResult = await client.query(`

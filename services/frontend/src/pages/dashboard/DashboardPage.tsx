@@ -16,6 +16,8 @@ export function DashboardPage() {
       return <StudentDashboard />;
     case 'parent':
       return <ParentDashboard />;
+    case 'finance_officer':
+      return <AdminDashboard />;
     default:
       return <StudentDashboard />;
   }

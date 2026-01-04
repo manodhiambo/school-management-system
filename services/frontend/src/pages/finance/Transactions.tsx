@@ -14,6 +14,8 @@ export default function Transactions() {
   const [expenseRecords, setExpenseRecords] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
   const [filters, setFilters] = useState({
@@ -79,6 +81,11 @@ export default function Transactions() {
     } catch (error) {
       console.error('Failed to load vendors:', error);
     }
+  };
+
+  const handleViewDetails = (record: any) => {
+    setSelectedRecord(record);
+    setShowDetailsModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -314,7 +321,7 @@ export default function Transactions() {
                 incomeRecords.map((record: any) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(record.transaction_date)}
+                      {formatDate(activeTab === 'income' ? record.income_date : record.expense_date)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{record.description}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{record.account_name || '-'}</td>
@@ -336,7 +343,11 @@ export default function Transactions() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button className="text-blue-600 hover:text-blue-800">
+                      <button 
+                        onClick={() => handleViewDetails(record)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="View Details"
+                      >
                         <Eye className="h-5 w-5" />
                       </button>
                     </td>
@@ -353,7 +364,7 @@ export default function Transactions() {
               expenseRecords.map((record: any) => (
                 <tr key={record.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatDate(record.transaction_date)}
+                    {formatDate(activeTab === 'income' ? record.income_date : record.expense_date)}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">{record.description}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{record.account_name || '-'}</td>
@@ -611,7 +622,104 @@ export default function Transactions() {
             </form>
           </div>
         </div>
+
       )}
+      {/* View Details Modal */}
+      {showDetailsModal && selectedRecord && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {activeTab === "income" ? "Income" : "Expense"} Details
+              </h2>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedRecord(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Number</label>
+                  <p className="text-gray-900">
+                    {activeTab === "income" ? selectedRecord.income_number : selectedRecord.expense_number}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Date</label>
+                  <p className="text-gray-900">
+                    {formatDate(activeTab === "income" ? selectedRecord.income_date : selectedRecord.expense_date)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Account</label>
+                  <p className="text-gray-900">{selectedRecord.account_name || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Category</label>
+                  <p className="text-gray-900">
+                    {activeTab === "income" ? selectedRecord.income_category : selectedRecord.expense_category}
+                  </p>
+                </div>
+                {activeTab === "expense" && selectedRecord.vendor_name && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Vendor</label>
+                    <p className="text-gray-900">{selectedRecord.vendor_name}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Payment Method</label>
+                  <p className="text-gray-900 capitalize">{selectedRecord.payment_method}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Amount</label>
+                  <p className="text-gray-900 font-semibold">
+                    {formatCurrency(parseFloat(selectedRecord.amount))}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">VAT</label>
+                  <p className="text-gray-900">
+                    {selectedRecord.vat_amount ? formatCurrency(parseFloat(selectedRecord.vat_amount)) : "Ksh 0"}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-500">Total Amount</label>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(parseFloat(selectedRecord.total_amount))}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-500">Description</label>
+                <p className="text-gray-900">{selectedRecord.description}</p>
+              </div>
+
+              {selectedRecord.payment_reference && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Reference Number</label>
+                  <p className="text-gray-900">{selectedRecord.payment_reference}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="text-sm font-medium text-gray-500">Status</label>
+                <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full $${getStatusBadge(selectedRecord.status)}`}>
+                  {selectedRecord.status}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

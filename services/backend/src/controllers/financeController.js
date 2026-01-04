@@ -363,7 +363,7 @@ class FinanceController {
             approved_by = $1,
             approved_at = NOW(),
             updated_at = NOW()
-        WHERE id = $2 AND approval_status = 'pending'
+        WHERE id = $2 AND status = 'pending'
         RETURNING *
       `, [req.user.id, id]);
       
@@ -414,7 +414,7 @@ class FinanceController {
         SET status = 'paid',
             paid_at = NOW(),
             updated_at = NOW()
-        WHERE id = $1 AND approval_status = 'approved'
+        WHERE id = $1 AND status = 'pending'
         RETURNING *
       `, [id]);
       

@@ -6,3 +6,4 @@ export { default as BankAccounts } from './BankAccounts';
 export { default as PettyCash } from './PettyCash';
 export { default as Assets } from './Assets';
 export { default as Reports } from './Reports';
+export { default as FinancialYears } from './FinancialYears';

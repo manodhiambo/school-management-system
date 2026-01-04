@@ -121,6 +121,12 @@ const navigationItems = [
   },
   
   {
+    name: 'Financial Years',
+    href: '/app/finance/financial-years',
+    icon: Calendar,
+    roles: ['admin', 'finance_officer']
+  },
+  {
     name: 'Fee Management',
     href: '/app/fee',
     icon: DollarSign,

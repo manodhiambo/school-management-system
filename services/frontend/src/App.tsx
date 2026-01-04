@@ -116,6 +116,7 @@ function App() {
               <Route path="finance/petty-cash" element={<PettyCash />} />
               <Route path="finance/assets" element={<Assets />} />
               <Route path="finance/reports" element={<Reports />} />
+              <Route path="finance/financial-years" element={<FinancialYears />} />
 
               {/* Student Routes */}
               <Route path="my-courses" element={<MyCoursesPage />} />

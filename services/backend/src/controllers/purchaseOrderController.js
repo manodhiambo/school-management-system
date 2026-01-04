@@ -55,7 +55,7 @@ class PurchaseOrderController {
       const {
         vendor_id,
         po_date,
-        delivery_date,
+        expected_delivery_date,
         subtotal,
         vat_amount,
         total_amount,
@@ -67,13 +67,13 @@ class PurchaseOrderController {
 
       const result = await pool.query(`
         INSERT INTO purchase_orders (
-          po_number, vendor_id, po_date, delivery_date,
+          po_number, vendor_id, po_date, expected_delivery_date,
           subtotal, vat_amount, total_amount, terms_conditions, notes,
           status, created_by, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft', $10, NOW(), NOW())
         RETURNING *
       `, [
-        po_number, vendor_id, po_date, delivery_date,
+        po_number, vendor_id, po_date, expected_delivery_date,
         subtotal, vat_amount, total_amount, terms_conditions, notes,
         req.user.id
       ]);
@@ -95,7 +95,7 @@ class PurchaseOrderController {
         SET
           vendor_id = COALESCE($1, vendor_id),
           po_date = COALESCE($2, po_date),
-          delivery_date = COALESCE($3, delivery_date),
+          expected_delivery_date = COALESCE($3, expected_delivery_date),
           subtotal = COALESCE($4, subtotal),
           vat_amount = COALESCE($5, vat_amount),
           total_amount = COALESCE($6, total_amount),
@@ -105,7 +105,7 @@ class PurchaseOrderController {
         WHERE id = $9
         RETURNING *
       `, [
-        data.vendor_id, data.po_date, data.delivery_date,
+        data.vendor_id, data.po_date, data.expected_delivery_date,
         data.subtotal, data.vat_amount, data.total_amount,
         data.terms_conditions, data.notes, id
       ]);

@@ -24,6 +24,7 @@ import academicRoutes from './routes/academicRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import libraryRoutes from './routes/libraryRoutes.js';
+import messageRoutes from './routes/simpleMessageRoutes.js';
 
 // Import routes with different naming
 import classesRoutes from './routes/classes.routes.js';
@@ -84,6 +85,7 @@ app.use('/api/v1/budgets', budgetRoutes);
 app.use('/api/v1/academic', academicRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/library', libraryRoutes);
+app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/online-exams', onlineExamRoutes);
 app.use('/api/v1/offline-results', offlineResultsRoutes);
 app.use('/api/v1/cbc-analytics', cbcAnalyticsRoutes);

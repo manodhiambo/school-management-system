@@ -21,7 +21,7 @@ export function MessagesPage() {
       setError(null);
       const response = await api.getMessages();
       console.log('Messages:', response);
-      setMessages(response.messages || response.data || []);
+      setMessages(response.data || response.messages || []);
     } catch (error: any) {
       console.error('Error loading messages:', error);
       setError(error?.message || 'Failed to load messages');

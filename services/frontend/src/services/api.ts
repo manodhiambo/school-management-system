@@ -830,6 +830,75 @@ class ApiService {
     return this.api.get('/finance/bank-transactions', { params: { accountId } });
   }
 
+  // ======================
+  // ONLINE EXAMS
+  // ======================
+  startExamAttempt(examId: string) {
+    return this.api.post('/online-exams/' + examId + '/start');
+  }
+
+  getExamAttempt(examId: string) {
+    return this.api.get('/online-exams/' + examId + '/attempt');
+  }
+
+  saveExamAnswer(examId: string, data: { question_id: string; answer_text: string }) {
+    return this.api.post('/online-exams/' + examId + '/answer', data);
+  }
+
+  submitExamAttempt(examId: string) {
+    return this.api.post('/online-exams/' + examId + '/submit');
+  }
+
+  getMyExamResult(examId: string) {
+    return this.api.get('/online-exams/' + examId + '/my-result');
+  }
+
+  getExamAttempts(examId: string) {
+    return this.api.get('/online-exams/' + examId + '/results');
+  }
+
+  getExamsForClass(classId: string) {
+    return this.api.get('/exams', { params: { class_id: classId } });
+  }
+
+  // ======================
+  // OFFLINE RESULTS
+  // ======================
+  saveOfflineResults(data: { exam_id: string; results: any[] }) {
+    return this.api.post('/offline-results/bulk', data);
+  }
+
+  getOfflineResults(examId: string) {
+    return this.api.get('/offline-results/' + examId);
+  }
+
+  publishExamResults(examId: string) {
+    return this.api.post('/offline-results/' + examId + '/publish');
+  }
+
+  // ======================
+  // CBC ANALYTICS
+  // ======================
+  getCbcOverview() {
+    return this.api.get('/cbc-analytics/overview');
+  }
+
+  getCbcClassAnalytics(classId: string) {
+    return this.api.get('/cbc-analytics/class/' + classId);
+  }
+
+  getCbcStudentAnalytics(studentId: string) {
+    return this.api.get('/cbc-analytics/student/' + studentId);
+  }
+
+  getCbcParentOverview() {
+    return this.api.get('/cbc-analytics/parent-overview');
+  }
+
+  getCbcSubjectAnalytics(subjectId: string) {
+    return this.api.get('/cbc-analytics/subject/' + subjectId);
+  }
+
 }
 
 export default new ApiService();

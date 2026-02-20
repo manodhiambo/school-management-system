@@ -29,6 +29,9 @@ import libraryRoutes from './routes/libraryRoutes.js';
 import classesRoutes from './routes/classes.routes.js';
 import subjectsRoutes from './routes/subjects.routes.js';
 import examsRoutes from './routes/exams.routes.js';
+import onlineExamRoutes from './routes/onlineExam.routes.js';
+import offlineResultsRoutes from './routes/offlineResults.routes.js';
+import cbcAnalyticsRoutes from './routes/cbcAnalytics.routes.js';
 
 dotenv.config();
 
@@ -81,6 +84,9 @@ app.use('/api/v1/budgets', budgetRoutes);
 app.use('/api/v1/academic', academicRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/library', libraryRoutes);
+app.use('/api/v1/online-exams', onlineExamRoutes);
+app.use('/api/v1/offline-results', offlineResultsRoutes);
+app.use('/api/v1/cbc-analytics', cbcAnalyticsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

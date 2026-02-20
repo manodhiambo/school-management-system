@@ -27,6 +27,9 @@ import {
   CreditCard,
   Building2,
   TrendingDown,
+  Monitor,
+  BarChart2,
+  ListChecks,
 } from 'lucide-react';
 
 // Define navigation items with role-based access
@@ -157,6 +160,18 @@ const navigationItems = [
     roles: ['admin']
   },
   {
+    name: 'CBC Analytics',
+    href: '/app/cbc-analytics',
+    icon: BarChart2,
+    roles: ['admin', 'teacher']
+  },
+  {
+    name: 'CBC Curriculum',
+    href: '/app/curriculum',
+    icon: GraduationCap,
+    roles: ['admin']
+  },
+  {
     name: 'Settings',
     href: '/app/settings',
     icon: Settings,
@@ -164,6 +179,12 @@ const navigationItems = [
   },
 
   // Student routes
+  {
+    name: 'My Exams',
+    href: '/app/my-exams',
+    icon: Monitor,
+    roles: ['student']
+  },
   {
     name: 'My Courses',
     href: '/app/my-courses',
@@ -244,6 +265,12 @@ const navigationItems = [
     name: 'Grade Book',
     href: '/app/gradebook',
     icon: Award,
+    roles: ['teacher']
+  },
+  {
+    name: 'Exams Manager',
+    href: '/app/teacher-exams',
+    icon: ListChecks,
     roles: ['teacher']
   },
 

@@ -189,7 +189,7 @@ class TeacherService {
     // Teachers are assigned to classes via timetable entries
     const classes = await query(`
       SELECT DISTINCT c.*,
-        (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id) as student_count
+        (SELECT COUNT(*)::int FROM students s WHERE s.class_id = c.id) as student_count
       FROM classes c
       JOIN timetable tt ON tt.class_id = c.id
       WHERE tt.teacher_id = $1

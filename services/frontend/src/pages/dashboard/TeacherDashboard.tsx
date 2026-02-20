@@ -39,7 +39,7 @@ export function TeacherDashboard() {
 
       // Calculate stats
       const totalStudents = (classesRes?.data || classesRes?.classes || [])
-        .reduce((sum: number, c: any) => sum + (c.student_count || 0), 0);
+        .reduce((sum: number, c: any) => sum + (Number(c.student_count) || 0), 0);
 
       setStats({
         totalClasses: (classesRes?.data || classesRes?.classes || []).length,
@@ -237,7 +237,7 @@ export function TeacherDashboard() {
                       </div>
                     </div>
                     <span className="text-sm font-medium text-blue-600">
-                      {classItem.student_count || 0} students
+                      {Number(classItem.student_count) || 0} students
                     </span>
                   </div>
                 ))}

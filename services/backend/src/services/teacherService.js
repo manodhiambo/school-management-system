@@ -172,6 +172,61 @@ class TeacherService {
     `);
     return stats[0];
   }
+
+  async getTeacherClasses(id) {
+    // Resolve teacher record from either teachers.id or users.id
+    const teacherResult = await query(
+      'SELECT id FROM teachers WHERE id = $1 OR user_id = $1',
+      [id]
+    );
+
+    if (teacherResult.length === 0) {
+      return [];
+    }
+
+    const teacherId = teacherResult[0].id;
+
+    // Teachers are assigned to classes via timetable entries
+    const classes = await query(`
+      SELECT DISTINCT c.*,
+        (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id) as student_count
+      FROM classes c
+      JOIN timetable tt ON tt.class_id = c.id
+      WHERE tt.teacher_id = $1
+        AND tt.is_active = true
+        AND c.is_active = true
+      ORDER BY c.name, c.section
+    `, [teacherId]);
+
+    return classes;
+  }
+
+  async getTeacherTimetable(id) {
+    // Resolve teacher record from either teachers.id or users.id
+    const teacherResult = await query(
+      'SELECT id FROM teachers WHERE id = $1 OR user_id = $1',
+      [id]
+    );
+
+    if (teacherResult.length === 0) {
+      return [];
+    }
+
+    const teacherId = teacherResult[0].id;
+
+    const timetable = await query(`
+      SELECT tt.*,
+        c.name as class_name, c.section,
+        s.name as subject_name
+      FROM timetable tt
+      LEFT JOIN classes c ON tt.class_id = c.id
+      LEFT JOIN subjects s ON tt.subject_id = s.id
+      WHERE tt.teacher_id = $1 AND tt.is_active = true
+      ORDER BY tt.day_of_week, tt.start_time
+    `, [teacherId]);
+
+    return timetable;
+  }
 }
 
 export default new TeacherService();

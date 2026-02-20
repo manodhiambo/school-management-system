@@ -65,7 +65,7 @@ import { CbcAnalyticsPage } from './pages/academic/CbcAnalyticsPage';
 import { CurriculumPage } from './pages/academic/CurriculumPage';
 
 // Shared Pages
-import { ProfilePage } from './pages/shared/ProfilePage';
+import { ProfilePage } from './pages/settings/ProfilePage';
 
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';

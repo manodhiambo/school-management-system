@@ -427,10 +427,26 @@ export function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-800">
+        <div className="p-4 border-t border-gray-800 space-y-2">
           <p className="text-xs text-gray-400 text-center">
-            © {new Date().getFullYear()} EduManage Pro
+            © {new Date().getFullYear()} Skul Manager
           </p>
+          <div className="text-center">
+            <p className="text-[10px] text-gray-500 leading-tight">Developed by</p>
+            <p className="text-[11px] text-blue-400 font-semibold leading-tight">Helvino Technologies Ltd</p>
+            <a
+              href="mailto:helvinotechltd@gmail.com"
+              className="text-[10px] text-gray-500 hover:text-blue-400 transition-colors block leading-tight"
+            >
+              helvinotechltd@gmail.com
+            </a>
+            <a
+              href="tel:0703445756"
+              className="text-[10px] text-gray-500 hover:text-blue-400 transition-colors block leading-tight"
+            >
+              0703 445 756
+            </a>
+          </div>
         </div>
       </div>
     </>

@@ -14,7 +14,10 @@ class ApiService {
     });
 
     this.api.interceptors.request.use((config) => {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const token = localStorage.getItem('accessToken') ||
+        sessionStorage.getItem('accessToken') ||
+        localStorage.getItem('token') ||
+        sessionStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -43,6 +46,14 @@ class ApiService {
 
   logout() {
     return this.api.post('/auth/logout');
+  }
+
+  forgotPassword(email: string) {
+    return this.api.post('/auth/forgot-password', { email });
+  }
+
+  resetPassword(token: string, newPassword: string) {
+    return this.api.post('/auth/reset-password', { token, newPassword });
   }
 
   getMe() {

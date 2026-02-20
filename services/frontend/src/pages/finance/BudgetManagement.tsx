@@ -161,7 +161,7 @@ const BudgetManagement: React.FC = () => {
       await budgetService.createBudget({
         ...budgetForm,
         total_amount: parseFloat(budgetForm.total_amount) || totalAllocated,
-        items: budgetItemsList,
+        items: budgetItemsList as any[],
       });
 
       setShowModal(false);

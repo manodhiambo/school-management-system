@@ -38,7 +38,11 @@ export function LoginPage() {
       const response: any = await api.login(email, password);
       const { accessToken, user } = response.data;
       setAuth(user, accessToken, rememberMe);
-      navigate('/app/dashboard');
+      if (user?.role === 'superadmin') {
+        navigate('/superadmin/dashboard');
+      } else {
+        navigate('/app/dashboard');
+      }
     } catch (err: any) {
       setLoginError(err.message || 'Invalid email or password');
     } finally {

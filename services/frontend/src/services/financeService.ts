@@ -75,11 +75,12 @@ export interface BankAccount {
 export interface PettyCashTransaction {
   id: string;
   transaction_number: string;
-  transaction_date: Date;
+  transaction_date: Date | string;
   transaction_type: 'disbursement' | 'replenishment';
   amount: number;
   description: string;
-  payee_name: string;
+  payee_name?: string;
+  custodian?: string;
   receipt_number?: string;
   category?: string;
   created_by?: string;
@@ -142,10 +143,21 @@ export interface Asset {
   created_at: string;
 }
 
+// Helper to extract data array from API responses
+const unwrap = async <T>(promise: Promise<any>): Promise<T[]> => {
+  const res: any = await promise;
+  return (res?.data ?? res?.items ?? res ?? []) as T[];
+};
+
+const unwrapOne = async <T>(promise: Promise<any>): Promise<T> => {
+  const res: any = await promise;
+  return (res?.data ?? res) as T;
+};
+
 class FinanceService {
   // Chart of Accounts
-  getChartOfAccounts() {
-    return api.getChartOfAccounts();
+  async getChartOfAccounts(): Promise<ChartOfAccount[]> {
+    return unwrap<ChartOfAccount>(api.getChartOfAccounts());
   }
 
   createAccount(data: Partial<ChartOfAccount>) {
@@ -153,8 +165,8 @@ class FinanceService {
   }
 
   // Financial Years
-  getFinancialYears() {
-    return api.getFinancialYears();
+  async getFinancialYears(): Promise<FinancialYear[]> {
+    return unwrap<FinancialYear>(api.getFinancialYears());
   }
 
   createFinancialYear(data: Partial<FinancialYear>) {
@@ -162,8 +174,8 @@ class FinanceService {
   }
 
   // Income
-  getIncomeRecords(params?: any) {
-    return api.getIncomeRecords(params);
+  async getIncomeRecords(params?: any): Promise<IncomeRecord[]> {
+    return unwrap<IncomeRecord>(api.getIncomeRecords(params));
   }
 
   createIncome(data: Partial<IncomeRecord>) {
@@ -171,8 +183,8 @@ class FinanceService {
   }
 
   // Expenses
-  getExpenseRecords(params?: any) {
-    return api.getExpenseRecords(params);
+  async getExpenseRecords(params?: any): Promise<ExpenseRecord[]> {
+    return unwrap<ExpenseRecord>(api.getExpenseRecords(params));
   }
 
   createExpense(data: Partial<ExpenseRecord>) {
@@ -192,8 +204,8 @@ class FinanceService {
   }
 
   // Vendors
-  getVendors() {
-    return api.getVendors();
+  async getVendors(): Promise<Vendor[]> {
+    return unwrap<Vendor>(api.getVendors());
   }
 
   createVendor(data: Partial<Vendor>) {
@@ -201,8 +213,8 @@ class FinanceService {
   }
 
   // Bank Accounts
-  getBankAccounts() {
-    return api.getBankAccounts();
+  async getBankAccounts(): Promise<BankAccount[]> {
+    return unwrap<BankAccount>(api.getBankAccounts());
   }
 
   createBankAccount(data: Partial<BankAccount>) {
@@ -210,16 +222,16 @@ class FinanceService {
   }
 
   // Petty Cash
-  getPettyCash(params?: any) {
-    return api.getPettyCash(params);
+  async getPettyCash(params?: any): Promise<PettyCashTransaction[]> {
+    return unwrap<PettyCashTransaction>(api.getPettyCash(params));
   }
 
   createPettyCash(data: Partial<PettyCashTransaction>) {
     return api.createPettyCash(data);
   }
 
-  getPettyCashSummary() {
-    return api.getPettyCashSummary();
+  async getPettyCashSummary(): Promise<PettyCashSummary> {
+    return unwrapOne<PettyCashSummary>(api.getPettyCashSummary());
   }
 
   deletePettyCash(id: string) {
@@ -227,8 +239,8 @@ class FinanceService {
   }
 
   // Assets
-  getAssets(params?: any) {
-    return api.getAssets(params);
+  async getAssets(params?: any): Promise<Asset[]> {
+    return unwrap<Asset>(api.getAssets(params));
   }
 
   createAsset(data: Partial<Asset>) {
@@ -243,13 +255,13 @@ class FinanceService {
     return api.deleteAsset(id);
   }
 
-  getAssetsSummary() {
-    return api.getAssetsSummary();
+  async getAssetsSummary(): Promise<any> {
+    return unwrapOne<any>(api.getAssetsSummary());
   }
 
   // Budgets
-  getBudgets(params?: any) {
-    return api.getBudgets(params);
+  async getBudgets(params?: any): Promise<Budget[]> {
+    return unwrap<Budget>(api.getBudgets(params));
   }
 
   createBudget(data: Partial<Budget>) {
@@ -269,8 +281,8 @@ class FinanceService {
   }
 
   // Purchase Orders
-  getPurchaseOrders(params?: any) {
-    return api.getPurchaseOrders(params);
+  async getPurchaseOrders(params?: any): Promise<PurchaseOrder[]> {
+    return unwrap<PurchaseOrder>(api.getPurchaseOrders(params));
   }
 
   createPurchaseOrder(data: Partial<PurchaseOrder>) {
@@ -290,22 +302,22 @@ class FinanceService {
   }
 
   // Dashboard
-  getDashboard() {
-    return api.getFinanceDashboard();
+  async getDashboard(): Promise<any> {
+    return unwrapOne<any>(api.getFinanceDashboard());
   }
 
   // Reports
-  getIncomeByCategory(params?: any) {
-    return api.getIncomeByCategory(params);
+  async getIncomeByCategory(params?: any): Promise<any[]> {
+    return unwrap<any>(api.getIncomeByCategory(params));
   }
 
-  getExpensesByCategory(params?: any) {
-    return api.getExpensesByCategory(params);
+  async getExpensesByCategory(params?: any): Promise<any[]> {
+    return unwrap<any>(api.getExpensesByCategory(params));
   }
 
   // Settings
-  getSettings() {
-    return api.getFinanceSettings();
+  async getSettings(): Promise<any> {
+    return unwrapOne<any>(api.getFinanceSettings());
   }
 
   updateSetting(key: string, value: any) {
@@ -334,8 +346,8 @@ class FinanceService {
     return api.createBankTransaction(data);
   }
 
-  getBankTransactions(accountId?: string) {
-    return api.getBankTransactions(accountId);
+  async getBankTransactions(accountId?: string): Promise<any[]> {
+    return unwrap<any>(api.getBankTransactions(accountId));
   }
 
 }

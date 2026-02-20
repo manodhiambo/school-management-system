@@ -19,9 +19,9 @@ export function NotificationsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getNotifications();
+      const response: any = await api.getNotifications();
       console.log('Notifications:', response);
-      setNotifications(response.notifications || response.data || []);
+      setNotifications((response as any)?.notifications || (response as any)?.data || []);
     } catch (error: any) {
       console.error('Error loading notifications:', error);
       setError(error?.message || 'Failed to load notifications');

@@ -109,7 +109,7 @@ export default function PettyCash() {
     }).format(amount);
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString('en-KE', {
       year: 'numeric',
       month: 'short',

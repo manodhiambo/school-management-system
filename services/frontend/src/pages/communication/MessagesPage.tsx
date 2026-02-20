@@ -19,9 +19,9 @@ export function MessagesPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getMessages();
+      const response: any = await api.getMessages();
       console.log('Messages data:', response);
-      setMessages(response.messages || response || []);
+      setMessages(response?.data || response?.messages || response || []);
     } catch (error: any) {
       console.error('Error loading messages:', error);
       setError(error?.message || 'Failed to load messages');

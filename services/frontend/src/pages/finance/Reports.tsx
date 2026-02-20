@@ -172,8 +172,9 @@ const Reports: React.FC = () => {
           break;
 
         case 'budget-vs-actual':
-          const budgets = await api.getAllBudgets({ status: 'approved' });
-          
+          const budgetsRes: any = await api.getAllBudgets({ status: 'approved' });
+          const budgets: any[] = budgetsRes?.data ?? budgetsRes?.budgets ?? budgetsRes ?? [];
+
           data.budget_variance = budgets.map((budget: any) => ({
             budget_name: budget.budget_name,
             allocated: Number(budget.total_amount),

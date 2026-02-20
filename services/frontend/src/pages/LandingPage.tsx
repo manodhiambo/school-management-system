@@ -143,18 +143,18 @@ export function LandingPage() {
                 <Button
                   size="lg"
                   className="bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold text-base px-8 group"
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/register')}
                 >
-                  Get Started Free
+                  Register Your School
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
                   className="border-white/40 text-white hover:bg-white/10 text-base px-8"
-                  onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => navigate('/login')}
                 >
-                  Explore Features
+                  Sign In
                 </Button>
               </div>
 
@@ -416,9 +416,9 @@ export function LandingPage() {
             <Button
               size="lg"
               className="bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold text-base px-10 group"
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/register')}
             >
-              Start Today — It's Free
+              Register Your School
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <a href="tel:0703445756">

@@ -22,9 +22,9 @@ export function MyCoursesPage() {
       setLoading(true);
       setError(null);
       // Fetch student's subjects/courses
-      const response = await api.getSubjects({ studentId: user?.id });
+      const response: any = await api.getSubjects({ studentId: user?.id });
       console.log('Courses data:', response);
-      setCourses(response.subjects || response || []);
+      setCourses(response?.data || response?.subjects || response || []);
     } catch (error: any) {
       console.error('Error loading courses:', error);
       setError(error?.message || 'Failed to load courses');

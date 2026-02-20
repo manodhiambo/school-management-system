@@ -21,7 +21,7 @@ export function MyFeesPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getStudentFeeAccount(user?.id);
+      const response: any = await api.getStudentFeeAccount(user?.id || '');
       console.log('My fees data:', response);
       setFees(response);
     } catch (error: any) {

@@ -19,17 +19,29 @@ import {
   Zap,
 } from 'lucide-react';
 
-/* ─── Curated Unsplash photos — African / Kenyan school life ─── */
+/* ─── Pexels photos — Black African / Kenyan school life ─── */
+const px = (id: number, w = 800) =>
+  `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}`;
+
 const PHOTOS = {
-  hero:        'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1400&q=85',
-  students1:   'https://images.unsplash.com/photo-1613545325278-f24b0cae1224?auto=format&fit=crop&w=700&q=80',
-  students2:   'https://images.unsplash.com/photo-1597534458220-9a09769a83da?auto=format&fit=crop&w=700&q=80',
-  classroom:   'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=700&q=80',
-  teacher:     'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=700&q=80',
-  building:    'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=700&q=80',
-  outdoor:     'https://images.unsplash.com/photo-1541178626-1e7e2e8c0ec4?auto=format&fit=crop&w=700&q=80',
-  library:     'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=700&q=80',
-  graduation:  'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=700&q=80',
+  // Wide hero — African children in school uniform, classroom
+  hero:       px(8943074, 1400),
+  // Students in uniform — Kenya / East Africa
+  students1:  px(8167393, 700),
+  // Group of African students studying together
+  students2:  px(5212345, 700),
+  // African classroom interior with children at desks
+  classroom:  px(8943151, 700),
+  // Black African teacher with young pupils
+  teacher:    px(8471997, 700),
+  // Kenyan school building / campus exterior
+  building:   px(1643383, 700),
+  // African children in outdoor school environment
+  outdoor:    px(8943047, 700),
+  // African children reading / school library
+  library:    px(1550337, 700),
+  // African school graduation / prize-giving
+  graduation: px(7659564, 700),
 };
 
 const FEATURES = [

@@ -6,11 +6,15 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated) {
-    // Redirect to LandingPage instead of login
     return <Navigate to="/" replace />;
+  }
+
+  // Superadmin has their own area
+  if (user?.role === 'superadmin') {
+    return <Navigate to="/superadmin/dashboard" replace />;
   }
 
   return <>{children}</>;

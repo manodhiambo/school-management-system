@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import {
@@ -316,9 +316,26 @@ const navigationItems = [
 
 export function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const user = useAuthStore((state) => state.user);
+  const { user, setAuth } = useAuthStore();
   const userRole = user?.role || 'admin';
+
+  // Check if currently logged in as a tenant (superadmin impersonation)
+  const superadminReturnToken = sessionStorage.getItem('superadmin_return_token');
+  const superadminReturnUserRaw = sessionStorage.getItem('superadmin_return_user');
+
+  const handleReturnToSuperAdmin = () => {
+    if (superadminReturnToken && superadminReturnUserRaw) {
+      try {
+        const superUser = JSON.parse(superadminReturnUserRaw);
+        sessionStorage.removeItem('superadmin_return_token');
+        sessionStorage.removeItem('superadmin_return_user');
+        setAuth(superUser, superadminReturnToken, true);
+        navigate('/superadmin/dashboard');
+      } catch { /* ignore parse errors */ }
+    }
+  };
 
   // Filter navigation based on user role
   const filteredNavigation = navigationItems.filter(item =>
@@ -334,12 +351,14 @@ export function Sidebar() {
       case 'student': return 'bg-green-600';
       case 'parent': return 'bg-purple-600';
       case 'finance_officer': return 'bg-yellow-600';
+      case 'superadmin': return 'bg-yellow-500';
       default: return 'bg-gray-600';
     }
   };
 
   const getRoleLabel = (role: string) => {
     if (role === 'finance_officer') return 'Finance Officer';
+    if (role === 'superadmin') return 'SuperAdmin';
     return role.charAt(0).toUpperCase() + role.slice(1);
   };
 
@@ -397,6 +416,19 @@ export function Sidebar() {
             </div>
           </div>
         </div>
+
+        {/* SuperAdmin impersonation banner */}
+        {superadminReturnToken && (
+          <div className="mx-2 mb-2 bg-yellow-500 rounded-lg p-2">
+            <p className="text-xs text-gray-900 font-medium text-center mb-1">Logged in as tenant</p>
+            <button
+              onClick={handleReturnToSuperAdmin}
+              className="w-full text-xs bg-gray-900 text-yellow-400 rounded py-1.5 font-semibold hover:bg-gray-800 transition-colors"
+            >
+              ← Return to SuperAdmin
+            </button>
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">

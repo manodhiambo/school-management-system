@@ -24,9 +24,9 @@ export function ProfilePage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getCurrentUser();
+      const response: any = await api.getCurrentUser();
       console.log('Profile data:', response);
-      setProfile(response.user || response.data || user);
+      setProfile((response as any)?.user || (response as any)?.data || user);
     } catch (error: any) {
       console.error('Error loading profile:', error);
       setError(error?.message || 'Failed to load profile');

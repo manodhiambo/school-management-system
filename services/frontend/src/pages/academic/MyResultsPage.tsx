@@ -21,9 +21,9 @@ export function MyResultsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getStudentExamResults(user?.id);
+      const response: any = await api.getStudentExamResults(user?.id || '');
       console.log('My results data:', response);
-      setResults(response.results || response || []);
+      setResults(response?.data || response?.results || response || []);
     } catch (error: any) {
       console.error('Error loading results:', error);
       setError(error?.message || 'Failed to load exam results');

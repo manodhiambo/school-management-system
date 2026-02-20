@@ -5,6 +5,10 @@ interface User {
   id: string;
   email: string;
   role: string;
+  name?: string;
+  tenant_id?: string | null;
+  tenant_name?: string;
+  tenant_status?: string;
 }
 
 interface AuthState {

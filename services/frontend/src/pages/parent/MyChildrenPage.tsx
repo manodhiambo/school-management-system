@@ -22,7 +22,7 @@ export function MyChildrenPage() {
       setLoading(true);
       setError(null);
       // Use getParentByUserId instead of getParent
-      const response: any = await api.getParentByUserId(user?.id);
+      const response: any = await api.getParentByUserId(user?.id || '');
       console.log('Parent data:', response);
       const parentData = response.data || response;
       setChildren(parentData.children || []);

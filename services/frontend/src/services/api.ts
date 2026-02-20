@@ -3,7 +3,7 @@ import axios, { AxiosInstance } from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 class ApiService {
-  private api: AxiosInstance;
+  api: AxiosInstance;
 
   constructor() {
     this.api = axios.create({
@@ -912,6 +912,84 @@ class ApiService {
 
   getCbcSubjectAnalytics(subjectId: string) {
     return this.api.get('/cbc-analytics/subject/' + subjectId);
+  }
+
+  // ======================
+  // SCHOOL REGISTRATION (Public — no auth header needed)
+  // ======================
+  registerSchool(data: {
+    school_name: string;
+    admin_name: string;
+    admin_email: string;
+    admin_phone: string;
+    school_address?: string;
+    school_type?: string;
+    county?: string;
+  }) {
+    return this.api.post('/registration/register', data);
+  }
+
+  initiateRegistrationPayment(tenantId: string, phone: string) {
+    return this.api.post('/registration/pay', { tenant_id: tenantId, phone });
+  }
+
+  pollRegistrationStatus(tenantId: string) {
+    return this.api.get('/registration/check-activation/' + tenantId);
+  }
+
+  renewSubscription(tenantId: string, phone: string) {
+    return this.api.post('/registration/renew', { tenant_id: tenantId, phone });
+  }
+
+  // ======================
+  // SUPERADMIN
+  // ======================
+  getSuperAdminStats() {
+    return this.api.get('/superadmin/stats');
+  }
+
+  getTenants(params?: any) {
+    return this.api.get('/superadmin/tenants', { params });
+  }
+
+  getTenant(id: string) {
+    return this.api.get('/superadmin/tenants/' + id);
+  }
+
+  createTenant(data: any) {
+    return this.api.post('/superadmin/tenants', data);
+  }
+
+  updateTenant(id: string, data: any) {
+    return this.api.put('/superadmin/tenants/' + id, data);
+  }
+
+  deleteTenant(id: string) {
+    return this.api.delete('/superadmin/tenants/' + id);
+  }
+
+  activateTenant(id: string) {
+    return this.api.post('/superadmin/tenants/' + id + '/activate');
+  }
+
+  suspendTenant(id: string) {
+    return this.api.post('/superadmin/tenants/' + id + '/suspend');
+  }
+
+  extendTenantSubscription(id: string, months: number) {
+    return this.api.post('/superadmin/tenants/' + id + '/extend', { months });
+  }
+
+  loginAsTenant(id: string) {
+    return this.api.post('/superadmin/tenants/' + id + '/login-as');
+  }
+
+  getTenantPayments(id: string) {
+    return this.api.get('/superadmin/tenants/' + id + '/payments');
+  }
+
+  updateSuperAdminProfile(data: { name?: string; phone?: string; currentPassword?: string; newPassword?: string }) {
+    return this.api.put('/superadmin/profile', data);
   }
 
 }

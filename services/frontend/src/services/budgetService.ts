@@ -70,17 +70,27 @@ export interface BudgetVariance {
   status: 'Over Budget' | 'Under Utilized' | 'On Track';
 }
 
+const unwrapArr = async <T>(p: Promise<any>): Promise<T[]> => {
+  const r: any = await p;
+  return (r?.data ?? r?.items ?? r ?? []) as T[];
+};
+
+const unwrapObj = async <T>(p: Promise<any>): Promise<T> => {
+  const r: any = await p;
+  return (r?.data ?? r) as T;
+};
+
 class BudgetService {
   // Budget CRUD
-  async getBudgets(params?: any) {
-    return api.getAllBudgets(params);
+  async getBudgets(params?: any): Promise<Budget[]> {
+    return unwrapArr<Budget>(api.getAllBudgets(params));
   }
 
-  async getBudget(id: string) {
-    return api.getBudgetById(id);
+  async getBudget(id: string): Promise<Budget> {
+    return unwrapObj<Budget>(api.getBudgetById(id));
   }
 
-  async createBudget(data: Partial<Budget & { items?: BudgetItem[] }>) {
+  async createBudget(data: Partial<Budget & { items?: any[] }>) {
     return api.createNewBudget(data);
   }
 
@@ -101,8 +111,8 @@ class BudgetService {
   }
 
   // Budget Items
-  async getBudgetItems(budgetId: string) {
-    return api.getBudgetItemsById(budgetId);
+  async getBudgetItems(budgetId: string): Promise<BudgetItem[]> {
+    return unwrapArr<BudgetItem>(api.getBudgetItemsById(budgetId));
   }
 
   async addBudgetItem(budgetId: string, data: Partial<BudgetItem>) {
@@ -119,11 +129,11 @@ class BudgetService {
 
   // Budget Analytics
   async getBudgetSummary(id: string): Promise<BudgetSummary> {
-    return api.getBudgetSummaryById(id);
+    return unwrapObj<BudgetSummary>(api.getBudgetSummaryById(id));
   }
 
   async getBudgetVariance(id: string): Promise<BudgetVariance[]> {
-    return api.getBudgetVarianceById(id);
+    return unwrapArr<BudgetVariance>(api.getBudgetVarianceById(id));
   }
 
   // Helper methods

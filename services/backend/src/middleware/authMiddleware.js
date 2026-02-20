@@ -19,7 +19,7 @@ export const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, config.jwt.secret);
     
     const result = await pool.query(
-      'SELECT id, email, role, is_active, is_verified FROM users WHERE id = $1',
+      'SELECT id, email, role, tenant_id, is_active, is_verified FROM users WHERE id = $1',
       [decoded.userId]
     );
 
@@ -28,7 +28,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     const user = result.rows[0];
-    
+
     if (!user.is_active) {
       throw new ApiError(401, 'Account is deactivated');
     }
@@ -37,6 +37,7 @@ export const authenticate = async (req, res, next) => {
       id: user.id,
       email: user.email,
       role: user.role,
+      tenant_id: user.tenant_id || null,
       isActive: user.is_active,
       isVerified: user.is_verified
     };

@@ -238,7 +238,7 @@ const VendorsPurchaseOrders: React.FC = () => {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="text-sm text-gray-500">Recent Vendors</div>
               <div className="text-2xl font-bold text-gray-900 mt-2">
-                {vendors.filter(v => {
+                {vendors.filter((v: any) => {
                   const created = new Date(v.created_at || '');
                   const monthAgo = new Date();
                   monthAgo.setMonth(monthAgo.getMonth() - 1);

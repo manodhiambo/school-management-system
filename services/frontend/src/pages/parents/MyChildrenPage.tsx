@@ -22,9 +22,9 @@ export function MyChildrenPage() {
       setLoading(true);
       setError(null);
       // Fetch parent's children
-      const response = await api.getParent(user?.id);
+      const response: any = await api.getParent(user?.id || '');
       console.log('Children data:', response);
-      setChildren(response.children || response.students || []);
+      setChildren((response as any)?.children || (response as any)?.students || []);
     } catch (error: any) {
       console.error('Error loading children:', error);
       setError(error?.message || 'Failed to load children information');

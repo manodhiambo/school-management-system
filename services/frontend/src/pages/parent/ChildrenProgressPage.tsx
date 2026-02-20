@@ -35,7 +35,7 @@ export function ChildrenProgressPage() {
     try {
       setLoading(true);
       setError(null);
-      const response: any = await api.getParentByUserId(user?.id);
+      const response: any = await api.getParentByUserId(user?.id || '');
       const parentData = response.data || response;
       const childrenData = parentData.children || [];
       setChildren(childrenData);

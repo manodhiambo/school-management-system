@@ -55,12 +55,14 @@ const Assets: React.FC = () => {
           ...formData,
           purchase_cost: parseFloat(formData.purchase_cost),
           current_value: parseFloat(formData.current_value),
+          status: formData.status as 'active' | 'disposed' | 'under_maintenance',
         });
       } else {
         await financeService.createAsset({
           ...formData,
           purchase_cost: parseFloat(formData.purchase_cost),
           current_value: parseFloat(formData.current_value),
+          status: formData.status as 'active' | 'disposed' | 'under_maintenance',
         });
       }
       setShowModal(false);

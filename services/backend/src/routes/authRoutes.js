@@ -18,48 +18,78 @@ router.post('/login', async (req, res) => {
     logger.info(`Login attempt for: ${email}`);
     
     const users = await query('SELECT * FROM users WHERE email = $1', [email]);
-    
+
     if (users.length === 0) {
       logger.warn(`User not found: ${email}`);
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
-    
+
     const user = users[0];
     logger.info(`User found: ${user.email}, role: ${user.role}`);
-    
+
     if (!user.is_active) {
       return res.status(401).json({ success: false, message: 'Account is deactivated' });
     }
-    
+
     if (!user.password) {
       logger.error('User has no password set');
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
-    
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       logger.warn(`Invalid password for: ${email}`);
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
-    
-    // Generate tokens
+
+    // For non-superadmin users, check tenant status
+    let tenantStatus = null;
+    if (user.role !== 'superadmin' && user.tenant_id) {
+      const tenantRows = await query(
+        'SELECT status FROM tenants WHERE id = $1',
+        [user.tenant_id]
+      );
+      if (tenantRows.length > 0) {
+        tenantStatus = tenantRows[0].status;
+        if (tenantStatus === 'suspended') {
+          return res.status(403).json({
+            success: false,
+            message: 'School account is suspended. Please contact Helvino Technologies Limited at helvinotechltd@gmail.com or 0703445756.'
+          });
+        }
+        if (tenantStatus === 'expired') {
+          return res.status(403).json({
+            success: false,
+            message: 'School subscription has expired. Please renew to continue.'
+          });
+        }
+        if (tenantStatus === 'pending') {
+          return res.status(403).json({
+            success: false,
+            message: 'School registration is pending payment. Please complete payment to activate.'
+          });
+        }
+      }
+    }
+
+    // Generate tokens — include tenant_id in JWT payload
     const accessToken = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
+      { userId: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id },
       config.jwt.secret,
       { expiresIn: config.jwt.accessExpiresIn }
     );
-    
+
     const refreshToken = jwt.sign(
       { userId: user.id },
       config.jwt.refreshSecret,
       { expiresIn: config.jwt.refreshExpiresIn }
     );
-    
+
     // Update last login
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
-    
+
     logger.info(`Login successful for: ${email}`);
-    
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -68,6 +98,7 @@ router.post('/login', async (req, res) => {
           id: user.id,
           email: user.email,
           role: user.role,
+          tenant_id: user.tenant_id,
           isActive: user.is_active,
           isVerified: user.is_verified
         },
@@ -131,15 +162,15 @@ router.post('/refresh-token', async (req, res) => {
     const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
     
     const users = await query('SELECT * FROM users WHERE id = $1 AND is_active = true', [decoded.userId]);
-    
+
     if (users.length === 0) {
       return res.status(401).json({ success: false, message: 'User not found' });
     }
-    
+
     const user = users[0];
-    
+
     const newAccessToken = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
+      { userId: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id },
       config.jwt.secret,
       { expiresIn: config.jwt.accessExpiresIn }
     );

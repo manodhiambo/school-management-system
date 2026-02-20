@@ -352,7 +352,7 @@ export default function Transactions() {
                 incomeRecords.map((record: any) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(activeTab === 'income' ? record.income_date : record.expense_date)}
+                      {formatDate(record.income_date || record.expense_date || record.date)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{record.description}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{record.account_name || '-'}</td>
@@ -395,7 +395,7 @@ export default function Transactions() {
               expenseRecords.map((record: any) => (
                 <tr key={record.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatDate(activeTab === 'income' ? record.income_date : record.expense_date)}
+                    {formatDate(record.income_date || record.expense_date || record.date)}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">{record.description}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{record.account_name || '-'}</td>

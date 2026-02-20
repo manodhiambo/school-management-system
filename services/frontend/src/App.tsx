@@ -4,6 +4,14 @@ import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { LoginPage } from './pages/auth/LoginPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { LandingPage } from './pages/LandingPage';
+import { SchoolRegistrationPage } from './pages/SchoolRegistrationPage';
+
+// SuperAdmin
+import { SuperAdminLayout } from './components/layout/SuperAdminLayout';
+import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
+import { TenantsPage } from './pages/superadmin/TenantsPage';
+import { SuperAdminProfilePage } from './pages/superadmin/SuperAdminProfilePage';
+import { ProtectedSuperAdmin } from './components/auth/ProtectedSuperAdmin';
 
 // Dashboard & Main Pages
 import { DashboardPage } from './pages/dashboard/DashboardPage';
@@ -91,6 +99,22 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/register" element={<SchoolRegistrationPage />} />
+
+            {/* SuperAdmin routes */}
+            <Route
+              path="/superadmin"
+              element={
+                <ProtectedSuperAdmin>
+                  <SuperAdminLayout />
+                </ProtectedSuperAdmin>
+              }
+            >
+              <Route index element={<Navigate to="/superadmin/dashboard" replace />} />
+              <Route path="dashboard" element={<SuperAdminDashboard />} />
+              <Route path="tenants" element={<TenantsPage />} />
+              <Route path="profile" element={<SuperAdminProfilePage />} />
+            </Route>
 
             {/* Protected dashboard area */}
             <Route

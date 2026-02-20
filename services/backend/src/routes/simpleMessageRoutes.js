@@ -6,6 +6,33 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+// Get messageable recipients — available to all authenticated users
+router.get('/recipients', authenticate, async (req, res) => {
+  try {
+    const recipients = await query(`
+      SELECT
+        u.id,
+        u.role,
+        COALESCE(t.first_name, s.first_name, p.first_name, '') || ' ' ||
+        COALESCE(t.last_name,  s.last_name,  p.last_name,  '') AS name,
+        u.email
+      FROM users u
+      LEFT JOIN teachers t ON u.id = t.user_id
+      LEFT JOIN students s ON u.id = s.user_id
+      LEFT JOIN parents  p ON u.id = p.user_id
+      WHERE u.is_active = true
+        AND u.id != $1
+        AND u.role IN ('admin', 'teacher')
+      ORDER BY u.role, name
+    `, [req.user.id]);
+
+    res.json({ success: true, data: recipients });
+  } catch (error) {
+    logger.error('Get recipients error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching recipients' });
+  }
+});
+
 // Send a message
 router.post('/send', authenticate, async (req, res) => {
   try {

@@ -52,6 +52,46 @@ const templates = {
     text: `${data.title || 'Notification'}\n\n${data.message}`
   }),
 
+  forgotPassword: (data) => ({
+    subject: 'Reset Your Password - Skul Manager',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+          .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; }
+          .button { display: inline-block; background: #3b82f6; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 24px 0; font-weight: 600; font-size: 16px; }
+          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 12px 12px; }
+          .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin-top: 20px; border-radius: 4px; font-size: 14px; color: #92400e; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>🔐 Password Reset</h1></div>
+          <div class="content">
+            <p>Hello <strong>${data.name || 'User'}</strong>,</p>
+            <p>We received a request to reset your password for your Skul Manager account. Click the button below to set a new password:</p>
+            <div style="text-align: center;">
+              <a href="${data.resetLink}" class="button">Reset My Password</a>
+            </div>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #6b7280; font-size: 13px;">${data.resetLink}</p>
+            <div class="warning">
+              ⚠️ This link expires in <strong>1 hour</strong>. If you did not request a password reset, please ignore this email — your password will remain unchanged.
+            </div>
+          </div>
+          <div class="footer"><p>Skul Manager - School Management System</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Hello ${data.name || 'User'},\n\nReset your password by visiting:\n${data.resetLink}\n\nThis link expires in 1 hour.\n\nIf you did not request this, ignore this email.\n\nSkul Manager`
+  }),
+
   passwordReset: (data) => ({
     subject: 'Password Reset - Skul Manager',
     html: `

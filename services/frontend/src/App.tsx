@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { LoginPage } from './pages/auth/LoginPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { LandingPage } from './pages/LandingPage';
 
 // Dashboard & Main Pages
@@ -89,6 +90,7 @@ function App() {
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* Protected dashboard area */}
             <Route

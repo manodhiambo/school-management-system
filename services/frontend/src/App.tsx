@@ -27,6 +27,8 @@ import { MyTimetablePage } from './pages/student/MyTimetablePage';
 import { AssignmentsPage } from './pages/student/AssignmentsPage';
 import { MessagesPage } from './pages/student/MessagesPage';
 import { NotificationsPage } from './pages/student/NotificationsPage';
+import { MyExamsPage } from './pages/student/MyExamsPage';
+import { TakeExamPage } from './pages/student/TakeExamPage';
 
 // Parent Pages
 import { MyChildrenPage } from './pages/parent/MyChildrenPage';
@@ -36,6 +38,7 @@ import { FeePaymentsPage } from './pages/parent/FeePaymentsPage';
 // Teacher Pages
 import { MyClassesPage } from './pages/teacher/MyClassesPage';
 import { GradeBookPage } from './pages/teacher/GradeBookPage';
+import { TeacherExamsPage } from './pages/teacher/TeacherExamsPage';
 
 // Library Pages
 import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
@@ -56,6 +59,10 @@ import {
   Reports,
 } from './pages/finance';
 import FinancialYears from "./pages/finance/FinancialYears";
+
+// CBC / Academic Pages
+import { CbcAnalyticsPage } from './pages/academic/CbcAnalyticsPage';
+import { CurriculumPage } from './pages/academic/CurriculumPage';
 
 // Shared Pages
 import { ProfilePage } from './pages/shared/ProfilePage';
@@ -128,6 +135,8 @@ function App() {
               <Route path="assignments" element={<AssignmentsPage />} />
               <Route path="messages" element={<MessagesPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="my-exams" element={<MyExamsPage />} />
+              <Route path="take-exam/:examId" element={<TakeExamPage />} />
 
               {/* Parent Routes */}
               <Route path="my-children" element={<MyChildrenPage />} />
@@ -137,6 +146,7 @@ function App() {
               {/* Teacher Routes */}
               <Route path="my-classes" element={<MyClassesPage />} />
               <Route path="gradebook" element={<GradeBookPage />} />
+              <Route path="teacher-exams" element={<TeacherExamsPage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />
@@ -144,6 +154,10 @@ function App() {
               <Route path="library-management" element={<LibraryManagementPage />} />
               <Route path="library-borrowings" element={<BorrowingsPage />} />
               <Route path="library-members" element={<LibraryMembersPage />} />
+
+              {/* CBC Routes */}
+              <Route path="cbc-analytics" element={<CbcAnalyticsPage />} />
+              <Route path="curriculum" element={<CurriculumPage />} />
 
               {/* Shared Routes */}
               <Route path="profile" element={<ProfilePage />} />

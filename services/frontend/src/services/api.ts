@@ -365,6 +365,10 @@ class ApiService {
     return this.api.patch("/messages/" + id + "/read");
   }
 
+  getMessageRecipients() {
+    return this.api.get('/messages/recipients');
+  }
+
   // Notifications
   getNotifications() {
     return this.api.get('/notifications');

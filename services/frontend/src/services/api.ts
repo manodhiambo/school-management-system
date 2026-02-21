@@ -931,8 +931,9 @@ class ApiService {
     return this.api.post('/registration/register', data);
   }
 
-  initiateRegistrationPayment(tenantId: string, phone: string) {
-    return this.api.post('/registration/pay', { tenant_id: tenantId, phone });
+  initiateRegistrationPayment(_tenantId: string, phone: string) {
+    // tenant_id is resolved from JWT on the backend
+    return this.api.post('/registration/pay', { phone });
   }
 
   pollRegistrationStatus(tenantId: string) {

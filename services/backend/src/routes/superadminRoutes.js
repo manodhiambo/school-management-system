@@ -34,7 +34,7 @@ router.get('/tenants', async (req, res) => {
     let idx = 1;
 
     if (search) {
-      conditions.push(`(t.school_name ILIKE $${idx} OR t.school_email ILIKE $${idx} OR t.contact_person ILIKE $${idx})`);
+      conditions.push(`(t.school_name ILIKE $${idx} OR t.email ILIKE $${idx} OR t.admin_email ILIKE $${idx})`);
       params.push(`%${search}%`);
       idx++;
     }
@@ -49,13 +49,10 @@ router.get('/tenants', async (req, res) => {
     const tenants = await query(`
       SELECT
         t.*,
-        t.contact_person AS admin_name,
-        t.school_email AS admin_email,
-        t.school_phone AS admin_phone,
         COUNT(DISTINCT u.id) FILTER (WHERE u.role = 'student') AS student_count,
         COUNT(DISTINCT u.id) FILTER (WHERE u.role = 'teacher') AS teacher_count,
         (
-          SELECT SUM(tp.amount)
+          SELECT COALESCE(SUM(tp.amount), 0)
           FROM tenant_payments tp
           WHERE tp.tenant_id = t.id AND tp.status = 'completed'
         ) AS total_paid,
@@ -76,7 +73,7 @@ router.get('/tenants', async (req, res) => {
     res.json({ success: true, data: tenants });
   } catch (error) {
     logger.error('List tenants error:', error);
-    res.status(500).json({ success: false, message: 'Failed to list tenants' });
+    res.status(500).json({ success: false, message: 'Failed to list tenants', error: error.message });
   }
 });
 
@@ -103,13 +100,11 @@ router.get('/tenants/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
 
-    // Get recent payments
     const payments = await query(
       `SELECT * FROM tenant_payments WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 10`,
       [id]
     );
 
-    // Get admin user
     const admins = await query(
       `SELECT id, email, is_active, created_at, last_login FROM users WHERE tenant_id = $1 AND role = 'admin' LIMIT 5`,
       [id]
@@ -125,7 +120,7 @@ router.get('/tenants/:id', async (req, res) => {
     });
   } catch (error) {
     logger.error('Get tenant error:', error);
-    res.status(500).json({ success: false, message: 'Failed to get tenant' });
+    res.status(500).json({ success: false, message: 'Failed to get tenant', error: error.message });
   }
 });
 
@@ -136,57 +131,60 @@ router.post('/tenants', async (req, res) => {
   try {
     const {
       school_name,
-      school_email,
-      school_phone,
-      school_address,
+      email,
+      phone,
+      address,
+      city,
       county,
-      contact_person,
-      registration_number,
-      status = 'active',
-      max_students = 500,
-      max_teachers = 50,
-      subscription_end,
+      country = 'Kenya',
+      admin_email,
+      status = 'trial',
       notes
     } = req.body;
 
-    if (!school_name || !school_email) {
+    if (!school_name || !email) {
       return res.status(400).json({
         success: false,
-        message: 'school_name and school_email are required'
+        message: 'school_name and email are required'
       });
     }
 
-    // Check if email already in use
-    const existing = await query('SELECT id FROM tenants WHERE school_email = $1', [school_email]);
+    const existing = await query('SELECT id FROM tenants WHERE email = $1', [email]);
     if (existing.length > 0) {
       return res.status(409).json({ success: false, message: 'A school with this email already exists' });
     }
 
-    const subEnd = subscription_end || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Generate unique school_code and subdomain
+    const baseCode = school_name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6);
+    const rand = Math.floor(Math.random() * 900) + 100;
+    const school_code = `${baseCode}${rand}`;
+    const subdomain = school_name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) + rand;
+
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
 
     const result = await query(`
       INSERT INTO tenants (
-        school_name, school_email, school_phone, school_address,
-        county, contact_person, registration_number, status,
-        max_students, max_teachers, subscription_start, subscription_end,
-        registration_fee_paid, notes, updated_at
+        school_name, email, phone, address, city, county, country,
+        admin_email, school_code, subdomain, schema_name,
+        status, subscription_starts_at, subscription_ends_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        NOW(), $11, true, $12, NOW()
+        $1, $2, $3, $4, $5, $6, $7,
+        $8, $9, $10, $11,
+        $12, NOW(), $13, NOW()
       )
       RETURNING *
     `, [
-      school_name, school_email, school_phone, school_address,
-      county, contact_person, registration_number, status,
-      max_students, max_teachers, subEnd, notes
+      school_name, email, phone, address, city, county, country,
+      admin_email || email, school_code, subdomain, `tenant_${school_code.toLowerCase()}`,
+      status, oneYearFromNow.toISOString()
     ]);
 
     logger.info(`Tenant created by superadmin: ${school_name}`);
-
     res.status(201).json({ success: true, data: result[0] });
   } catch (error) {
     logger.error('Create tenant error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create tenant' });
+    res.status(500).json({ success: false, message: 'Failed to create tenant', error: error.message });
   }
 });
 
@@ -198,18 +196,15 @@ router.put('/tenants/:id', async (req, res) => {
     const { id } = req.params;
     const {
       school_name,
-      school_email,
-      school_phone,
-      school_address,
+      email,
+      phone,
+      address,
+      city,
       county,
-      contact_person,
-      registration_number,
+      country,
+      admin_email,
       status,
-      notes,
-      subscription_end,
-      max_students,
-      max_teachers,
-      logo_url
+      subscription_ends_at
     } = req.body;
 
     const existing = await query('SELECT id FROM tenants WHERE id = $1', [id]);
@@ -219,34 +214,29 @@ router.put('/tenants/:id', async (req, res) => {
 
     const result = await query(`
       UPDATE tenants SET
-        school_name = COALESCE($1, school_name),
-        school_email = COALESCE($2, school_email),
-        school_phone = COALESCE($3, school_phone),
-        school_address = COALESCE($4, school_address),
-        county = COALESCE($5, county),
-        contact_person = COALESCE($6, contact_person),
-        registration_number = COALESCE($7, registration_number),
-        status = COALESCE($8, status),
-        notes = COALESCE($9, notes),
-        subscription_end = COALESCE($10, subscription_end),
-        max_students = COALESCE($11, max_students),
-        max_teachers = COALESCE($12, max_teachers),
-        logo_url = COALESCE($13, logo_url),
-        updated_at = NOW()
-      WHERE id = $14
+        school_name        = COALESCE($1, school_name),
+        email              = COALESCE($2, email),
+        phone              = COALESCE($3, phone),
+        address            = COALESCE($4, address),
+        city               = COALESCE($5, city),
+        county             = COALESCE($6, county),
+        country            = COALESCE($7, country),
+        admin_email        = COALESCE($8, admin_email),
+        status             = COALESCE($9, status),
+        subscription_ends_at = COALESCE($10, subscription_ends_at),
+        updated_at         = NOW()
+      WHERE id = $11
       RETURNING *
     `, [
-      school_name, school_email, school_phone, school_address,
-      county, contact_person, registration_number, status,
-      notes, subscription_end, max_students, max_teachers, logo_url,
-      id
+      school_name, email, phone, address, city, county, country,
+      admin_email, status, subscription_ends_at, id
     ]);
 
     logger.info(`Tenant updated by superadmin: ${id}`);
     res.json({ success: true, data: result[0] });
   } catch (error) {
     logger.error('Update tenant error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update tenant' });
+    res.status(500).json({ success: false, message: 'Failed to update tenant', error: error.message });
   }
 });
 
@@ -263,7 +253,7 @@ router.delete('/tenants/:id', async (req, res) => {
     }
 
     await query(
-      `UPDATE tenants SET status = 'suspended', updated_at = NOW() WHERE id = $1`,
+      `UPDATE tenants SET status = 'suspended', suspended_at = NOW(), updated_at = NOW() WHERE id = $1`,
       [id]
     );
 
@@ -271,12 +261,12 @@ router.delete('/tenants/:id', async (req, res) => {
 
     res.json({
       success: true,
-      message: `School "${existing[0].school_name}" has been suspended. All users will lose access. This is a soft delete — the record is preserved.`,
+      message: `School "${existing[0].school_name}" has been suspended.`,
       warning: 'All users belonging to this tenant can no longer log in until the account is reactivated.'
     });
   } catch (error) {
     logger.error('Delete tenant error:', error);
-    res.status(500).json({ success: false, message: 'Failed to suspend tenant' });
+    res.status(500).json({ success: false, message: 'Failed to suspend tenant', error: error.message });
   }
 });
 
@@ -298,19 +288,19 @@ router.post('/tenants/:id/activate', async (req, res) => {
     const result = await query(`
       UPDATE tenants SET
         status = 'active',
-        subscription_start = NOW(),
-        subscription_end = $1,
-        registration_fee_paid = true,
+        subscription_starts_at = NOW(),
+        subscription_ends_at = $1,
+        suspended_at = NULL,
         updated_at = NOW()
       WHERE id = $2
       RETURNING *
-    `, [oneYearFromNow.toISOString().split('T')[0], id]);
+    `, [oneYearFromNow.toISOString(), id]);
 
     logger.info(`Tenant activated by superadmin: ${id}`);
     res.json({ success: true, message: 'Tenant activated successfully', data: result[0] });
   } catch (error) {
     logger.error('Activate tenant error:', error);
-    res.status(500).json({ success: false, message: 'Failed to activate tenant' });
+    res.status(500).json({ success: false, message: 'Failed to activate tenant', error: error.message });
   }
 });
 
@@ -327,7 +317,7 @@ router.post('/tenants/:id/suspend', async (req, res) => {
     }
 
     const result = await query(`
-      UPDATE tenants SET status = 'suspended', updated_at = NOW()
+      UPDATE tenants SET status = 'suspended', suspended_at = NOW(), updated_at = NOW()
       WHERE id = $1
       RETURNING *
     `, [id]);
@@ -336,45 +326,45 @@ router.post('/tenants/:id/suspend', async (req, res) => {
     res.json({ success: true, message: 'Tenant suspended', data: result[0] });
   } catch (error) {
     logger.error('Suspend tenant error:', error);
-    res.status(500).json({ success: false, message: 'Failed to suspend tenant' });
+    res.status(500).json({ success: false, message: 'Failed to suspend tenant', error: error.message });
   }
 });
 
 // ============================================================
-// POST /tenants/:id/extend — Extend subscription by 1 year
+// POST /tenants/:id/extend — Extend subscription
 // ============================================================
 router.post('/tenants/:id/extend', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const existing = await query('SELECT id, school_name, subscription_end FROM tenants WHERE id = $1', [id]);
+    const existing = await query('SELECT id, school_name, subscription_ends_at FROM tenants WHERE id = $1', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
 
     const tenant = existing[0];
     const months = parseInt(req.body?.months) || 12;
-    // Extend from current subscription_end or from today if expired
-    const baseDate = tenant.subscription_end && new Date(tenant.subscription_end) > new Date()
-      ? new Date(tenant.subscription_end)
+
+    // Extend from current subscription_ends_at or from today if expired/not set
+    const baseDate = tenant.subscription_ends_at && new Date(tenant.subscription_ends_at) > new Date()
+      ? new Date(tenant.subscription_ends_at)
       : new Date();
     baseDate.setMonth(baseDate.getMonth() + months);
-    const newEnd = baseDate.toISOString().split('T')[0];
 
     const result = await query(`
       UPDATE tenants SET
-        subscription_end = $1,
+        subscription_ends_at = $1,
         status = CASE WHEN status = 'expired' THEN 'active' ELSE status END,
         updated_at = NOW()
       WHERE id = $2
       RETURNING *
-    `, [newEnd, id]);
+    `, [baseDate.toISOString(), id]);
 
-    logger.info(`Tenant subscription extended by superadmin: ${id}, new end: ${newEnd}`);
-    res.json({ success: true, message: `Subscription extended to ${newEnd}`, data: result[0] });
+    logger.info(`Tenant subscription extended by superadmin: ${id}, new end: ${baseDate.toISOString()}`);
+    res.json({ success: true, message: `Subscription extended to ${baseDate.toDateString()}`, data: result[0] });
   } catch (error) {
     logger.error('Extend subscription error:', error);
-    res.status(500).json({ success: false, message: 'Failed to extend subscription' });
+    res.status(500).json({ success: false, message: 'Failed to extend subscription', error: error.message });
   }
 });
 
@@ -441,7 +431,7 @@ router.post('/tenants/:id/login-as', async (req, res) => {
     });
   } catch (error) {
     logger.error('Login-as error:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate impersonation token' });
+    res.status(500).json({ success: false, message: 'Failed to generate impersonation token', error: error.message });
   }
 });
 
@@ -465,7 +455,7 @@ router.get('/tenants/:id/payments', async (req, res) => {
     res.json({ success: true, data: payments });
   } catch (error) {
     logger.error('Get tenant payments error:', error);
-    res.status(500).json({ success: false, message: 'Failed to get payments' });
+    res.status(500).json({ success: false, message: 'Failed to get payments', error: error.message });
   }
 });
 
@@ -476,12 +466,16 @@ router.get('/stats', async (req, res) => {
   try {
     const statsRows = await query(`
       SELECT
-        COUNT(*) AS total_tenants,
-        COUNT(*) FILTER (WHERE status = 'active')    AS active_tenants,
-        COUNT(*) FILTER (WHERE status = 'pending')   AS pending,
-        COUNT(*) FILTER (WHERE status = 'suspended') AS suspended,
-        COUNT(*) FILTER (WHERE status = 'expired')   AS expired,
-        COUNT(*) FILTER (WHERE subscription_end BETWEEN NOW() AND NOW() + INTERVAL '30 days') AS expiring_soon
+        COUNT(*)                                                   AS total_tenants,
+        COUNT(*) FILTER (WHERE status = 'active')                 AS active_tenants,
+        COUNT(*) FILTER (WHERE status = 'trial')                  AS trial_tenants,
+        COUNT(*) FILTER (WHERE status = 'suspended')              AS suspended,
+        COUNT(*) FILTER (WHERE status = 'expired')                AS expired,
+        COUNT(*) FILTER (WHERE status = 'cancelled')              AS cancelled,
+        COUNT(*) FILTER (WHERE
+          subscription_ends_at BETWEEN NOW() AND NOW() + INTERVAL '30 days'
+          AND status = 'active'
+        ) AS expiring_soon
       FROM tenants
     `);
 
@@ -494,18 +488,18 @@ router.get('/stats', async (req, res) => {
     `);
 
     const recentRows = await query(`
-      SELECT id, school_name, school_email, county, status, created_at
+      SELECT id, school_name, email, admin_email, county, status, created_at
       FROM tenants
       ORDER BY created_at DESC
       LIMIT 5
     `);
 
     const expiringRows = await query(`
-      SELECT id, school_name, subscription_end
+      SELECT id, school_name, subscription_ends_at
       FROM tenants
-      WHERE subscription_end BETWEEN NOW() AND NOW() + INTERVAL '30 days'
+      WHERE subscription_ends_at BETWEEN NOW() AND NOW() + INTERVAL '30 days'
         AND status = 'active'
-      ORDER BY subscription_end ASC
+      ORDER BY subscription_ends_at ASC
       LIMIT 5
     `);
 
@@ -521,34 +515,35 @@ router.get('/stats', async (req, res) => {
     });
   } catch (error) {
     logger.error('Stats error:', error);
-    res.status(500).json({ success: false, message: 'Failed to get stats' });
+    res.status(500).json({ success: false, message: 'Failed to get stats', error: error.message });
   }
 });
 
 // ============================================================
-// PUT /profile — Update superadmin profile / change password
+// PUT /profile — Change superadmin password
 // ============================================================
 router.put('/profile', async (req, res) => {
   try {
-    const { name, phone, currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    if (newPassword) {
-      // Password change mode
-      const users = await query('SELECT password FROM users WHERE id = $1', [userId]);
-      if (users.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
-
-      const valid = await bcrypt.compare(currentPassword || '', users[0].password);
-      if (!valid) return res.status(400).json({ success: false, message: 'Current password is incorrect' });
-
-      const hash = await bcrypt.hash(newPassword, 12);
-      await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hash, userId]);
+    if (!newPassword) {
+      return res.status(400).json({ success: false, message: 'New password is required' });
     }
 
-    res.json({ success: true, message: 'Profile updated successfully' });
+    const users = await query('SELECT password FROM users WHERE id = $1', [userId]);
+    if (users.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const valid = await bcrypt.compare(currentPassword || '', users[0].password);
+    if (!valid) return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hash, userId]);
+
+    res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
     logger.error('Update superadmin profile error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update profile' });
+    res.status(500).json({ success: false, message: 'Failed to update password', error: error.message });
   }
 });
 

@@ -58,12 +58,12 @@ export function SuperAdminDashboard() {
       desc: 'Currently active',
     },
     {
-      title: 'Inactive / Suspended',
-      value: (s.total_tenants ?? 0) - (s.active_tenants ?? 0),
+      title: 'Trial / Inactive',
+      value: (s.trial_tenants ?? 0) + (s.suspended ?? 0),
       icon: XCircle,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      desc: 'Pending or suspended',
+      desc: 'On trial or suspended',
     },
     {
       title: 'Total Revenue (KSh)',

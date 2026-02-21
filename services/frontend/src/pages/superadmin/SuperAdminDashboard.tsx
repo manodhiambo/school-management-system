@@ -135,7 +135,7 @@ export function SuperAdminDashboard() {
                 <div key={t.id} className="py-3 flex items-center justify-between">
                   <div>
                     <p className="font-medium text-gray-900">{t.school_name}</p>
-                    <p className="text-xs text-gray-500">{t.admin_email} · {t.county || 'N/A'}</p>
+                    <p className="text-xs text-gray-500">{t.school_email} · {t.county || 'N/A'}</p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -171,7 +171,7 @@ export function SuperAdminDashboard() {
                 <div key={t.id} className="py-3 flex items-center justify-between">
                   <div>
                     <p className="font-medium text-gray-900">{t.school_name}</p>
-                    <p className="text-xs text-gray-500">Expires: {new Date(t.subscription_end_date).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500">Expires: {new Date(t.subscription_end).toLocaleDateString()}</p>
                   </div>
                   <Link to={`/superadmin/tenants`}>
                     <Button size="sm" variant="outline" className="text-xs h-7 border-orange-300 text-orange-600 hover:bg-orange-50">

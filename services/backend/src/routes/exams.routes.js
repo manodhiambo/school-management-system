@@ -1,15 +1,16 @@
 import express from 'express';
-import { authenticate, authorize } from '../middleware/authMiddleware.js';
+import { authenticate } from '../middleware/authMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
-// GET /exams — role-aware filtering
+// GET /exams — role-aware filtering, always scoped to tenant
 router.get('/', authenticate, async (req, res) => {
   try {
     const { class_id, mode } = req.query;
     const role = req.user.role;
+    const tid = req.user.tenant_id;
 
     let sql = '';
     let params = [];
@@ -17,17 +18,15 @@ router.get('/', authenticate, async (req, res) => {
     const conditions = [];
 
     if (role === 'student') {
-      // Auto-filter to student's class
       sql = `
         SELECT e.*, c.name AS class_name, c.education_level
         FROM exams e
         LEFT JOIN classes c ON c.id = e.class_id
         JOIN students s ON s.class_id = e.class_id
-        WHERE s.user_id = $${paramIdx++}
+        WHERE s.user_id = $${paramIdx++} AND e.tenant_id = $${paramIdx++}
       `;
-      params.push(req.user.id);
+      params.push(req.user.id, tid);
     } else if (role === 'parent') {
-      // Filter to all children's classes
       sql = `
         SELECT DISTINCT e.*, c.name AS class_name, c.education_level
         FROM exams e
@@ -35,17 +34,18 @@ router.get('/', authenticate, async (req, res) => {
         JOIN students s ON s.class_id = e.class_id
         JOIN parent_students ps ON ps.student_id = s.id
         JOIN parents p ON p.id = ps.parent_id
-        WHERE p.user_id = $${paramIdx++}
+        WHERE p.user_id = $${paramIdx++} AND e.tenant_id = $${paramIdx++}
       `;
-      params.push(req.user.id);
+      params.push(req.user.id, tid);
     } else {
-      // admin / teacher: all exams
+      // admin / teacher: all exams for this tenant
       sql = `
         SELECT e.*, c.name AS class_name, c.education_level
         FROM exams e
         LEFT JOIN classes c ON c.id = e.class_id
-        WHERE 1=1
+        WHERE e.tenant_id = $${paramIdx++}
       `;
+      params.push(tid);
       if (class_id) {
         conditions.push(`e.class_id = $${paramIdx++}`);
         params.push(class_id);
@@ -69,15 +69,16 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// GET /exams/:id — include questions for online exams; enforce student access window
+// GET /exams/:id
 router.get('/:id', authenticate, async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const exams = await query(`
       SELECT e.*, c.name AS class_name, c.education_level
       FROM exams e
       LEFT JOIN classes c ON c.id = e.class_id
-      WHERE e.id = $1
-    `, [req.params.id]);
+      WHERE e.id = $1 AND e.tenant_id = $2
+    `, [req.params.id, tid]);
 
     if (exams.length === 0) {
       return res.status(404).json({ success: false, message: 'Exam not found' });
@@ -85,7 +86,6 @@ router.get('/:id', authenticate, async (req, res) => {
 
     const exam = exams[0];
 
-    // Student access window check for online exams
     if (req.user.role === 'student' && exam.mode === 'online') {
       const now = new Date();
       const start = exam.start_date ? new Date(exam.start_date) : null;
@@ -101,7 +101,6 @@ router.get('/:id', authenticate, async (req, res) => {
         'SELECT * FROM exam_questions WHERE exam_id = $1 ORDER BY order_index',
         [req.params.id]
       );
-      // Strip correct_answer for students
       if (req.user.role === 'student') {
         questions = rawQuestions.map(({ correct_answer, ...q }) => q);
       } else {
@@ -116,9 +115,10 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// POST /exams — create exam with optional online questions
+// POST /exams — create exam
 router.post('/', authenticate, async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const {
       name, description, exam_type, academic_year, term,
       start_date, end_date, class_id, mode, duration_minutes,
@@ -128,17 +128,16 @@ router.post('/', authenticate, async (req, res) => {
     const examId = uuidv4();
     await query(
       `INSERT INTO exams (id, name, description, exam_type, academic_year, term, start_date, end_date,
-        class_id, mode, duration_minutes, instructions, created_by, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,true)`,
+        class_id, mode, duration_minutes, instructions, created_by, tenant_id, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true)`,
       [
         examId, name, description || null, exam_type || null, academic_year || null,
         term || null, start_date || null, end_date || null,
         class_id || null, mode || 'offline', duration_minutes || null,
-        instructions || null, req.user.id
+        instructions || null, req.user.id, tid
       ]
     );
 
-    // Bulk-insert questions if online exam with questions provided
     if (mode === 'online' && Array.isArray(questions) && questions.length > 0) {
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
@@ -174,6 +173,7 @@ router.post('/', authenticate, async (req, res) => {
 // PUT /exams/:id — update exam
 router.put('/:id', authenticate, async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const {
       name, description, exam_type, academic_year, term,
       start_date, end_date, is_active, class_id, mode,
@@ -185,11 +185,11 @@ router.put('/:id', authenticate, async (req, res) => {
        SET name=$1, description=$2, exam_type=$3, academic_year=$4, term=$5,
            start_date=$6, end_date=$7, is_active=$8, class_id=$9, mode=$10,
            duration_minutes=$11, instructions=$12, updated_at=NOW()
-       WHERE id=$13`,
+       WHERE id=$13 AND tenant_id=$14`,
       [
         name, description, exam_type, academic_year, term, start_date, end_date,
         is_active !== false, class_id || null, mode || 'offline',
-        duration_minutes || null, instructions || null, req.params.id
+        duration_minutes || null, instructions || null, req.params.id, tid
       ]
     );
 
@@ -209,7 +209,8 @@ router.put('/:id', authenticate, async (req, res) => {
 // DELETE /exams/:id
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM exams WHERE id = $1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query('DELETE FROM exams WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
     res.json({ success: true, message: 'Exam deleted successfully' });
   } catch (error) {
     console.error('Delete exam error:', error);

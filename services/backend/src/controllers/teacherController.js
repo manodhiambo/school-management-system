@@ -6,7 +6,8 @@ import ApiError from '../utils/ApiError.js';
 class TeacherController {
   createTeacher = asyncHandler(async (req, res) => {
     const teacherData = req.body;
-    const teacher = await teacherService.createTeacher(teacherData);
+    const tenantId = req.user.tenant_id;
+    const teacher = await teacherService.createTeacher(teacherData, tenantId);
 
     res.status(201).json(
       new ApiResponse(201, teacher, 'Teacher created successfully')
@@ -14,6 +15,7 @@ class TeacherController {
   });
 
   getTeachers = asyncHandler(async (req, res) => {
+    const tenantId = req.user.tenant_id;
     const filters = {
       departmentId: req.query.departmentId,
       status: req.query.status,
@@ -29,7 +31,7 @@ class TeacherController {
       sortOrder: req.query.sortOrder || 'DESC'
     };
 
-    const result = await teacherService.getTeachers(filters, pagination);
+    const result = await teacherService.getTeachers(filters, pagination, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, result.teachers, 'Teachers retrieved successfully', result.pagination)
@@ -38,7 +40,8 @@ class TeacherController {
 
   getTeacherById = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const teacher = await teacherService.getTeacherById(id);
+    const tenantId = req.user.tenant_id;
+    const teacher = await teacherService.getTeacherById(id, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, teacher, 'Teacher retrieved successfully')
@@ -48,7 +51,8 @@ class TeacherController {
   updateTeacher = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
-    const teacher = await teacherService.updateTeacher(id, updateData);
+    const tenantId = req.user.tenant_id;
+    const teacher = await teacherService.updateTeacher(id, updateData, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, teacher, 'Teacher updated successfully')
@@ -90,15 +94,8 @@ class TeacherController {
     const ipAddress = req.ip || req.connection.remoteAddress;
 
     const attendance = await teacherService.markAttendance(
-      id,
-      date,
-      status,
-      checkInTime,
-      checkOutTime,
-      location,
-      ipAddress,
-      req.user.id,
-      remarks
+      id, date, status, checkInTime, checkOutTime,
+      location, ipAddress, req.user.id, remarks
     );
 
     res.status(200).json(
@@ -187,11 +184,8 @@ class TeacherController {
   });
 
   getTeacherStatistics = asyncHandler(async (req, res) => {
-    const filters = {
-      departmentId: req.query.departmentId
-    };
-
-    const stats = await teacherService.getTeacherStatistics(filters);
+    const tenantId = req.user.tenant_id;
+    const stats = await teacherService.getStatistics(tenantId);
 
     res.status(200).json(
       new ApiResponse(200, stats, 'Teacher statistics retrieved successfully')
@@ -200,28 +194,29 @@ class TeacherController {
 
   deleteTeacher = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const result = await teacherService.deleteTeacher(id);
+    const tenantId = req.user.tenant_id;
+    const result = await teacherService.deleteTeacher(id, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, result, 'Teacher deleted successfully')
     );
   });
 
-
   getTeacherClasses = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const classes = await teacherService.getTeacherClasses(id);
-    
+    const tenantId = req.user.tenant_id;
+    const classes = await teacherService.getTeacherClasses(id, tenantId);
+
     res.status(200).json(
       new ApiResponse(200, classes, 'Teacher classes retrieved successfully')
     );
   });
 
-
   getTeacherTimetable = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const timetable = await teacherService.getTeacherTimetable(id);
-    
+    const tenantId = req.user.tenant_id;
+    const timetable = await teacherService.getTeacherTimetable(id, tenantId);
+
     res.status(200).json(
       new ApiResponse(200, timetable, 'Teacher timetable retrieved successfully')
     );

@@ -5,7 +5,8 @@ import ApiResponse from '../utils/ApiResponse.js';
 class ParentController {
   createParent = asyncHandler(async (req, res) => {
     const parentData = req.body;
-    const parent = await parentService.createParent(parentData);
+    const tenantId = req.user.tenant_id;
+    const parent = await parentService.createParent(parentData, tenantId);
 
     res.status(201).json(
       new ApiResponse(201, parent, 'Parent created successfully')
@@ -13,6 +14,7 @@ class ParentController {
   });
 
   getParents = asyncHandler(async (req, res) => {
+    const tenantId = req.user.tenant_id;
     const filters = {
       search: req.query.search,
       relationship: req.query.relationship,
@@ -27,7 +29,7 @@ class ParentController {
       sortOrder: req.query.sortOrder || 'DESC'
     };
 
-    const result = await parentService.getParents(filters, pagination);
+    const result = await parentService.getParents(filters, pagination, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, result.parents, 'Parents retrieved successfully', result.pagination)
@@ -36,17 +38,18 @@ class ParentController {
 
   getParentById = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const parent = await parentService.getParentById(id);
+    const tenantId = req.user.tenant_id;
+    const parent = await parentService.getParentById(id, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, parent, 'Parent retrieved successfully')
     );
   });
 
-  // NEW: Get parent by user_id
   getParentByUserId = asyncHandler(async (req, res) => {
     const { userId } = req.params;
-    const parent = await parentService.getParentByUserId(userId);
+    const tenantId = req.user.tenant_id;
+    const parent = await parentService.getParentByUserId(userId, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, parent, 'Parent retrieved successfully')
@@ -56,7 +59,8 @@ class ParentController {
   updateParent = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
-    const parent = await parentService.updateParent(id, updateData);
+    const tenantId = req.user.tenant_id;
+    const parent = await parentService.updateParent(id, updateData, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, parent, 'Parent updated successfully')
@@ -67,13 +71,7 @@ class ParentController {
     const { id } = req.params;
     const { studentId, relationship, isPrimaryContact, canPickup } = req.body;
 
-    const parent = await parentService.linkStudent(
-      id,
-      studentId,
-      relationship,
-      isPrimaryContact,
-      canPickup
-    );
+    const parent = await parentService.linkStudent(id, studentId, relationship, isPrimaryContact, canPickup);
 
     res.status(200).json(
       new ApiResponse(200, parent, 'Student linked successfully')
@@ -203,7 +201,8 @@ class ParentController {
   });
 
   getStatistics = asyncHandler(async (req, res) => {
-    const stats = await parentService.getParentStatistics();
+    const tenantId = req.user.tenant_id;
+    const stats = await parentService.getParentStatistics(tenantId);
 
     res.status(200).json(
       new ApiResponse(200, stats, 'Parent statistics retrieved successfully')
@@ -212,7 +211,8 @@ class ParentController {
 
   deleteParent = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const result = await parentService.deleteParent(id);
+    const tenantId = req.user.tenant_id;
+    const result = await parentService.deleteParent(id, tenantId);
 
     res.status(200).json(
       new ApiResponse(200, result, 'Parent deleted successfully')

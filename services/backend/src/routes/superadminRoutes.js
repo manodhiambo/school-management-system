@@ -494,7 +494,7 @@ router.get('/stats', async (req, res) => {
     `);
 
     const recentRows = await query(`
-      SELECT id, school_name, admin_email, county, status, created_at
+      SELECT id, school_name, school_email, county, status, created_at
       FROM tenants
       ORDER BY created_at DESC
       LIMIT 5
@@ -535,21 +535,14 @@ router.put('/profile', async (req, res) => {
 
     if (newPassword) {
       // Password change mode
-      const users = await query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+      const users = await query('SELECT password FROM users WHERE id = $1', [userId]);
       if (users.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
-      const valid = await bcrypt.compare(currentPassword || '', users[0].password_hash);
+      const valid = await bcrypt.compare(currentPassword || '', users[0].password);
       if (!valid) return res.status(400).json({ success: false, message: 'Current password is incorrect' });
 
       const hash = await bcrypt.hash(newPassword, 12);
-      await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hash, userId]);
-    }
-
-    if (name || phone) {
-      await query(
-        'UPDATE users SET full_name = COALESCE($1, full_name), phone = COALESCE($2, phone), updated_at = NOW() WHERE id = $3',
-        [name || null, phone || null, userId]
-      );
+      await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hash, userId]);
     }
 
     res.json({ success: true, message: 'Profile updated successfully' });

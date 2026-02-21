@@ -918,13 +918,15 @@ class ApiService {
   // SCHOOL REGISTRATION (Public — no auth header needed)
   // ======================
   registerSchool(data: {
-    school_name: string;
-    admin_name: string;
-    admin_email: string;
-    admin_phone: string;
-    school_address?: string;
-    school_type?: string;
+    schoolName: string;
+    schoolEmail: string;
+    schoolPhone: string;
+    contactPerson: string;
+    adminEmail: string;
+    adminPassword: string;
+    schoolAddress?: string;
     county?: string;
+    registrationNumber?: string;
   }) {
     return this.api.post('/registration/register', data);
   }

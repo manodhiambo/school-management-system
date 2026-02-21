@@ -5,45 +5,41 @@ import ApiError from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
 
 class ParentService {
-  async createParent(data) {
+  async createParent(data, tenantId) {
     const {
       email, password, firstName, lastName, relationship,
       occupation, phonePrimary, phoneSecondary, address,
       city, state, pincode, studentIds
     } = data;
 
-    // Check if email already exists
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.length > 0) {
       throw new ApiError(400, 'Email already registered');
     }
 
-    // Create user account
     const userId = uuidv4();
     const hashedPassword = await bcrypt.hash(password || 'parent123', 10);
-    
+
     await query(
-      `INSERT INTO users (id, email, password, role, is_active, is_verified)
-       VALUES ($1, $2, $3, 'parent', true, true)`,
-      [userId, email, hashedPassword]
+      `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified)
+       VALUES ($1, $2, $3, 'parent', $4, true, true)`,
+      [userId, email, hashedPassword, tenantId]
     );
 
-    // Create parent profile
     const parentId = uuidv4();
     await query(
       `INSERT INTO parents (
         id, user_id, first_name, last_name, relationship,
         occupation, phone_primary, phone_secondary, address,
-        city, state, pincode
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        city, state, pincode, tenant_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         parentId, userId, firstName, lastName, relationship || 'guardian',
         occupation || null, phonePrimary || null, phoneSecondary || null,
-        address || null, city || null, state || null, pincode || null
+        address || null, city || null, state || null, pincode || null, tenantId
       ]
     );
 
-    // Link students if provided
     if (studentIds && studentIds.length > 0) {
       for (const studentId of studentIds) {
         await this.linkStudent(parentId, studentId, relationship);
@@ -51,10 +47,10 @@ class ParentService {
     }
 
     logger.info(`Parent created: ${firstName} ${lastName}`);
-    return await this.getParentById(parentId);
+    return await this.getParentById(parentId, tenantId);
   }
 
-  async getParents(filters = {}, pagination = {}) {
+  async getParents(filters = {}, pagination = {}, tenantId) {
     const { search, relationship } = filters;
     const { page = 1, limit = 20 } = pagination;
     const offset = (page - 1) * limit;
@@ -64,10 +60,10 @@ class ParentService {
         (SELECT COUNT(*) FROM parent_students ps WHERE ps.parent_id = p.id) as children_count
       FROM parents p
       LEFT JOIN users u ON p.user_id = u.id
-      WHERE 1=1
+      WHERE p.tenant_id = $1
     `;
-    const params = [];
-    let paramIndex = 1;
+    const params = [tenantId];
+    let paramIndex = 2;
 
     if (search) {
       sql += ` AND (p.first_name ILIKE $${paramIndex} OR p.last_name ILIKE $${paramIndex} OR p.phone_primary ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`;
@@ -93,13 +89,13 @@ class ParentService {
     };
   }
 
-  async getParentById(id) {
+  async getParentById(id, tenantId) {
     const results = await query(
       `SELECT p.*, u.email, u.is_active
        FROM parents p
        LEFT JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
-      [id]
+       WHERE p.id = $1${tenantId ? ' AND p.tenant_id = $2' : ''}`,
+      tenantId ? [id, tenantId] : [id]
     );
 
     if (results.length === 0) {
@@ -109,20 +105,19 @@ class ParentService {
     return results[0];
   }
 
-  async getParentByUserId(userId) {
+  async getParentByUserId(userId, tenantId) {
     const results = await query(
       `SELECT p.*, u.email, u.is_active
        FROM parents p
        LEFT JOIN users u ON p.user_id = u.id
-       WHERE p.user_id = $1`,
-      [userId]
+       WHERE p.user_id = $1${tenantId ? ' AND p.tenant_id = $2' : ''}`,
+      tenantId ? [userId, tenantId] : [userId]
     );
 
     if (results.length === 0) {
       throw new ApiError(404, 'Parent not found');
     }
 
-    // Get children
     const children = await query(
       `SELECT s.*, c.name as class_name
        FROM students s
@@ -138,8 +133,8 @@ class ParentService {
     };
   }
 
-  async updateParent(id, data) {
-    await this.getParentById(id);
+  async updateParent(id, data, tenantId) {
+    await this.getParentById(id, tenantId);
 
     const updates = [];
     const values = [];
@@ -174,16 +169,16 @@ class ParentService {
       );
     }
 
-    return await this.getParentById(id);
+    return await this.getParentById(id, tenantId);
   }
 
-  async deleteParent(id) {
-    const parent = await this.getParentById(id);
-    
+  async deleteParent(id, tenantId) {
+    const parent = await this.getParentById(id, tenantId);
+
     if (parent.user_id) {
       await query('DELETE FROM users WHERE id = $1', [parent.user_id]);
     }
-    
+
     await query('DELETE FROM parents WHERE id = $1', [id]);
     return { message: 'Parent deleted successfully' };
   }
@@ -197,6 +192,17 @@ class ParentService {
       [linkId, parentId, studentId, relationship || 'guardian']
     );
     return { message: 'Student linked successfully' };
+  }
+
+  async updateStudentLink(parentId, studentId, data) {
+    await query(
+      `UPDATE parent_students SET
+        is_primary_contact = COALESCE($1, is_primary_contact),
+        updated_at = NOW()
+       WHERE parent_id = $2 AND student_id = $3`,
+      [data.isPrimaryContact, parentId, studentId]
+    );
+    return { message: 'Student link updated' };
   }
 
   async unlinkStudent(parentId, studentId) {
@@ -218,10 +224,71 @@ class ParentService {
     );
   }
 
-  async getStatistics() {
-    const stats = await query(`
-      SELECT COUNT(*) as total FROM parents
-    `);
+  async getChildAttendance(parentId, studentId, filters) {
+    return await query(
+      `SELECT * FROM attendance WHERE student_id = $1 ORDER BY date DESC LIMIT 30`,
+      [studentId]
+    );
+  }
+
+  async getChildAcademicReport(parentId, studentId, filters) {
+    return await query(
+      `SELECT er.*, e.name as exam_name, s.name as subject_name
+       FROM exam_results er
+       JOIN exams e ON er.exam_id = e.id
+       LEFT JOIN subjects s ON er.subject_id = s.id
+       WHERE er.student_id = $1
+       ORDER BY e.start_date DESC`,
+      [studentId]
+    );
+  }
+
+  async getChildFees(parentId, studentId) {
+    const invoices = await query(
+      'SELECT * FROM fee_invoices WHERE student_id = $1 ORDER BY created_at DESC',
+      [studentId]
+    );
+    return { invoices };
+  }
+
+  async getPaymentHistory(parentId) {
+    const parent = await this.getParentById(parentId);
+    const children = await this.getChildren(parentId);
+    if (children.length === 0) return [];
+
+    const studentIds = children.map(c => c.id);
+    return await query(
+      `SELECT fp.* FROM fee_payments fp
+       JOIN fee_invoices fi ON fp.invoice_id = fi.id
+       WHERE fi.student_id = ANY($1)
+       ORDER BY fp.payment_date DESC`,
+      [studentIds]
+    );
+  }
+
+  async getNotifications(parentId, filters) {
+    return [];
+  }
+
+  async markNotificationAsRead(parentId, notificationId) {
+    return { message: 'Notification marked as read' };
+  }
+
+  async getMessages(parentId, filters) {
+    return [];
+  }
+
+  async getParentDashboard(parentId) {
+    const parent = await this.getParentById(parentId);
+    const children = await this.getChildren(parentId);
+    return { parent, children };
+  }
+
+  async getParentStatistics(tenantId) {
+    const stats = await query(
+      `SELECT COUNT(*) as total FROM parents${tenantId ? ' WHERE tenant_id = $1' : ''}`,
+      tenantId ? [tenantId] : []
+    );
     return stats[0];
   }
 }

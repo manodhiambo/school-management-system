@@ -6,13 +6,14 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Get all subjects — supports ?education_level= and ?category= filters
+// Get all subjects
 router.get('/', authenticate, async (req, res) => {
   try {
     const { education_level, category } = req.query;
-    const conditions = [];
-    const params = [];
-    let paramIdx = 1;
+    const tid = req.user.tenant_id;
+    const conditions = ['tenant_id = $1'];
+    const params = [tid];
+    let paramIdx = 2;
 
     if (education_level) {
       conditions.push(`education_level = $${paramIdx++}`);
@@ -23,7 +24,7 @@ router.get('/', authenticate, async (req, res) => {
       params.push(category);
     }
 
-    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const whereClause = 'WHERE ' + conditions.join(' AND ');
     const subjects = await query(`SELECT * FROM subjects ${whereClause} ORDER BY name`, params);
 
     res.json({ success: true, data: subjects });
@@ -36,7 +37,11 @@ router.get('/', authenticate, async (req, res) => {
 // Get single subject
 router.get('/:id', authenticate, async (req, res) => {
   try {
-    const subjects = await query('SELECT * FROM subjects WHERE id = $1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    const subjects = await query(
+      'SELECT * FROM subjects WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, tid]
+    );
     if (subjects.length === 0) {
       return res.status(404).json({ success: false, message: 'Subject not found' });
     }
@@ -51,12 +56,13 @@ router.get('/:id', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     const { name, code, description, credits, is_active, education_level, category } = req.body;
+    const tid = req.user.tenant_id;
 
     const subjectId = uuidv4();
     await query(
-      `INSERT INTO subjects (id, name, code, description, credits, is_active, education_level, category)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [subjectId, name, code || null, description || null, credits || 0, is_active !== false, education_level || null, category || 'core']
+      `INSERT INTO subjects (id, name, code, description, credits, is_active, education_level, category, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [subjectId, name, code || null, description || null, credits || 0, is_active !== false, education_level || null, category || 'core', tid]
     );
 
     const newSubject = await query('SELECT * FROM subjects WHERE id = $1', [subjectId]);
@@ -76,13 +82,14 @@ router.post('/', authenticate, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { name, code, description, credits, is_active, education_level, category } = req.body;
+    const tid = req.user.tenant_id;
 
     await query(
       `UPDATE subjects
        SET name=$1, code=$2, description=$3, credits=$4, is_active=$5,
            education_level=$6, category=$7, updated_at=NOW()
-       WHERE id=$8`,
-      [name, code, description, credits, is_active, education_level || null, category || 'core', req.params.id]
+       WHERE id=$8 AND tenant_id=$9`,
+      [name, code, description, credits, is_active, education_level || null, category || 'core', req.params.id, tid]
     );
 
     const updated = await query('SELECT * FROM subjects WHERE id = $1', [req.params.id]);
@@ -97,7 +104,8 @@ router.put('/:id', authenticate, async (req, res) => {
 // Delete subject
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM subjects WHERE id = $1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query('DELETE FROM subjects WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
     res.json({ success: true, message: 'Subject deleted successfully' });
   } catch (error) {
     logger.error('Delete subject error:', error);

@@ -11,10 +11,11 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
-// Get all students - returns array directly in data
+// Get all students
 router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) => {
   try {
     const { classId, status, search } = req.query;
+    const tid = req.user.tenant_id;
 
     let sql = `
       SELECT
@@ -28,10 +29,10 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
       JOIN users u ON s.user_id = u.id
       LEFT JOIN classes c ON s.class_id = c.id
       LEFT JOIN parents p ON s.parent_id = p.id
-      WHERE 1=1
+      WHERE s.tenant_id = $1
     `;
-    const params = [];
-    let paramIndex = 1;
+    const params = [tid];
+    let paramIndex = 2;
 
     if (classId) {
       sql += ` AND s.class_id = $${paramIndex}`;
@@ -55,7 +56,6 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
 
     const students = await query(sql, params);
 
-    // Return array directly for frontend compatibility
     res.json({
       success: true,
       data: students
@@ -69,13 +69,15 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
 // Get student statistics
 router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const stats = await query(`
       SELECT
         COUNT(*) as total_students,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_students,
         SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_students
       FROM students
-    `);
+      WHERE tenant_id = $1
+    `, [tid]);
 
     res.json({
       success: true,
@@ -90,13 +92,14 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
 // Get single student
 router.get('/:id', async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const students = await query(
       `SELECT s.*, u.email, c.name as class_name
        FROM students s
        JOIN users u ON s.user_id = u.id
        LEFT JOIN classes c ON s.class_id = c.id
-       WHERE s.id = $1`,
-      [req.params.id]
+       WHERE s.id = $1 AND s.tenant_id = $2`,
+      [req.params.id, tid]
     );
 
     if (students.length === 0) {
@@ -117,6 +120,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     logger.info('Create student request body:', JSON.stringify(req.body));
+    const tid = req.user.tenant_id;
 
     const {
       email, password, firstName, first_name, lastName, last_name,
@@ -125,7 +129,6 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
       address, city, state, pincode, phonePrimary, phone_primary, phone
     } = req.body;
 
-    // Handle both camelCase and snake_case
     const actualFirstName = firstName || first_name;
     const actualLastName = lastName || last_name;
     const actualEmail = email;
@@ -150,13 +153,13 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email already exists' });
     }
 
-    // Generate admission number
+    // Generate admission number scoped to tenant
     const year = new Date().getFullYear();
     const lastStudent = await query(
       `SELECT admission_number FROM students
-       WHERE admission_number LIKE $1
+       WHERE admission_number LIKE $1 AND tenant_id = $2
        ORDER BY admission_number DESC LIMIT 1`,
-      [`STD${year}%`]
+      [`STD${year}%`, tid]
     );
 
     let sequence = 1;
@@ -165,29 +168,29 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     }
     const admissionNumber = `STD${year}${sequence.toString().padStart(4, '0')}`;
 
-    // Create user
+    // Create user with tenant_id
     const userId = uuidv4();
     const hashedPassword = await bcrypt.hash(password || 'student123', 10);
 
     await query(
-      `INSERT INTO users (id, email, password, role, is_active, is_verified)
-       VALUES ($1, $2, $3, 'student', true, true)`,
-      [userId, actualEmail, hashedPassword]
+      `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified)
+       VALUES ($1, $2, $3, 'student', $4, true, true)`,
+      [userId, actualEmail, hashedPassword, tid]
     );
 
-    // Create student
+    // Create student with tenant_id
     const studentId = uuidv4();
     await query(
       `INSERT INTO students (
         id, user_id, admission_number, first_name, last_name, date_of_birth,
         gender, blood_group, class_id, parent_id, admission_date,
-        address, city, state, pincode, phone, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'active')`,
+        address, city, state, pincode, phone, tenant_id, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'active')`,
       [
         studentId, userId, admissionNumber, actualFirstName, actualLastName,
         actualDateOfBirth, actualGender, actualBloodGroup,
         actualClassId, actualParentId, actualAdmissionDate,
-        address || null, city || null, state || null, pincode || null, actualPhone
+        address || null, city || null, state || null, pincode || null, actualPhone, tid
       ]
     );
 
@@ -212,6 +215,7 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
 // Update student
 router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const {
       firstName, first_name, lastName, last_name, dateOfBirth, date_of_birth,
       gender, bloodGroup, blood_group, classId, class_id, parentId, parent_id,
@@ -234,13 +238,13 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
         phone = COALESCE($12, phone),
         status = COALESCE($13, status),
         updated_at = NOW()
-       WHERE id = $14`,
+       WHERE id = $14 AND tenant_id = $15`,
       [
         firstName || first_name, lastName || last_name,
         dateOfBirth || date_of_birth, gender,
         bloodGroup || blood_group, classId || class_id,
         parentId || parent_id, address, city, state, pincode,
-        phone, status, req.params.id
+        phone, status, req.params.id, tid
       ]
     );
 
@@ -249,8 +253,8 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
        FROM students s
        JOIN users u ON s.user_id = u.id
        LEFT JOIN classes c ON s.class_id = c.id
-       WHERE s.id = $1`,
-      [req.params.id]
+       WHERE s.id = $1 AND s.tenant_id = $2`,
+      [req.params.id, tid]
     );
 
     res.json({
@@ -267,15 +271,16 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
 // Delete student
 router.delete('/:id', requireRole(['admin']), async (req, res) => {
   try {
-    // Get user_id before deleting
-    const student = await query('SELECT user_id FROM students WHERE id = $1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    const student = await query(
+      'SELECT user_id FROM students WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, tid]
+    );
 
     if (student.length > 0) {
-      // Delete student first
-      await query('DELETE FROM students WHERE id = $1', [req.params.id]);
-      // Then delete user
+      await query('DELETE FROM students WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
       if (student[0].user_id) {
-        await query('DELETE FROM users WHERE id = $1', [student[0].user_id]);
+        await query('DELETE FROM users WHERE id = $1 AND tenant_id = $2', [student[0].user_id, tid]);
       }
     }
 
@@ -294,17 +299,17 @@ router.post('/:id/link-parent', requireRole(['admin']), async (req, res) => {
   try {
     const { parentId, parent_id } = req.body;
     const actualParentId = parentId || parent_id;
+    const tid = req.user.tenant_id;
 
     if (!actualParentId) {
       return res.status(400).json({ success: false, message: 'Parent ID is required' });
     }
 
     await query(
-      'UPDATE students SET parent_id = $1, updated_at = NOW() WHERE id = $2',
-      [actualParentId, req.params.id]
+      'UPDATE students SET parent_id = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3',
+      [actualParentId, req.params.id, tid]
     );
 
-    // Also add to parent_students junction table if it exists
     try {
       await query(
         'INSERT INTO parent_students (parent_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
@@ -322,19 +327,18 @@ router.post('/:id/link-parent', requireRole(['admin']), async (req, res) => {
 });
 
 // Get student exam results
-router.get("/:id/exam-results", authenticate, async (req, res) => {
+router.get("/:id/exam-results", async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const studentId = req.params.id;
 
-    // First try to find student by user_id or student id
     const student = await query(
-      "SELECT id FROM students WHERE id = $1 OR user_id = $1",
-      [studentId]
+      "SELECT id FROM students WHERE (id = $1 OR user_id = $1) AND tenant_id = $2",
+      [studentId, tid]
     );
 
     const actualStudentId = student.length > 0 ? student[0].id : studentId;
 
-    // Get exam results with exam and subject details
     const results = await query(`
       SELECT
         er.*,
@@ -348,11 +352,10 @@ router.get("/:id/exam-results", authenticate, async (req, res) => {
       FROM exam_results er
       JOIN exams e ON er.exam_id = e.id
       LEFT JOIN subjects s ON er.subject_id = s.id
-      WHERE er.student_id = $1
+      WHERE er.student_id = $1 AND e.tenant_id = $2
       ORDER BY e.start_date DESC, s.name
-    `, [actualStudentId]);
+    `, [actualStudentId, tid]);
 
-    // Group results by exam
     const groupedResults = results.reduce((acc, result) => {
       const examId = result.exam_id;
       if (!acc[examId]) {
@@ -381,7 +384,6 @@ router.get("/:id/exam-results", authenticate, async (req, res) => {
       return acc;
     }, {});
 
-    // Calculate overall percentage and grade for each exam
     const formattedResults = Object.values(groupedResults).map((exam) => ({
       ...exam,
       percentage: exam.total_marks > 0 ? ((exam.marks_obtained / exam.total_marks) * 100).toFixed(1) : 0,
@@ -401,4 +403,3 @@ router.get("/:id/exam-results", authenticate, async (req, res) => {
 });
 
 export default router;
-

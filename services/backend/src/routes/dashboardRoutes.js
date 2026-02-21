@@ -9,6 +9,10 @@ const router = express.Router();
 router.get('/dashboard', authenticate, async (req, res) => {
   try {
     logger.info('Fetching dashboard stats...');
+    const tid = req.user.tenant_id;
+    if (!tid) {
+      return res.status(403).json({ success: false, message: 'No tenant associated with this account' });
+    }
 
     // Students statistics
     const studentStats = await query(`
@@ -17,7 +21,8 @@ router.get('/dashboard', authenticate, async (req, res) => {
         COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0)::int as active_students,
         COALESCE(SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END), 0)::int as inactive_students
       FROM students
-    `);
+      WHERE tenant_id = $1
+    `, [tid]);
 
     // Teachers statistics
     const teacherStats = await query(`
@@ -25,13 +30,20 @@ router.get('/dashboard', authenticate, async (req, res) => {
         COUNT(*)::int as total_teachers,
         COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0)::int as active_teachers
       FROM teachers
-    `);
+      WHERE tenant_id = $1
+    `, [tid]);
 
     // Parents statistics
-    const parentStats = await query('SELECT COUNT(*)::int as total FROM parents');
+    const parentStats = await query(
+      'SELECT COUNT(*)::int as total FROM parents WHERE tenant_id = $1',
+      [tid]
+    );
 
     // Classes statistics
-    const classStats = await query('SELECT COUNT(*)::int as total FROM classes');
+    const classStats = await query(
+      'SELECT COUNT(*)::int as total FROM classes WHERE tenant_id = $1',
+      [tid]
+    );
 
     // Fee statistics
     const feeStats = await query(`
@@ -40,7 +52,8 @@ router.get('/dashboard', authenticate, async (req, res) => {
         COALESCE(SUM(paid_amount), 0)::numeric as total_collected,
         COALESCE(SUM(balance_amount), 0)::numeric as total_pending
       FROM fee_invoices
-    `);
+      WHERE tenant_id = $1
+    `, [tid]);
 
     // Today's attendance
     const todayAttendance = await query(`
@@ -50,16 +63,17 @@ router.get('/dashboard', authenticate, async (req, res) => {
         COALESCE(SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END), 0)::int as absent,
         COALESCE(SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END), 0)::int as late
       FROM attendance
-      WHERE DATE(date) = CURRENT_DATE
-    `);
+      WHERE DATE(date) = CURRENT_DATE AND tenant_id = $1
+    `, [tid]);
 
     // Recent admissions
     const recentAdmissions = await query(`
       SELECT first_name, last_name, admission_number, created_at
       FROM students
+      WHERE tenant_id = $1
       ORDER BY created_at DESC
       LIMIT 5
-    `);
+    `, [tid]);
 
     // Recent payments
     const recentPayments = await query(`
@@ -67,9 +81,10 @@ router.get('/dashboard', authenticate, async (req, res) => {
       FROM fee_payments fp
       JOIN fee_invoices fi ON fp.invoice_id = fi.id
       JOIN students s ON fi.student_id = s.id
+      WHERE s.tenant_id = $1
       ORDER BY fp.payment_date DESC
       LIMIT 5
-    `);
+    `, [tid]);
 
     const studentData = studentStats[0] || {};
     const teacherData = teacherStats[0] || {};
@@ -111,7 +126,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
       recentPayments: recentPayments || []
     };
 
-    logger.info('Dashboard data prepared:', JSON.stringify(data));
+    logger.info('Dashboard data prepared');
 
     res.json({
       success: true,

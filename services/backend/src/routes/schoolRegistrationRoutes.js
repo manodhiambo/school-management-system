@@ -11,6 +11,18 @@ const router = express.Router();
 const REGISTRATION_FEE = 50000; // KES 50,000
 const RENEWAL_FEE = 10000;      // KES 10,000
 
+// Helper: generate unique school_code
+function generateSchoolCode(schoolName) {
+  const base = schoolName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6);
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `${base}${rand}`;
+}
+
+// Helper: generate unique payment_number
+function generatePaymentNumber() {
+  return `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+}
+
 // ============================================================
 // POST /register — Register a new school (public)
 // ============================================================
@@ -50,7 +62,6 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Validate email formats (basic)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(schoolEmail)) {
       return res.status(400).json({ success: false, message: 'Invalid school email format' });
@@ -61,7 +72,7 @@ router.post('/register', async (req, res) => {
 
     // Check school email not already in use
     const existingSchool = await query(
-      'SELECT id FROM tenants WHERE school_email = $1',
+      'SELECT id FROM tenants WHERE email = $1',
       [schoolEmail]
     );
     if (existingSchool.length > 0) {
@@ -83,7 +94,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Validate phone format
+    // Validate and format phone
     let formattedPhone;
     try {
       formattedPhone = formatPhone(schoolPhone);
@@ -91,65 +102,77 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, message: phoneErr.message });
     }
 
-    // Create tenant record (status = 'pending' until payment)
+    // Generate unique school_code and subdomain
+    let school_code, subdomain;
+    let codeUnique = false;
+    while (!codeUnique) {
+      school_code = generateSchoolCode(schoolName);
+      subdomain = schoolName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16) + school_code.slice(-4);
+      const codeCheck = await query('SELECT id FROM tenants WHERE school_code = $1 OR subdomain = $2', [school_code, subdomain]);
+      if (codeCheck.length === 0) codeUnique = true;
+    }
+    const schema_name = `tenant_${school_code.toLowerCase()}`;
+
+    // Create tenant record (status = 'trial' until payment activates it)
     const tenantResult = await query(`
       INSERT INTO tenants (
-        school_name, school_email, school_phone, school_address,
-        county, contact_person, registration_number,
-        status, registration_fee_paid, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', false, NOW())
+        school_name, email, phone, address, county, country,
+        admin_email, school_code, subdomain, schema_name,
+        status, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, 'Kenya', $6, $7, $8, $9, 'trial', NOW())
       RETURNING *
     `, [
-      schoolName, schoolEmail, formattedPhone, schoolAddress,
-      county, contactPerson, registrationNumber
+      schoolName, schoolEmail, formattedPhone, schoolAddress || null, county || null,
+      adminEmail, school_code, subdomain, schema_name
     ]);
 
     const tenant = tenantResult[0];
 
-    // Store admin credentials temporarily in payment notes (hashed for safety)
+    // Store admin credentials temporarily in payment notes (hashed)
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
     const notesPayload = JSON.stringify({
       adminEmail,
-      hashedPassword
+      hashedPassword,
+      contactPerson: contactPerson || '',
+      registrationNumber: registrationNumber || ''
     });
 
     // Create payment record
+    const paymentNumber = generatePaymentNumber();
     const paymentResult = await query(`
       INSERT INTO tenant_payments (
-        tenant_id, payment_type, amount, phone_number, status, notes
-      ) VALUES ($1, 'registration', $2, $3, 'pending', $4)
+        tenant_id, payment_number, amount, currency, payment_method,
+        payment_provider, mpesa_phone_number, status, notes, created_at, updated_at
+      ) VALUES ($1, $2, $3, 'KES', 'mpesa', 'safaricom', $4, 'pending', $5, NOW(), NOW())
       RETURNING *
-    `, [tenant.id, REGISTRATION_FEE, formattedPhone, notesPayload]);
+    `, [tenant.id, paymentNumber, REGISTRATION_FEE, formattedPhone, notesPayload]);
 
     const payment = paymentResult[0];
 
     // Initiate STK Push
     let checkoutRequestId = null;
-    let merchantRequestId = null;
     let stkMessage = 'STK push initiated';
 
     try {
       const stkResponse = await initiateSTKPush(
         formattedPhone,
         REGISTRATION_FEE,
-        `REG-${tenant.id.split('-')[0].toUpperCase()}`,
+        `REG-${tenant.school_code}`,
         'SchoolReg'
       );
 
       checkoutRequestId = stkResponse.CheckoutRequestID;
-      merchantRequestId = stkResponse.MerchantRequestID;
 
-      // Save checkout_request_id and merchant_request_id to payment record
       await query(`
         UPDATE tenant_payments SET
-          checkout_request_id = $1,
-          merchant_request_id = $2
+          mpesa_checkout_request_id = $1,
+          mpesa_transaction_id = $2,
+          updated_at = NOW()
         WHERE id = $3
-      `, [checkoutRequestId, merchantRequestId, payment.id]);
+      `, [checkoutRequestId, stkResponse.MerchantRequestID || null, payment.id]);
 
       logger.info(`STK Push sent for tenant ${tenant.id}, checkoutRequestId: ${checkoutRequestId}`);
     } catch (stkErr) {
-      // In sandbox/dev mode, log and continue — don't block registration
       logger.warn(`STK Push failed (sandbox?): ${stkErr.message}`);
       stkMessage = `STK Push could not be sent: ${stkErr.message}. Please contact support.`;
     }
@@ -163,14 +186,13 @@ router.post('/register', async (req, res) => {
         tenantId: tenant.id,
         paymentId: payment.id,
         checkoutRequestId,
-        merchantRequestId,
         schoolName: tenant.school_name,
         status: tenant.status
       }
     });
   } catch (error) {
     logger.error('School registration error:', error);
-    res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
+    res.status(500).json({ success: false, message: 'Registration failed. Please try again.', error: error.message });
   }
 });
 
@@ -189,12 +211,12 @@ router.post('/mpesa/callback', async (req, res) => {
 
     const { ResultCode, ResultDesc, CheckoutRequestID, CallbackMetadata } = stkCallback;
 
-    // Find the payment by checkout_request_id
+    // Find the payment by mpesa_checkout_request_id
     const payments = await query(
-      `SELECT tp.*, t.id AS tenant_id_ref
+      `SELECT tp.*, t.id AS the_tenant_id
        FROM tenant_payments tp
        JOIN tenants t ON t.id = tp.tenant_id
-       WHERE tp.checkout_request_id = $1`,
+       WHERE tp.mpesa_checkout_request_id = $1`,
       [CheckoutRequestID]
     );
 
@@ -206,7 +228,6 @@ router.post('/mpesa/callback', async (req, res) => {
     const payment = payments[0];
 
     if (ResultCode === 0) {
-      // Payment successful — extract metadata
       const items = CallbackMetadata?.Item || [];
       let mpesaReceiptNumber = null;
       let amount = null;
@@ -226,24 +247,23 @@ router.post('/mpesa/callback', async (req, res) => {
         UPDATE tenant_payments SET
           status = 'completed',
           mpesa_receipt_number = $1,
-          result_code = 0,
-          result_desc = $2,
-          payment_date = NOW()
+          callback_data = $2,
+          transaction_date = NOW(),
+          updated_at = NOW()
         WHERE id = $3
-      `, [mpesaReceiptNumber, ResultDesc, payment.id]);
+      `, [mpesaReceiptNumber, JSON.stringify(req.body), payment.id]);
 
       // Activate tenant
       await query(`
         UPDATE tenants SET
           status = 'active',
-          registration_fee_paid = true,
-          subscription_start = NOW(),
-          subscription_end = $1,
+          subscription_starts_at = NOW(),
+          subscription_ends_at = $1,
           updated_at = NOW()
         WHERE id = $2
-      `, [oneYearFromNow.toISOString().split('T')[0], payment.tenant_id]);
+      `, [oneYearFromNow.toISOString(), payment.tenant_id]);
 
-      // Create admin user from stored credentials in notes
+      // Create admin user from stored credentials
       try {
         let adminCredentials = null;
         if (payment.notes) {
@@ -251,13 +271,13 @@ router.post('/mpesa/callback', async (req, res) => {
         }
 
         if (adminCredentials?.adminEmail && adminCredentials?.hashedPassword) {
-          // Check if user already exists (in case of duplicate callback)
           const existingAdmin = await query(
             'SELECT id FROM users WHERE email = $1',
             [adminCredentials.adminEmail]
           );
 
           if (existingAdmin.length === 0) {
+            const newUserId = uuidv4();
             await query(`
               INSERT INTO users (
                 id, email, password, role, tenant_id,
@@ -267,15 +287,19 @@ router.post('/mpesa/callback', async (req, res) => {
                 true, true, NOW(), NOW()
               )
             `, [
-              uuidv4(),
+              newUserId,
               adminCredentials.adminEmail,
               adminCredentials.hashedPassword,
               payment.tenant_id
             ]);
 
+            // Update tenant with admin_user_id
+            await query(
+              'UPDATE tenants SET admin_user_id = $1, updated_at = NOW() WHERE id = $2',
+              [newUserId, payment.tenant_id]
+            );
+
             logger.info(`Admin user created for tenant ${payment.tenant_id}: ${adminCredentials.adminEmail}`);
-          } else {
-            logger.info(`Admin user already exists for email: ${adminCredentials.adminEmail}`);
           }
         }
       } catch (userErr) {
@@ -283,26 +307,23 @@ router.post('/mpesa/callback', async (req, res) => {
       }
 
       logger.info(`Registration payment successful for tenant ${payment.tenant_id}, receipt: ${mpesaReceiptNumber}`);
-      // Welcome notification placeholder
-      logger.info(`[WELCOME] School activation email should be sent to tenant ${payment.tenant_id}`);
     } else {
       // Payment failed
       await query(`
         UPDATE tenant_payments SET
           status = 'failed',
-          result_code = $1,
-          result_desc = $2
+          error_message = $1,
+          callback_data = $2,
+          updated_at = NOW()
         WHERE id = $3
-      `, [ResultCode, ResultDesc, payment.id]);
+      `, [ResultDesc, JSON.stringify(req.body), payment.id]);
 
       logger.warn(`Registration payment failed for tenant ${payment.tenant_id}: ${ResultDesc}`);
     }
 
-    // Always respond 200 with success to Safaricom
     return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   } catch (error) {
     logger.error('M-Pesa callback error:', error);
-    // Still return 200 to Safaricom so it doesn't retry endlessly
     return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   }
 });
@@ -323,18 +344,12 @@ router.post('/renew', authenticate, async (req, res) => {
       return res.status(403).json({ success: false, message: 'No tenant associated with this account' });
     }
 
-    // Get tenant
-    const tenants = await query(
-      'SELECT * FROM tenants WHERE id = $1',
-      [tenantId]
-    );
-
+    const tenants = await query('SELECT * FROM tenants WHERE id = $1', [tenantId]);
     if (tenants.length === 0) {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
 
     const tenant = tenants[0];
-
     if (tenant.status === 'suspended') {
       return res.status(403).json({
         success: false,
@@ -342,7 +357,6 @@ router.post('/renew', authenticate, async (req, res) => {
       });
     }
 
-    // Validate phone
     let formattedPhone;
     try {
       formattedPhone = formatPhone(phone);
@@ -350,38 +364,37 @@ router.post('/renew', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: phoneErr.message });
     }
 
-    // Create renewal payment record
+    const paymentNumber = generatePaymentNumber();
     const paymentResult = await query(`
       INSERT INTO tenant_payments (
-        tenant_id, payment_type, amount, phone_number, status
-      ) VALUES ($1, 'renewal', $2, $3, 'pending')
+        tenant_id, payment_number, amount, currency, payment_method,
+        payment_provider, mpesa_phone_number, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, 'KES', 'mpesa', 'safaricom', $4, 'pending', NOW(), NOW())
       RETURNING *
-    `, [tenantId, RENEWAL_FEE, formattedPhone]);
+    `, [tenantId, paymentNumber, RENEWAL_FEE, formattedPhone]);
 
     const payment = paymentResult[0];
-
     let checkoutRequestId = null;
-    let merchantRequestId = null;
 
     try {
       const stkResponse = await initiateSTKPush(
         formattedPhone,
         RENEWAL_FEE,
-        `REN-${tenantId.split('-')[0].toUpperCase()}`,
+        `REN-${tenant.school_code}`,
         'Renewal'
       );
 
       checkoutRequestId = stkResponse.CheckoutRequestID;
-      merchantRequestId = stkResponse.MerchantRequestID;
 
       await query(`
         UPDATE tenant_payments SET
-          checkout_request_id = $1,
-          merchant_request_id = $2
+          mpesa_checkout_request_id = $1,
+          mpesa_transaction_id = $2,
+          updated_at = NOW()
         WHERE id = $3
-      `, [checkoutRequestId, merchantRequestId, payment.id]);
+      `, [checkoutRequestId, stkResponse.MerchantRequestID || null, payment.id]);
 
-      logger.info(`Renewal STK Push sent for tenant ${tenantId}, checkoutRequestId: ${checkoutRequestId}`);
+      logger.info(`Renewal STK Push sent for tenant ${tenantId}`);
     } catch (stkErr) {
       logger.warn(`Renewal STK Push failed: ${stkErr.message}`);
     }
@@ -399,62 +412,7 @@ router.post('/renew', authenticate, async (req, res) => {
     });
   } catch (error) {
     logger.error('Renewal error:', error);
-    res.status(500).json({ success: false, message: 'Renewal failed. Please try again.' });
-  }
-});
-
-// ============================================================
-// POST /verify-payment — Poll payment status by checkoutRequestId (public)
-// ============================================================
-router.post('/verify-payment', async (req, res) => {
-  try {
-    const { checkoutRequestId } = req.body;
-
-    if (!checkoutRequestId) {
-      return res.status(400).json({
-        success: false,
-        message: 'checkoutRequestId is required'
-      });
-    }
-
-    const payments = await query(
-      `SELECT tp.id, tp.status AS payment_status, tp.payment_type,
-              tp.amount, tp.mpesa_receipt_number, tp.result_code,
-              tp.result_desc, tp.payment_date, tp.created_at,
-              t.status AS tenant_status, t.id AS tenant_id,
-              t.school_name, t.subscription_end
-       FROM tenant_payments tp
-       JOIN tenants t ON t.id = tp.tenant_id
-       WHERE tp.checkout_request_id = $1`,
-      [checkoutRequestId]
-    );
-
-    if (payments.length === 0) {
-      return res.status(404).json({ success: false, message: 'Payment not found' });
-    }
-
-    const payment = payments[0];
-
-    res.json({
-      success: true,
-      data: {
-        paymentId: payment.id,
-        paymentStatus: payment.payment_status,
-        paymentType: payment.payment_type,
-        amount: payment.amount,
-        mpesaReceiptNumber: payment.mpesa_receipt_number,
-        resultCode: payment.result_code,
-        resultDesc: payment.result_desc,
-        paymentDate: payment.payment_date,
-        tenantId: payment.tenant_id,
-        tenantStatus: payment.tenant_status,
-        schoolName: payment.school_name,
-        subscriptionEnd: payment.subscription_end
-      }
-    });
-  } catch (error) {
-    logger.error('Verify payment error:', error);
-    res.status(500).json({ success: false, message: 'Failed to verify payment' });
+    res.status(500).json({ success: false, message: 'Renewal failed. Please try again.', error: error.message });
   }
 });
 
@@ -466,7 +424,7 @@ router.get('/check-activation/:tenantId', async (req, res) => {
     const { tenantId } = req.params;
 
     const tenants = await query(
-      `SELECT id, status, school_name, subscription_start, subscription_end
+      `SELECT id, status, school_name, subscription_starts_at, subscription_ends_at
        FROM tenants WHERE id = $1`,
       [tenantId]
     );
@@ -484,13 +442,13 @@ router.get('/check-activation/:tenantId', async (req, res) => {
         schoolName: tenant.school_name,
         active: tenant.status === 'active',
         status: tenant.status,
-        subscriptionStart: tenant.subscription_start,
-        subscriptionEnd: tenant.subscription_end
+        subscriptionStart: tenant.subscription_starts_at,
+        subscriptionEnd: tenant.subscription_ends_at
       }
     });
   } catch (error) {
     logger.error('Check activation error:', error);
-    res.status(500).json({ success: false, message: 'Failed to check activation status' });
+    res.status(500).json({ success: false, message: 'Failed to check activation status', error: error.message });
   }
 });
 

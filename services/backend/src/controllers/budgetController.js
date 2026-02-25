@@ -1,13 +1,14 @@
 import pool from '../config/database.js';
 
-// Helper to generate budget number
-async function generateBudgetNumber() {
+// Helper to generate budget number scoped to a tenant
+async function generateBudgetNumber(tenantId) {
   const result = await pool.query(`
     SELECT budget_name FROM budgets
     WHERE budget_name LIKE 'BDG-%'
+      AND tenant_id = $1
     ORDER BY budget_name DESC
     LIMIT 1
-  `);
+  `, [tenantId]);
 
   if (result.rows.length === 0) {
     return 'BDG-00001';
@@ -24,10 +25,11 @@ class BudgetController {
   // Get all budgets with detailed information
   async getBudgets(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { status, financial_year_id } = req.query;
-      
+
       let query = `
-        SELECT 
+        SELECT
           b.*,
           fy.year_name as financial_year_name,
           fy.start_date as fy_start_date,
@@ -37,39 +39,39 @@ class BudgetController {
           COUNT(DISTINCT bi.id) as item_count,
           COALESCE(SUM(bi.allocated_amount), 0) as total_allocated,
           COALESCE(SUM(bi.spent_amount), 0) as total_spent,
-          CASE 
-            WHEN b.total_amount > 0 THEN 
+          CASE
+            WHEN b.total_amount > 0 THEN
               ROUND((COALESCE(SUM(bi.spent_amount), 0) / b.total_amount * 100), 2)
-            ELSE 0 
+            ELSE 0
           END as utilization_percentage
         FROM budgets b
         LEFT JOIN financial_years fy ON b.financial_year_id = fy.id
         LEFT JOIN users u ON b.created_by = u.id
         LEFT JOIN users au ON b.approved_by = au.id
         LEFT JOIN budget_items bi ON b.id = bi.budget_id
-        WHERE 1=1
+        WHERE b.tenant_id = $1
       `;
-      
-      const params = [];
-      let paramCount = 1;
-      
+
+      const params = [tenantId];
+      let paramCount = 2;
+
       if (status) {
         query += ` AND b.status = $${paramCount}`;
         params.push(status);
         paramCount++;
       }
-      
+
       if (financial_year_id) {
         query += ` AND b.financial_year_id = $${paramCount}`;
         params.push(financial_year_id);
         paramCount++;
       }
-      
+
       query += `
         GROUP BY b.id, fy.id, u.email, au.email
         ORDER BY b.created_at DESC
       `;
-      
+
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
@@ -81,10 +83,11 @@ class BudgetController {
   // Get single budget with all items
   async getBudget(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const budgetResult = await pool.query(`
-        SELECT 
+        SELECT
           b.*,
           fy.year_name as financial_year_name,
           u.email as created_by_name,
@@ -94,26 +97,28 @@ class BudgetController {
         LEFT JOIN users u ON b.created_by = u.id
         LEFT JOIN users au ON b.approved_by = au.id
         WHERE b.id = $1
-      `, [id]);
-      
+          AND b.tenant_id = $2
+      `, [id, tenantId]);
+
       if (budgetResult.rows.length === 0) {
         return res.status(404).json({ error: 'Budget not found' });
       }
-      
+
       const itemsResult = await pool.query(`
-        SELECT 
+        SELECT
           bi.*,
           coa.account_name,
           coa.account_code
         FROM budget_items bi
         LEFT JOIN chart_of_accounts coa ON bi.account_id = coa.id
         WHERE bi.budget_id = $1
+          AND bi.tenant_id = $2
         ORDER BY bi.item_name
-      `, [id]);
-      
+      `, [id, tenantId]);
+
       const budget = budgetResult.rows[0];
       budget.items = itemsResult.rows;
-      
+
       res.json(budget);
     } catch (error) {
       console.error('Error fetching budget:', error);
@@ -124,10 +129,11 @@ class BudgetController {
   // Create new budget
   async createBudget(req, res) {
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
+      const tenantId = req.tenantId;
       const {
         budget_name,
         financial_year_id,
@@ -137,17 +143,17 @@ class BudgetController {
         description,
         items,
       } = req.body;
-      
-      // Generate budget number if not provided
-      const finalBudgetName = budget_name || await generateBudgetNumber();
-      
+
+      // Generate budget number if not provided (scoped to tenant)
+      const finalBudgetName = budget_name || await generateBudgetNumber(tenantId);
+
       // Create budget
       const budgetResult = await client.query(`
         INSERT INTO budgets (
           budget_name, financial_year_id, start_date, end_date,
           total_amount, spent_amount, status, description,
-          created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, 0, 'draft', $6, $7, NOW(), NOW())
+          created_by, tenant_id, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, 0, 'draft', $6, $7, $8, NOW(), NOW())
         RETURNING *
       `, [
         finalBudgetName,
@@ -157,40 +163,43 @@ class BudgetController {
         total_amount,
         description,
         req.user.id,
+        tenantId,
       ]);
-      
+
       const budget = budgetResult.rows[0];
-      
+
       // Add budget items if provided
       if (items && items.length > 0) {
         for (const item of items) {
           await client.query(`
             INSERT INTO budget_items (
               budget_id, item_name, account_id, allocated_amount,
-              spent_amount, description, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, 0, $5, NOW(), NOW())
+              spent_amount, description, tenant_id, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, 0, $5, $6, NOW(), NOW())
           `, [
             budget.id,
             item.item_name,
             item.account_id,
             item.allocated_amount,
             item.description,
+            tenantId,
           ]);
         }
       }
-      
+
       await client.query('COMMIT');
-      
+
       // Fetch complete budget with items
       const completeResult = await pool.query(`
-        SELECT 
+        SELECT
           b.*,
           fy.year_name as financial_year_name
         FROM budgets b
         LEFT JOIN financial_years fy ON b.financial_year_id = fy.id
         WHERE b.id = $1
-      `, [budget.id]);
-      
+          AND b.tenant_id = $2
+      `, [budget.id, tenantId]);
+
       res.status(201).json(completeResult.rows[0]);
     } catch (error) {
       await client.query('ROLLBACK');
@@ -204,6 +213,7 @@ class BudgetController {
   // Update budget
   async updateBudget(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
       const {
         budget_name,
@@ -214,10 +224,10 @@ class BudgetController {
         status,
         description,
       } = req.body;
-      
+
       const result = await pool.query(`
-        UPDATE budgets 
-        SET 
+        UPDATE budgets
+        SET
           budget_name = COALESCE($1, budget_name),
           financial_year_id = COALESCE($2, financial_year_id),
           start_date = COALESCE($3, start_date),
@@ -227,13 +237,14 @@ class BudgetController {
           description = COALESCE($7, description),
           updated_at = NOW()
         WHERE id = $8
+          AND tenant_id = $9
         RETURNING *
-      `, [budget_name, financial_year_id, start_date, end_date, total_amount, status, description, id]);
-      
+      `, [budget_name, financial_year_id, start_date, end_date, total_amount, status, description, id, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Budget not found' });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error updating budget:', error);
@@ -244,25 +255,26 @@ class BudgetController {
   // Delete budget
   async deleteBudget(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
-      // Check if budget has any spent amount
+
+      // Check if budget exists and is not closed (scoped to tenant)
       const checkResult = await pool.query(`
-        SELECT spent_amount FROM budgets WHERE id = $1
-      `, [id]);
-      
+        SELECT spent_amount FROM budgets WHERE id = $1 AND tenant_id = $2
+      `, [id, tenantId]);
+
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ error: 'Budget not found' });
       }
-      
+
       if (checkResult.rows[0].spent_amount > 0) {
-        return res.status(400).json({ 
-          error: 'Cannot delete budget with recorded expenses' 
+        return res.status(400).json({
+          error: 'Cannot delete budget with recorded expenses'
         });
       }
-      
-      await pool.query('DELETE FROM budgets WHERE id = $1', [id]);
-      
+
+      await pool.query('DELETE FROM budgets WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+
       res.json({ message: 'Budget deleted successfully' });
     } catch (error) {
       console.error('Error deleting budget:', error);
@@ -273,24 +285,27 @@ class BudgetController {
   // Approve budget
   async approveBudget(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const result = await pool.query(`
-        UPDATE budgets 
+        UPDATE budgets
         SET status = 'approved',
             approved_by = $1,
             approved_at = NOW(),
             updated_at = NOW()
-        WHERE id = $2 AND status = 'draft'
+        WHERE id = $2
+          AND tenant_id = $3
+          AND status = 'draft'
         RETURNING *
-      `, [req.user.id, id]);
-      
+      `, [req.user.id, id, tenantId]);
+
       if (result.rows.length === 0) {
-        return res.status(404).json({ 
-          error: 'Budget not found or already approved' 
+        return res.status(404).json({
+          error: 'Budget not found or already approved'
         });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error approving budget:', error);
@@ -301,22 +316,25 @@ class BudgetController {
   // Close/Archive budget
   async closeBudget(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const result = await pool.query(`
-        UPDATE budgets 
+        UPDATE budgets
         SET status = 'closed',
             updated_at = NOW()
-        WHERE id = $1 AND status IN ('approved', 'active')
+        WHERE id = $1
+          AND tenant_id = $2
+          AND status IN ('approved', 'active')
         RETURNING *
-      `, [id]);
-      
+      `, [id, tenantId]);
+
       if (result.rows.length === 0) {
-        return res.status(404).json({ 
-          error: 'Budget not found or cannot be closed' 
+        return res.status(404).json({
+          error: 'Budget not found or cannot be closed'
         });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error closing budget:', error);
@@ -331,26 +349,28 @@ class BudgetController {
   // Get budget items
   async getBudgetItems(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { budgetId } = req.params;
-      
+
       const result = await pool.query(`
-        SELECT 
+        SELECT
           bi.*,
           coa.account_name,
           coa.account_code,
           coa.account_type,
           (bi.allocated_amount - bi.spent_amount) as remaining_amount,
-          CASE 
-            WHEN bi.allocated_amount > 0 THEN 
+          CASE
+            WHEN bi.allocated_amount > 0 THEN
               ROUND((bi.spent_amount / bi.allocated_amount * 100), 2)
-            ELSE 0 
+            ELSE 0
           END as utilization_percentage
         FROM budget_items bi
         LEFT JOIN chart_of_accounts coa ON bi.account_id = coa.id
         WHERE bi.budget_id = $1
+          AND bi.tenant_id = $2
         ORDER BY bi.item_name
-      `, [budgetId]);
-      
+      `, [budgetId, tenantId]);
+
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching budget items:', error);
@@ -361,6 +381,7 @@ class BudgetController {
   // Add budget item
   async addBudgetItem(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { budgetId } = req.params;
       const {
         item_name,
@@ -368,30 +389,30 @@ class BudgetController {
         allocated_amount,
         description,
       } = req.body;
-      
-      // Check if budget exists and is not closed
+
+      // Check if budget exists and is not closed (scoped to tenant)
       const budgetCheck = await pool.query(`
-        SELECT status FROM budgets WHERE id = $1
-      `, [budgetId]);
-      
+        SELECT status FROM budgets WHERE id = $1 AND tenant_id = $2
+      `, [budgetId, tenantId]);
+
       if (budgetCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Budget not found' });
       }
-      
+
       if (budgetCheck.rows[0].status === 'closed') {
-        return res.status(400).json({ 
-          error: 'Cannot add items to a closed budget' 
+        return res.status(400).json({
+          error: 'Cannot add items to a closed budget'
         });
       }
-      
+
       const result = await pool.query(`
         INSERT INTO budget_items (
           budget_id, item_name, account_id, allocated_amount,
-          spent_amount, description, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, 0, $5, NOW(), NOW())
+          spent_amount, description, tenant_id, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, 0, $5, $6, NOW(), NOW())
         RETURNING *
-      `, [budgetId, item_name, account_id, allocated_amount, description]);
-      
+      `, [budgetId, item_name, account_id, allocated_amount, description, tenantId]);
+
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error adding budget item:', error);
@@ -402,6 +423,7 @@ class BudgetController {
   // Update budget item
   async updateBudgetItem(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
       const {
         item_name,
@@ -409,23 +431,24 @@ class BudgetController {
         allocated_amount,
         description,
       } = req.body;
-      
+
       const result = await pool.query(`
-        UPDATE budget_items 
-        SET 
+        UPDATE budget_items
+        SET
           item_name = COALESCE($1, item_name),
           account_id = COALESCE($2, account_id),
           allocated_amount = COALESCE($3, allocated_amount),
           description = COALESCE($4, description),
           updated_at = NOW()
         WHERE id = $5
+          AND tenant_id = $6
         RETURNING *
-      `, [item_name, account_id, allocated_amount, description, id]);
-      
+      `, [item_name, account_id, allocated_amount, description, id, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Budget item not found' });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error updating budget item:', error);
@@ -436,25 +459,26 @@ class BudgetController {
   // Delete budget item
   async deleteBudgetItem(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
-      // Check if item has spent amount
+
+      // Check if item has spent amount (scoped to tenant)
       const checkResult = await pool.query(`
-        SELECT spent_amount FROM budget_items WHERE id = $1
-      `, [id]);
-      
+        SELECT spent_amount FROM budget_items WHERE id = $1 AND tenant_id = $2
+      `, [id, tenantId]);
+
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ error: 'Budget item not found' });
       }
-      
+
       if (checkResult.rows[0].spent_amount > 0) {
-        return res.status(400).json({ 
-          error: 'Cannot delete budget item with recorded expenses' 
+        return res.status(400).json({
+          error: 'Cannot delete budget item with recorded expenses'
         });
       }
-      
-      await pool.query('DELETE FROM budget_items WHERE id = $1', [id]);
-      
+
+      await pool.query('DELETE FROM budget_items WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+
       res.json({ message: 'Budget item deleted successfully' });
     } catch (error) {
       console.error('Error deleting budget item:', error);
@@ -469,20 +493,21 @@ class BudgetController {
   // Get budget summary/analytics
   async getBudgetSummary(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const summary = await pool.query(`
-        SELECT 
+        SELECT
           b.id,
           b.budget_name,
           b.total_amount,
           b.spent_amount,
           b.status,
           (b.total_amount - b.spent_amount) as remaining_amount,
-          CASE 
-            WHEN b.total_amount > 0 THEN 
+          CASE
+            WHEN b.total_amount > 0 THEN
               ROUND((b.spent_amount / b.total_amount * 100), 2)
-            ELSE 0 
+            ELSE 0
           END as utilization_percentage,
           COUNT(bi.id) as total_items,
           COUNT(CASE WHEN bi.spent_amount >= bi.allocated_amount THEN 1 END) as exhausted_items,
@@ -491,16 +516,17 @@ class BudgetController {
         FROM budgets b
         LEFT JOIN budget_items bi ON b.id = bi.budget_id
         WHERE b.id = $1
+          AND b.tenant_id = $2
         GROUP BY b.id
-      `, [id]);
-      
+      `, [id, tenantId]);
+
       if (summary.rows.length === 0) {
         return res.status(404).json({ error: 'Budget not found' });
       }
-      
-      // Get spending by category
+
+      // Get spending by category (items already scoped via budget ownership)
       const byCategory = await pool.query(`
-        SELECT 
+        SELECT
           coa.account_type as category,
           coa.account_name,
           COUNT(bi.id) as item_count,
@@ -510,10 +536,11 @@ class BudgetController {
         FROM budget_items bi
         LEFT JOIN chart_of_accounts coa ON bi.account_id = coa.id
         WHERE bi.budget_id = $1
+          AND bi.tenant_id = $2
         GROUP BY coa.account_type, coa.account_name
         ORDER BY spent DESC
-      `, [id]);
-      
+      `, [id, tenantId]);
+
       res.json({
         ...summary.rows[0],
         by_category: byCategory.rows,
@@ -527,22 +554,23 @@ class BudgetController {
   // Get budget variance report
   async getBudgetVariance(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const variance = await pool.query(`
-        SELECT 
+        SELECT
           bi.id,
           bi.item_name,
           coa.account_name,
           bi.allocated_amount,
           bi.spent_amount,
           (bi.allocated_amount - bi.spent_amount) as variance,
-          CASE 
-            WHEN bi.allocated_amount > 0 THEN 
+          CASE
+            WHEN bi.allocated_amount > 0 THEN
               ROUND(((bi.spent_amount - bi.allocated_amount) / bi.allocated_amount * 100), 2)
-            ELSE 0 
+            ELSE 0
           END as variance_percentage,
-          CASE 
+          CASE
             WHEN bi.spent_amount > bi.allocated_amount THEN 'Over Budget'
             WHEN bi.spent_amount < bi.allocated_amount * 0.8 THEN 'Under Utilized'
             ELSE 'On Track'
@@ -550,9 +578,10 @@ class BudgetController {
         FROM budget_items bi
         LEFT JOIN chart_of_accounts coa ON bi.account_id = coa.id
         WHERE bi.budget_id = $1
+          AND bi.tenant_id = $2
         ORDER BY variance ASC
-      `, [id]);
-      
+      `, [id, tenantId]);
+
       res.json(variance.rows);
     } catch (error) {
       console.error('Error fetching budget variance:', error);

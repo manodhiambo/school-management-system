@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,10 +8,18 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
+
 // Get settings
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const settings = await query('SELECT * FROM settings LIMIT 1');
+    const tenantId = req.tenantId;
+    const settings = await query(
+      'SELECT * FROM settings WHERE tenant_id = $1 LIMIT 1',
+      [tenantId]
+    );
     res.json({
       success: true,
       data: settings[0] || {}
@@ -22,30 +31,30 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Update settings
-router.put('/', authenticate, requireRole(['admin']), async (req, res) => {
+router.put('/', requireRole(['admin']), async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const {
       school_name, school_code, phone, email, address, city, state, pincode,
       website, current_academic_year, timezone, currency, date_format, time_format,
       school_logo_url
     } = req.body;
 
-    // Check if settings exist
-    const existing = await query('SELECT * FROM settings LIMIT 1');
+    // Check if settings exist for this tenant
+    const existing = await query('SELECT * FROM settings WHERE tenant_id = $1 LIMIT 1', [tenantId]);
 
     if (existing.length === 0) {
       // Create settings
       const settingsId = uuidv4();
       await query(
-        `INSERT INTO settings (id, school_name, school_code, phone, email, address, city, state, pincode,
+        `INSERT INTO settings (id, tenant_id, school_name, school_code, phone, email, address, city, state, pincode,
           website, current_academic_year, timezone, currency, date_format, time_format, school_logo_url, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())`,
-        [settingsId, school_name, school_code, phone, email, address, city, state, pincode,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())`,
+        [settingsId, tenantId, school_name, school_code, phone, email, address, city, state, pincode,
           website, current_academic_year, timezone || 'Africa/Nairobi', currency || 'KES',
           date_format || 'DD/MM/YYYY', time_format || '12h', school_logo_url]
       );
     } else {
-      // Update settings - only update fields that are provided
       await query(
         `UPDATE settings SET
           school_name = COALESCE($1, school_name),
@@ -64,14 +73,14 @@ router.put('/', authenticate, requireRole(['admin']), async (req, res) => {
           time_format = COALESCE($14, time_format),
           school_logo_url = COALESCE($15, school_logo_url),
           updated_at = NOW()
-         WHERE id = $16`,
+         WHERE tenant_id = $16`,
         [school_name, school_code, phone, email, address, city, state, pincode,
           website, current_academic_year, timezone, currency, date_format, time_format,
-          school_logo_url, existing[0].id]
+          school_logo_url, tenantId]
       );
     }
 
-    const settings = await query('SELECT * FROM settings LIMIT 1');
+    const settings = await query('SELECT * FROM settings WHERE tenant_id = $1 LIMIT 1', [tenantId]);
 
     res.json({
       success: true,
@@ -85,9 +94,13 @@ router.put('/', authenticate, requireRole(['admin']), async (req, res) => {
 });
 
 // Get academic years
-router.get('/academic-years', authenticate, async (req, res) => {
+router.get('/academic-years', async (req, res) => {
   try {
-    const years = await query('SELECT * FROM academic_years ORDER BY start_date DESC');
+    const tenantId = req.tenantId;
+    const years = await query(
+      'SELECT * FROM academic_years WHERE tenant_id = $1 ORDER BY start_date DESC',
+      [tenantId]
+    );
     res.json({
       success: true,
       data: years
@@ -99,20 +112,21 @@ router.get('/academic-years', authenticate, async (req, res) => {
 });
 
 // Create academic year
-router.post('/academic-years', authenticate, requireRole(['admin']), async (req, res) => {
+router.post('/academic-years', requireRole(['admin']), async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { year, start_date, end_date, is_current } = req.body;
 
     const yearId = uuidv4();
 
     if (is_current) {
-      await query('UPDATE academic_years SET is_current = false');
+      await query('UPDATE academic_years SET is_current = false WHERE tenant_id = $1', [tenantId]);
     }
 
     await query(
-      `INSERT INTO academic_years (id, year, start_date, end_date, is_current)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [yearId, year, start_date, end_date, is_current || false]
+      `INSERT INTO academic_years (id, tenant_id, year, start_date, end_date, is_current)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [yearId, tenantId, year, start_date, end_date, is_current || false]
     );
 
     res.status(201).json({

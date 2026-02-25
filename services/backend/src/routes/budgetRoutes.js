@@ -1,11 +1,14 @@
 import express from 'express';
 import budgetController from '../controllers/budgetController.js';
 import { authenticate, authorize } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 
 const router = express.Router();
 
 // All budget routes require authentication and finance role
 router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
 router.use(authorize(['admin', 'finance_officer']));
 
 // Budget CRUD

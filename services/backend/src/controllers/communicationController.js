@@ -5,11 +5,8 @@ import ApiResponse from '../utils/ApiResponse.js';
 class CommunicationController {
   // ==================== MESSAGES ====================
   sendMessage = asyncHandler(async (req, res) => {
-    const messageData = {
-      ...req.body,
-      senderId: req.user.id
-    };
-    const message = await communicationService.sendMessage(messageData);
+    const messageData = { ...req.body, senderId: req.user.id };
+    const message = await communicationService.sendMessage(messageData, req.tenantId);
     res.status(201).json(new ApiResponse(201, message, 'Message sent successfully'));
   });
 
@@ -19,20 +16,18 @@ class CommunicationController {
       isRead: req.query.isRead === 'true',
       limit: parseInt(req.query.limit) || 50
     };
-    const messages = await communicationService.getMessages(req.user.id, filters);
+    const messages = await communicationService.getMessages(req.user.id, filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, messages, 'Messages retrieved successfully'));
   });
 
   getSentMessages = asyncHandler(async (req, res) => {
-    const filters = {
-      limit: parseInt(req.query.limit) || 50
-    };
-    const messages = await communicationService.getSentMessages(req.user.id, filters);
+    const filters = { limit: parseInt(req.query.limit) || 50 };
+    const messages = await communicationService.getSentMessages(req.user.id, filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, messages, 'Sent messages retrieved successfully'));
   });
 
   getMessage = asyncHandler(async (req, res) => {
-    const message = await communicationService.getMessageById(req.params.id);
+    const message = await communicationService.getMessageById(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, message, 'Message retrieved successfully'));
   });
 
@@ -42,7 +37,7 @@ class CommunicationController {
   });
 
   deleteMessage = asyncHandler(async (req, res) => {
-    const result = await communicationService.deleteMessage(req.params.id, req.user.id);
+    const result = await communicationService.deleteMessage(req.params.id, req.user.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Message deleted successfully'));
   });
 
@@ -74,11 +69,8 @@ class CommunicationController {
 
   // ==================== ANNOUNCEMENTS ====================
   createAnnouncement = asyncHandler(async (req, res) => {
-    const announcementData = {
-      ...req.body,
-      createdBy: req.user.id
-    };
-    const announcement = await communicationService.createAnnouncement(announcementData);
+    const announcementData = { ...req.body, createdBy: req.user.id };
+    const announcement = await communicationService.createAnnouncement(announcementData, req.tenantId);
     res.status(201).json(new ApiResponse(201, announcement, 'Announcement created successfully'));
   });
 
@@ -89,31 +81,28 @@ class CommunicationController {
       isPublished: req.query.isPublished === 'true',
       limit: parseInt(req.query.limit) || 50
     };
-    const announcements = await communicationService.getAnnouncements(filters);
+    const announcements = await communicationService.getAnnouncements(filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, announcements, 'Announcements retrieved successfully'));
   });
 
   getAnnouncement = asyncHandler(async (req, res) => {
-    const announcement = await communicationService.getAnnouncementById(req.params.id);
+    const announcement = await communicationService.getAnnouncementById(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, announcement, 'Announcement retrieved successfully'));
   });
 
   updateAnnouncement = asyncHandler(async (req, res) => {
-    const announcement = await communicationService.updateAnnouncement(req.params.id, req.body);
+    const announcement = await communicationService.updateAnnouncement(req.params.id, req.body, req.tenantId);
     res.status(200).json(new ApiResponse(200, announcement, 'Announcement updated successfully'));
   });
 
   deleteAnnouncement = asyncHandler(async (req, res) => {
-    const result = await communicationService.deleteAnnouncement(req.params.id);
+    const result = await communicationService.deleteAnnouncement(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Announcement deleted successfully'));
   });
 
   // ==================== PTM ====================
   schedulePTM = asyncHandler(async (req, res) => {
-    const ptmData = {
-      ...req.body,
-      scheduledBy: req.user.id
-    };
+    const ptmData = { ...req.body, scheduledBy: req.user.id };
     const ptm = await communicationService.schedulePTM(ptmData);
     res.status(201).json(new ApiResponse(201, ptm, 'PTM scheduled successfully'));
   });

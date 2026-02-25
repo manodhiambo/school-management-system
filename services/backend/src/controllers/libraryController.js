@@ -4,20 +4,22 @@ import logger from '../utils/logger.js';
 // Get all library members (for admin)
 export const getAllMembers = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const result = await query(`
-      SELECT 
+      SELECT
         lm.*,
         COALESCE(s.first_name || ' ' || s.last_name, t.first_name || ' ' || t.last_name) as member_name,
         COALESCE(s.admission_number, t.employee_id) as member_id_number,
         u.email,
         u.role
       FROM library_members lm
-      LEFT JOIN students s ON lm.student_id = s.id
-      LEFT JOIN teachers t ON lm.teacher_id = t.id
+      LEFT JOIN students s ON lm.student_id = s.id AND s.tenant_id = $1
+      LEFT JOIN teachers t ON lm.teacher_id = t.id AND t.tenant_id = $1
       LEFT JOIN users u ON lm.user_id = u.id
       WHERE lm.status = 'active'
+      AND lm.tenant_id = $1
       ORDER BY lm.created_at DESC
-    `);
+    `, [tenantId]);
 
     res.json({ success: true, data: result });
   } catch (error) {
@@ -29,9 +31,11 @@ export const getAllMembers = async (req, res) => {
 // Get users without library membership
 export const getUsersWithoutMembership = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
+
     // Get students without membership
     const students = await query(`
-      SELECT 
+      SELECT
         s.id,
         s.user_id,
         s.first_name || ' ' || s.last_name as name,
@@ -40,14 +44,15 @@ export const getUsersWithoutMembership = async (req, res) => {
         'student' as member_type
       FROM students s
       JOIN users u ON s.user_id = u.id
-      LEFT JOIN library_members lm ON s.id = lm.student_id AND lm.status = 'active'
+      LEFT JOIN library_members lm ON s.id = lm.student_id AND lm.status = 'active' AND lm.tenant_id = $1
       WHERE lm.id IS NULL
       AND s.status = 'active'
-    `);
+      AND s.tenant_id = $1
+    `, [tenantId]);
 
     // Get teachers without membership
     const teachers = await query(`
-      SELECT 
+      SELECT
         t.id,
         t.user_id,
         t.first_name || ' ' || t.last_name as name,
@@ -56,10 +61,11 @@ export const getUsersWithoutMembership = async (req, res) => {
         'teacher' as member_type
       FROM teachers t
       JOIN users u ON t.user_id = u.id
-      LEFT JOIN library_members lm ON t.id = lm.teacher_id AND lm.status = 'active'
+      LEFT JOIN library_members lm ON t.id = lm.teacher_id AND lm.status = 'active' AND lm.tenant_id = $1
       WHERE lm.id IS NULL
       AND t.status = 'active'
-    `);
+      AND t.tenant_id = $1
+    `, [tenantId]);
 
     const combined = [...students, ...teachers];
     res.json({ success: true, data: combined });
@@ -72,39 +78,40 @@ export const getUsersWithoutMembership = async (req, res) => {
 // Create library member
 export const createMember = async (req, res) => {
   try {
-    const { 
-      user_id, 
-      student_id, 
-      teacher_id, 
-      member_type, 
+    const tenantId = req.tenantId;
+    const {
+      user_id,
+      student_id,
+      teacher_id,
+      member_type,
       max_books_allowed = 3,
       max_days_allowed = 14,
-      notes 
+      notes
     } = req.body;
 
     // Validate that either student_id or teacher_id is provided
     if (!student_id && !teacher_id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Either student_id or teacher_id must be provided' 
+      return res.status(400).json({
+        success: false,
+        message: 'Either student_id or teacher_id must be provided'
       });
     }
 
     // Check if user already has active membership
     const existing = await query(
-      'SELECT id FROM library_members WHERE (student_id = $1 OR teacher_id = $2) AND status = $3',
-      [student_id || null, teacher_id || null, 'active']
+      'SELECT id FROM library_members WHERE (student_id = $1 OR teacher_id = $2) AND status = $3 AND tenant_id = $4',
+      [student_id || null, teacher_id || null, 'active', tenantId]
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User already has an active library membership' 
+      return res.status(400).json({
+        success: false,
+        message: 'User already has an active library membership'
       });
     }
 
     // Generate membership number
-    const memberCount = await query('SELECT COUNT(*) as count FROM library_members');
+    const memberCount = await query('SELECT COUNT(*) as count FROM library_members WHERE tenant_id = $1', [tenantId]);
     const membershipNumber = `LIB${String(parseInt(memberCount[0].count) + 1).padStart(6, '0')}`;
 
     // Calculate dates
@@ -113,18 +120,18 @@ export const createMember = async (req, res) => {
     end_date.setFullYear(end_date.getFullYear() + 1);
 
     const result = await query(
-      `INSERT INTO library_members 
-      (user_id, student_id, teacher_id, member_type, membership_number, 
-       membership_start_date, membership_end_date, max_books_allowed, 
-       max_days_allowed, status) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
+      `INSERT INTO library_members
+      (user_id, student_id, teacher_id, member_type, membership_number,
+       membership_start_date, membership_end_date, max_books_allowed,
+       max_days_allowed, status, tenant_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10)
       RETURNING id, membership_number`,
       [user_id || null, student_id || null, teacher_id || null, member_type, membershipNumber,
-       start_date, end_date, max_books_allowed, max_days_allowed]
+       start_date, end_date, max_books_allowed, max_days_allowed, tenantId]
     );
 
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       message: 'Library member created successfully',
       data: result[0]
     });
@@ -137,28 +144,28 @@ export const createMember = async (req, res) => {
 // Update library member
 export const updateMember = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const updates = req.body;
 
-    const allowedFields = ['max_books_allowed', 'max_days_allowed', 'membership_end_date', 
+    const allowedFields = ['max_books_allowed', 'max_days_allowed', 'membership_end_date',
                           'is_blocked', 'block_reason', 'status'];
-    
-    const fields = Object.keys(updates)
-      .filter(key => allowedFields.includes(key))
+
+    const filteredKeys = Object.keys(updates).filter(key => allowedFields.includes(key));
+
+    const fields = filteredKeys
       .map((key, index) => `${key} = $${index + 1}`)
       .join(', ');
 
-    const values = Object.keys(updates)
-      .filter(key => allowedFields.includes(key))
-      .map(key => updates[key]);
+    const values = filteredKeys.map(key => updates[key]);
 
     if (fields.length === 0) {
       return res.status(400).json({ success: false, message: 'No valid fields to update' });
     }
 
-    values.push(id);
+    values.push(id, tenantId);
     await query(
-      `UPDATE library_members SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`,
+      `UPDATE library_members SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length - 1} AND tenant_id = $${values.length}`,
       values
     );
 
@@ -172,24 +179,25 @@ export const updateMember = async (req, res) => {
 // Delete (deactivate) library member
 export const deleteMember = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { id } = req.params;
 
     // Check for active borrowings
     const activeBorrowings = await query(
-      "SELECT COUNT(*) as count FROM library_borrowings WHERE member_id = $1 AND status = 'issued'",
-      [id]
+      "SELECT COUNT(*) as count FROM library_borrowings WHERE member_id = $1 AND status = 'issued' AND tenant_id = $2",
+      [id, tenantId]
     );
 
     if (activeBorrowings[0].count > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Cannot deactivate member with active borrowings' 
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot deactivate member with active borrowings'
       });
     }
 
     await query(
-      "UPDATE library_members SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-      [id]
+      "UPDATE library_members SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND tenant_id = $2",
+      [id, tenantId]
     );
 
     res.json({ success: true, message: 'Member deactivated successfully' });
@@ -202,17 +210,19 @@ export const deleteMember = async (req, res) => {
 // Get current user's membership info
 export const getMember = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const result = await query(`
-      SELECT 
+      SELECT
         lm.*,
         COALESCE(s.first_name || ' ' || s.last_name, t.first_name || ' ' || t.last_name) as member_name,
         u.email
       FROM library_members lm
-      LEFT JOIN students s ON lm.student_id = s.id
-      LEFT JOIN teachers t ON lm.teacher_id = t.id
+      LEFT JOIN students s ON lm.student_id = s.id AND s.tenant_id = $2
+      LEFT JOIN teachers t ON lm.teacher_id = t.id AND t.tenant_id = $2
       JOIN users u ON lm.user_id = u.id
       WHERE lm.user_id = $1 AND lm.status = 'active'
-    `, [req.user.id]);
+      AND lm.tenant_id = $2
+    `, [req.user.id, tenantId]);
 
     if (result.length === 0) {
       return res.status(404).json({ success: false, message: 'No active membership found' });
@@ -228,9 +238,10 @@ export const getMember = async (req, res) => {
 // Get current user's borrowings
 export const getMyBorrowings = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const member = await query(
-      'SELECT id FROM library_members WHERE user_id = $1 AND status = $2',
-      [req.user.id, 'active']
+      'SELECT id FROM library_members WHERE user_id = $1 AND status = $2 AND tenant_id = $3',
+      [req.user.id, 'active', tenantId]
     );
 
     if (member.length === 0) {
@@ -238,26 +249,27 @@ export const getMyBorrowings = async (req, res) => {
     }
 
     const result = await query(`
-      SELECT 
+      SELECT
         lb.*,
         book.title,
         book.author,
         book.isbn,
         book.cover_image_url,
-        CASE 
+        CASE
           WHEN lb.status = 'issued' AND lb.due_date < CURRENT_DATE THEN true
           ELSE false
         END as is_overdue,
-        CASE 
-          WHEN lb.status = 'issued' AND lb.due_date < CURRENT_DATE 
+        CASE
+          WHEN lb.status = 'issued' AND lb.due_date < CURRENT_DATE
           THEN CURRENT_DATE - lb.due_date
           ELSE 0
         END as days_overdue
       FROM library_borrowings lb
-      JOIN library_books book ON lb.book_id = book.id
+      JOIN library_books book ON lb.book_id = book.id AND book.tenant_id = $2
       WHERE lb.member_id = $1
+      AND lb.tenant_id = $2
       ORDER BY lb.created_at DESC
-    `, [member[0].id]);
+    `, [member[0].id, tenantId]);
 
     res.json({ success: true, data: result });
   } catch (error) {
@@ -269,13 +281,15 @@ export const getMyBorrowings = async (req, res) => {
 // Get all categories
 export const getCategories = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const result = await query(`
       SELECT category, COUNT(*) as count
       FROM library_books
       WHERE is_active = true AND category IS NOT NULL
+      AND tenant_id = $1
       GROUP BY category
       ORDER BY category
-    `);
+    `, [tenantId]);
 
     res.json({ success: true, data: result });
   } catch (error) {
@@ -287,14 +301,16 @@ export const getCategories = async (req, res) => {
 // Barcode/QR code search
 export const searchByBarcode = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { barcode } = req.params;
 
     const result = await query(
       `SELECT * FROM library_books
        WHERE is_active = true
-       AND (isbn = $1 OR keywords LIKE $2)
+       AND tenant_id = $1
+       AND (isbn = $2 OR keywords LIKE $3)
        LIMIT 1`,
-      [barcode, `%${barcode}%`]
+      [tenantId, barcode, `%${barcode}%`]
     );
 
     if (result.length === 0) {
@@ -313,24 +329,26 @@ export const searchByBarcode = async (req, res) => {
 // Get all books with filters
 export const getBooks = async (req, res) => {
   try {
-    const { 
-      search, 
-      category, 
-      availability, 
-      page = 1, 
-      limit = 20 
+    const tenantId = req.tenantId;
+    const {
+      search,
+      category,
+      availability,
+      page = 1,
+      limit = 20
     } = req.query;
 
     let sql = `
-      SELECT 
+      SELECT
         lb.*,
         lb.available_copies
       FROM library_books lb
       WHERE lb.is_active = true
+      AND lb.tenant_id = $1
     `;
-    
-    const params = [];
-    let paramCount = 1;
+
+    const params = [tenantId];
+    let paramCount = 2;
 
     if (search) {
       sql += ` AND (lb.title ILIKE $${paramCount} OR lb.author ILIKE $${paramCount + 1} OR lb.isbn ILIKE $${paramCount + 2} OR lb.keywords ILIKE $${paramCount + 3})`;
@@ -352,7 +370,7 @@ export const getBooks = async (req, res) => {
     }
 
     sql += ` ORDER BY lb.created_at DESC`;
-    
+
     const offset = (page - 1) * limit;
     sql += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(parseInt(limit), parseInt(offset));
@@ -360,17 +378,17 @@ export const getBooks = async (req, res) => {
     const books = await query(sql, params);
 
     // Get total count
-    let countSql = `SELECT COUNT(*) as total FROM library_books lb WHERE lb.is_active = true`;
-    const countParams = [];
-    let countParamIndex = 1;
-    
+    let countSql = `SELECT COUNT(*) as total FROM library_books lb WHERE lb.is_active = true AND lb.tenant_id = $1`;
+    const countParams = [tenantId];
+    let countParamIndex = 2;
+
     if (search) {
       countSql += ` AND (lb.title ILIKE $${countParamIndex} OR lb.author ILIKE $${countParamIndex + 1} OR lb.isbn ILIKE $${countParamIndex + 2} OR lb.keywords ILIKE $${countParamIndex + 3})`;
       const searchPattern = `%${search}%`;
       countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
       countParamIndex += 4;
     }
-    
+
     if (category) {
       countSql += ` AND lb.category = $${countParamIndex}`;
       countParams.push(category);
@@ -379,8 +397,8 @@ export const getBooks = async (req, res) => {
     const totalResult = await query(countSql, countParams);
     const total = parseInt(totalResult[0].total);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: books,
       pagination: {
         page: parseInt(page),
@@ -398,12 +416,14 @@ export const getBooks = async (req, res) => {
 // Get single book by ID
 export const getBook = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { id } = req.params;
 
     const result = await query(`
       SELECT * FROM library_books
       WHERE id = $1 AND is_active = true
-    `, [id]);
+      AND tenant_id = $2
+    `, [id, tenantId]);
 
     if (result.length === 0) {
       return res.status(404).json({ success: false, message: 'Book not found' });
@@ -419,6 +439,7 @@ export const getBook = async (req, res) => {
 // Add new book
 export const addBook = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const {
       title,
       subtitle,
@@ -442,35 +463,35 @@ export const addBook = async (req, res) => {
       is_reference_only = false
     } = req.body;
 
-    // Check if ISBN already exists
+    // Check if ISBN already exists for this tenant
     if (isbn) {
       const existing = await query(
-        'SELECT id FROM library_books WHERE isbn = $1 AND is_active = true',
-        [isbn]
+        'SELECT id FROM library_books WHERE isbn = $1 AND is_active = true AND tenant_id = $2',
+        [isbn, tenantId]
       );
 
       if (existing.length > 0) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Book with this ISBN already exists' 
+        return res.status(400).json({
+          success: false,
+          message: 'Book with this ISBN already exists'
         });
       }
     }
 
     const result = await query(
-      `INSERT INTO library_books 
-      (title, subtitle, author, co_authors, isbn, publisher, edition, publication_year, 
-       language, pages, category, sub_category, total_copies, available_copies, location, 
-       description, keywords, cover_image_url, price, condition, is_reference_only, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14, $15, $16, $17, $18, $19, $20, true)
+      `INSERT INTO library_books
+      (title, subtitle, author, co_authors, isbn, publisher, edition, publication_year,
+       language, pages, category, sub_category, total_copies, available_copies, location,
+       description, keywords, cover_image_url, price, condition, is_reference_only, is_active, tenant_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14, $15, $16, $17, $18, $19, $20, true, $21)
       RETURNING id`,
-      [title, subtitle, author, co_authors, isbn, publisher, edition, publication_year, 
-       language, pages, category, sub_category, total_copies, location, 
-       description, keywords, cover_image_url, price, condition, is_reference_only]
+      [title, subtitle, author, co_authors, isbn, publisher, edition, publication_year,
+       language, pages, category, sub_category, total_copies, location,
+       description, keywords, cover_image_url, price, condition, is_reference_only, tenantId]
     );
 
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       message: 'Book added successfully',
       data: { id: result[0].id }
     });
@@ -483,31 +504,31 @@ export const addBook = async (req, res) => {
 // Update book
 export const updateBook = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const updates = req.body;
 
-    const allowedFields = ['title', 'subtitle', 'author', 'co_authors', 'isbn', 'publisher', 
-                          'edition', 'publication_year', 'language', 'pages', 'category', 
-                          'sub_category', 'total_copies', 'available_copies', 'location', 
-                          'description', 'keywords', 'cover_image_url', 'price', 'condition', 
+    const allowedFields = ['title', 'subtitle', 'author', 'co_authors', 'isbn', 'publisher',
+                          'edition', 'publication_year', 'language', 'pages', 'category',
+                          'sub_category', 'total_copies', 'available_copies', 'location',
+                          'description', 'keywords', 'cover_image_url', 'price', 'condition',
                           'is_reference_only'];
 
-    const fields = Object.keys(updates)
-      .filter(key => allowedFields.includes(key))
+    const filteredKeys = Object.keys(updates).filter(key => allowedFields.includes(key));
+
+    const fields = filteredKeys
       .map((key, index) => `${key} = $${index + 1}`)
       .join(', ');
 
-    const values = Object.keys(updates)
-      .filter(key => allowedFields.includes(key))
-      .map(key => updates[key]);
+    const values = filteredKeys.map(key => updates[key]);
 
     if (fields.length === 0) {
       return res.status(400).json({ success: false, message: 'No valid fields to update' });
     }
 
-    values.push(id);
+    values.push(id, tenantId);
     await query(
-      `UPDATE library_books SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`,
+      `UPDATE library_books SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length - 1} AND tenant_id = $${values.length}`,
       values
     );
 
@@ -521,24 +542,25 @@ export const updateBook = async (req, res) => {
 // Delete (deactivate) book
 export const deleteBook = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { id } = req.params;
 
     // Check for active borrowings
     const activeBorrowings = await query(
-      "SELECT COUNT(*) as count FROM library_borrowings WHERE book_id = $1 AND status = 'issued'",
-      [id]
+      "SELECT COUNT(*) as count FROM library_borrowings WHERE book_id = $1 AND status = 'issued' AND tenant_id = $2",
+      [id, tenantId]
     );
 
     if (activeBorrowings[0].count > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Cannot delete book with active borrowings' 
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete book with active borrowings'
       });
     }
 
     await query(
-      'UPDATE library_books SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-      [id]
+      'UPDATE library_books SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND tenant_id = $2',
+      [id, tenantId]
     );
 
     res.json({ success: true, message: 'Book deleted successfully' });
@@ -553,14 +575,15 @@ export const deleteBook = async (req, res) => {
 // Issue/Borrow a book
 export const issueBook = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { member_id, book_id, due_date, condition_on_issue = 'good', remarks } = req.body;
 
     logger.info('Issue book request:', { member_id, book_id, due_date });
 
     // Check if member exists and is active
     const member = await query(
-      'SELECT * FROM library_members WHERE id = $1 AND status = $2',
-      [member_id, 'active']
+      'SELECT * FROM library_members WHERE id = $1 AND status = $2 AND tenant_id = $3',
+      [member_id, 'active', tenantId]
     );
 
     if (member.length === 0) {
@@ -581,21 +604,21 @@ export const issueBook = async (req, res) => {
 
     // Check current borrowings count
     const currentBorrowings = await query(
-      "SELECT COUNT(*) as count FROM library_borrowings WHERE member_id = $1 AND status = 'issued'",
-      [member_id]
+      "SELECT COUNT(*) as count FROM library_borrowings WHERE member_id = $1 AND status = 'issued' AND tenant_id = $2",
+      [member_id, tenantId]
     );
 
     if (parseInt(currentBorrowings[0].count) >= memberData.max_books_allowed) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Member has reached maximum borrowing limit of ${memberData.max_books_allowed} books` 
+      return res.status(400).json({
+        success: false,
+        message: `Member has reached maximum borrowing limit of ${memberData.max_books_allowed} books`
       });
     }
 
     // Check if book is available
     const book = await query(
-      'SELECT * FROM library_books WHERE id = $1 AND is_active = true',
-      [book_id]
+      'SELECT * FROM library_books WHERE id = $1 AND is_active = true AND tenant_id = $2',
+      [book_id, tenantId]
     );
 
     if (book.length === 0) {
@@ -612,14 +635,14 @@ export const issueBook = async (req, res) => {
 
     // Check if member already borrowed this book
     const existingBorrowing = await query(
-      "SELECT id FROM library_borrowings WHERE member_id = $1 AND book_id = $2 AND status = 'issued'",
-      [member_id, book_id]
+      "SELECT id FROM library_borrowings WHERE member_id = $1 AND book_id = $2 AND status = 'issued' AND tenant_id = $3",
+      [member_id, book_id, tenantId]
     );
 
     if (existingBorrowing.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Member has already borrowed this book' 
+      return res.status(400).json({
+        success: false,
+        message: 'Member has already borrowed this book'
       });
     }
 
@@ -633,21 +656,21 @@ export const issueBook = async (req, res) => {
 
     // Create borrowing record
     const result = await query(
-      `INSERT INTO library_borrowings 
-      (book_id, member_id, issue_date, due_date, status, condition_on_issue, remarks, issued_by)
-      VALUES ($1, $2, CURRENT_DATE, $3, 'issued', $4, $5, $6)
+      `INSERT INTO library_borrowings
+      (book_id, member_id, issue_date, due_date, status, condition_on_issue, remarks, issued_by, tenant_id)
+      VALUES ($1, $2, CURRENT_DATE, $3, 'issued', $4, $5, $6, $7)
       RETURNING id`,
-      [book_id, member_id, calculatedDueDate, condition_on_issue, remarks, req.user.id]
+      [book_id, member_id, calculatedDueDate, condition_on_issue, remarks, req.user.id, tenantId]
     );
 
-    // Update available copies
+    // Update available copies (scoped to tenant)
     await query(
-      'UPDATE library_books SET available_copies = available_copies - 1 WHERE id = $1',
-      [book_id]
+      'UPDATE library_books SET available_copies = available_copies - 1 WHERE id = $1 AND tenant_id = $2',
+      [book_id, tenantId]
     );
 
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       message: 'Book issued successfully',
       data: { id: result[0].id }
     });
@@ -660,13 +683,14 @@ export const issueBook = async (req, res) => {
 // Return a book
 export const returnBook = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const { condition_on_return = 'good', fine_paid = 0, fine_waived = 0, remarks } = req.body;
 
     // Get borrowing details
     const borrowing = await query(
-      "SELECT * FROM library_borrowings WHERE id = $1 AND status = 'issued'",
-      [id]
+      "SELECT * FROM library_borrowings WHERE id = $1 AND status = 'issued' AND tenant_id = $2",
+      [id, tenantId]
     );
 
     if (borrowing.length === 0) {
@@ -679,16 +703,16 @@ export const returnBook = async (req, res) => {
     let fine_amount = 0;
     const today = new Date();
     const dueDate = new Date(borrowData.due_date);
-    
+
     if (today > dueDate) {
       const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-      fine_amount = daysOverdue * 5; // ₹5 per day fine
+      fine_amount = daysOverdue * 5; // KSh 5 per day fine
     }
 
     // Update borrowing record
     await query(
-      `UPDATE library_borrowings 
-      SET status = 'returned', 
+      `UPDATE library_borrowings
+      SET status = 'returned',
           return_date = CURRENT_DATE,
           condition_on_return = $1,
           fine_amount = $2,
@@ -697,18 +721,18 @@ export const returnBook = async (req, res) => {
           remarks = COALESCE(remarks, '') || ' | Return: ' || COALESCE($5, ''),
           returned_to = $6,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $7`,
-      [condition_on_return, fine_amount, fine_paid, fine_waived, remarks, req.user.id, id]
+      WHERE id = $7 AND tenant_id = $8`,
+      [condition_on_return, fine_amount, fine_paid, fine_waived, remarks, req.user.id, id, tenantId]
     );
 
-    // Update available copies
+    // Update available copies (scoped to tenant)
     await query(
-      'UPDATE library_books SET available_copies = available_copies + 1 WHERE id = $1',
-      [borrowData.book_id]
+      'UPDATE library_books SET available_copies = available_copies + 1 WHERE id = $1 AND tenant_id = $2',
+      [borrowData.book_id, tenantId]
     );
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Book returned successfully',
       data: { fine_amount, fine_paid, fine_waived, fine_remaining: Math.max(0, fine_amount - fine_paid - fine_waived) }
     });
@@ -721,17 +745,18 @@ export const returnBook = async (req, res) => {
 // Get all borrowings (admin view)
 export const getAllBorrowings = async (req, res) => {
   try {
-    const { 
-      status, 
-      member_id, 
-      book_id, 
+    const tenantId = req.tenantId;
+    const {
+      status,
+      member_id,
+      book_id,
       overdue,
-      page = 1, 
-      limit = 20 
+      page = 1,
+      limit = 20
     } = req.query;
 
     let sql = `
-      SELECT 
+      SELECT
         lb.*,
         book.title as book_title,
         book.author as book_author,
@@ -740,25 +765,25 @@ export const getAllBorrowings = async (req, res) => {
         COALESCE(s.admission_number, t.employee_id) as member_id_number,
         lm.membership_number,
         lm.member_type,
-        CASE 
+        CASE
           WHEN lb.status = 'issued' AND lb.due_date < CURRENT_DATE THEN true
           ELSE false
         END as is_overdue,
-        CASE 
-          WHEN lb.status = 'issued' AND lb.due_date < CURRENT_DATE 
+        CASE
+          WHEN lb.status = 'issued' AND lb.due_date < CURRENT_DATE
           THEN CURRENT_DATE - lb.due_date
           ELSE 0
         END as days_overdue
       FROM library_borrowings lb
-      JOIN library_books book ON lb.book_id = book.id
-      JOIN library_members lm ON lb.member_id = lm.id
-      LEFT JOIN students s ON lm.student_id = s.id
-      LEFT JOIN teachers t ON lm.teacher_id = t.id
-      WHERE 1=1
+      JOIN library_books book ON lb.book_id = book.id AND book.tenant_id = $1
+      JOIN library_members lm ON lb.member_id = lm.id AND lm.tenant_id = $1
+      LEFT JOIN students s ON lm.student_id = s.id AND s.tenant_id = $1
+      LEFT JOIN teachers t ON lm.teacher_id = t.id AND t.tenant_id = $1
+      WHERE lb.tenant_id = $1
     `;
-    
-    const params = [];
-    let paramCount = 1;
+
+    const params = [tenantId];
+    let paramCount = 2;
 
     if (status) {
       sql += ` AND lb.status = $${paramCount}`;
@@ -783,7 +808,7 @@ export const getAllBorrowings = async (req, res) => {
     }
 
     sql += ` ORDER BY lb.created_at DESC`;
-    
+
     const offset = (page - 1) * limit;
     sql += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(parseInt(limit), parseInt(offset));
@@ -791,10 +816,10 @@ export const getAllBorrowings = async (req, res) => {
     const borrowings = await query(sql, params);
 
     // Get total count
-    let countSql = `SELECT COUNT(*) as total FROM library_borrowings lb WHERE 1=1`;
-    const countParams = [];
-    let countParamIndex = 1;
-    
+    let countSql = `SELECT COUNT(*) as total FROM library_borrowings lb WHERE lb.tenant_id = $1`;
+    const countParams = [tenantId];
+    let countParamIndex = 2;
+
     if (status) {
       countSql += ` AND lb.status = $${countParamIndex}`;
       countParams.push(status);
@@ -817,8 +842,8 @@ export const getAllBorrowings = async (req, res) => {
     const totalResult = await query(countSql, countParams);
     const total = parseInt(totalResult[0].total);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: borrowings,
       pagination: {
         page: parseInt(page),
@@ -836,63 +861,68 @@ export const getAllBorrowings = async (req, res) => {
 // Get library statistics
 export const getStatistics = async (req, res) => {
   try {
+    const tenantId = req.tenantId;
+
     const borrowingStats = await query(`
-      SELECT 
+      SELECT
         COUNT(CASE WHEN status = 'issued' THEN 1 END) as active_borrowings,
         COUNT(CASE WHEN status = 'returned' THEN 1 END) as total_returns,
         COUNT(CASE WHEN status = 'issued' AND due_date < CURRENT_DATE THEN 1 END) as overdue_books,
         SUM(CASE WHEN status = 'returned' THEN COALESCE(fine_paid, 0) ELSE 0 END) as total_fines_collected,
-        SUM(CASE WHEN status= 'issued' AND due_date < CURRENT_DATE
-      THEN (CURRENT_DATE - due_date) * 5
-      ELSE 0
-    END
-  ) AS pending_fines
-FROM library_borrowings
-`);
+        SUM(CASE WHEN status = 'issued' AND due_date < CURRENT_DATE
+          THEN (CURRENT_DATE - due_date) * 5
+          ELSE 0
+        END) AS pending_fines
+      FROM library_borrowings
+      WHERE tenant_id = $1
+    `, [tenantId]);
 
-const bookStats = await query(`
-  SELECT 
-    COUNT(*) AS total_books,
-    SUM(total_copies) AS total_copies,
-    SUM(available_copies) AS available_copies,
-    COUNT(DISTINCT category) AS total_categories
-  FROM library_books
-  WHERE is_active = true
-`);
+    const bookStats = await query(`
+      SELECT
+        COUNT(*) AS total_books,
+        SUM(total_copies) AS total_copies,
+        SUM(available_copies) AS available_copies,
+        COUNT(DISTINCT category) AS total_categories
+      FROM library_books
+      WHERE is_active = true
+      AND tenant_id = $1
+    `, [tenantId]);
 
-const memberStats = await query(`
-  SELECT 
-    COUNT(*) AS total_members,
-    COUNT(CASE WHEN membership_end_date > CURRENT_DATE THEN 1 END) AS active_members,
-    COUNT(CASE WHEN membership_end_date <= CURRENT_DATE THEN 1 END) AS expired_members,
-    COUNT(CASE WHEN is_blocked = true THEN 1 END) AS blocked_members
-  FROM library_members
-  WHERE status = 'active'
-`);
+    const memberStats = await query(`
+      SELECT
+        COUNT(*) AS total_members,
+        COUNT(CASE WHEN membership_end_date > CURRENT_DATE THEN 1 END) AS active_members,
+        COUNT(CASE WHEN membership_end_date <= CURRENT_DATE THEN 1 END) AS expired_members,
+        COUNT(CASE WHEN is_blocked = true THEN 1 END) AS blocked_members
+      FROM library_members
+      WHERE status = 'active'
+      AND tenant_id = $1
+    `, [tenantId]);
 
-const topBooks = await query(`
-  SELECT 
-    book.title,
-    book.author,
-    COUNT(lb.id) AS borrow_count
-  FROM library_borrowings lb
-  JOIN library_books book ON lb.book_id = book.id
-  GROUP BY book.id, book.title, book.author
-  ORDER BY borrow_count DESC
-  LIMIT 10
-`);
+    const topBooks = await query(`
+      SELECT
+        book.title,
+        book.author,
+        COUNT(lb.id) AS borrow_count
+      FROM library_borrowings lb
+      JOIN library_books book ON lb.book_id = book.id AND book.tenant_id = $1
+      WHERE lb.tenant_id = $1
+      GROUP BY book.id, book.title, book.author
+      ORDER BY borrow_count DESC
+      LIMIT 10
+    `, [tenantId]);
 
-res.json({ 
-  success: true, 
-  data: {
-    borrowings: borrowingStats[0] || {},
-    books: bookStats[0] || {},
-    members: memberStats[0] || {},
-    topBooks: topBooks || []
+    res.json({
+      success: true,
+      data: {
+        borrowings: borrowingStats[0] || {},
+        books: bookStats[0] || {},
+        members: memberStats[0] || {},
+        topBooks: topBooks || []
+      }
+    });
+  } catch (error) {
+    logger.error('Get statistics error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
-});
-} catch (error) {
-  logger.error('Get statistics error:', error);
-  res.status(500).json({ success: false, message: error.message });
-}
 };

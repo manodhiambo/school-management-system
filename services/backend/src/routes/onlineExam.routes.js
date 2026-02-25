@@ -1,9 +1,14 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
+
+router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
 
 function computeCBCGrade(percentage, educationLevel) {
   if (['playgroup','pre_primary','lower_primary','upper_primary'].includes(educationLevel)) {
@@ -28,19 +33,20 @@ function computeCBCGrade(percentage, educationLevel) {
 }
 
 // POST /online-exams/:examId/start  [student]
-router.post('/:examId/start', authenticate, async (req, res) => {
+router.post('/:examId/start', async (req, res) => {
   try {
     if (req.user.role !== 'student') {
       return res.status(403).json({ success: false, message: 'Students only' });
     }
+    const tenantId = req.tenantId;
 
-    // Get exam with class info
+    // Get exam — must belong to this tenant
     const exams = await query(`
       SELECT e.*, c.education_level
       FROM exams e
       LEFT JOIN classes c ON c.id = e.class_id
-      WHERE e.id = $1 AND e.mode = 'online'
-    `, [req.params.examId]);
+      WHERE e.id = $1 AND e.mode = 'online' AND e.tenant_id = $2
+    `, [req.params.examId, tenantId]);
 
     if (exams.length === 0) {
       return res.status(404).json({ success: false, message: 'Online exam not found' });
@@ -48,7 +54,6 @@ router.post('/:examId/start', authenticate, async (req, res) => {
 
     const exam = exams[0];
 
-    // Check access window
     const now = new Date();
     if (exam.start_date && now < new Date(exam.start_date)) {
       return res.status(403).json({ success: false, message: 'Exam has not started yet' });
@@ -57,35 +62,34 @@ router.post('/:examId/start', authenticate, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Exam has ended' });
     }
 
-    // Get student record
-    const students = await query('SELECT id FROM students WHERE user_id = $1', [req.user.id]);
+    const students = await query(
+      'SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2',
+      [req.user.id, tenantId]
+    );
     if (students.length === 0) {
       return res.status(404).json({ success: false, message: 'Student record not found' });
     }
     const studentId = students[0].id;
 
-    // Get questions for max score calculation
     const questions = await query(
-      'SELECT id, question_text, question_type, options, marks, order_index FROM exam_questions WHERE exam_id = $1 ORDER BY order_index',
-      [req.params.examId]
+      'SELECT id, question_text, question_type, options, marks, order_index FROM exam_questions WHERE exam_id = $1 AND tenant_id = $2 ORDER BY order_index',
+      [req.params.examId, tenantId]
     );
 
     const maxScore = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
 
-    // Create attempt (UNIQUE constraint prevents duplicates)
     const attemptId = uuidv4();
     try {
       await query(
-        `INSERT INTO exam_attempts (id, exam_id, student_id, max_score, status)
-         VALUES ($1, $2, $3, $4, 'in_progress')`,
-        [attemptId, req.params.examId, studentId, maxScore]
+        `INSERT INTO exam_attempts (id, tenant_id, exam_id, student_id, max_score, status)
+         VALUES ($1, $2, $3, $4, $5, 'in_progress')`,
+        [attemptId, tenantId, req.params.examId, studentId, maxScore]
       );
     } catch (err) {
       if (err.code === '23505') {
-        // Already started — return existing attempt
         const existing = await query(
-          'SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2',
-          [req.params.examId, studentId]
+          'SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND tenant_id = $3',
+          [req.params.examId, studentId, tenantId]
         );
         return res.json({
           success: true,
@@ -110,21 +114,25 @@ router.post('/:examId/start', authenticate, async (req, res) => {
 });
 
 // GET /online-exams/:examId/attempt  [student] — crash recovery
-router.get('/:examId/attempt', authenticate, async (req, res) => {
+router.get('/:examId/attempt', async (req, res) => {
   try {
     if (req.user.role !== 'student') {
       return res.status(403).json({ success: false, message: 'Students only' });
     }
+    const tenantId = req.tenantId;
 
-    const students = await query('SELECT id FROM students WHERE user_id = $1', [req.user.id]);
+    const students = await query(
+      'SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2',
+      [req.user.id, tenantId]
+    );
     if (students.length === 0) {
       return res.status(404).json({ success: false, message: 'Student record not found' });
     }
     const studentId = students[0].id;
 
     const attempts = await query(
-      'SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2',
-      [req.params.examId, studentId]
+      'SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND tenant_id = $3',
+      [req.params.examId, studentId, tenantId]
     );
 
     if (attempts.length === 0) {
@@ -145,23 +153,26 @@ router.get('/:examId/attempt', authenticate, async (req, res) => {
 });
 
 // POST /online-exams/:examId/answer  [student] — upsert answer
-router.post('/:examId/answer', authenticate, async (req, res) => {
+router.post('/:examId/answer', async (req, res) => {
   try {
     if (req.user.role !== 'student') {
       return res.status(403).json({ success: false, message: 'Students only' });
     }
-
+    const tenantId = req.tenantId;
     const { question_id, answer_text } = req.body;
 
-    const students = await query('SELECT id FROM students WHERE user_id = $1', [req.user.id]);
+    const students = await query(
+      'SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2',
+      [req.user.id, tenantId]
+    );
     if (students.length === 0) {
       return res.status(404).json({ success: false, message: 'Student record not found' });
     }
     const studentId = students[0].id;
 
     const attempts = await query(
-      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND status = 'in_progress'",
-      [req.params.examId, studentId]
+      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND tenant_id = $3 AND status = 'in_progress'",
+      [req.params.examId, studentId, tenantId]
     );
 
     if (attempts.length === 0) {
@@ -186,21 +197,25 @@ router.post('/:examId/answer', authenticate, async (req, res) => {
 });
 
 // POST /online-exams/:examId/submit  [student]
-router.post('/:examId/submit', authenticate, async (req, res) => {
+router.post('/:examId/submit', async (req, res) => {
   try {
     if (req.user.role !== 'student') {
       return res.status(403).json({ success: false, message: 'Students only' });
     }
+    const tenantId = req.tenantId;
 
-    const students = await query('SELECT id FROM students WHERE user_id = $1', [req.user.id]);
+    const students = await query(
+      'SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2',
+      [req.user.id, tenantId]
+    );
     if (students.length === 0) {
       return res.status(404).json({ success: false, message: 'Student record not found' });
     }
     const studentId = students[0].id;
 
     const attempts = await query(
-      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND status = 'in_progress'",
-      [req.params.examId, studentId]
+      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND tenant_id = $3 AND status = 'in_progress'",
+      [req.params.examId, studentId, tenantId]
     );
 
     if (attempts.length === 0) {
@@ -209,24 +224,21 @@ router.post('/:examId/submit', authenticate, async (req, res) => {
 
     const attempt = attempts[0];
 
-    // Get exam with class/education_level
     const exams = await query(`
       SELECT e.*, c.education_level
       FROM exams e
       LEFT JOIN classes c ON c.id = e.class_id
-      WHERE e.id = $1
-    `, [req.params.examId]);
+      WHERE e.id = $1 AND e.tenant_id = $2
+    `, [req.params.examId, tenantId]);
 
     const exam = exams[0];
     const educationLevel = exam.education_level || 'lower_primary';
 
-    // Get all questions
     const questions = await query(
-      'SELECT * FROM exam_questions WHERE exam_id = $1',
-      [req.params.examId]
+      'SELECT * FROM exam_questions WHERE exam_id = $1 AND tenant_id = $2',
+      [req.params.examId, tenantId]
     );
 
-    // Get all answers for this attempt
     const answers = await query(
       'SELECT * FROM exam_attempt_answers WHERE attempt_id = $1',
       [attempt.id]
@@ -252,11 +264,9 @@ router.post('/:examId/submit', authenticate, async (req, res) => {
           marksAwarded = isCorrect ? (q.marks || 1) : 0;
         }
       }
-      // short_answer: manual grading (marksAwarded stays 0 until teacher grades)
 
       totalScore += marksAwarded;
 
-      // Update answer record
       if (answer) {
         await query(
           'UPDATE exam_attempt_answers SET is_correct=$1, marks_awarded=$2 WHERE id=$3',
@@ -280,7 +290,6 @@ router.post('/:examId/submit', authenticate, async (req, res) => {
     const cbcGrade = computeCBCGrade(percentage, educationLevel);
     const now = new Date();
 
-    // Update attempt
     await query(
       `UPDATE exam_attempts
        SET submitted_at=$1, total_score=$2, max_score=$3, cbc_grade=$4, status='submitted',
@@ -289,17 +298,17 @@ router.post('/:examId/submit', authenticate, async (req, res) => {
       [now, totalScore, maxScore, cbcGrade, attempt.id]
     );
 
-    // Insert into exam_results
+    // Upsert into exam_results
     const existingResult = await query(
-      'SELECT id FROM exam_results WHERE exam_id = $1 AND student_id = $2',
-      [req.params.examId, studentId]
+      'SELECT id FROM exam_results WHERE exam_id = $1 AND student_id = $2 AND tenant_id = $3',
+      [req.params.examId, studentId, tenantId]
     );
 
     if (existingResult.length === 0) {
       await query(
-        `INSERT INTO exam_results (id, exam_id, student_id, marks_obtained, max_marks, cbc_grade)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [uuidv4(), req.params.examId, studentId, totalScore, maxScore, cbcGrade]
+        `INSERT INTO exam_results (id, tenant_id, exam_id, student_id, marks_obtained, max_marks, cbc_grade)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [uuidv4(), tenantId, req.params.examId, studentId, totalScore, maxScore, cbcGrade]
       );
     } else {
       await query(
@@ -320,19 +329,26 @@ router.post('/:examId/submit', authenticate, async (req, res) => {
 });
 
 // GET /online-exams/:examId/results  [admin, teacher]
-router.get('/:examId/results', authenticate, async (req, res) => {
+router.get('/:examId/results', async (req, res) => {
   try {
     if (!['admin','teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const tenantId = req.tenantId;
+
+    // Verify exam belongs to this tenant
+    const examCheck = await query('SELECT id FROM exams WHERE id = $1 AND tenant_id = $2', [req.params.examId, tenantId]);
+    if (examCheck.length === 0) {
+      return res.status(404).json({ success: false, message: 'Exam not found' });
     }
 
     const results = await query(`
       SELECT ea.*, s.first_name, s.last_name, s.admission_number
       FROM exam_attempts ea
       JOIN students s ON s.id = ea.student_id
-      WHERE ea.exam_id = $1
+      WHERE ea.exam_id = $1 AND ea.tenant_id = $2
       ORDER BY ea.total_score DESC
-    `, [req.params.examId]);
+    `, [req.params.examId, tenantId]);
 
     res.json({ success: true, data: results });
   } catch (error) {
@@ -342,21 +358,25 @@ router.get('/:examId/results', authenticate, async (req, res) => {
 });
 
 // GET /online-exams/:examId/my-result  [student]
-router.get('/:examId/my-result', authenticate, async (req, res) => {
+router.get('/:examId/my-result', async (req, res) => {
   try {
     if (req.user.role !== 'student') {
       return res.status(403).json({ success: false, message: 'Students only' });
     }
+    const tenantId = req.tenantId;
 
-    const students = await query('SELECT id FROM students WHERE user_id = $1', [req.user.id]);
+    const students = await query(
+      'SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2',
+      [req.user.id, tenantId]
+    );
     if (students.length === 0) {
       return res.status(404).json({ success: false, message: 'Student record not found' });
     }
     const studentId = students[0].id;
 
     const attempts = await query(
-      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND status != 'in_progress'",
-      [req.params.examId, studentId]
+      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2 AND tenant_id = $3 AND status != 'in_progress'",
+      [req.params.examId, studentId, tenantId]
     );
 
     if (attempts.length === 0) {

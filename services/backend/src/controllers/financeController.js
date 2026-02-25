@@ -2,13 +2,13 @@
 import pool from '../config/database.js';
 
 // Helper function to generate unique numbers (standalone)
-async function generateNumber(prefix, table, column) {
+async function generateNumber(prefix, table, column, tenantId) {
   const result = await pool.query(`
     SELECT ${column} FROM ${table}
-    WHERE ${column} LIKE $1
+    WHERE ${column} LIKE $1 AND tenant_id = $2
     ORDER BY ${column} DESC
     LIMIT 1
-  `, [`${prefix}%`]);
+  `, [`${prefix}%`, tenantId]);
 
   if (result.rows.length === 0) {
     return `${prefix}00001`;
@@ -24,53 +24,55 @@ class FinanceController {
   // Dashboard
   async getDashboard(req, res) {
     try {
+      const tenantId = req.tenantId;
       const client = await pool.connect();
-      
+
       try {
         const currentYear = await client.query(`
-          SELECT * FROM financial_years 
-          WHERE is_active = true 
-          ORDER BY start_date DESC 
+          SELECT * FROM financial_years
+          WHERE is_active = true AND tenant_id = $1
+          ORDER BY start_date DESC
           LIMIT 1
-        `);
-        
+        `, [tenantId]);
+
         const financialYear = currentYear.rows[0];
-        
+
         const incomeResult = await client.query(`
-          SELECT 
+          SELECT
             COALESCE(SUM(total_amount), 0) as total,
-            COALESCE(SUM(CASE 
-              WHEN income_date >= date_trunc('month', CURRENT_DATE) 
-              THEN total_amount 
-              ELSE 0 
+            COALESCE(SUM(CASE
+              WHEN income_date >= date_trunc('month', CURRENT_DATE)
+              THEN total_amount
+              ELSE 0
             END), 0) as monthly
           FROM income_records
-          WHERE status = 'completed'
-        `);
-        
+          WHERE status = 'completed' AND tenant_id = $1
+        `, [tenantId]);
+
         const expenseResult = await client.query(`
-          SELECT 
+          SELECT
             COALESCE(SUM(total_amount), 0) as total,
-            COALESCE(SUM(CASE 
-              WHEN expense_date >= date_trunc('month', CURRENT_DATE) 
-              THEN total_amount 
-              ELSE 0 
+            COALESCE(SUM(CASE
+              WHEN expense_date >= date_trunc('month', CURRENT_DATE)
+              THEN total_amount
+              ELSE 0
             END), 0) as monthly,
             COUNT(CASE WHEN approval_status = 'pending' THEN 1 END) as pending_approvals
           FROM expense_records
-        `);
-        
+          WHERE tenant_id = $1
+        `, [tenantId]);
+
         const bankResult = await client.query(`
           SELECT COALESCE(SUM(current_balance), 0) as total
           FROM bank_accounts
-          WHERE is_active = true
-        `);
-        
+          WHERE is_active = true AND tenant_id = $1
+        `, [tenantId]);
+
         const totalIncome = parseFloat(incomeResult.rows[0].total);
         const totalExpenses = parseFloat(expenseResult.rows[0].total);
         const monthlyIncome = parseFloat(incomeResult.rows[0].monthly);
         const monthlyExpenses = parseFloat(expenseResult.rows[0].monthly);
-        
+
         res.json({
           totalIncome,
           totalExpenses,
@@ -93,10 +95,12 @@ class FinanceController {
 
   async getChartOfAccounts(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT * FROM chart_of_accounts 
+        SELECT * FROM chart_of_accounts
+        WHERE tenant_id = $1
         ORDER BY account_type, account_code
-      `);
+      `, [tenantId]);
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching chart of accounts:', error);
@@ -106,15 +110,16 @@ class FinanceController {
 
   async createAccount(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { account_code, account_name, account_type, parent_account_id, description } = req.body;
-      
+
       const result = await pool.query(`
         INSERT INTO chart_of_accounts (
-          account_code, account_name, account_type, parent_account_id, description, is_active
-        ) VALUES ($1, $2, $3, $4, $5, true)
+          tenant_id, account_code, account_name, account_type, parent_account_id, description, is_active
+        ) VALUES ($1, $2, $3, $4, $5, $6, true)
         RETURNING *
-      `, [account_code, account_name, account_type, parent_account_id, description]);
-      
+      `, [tenantId, account_code, account_name, account_type, parent_account_id, description]);
+
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating account:', error);
@@ -124,10 +129,12 @@ class FinanceController {
 
   async getFinancialYears(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT * FROM financial_years 
+        SELECT * FROM financial_years
+        WHERE tenant_id = $1
         ORDER BY start_date DESC
-      `);
+      `, [tenantId]);
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching financial years:', error);
@@ -137,14 +144,15 @@ class FinanceController {
 
   async createFinancialYear(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { year_name, start_date, end_date } = req.body;
-      
+
       const result = await pool.query(`
-        INSERT INTO financial_years (year_name, start_date, end_date, status, is_current, is_active)
-        VALUES ($1, $2, $3, 'draft', false, true)
+        INSERT INTO financial_years (tenant_id, year_name, start_date, end_date, status, is_current, is_active)
+        VALUES ($1, $2, $3, $4, 'draft', false, true)
         RETURNING *
-      `, [year_name, start_date, end_date]);
-      
+      `, [tenantId, year_name, start_date, end_date]);
+
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating financial year:', error);
@@ -154,40 +162,41 @@ class FinanceController {
 
   async getIncomeRecords(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { status, dateFrom, dateTo } = req.query;
-      
+
       let query = `
-        SELECT 
+        SELECT
           ir.*,
           coa.account_name,
           coa.account_code
         FROM income_records ir
         LEFT JOIN chart_of_accounts coa ON ir.account_id = coa.id
-        WHERE 1=1
+        WHERE ir.tenant_id = $1
       `;
-      const params = [];
-      let paramCount = 1;
-      
+      const params = [tenantId];
+      let paramCount = 2;
+
       if (status) {
         query += ` AND ir.status = $${paramCount}`;
         params.push(status);
         paramCount++;
       }
-      
+
       if (dateFrom) {
         query += ` AND ir.income_date >= $${paramCount}`;
         params.push(dateFrom);
         paramCount++;
       }
-      
+
       if (dateTo) {
         query += ` AND ir.income_date <= $${paramCount}`;
         params.push(dateTo);
         paramCount++;
       }
-      
+
       query += ` ORDER BY ir.income_date DESC`;
-      
+
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
@@ -198,6 +207,7 @@ class FinanceController {
 
   async createIncome(req, res) {
     try {
+      const tenantId = req.tenantId;
       const {
         transaction_date,
         account_id,
@@ -207,23 +217,24 @@ class FinanceController {
         reference_number,
         payment_method,
       } = req.body;
-      
+
       // Generate income number
-      const incomeNumber = await generateNumber('INC-', 'income_records', 'income_number');
-      
+      const incomeNumber = await generateNumber('INC-', 'income_records', 'income_number', tenantId);
+
       // Calculate VAT if not provided
       const vatRate = vat_amount ? 0 : 16;
       const finalVatAmount = vat_amount || (amount * 16 / 100);
       const totalAmount = parseFloat(amount) + parseFloat(finalVatAmount);
-      
+
       const result = await pool.query(`
         INSERT INTO income_records (
-          income_number, income_date, income_category, account_id, amount, vat_rate, vat_amount, total_amount,
+          tenant_id, income_number, income_date, income_category, account_id, amount, vat_rate, vat_amount, total_amount,
           description, payment_reference, payment_method,
           status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, 'Other Income', $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, NOW(), NOW())
+        ) VALUES ($1, $2, $3, 'Other Income', $4, $5, $6, $7, $8, $9, $10, $11, 'completed', $12, NOW(), NOW())
         RETURNING *
       `, [
+        tenantId,
         incomeNumber,
         transaction_date,
         account_id,
@@ -236,7 +247,7 @@ class FinanceController {
         payment_method,
         req.user.id,
       ]);
-      
+
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating income:', error);
@@ -246,10 +257,11 @@ class FinanceController {
 
   async getExpenseRecords(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { status, dateFrom, dateTo } = req.query;
-      
+
       let query = `
-        SELECT 
+        SELECT
           er.*,
           coa.account_name,
           coa.account_code,
@@ -257,31 +269,31 @@ class FinanceController {
         FROM expense_records er
         LEFT JOIN chart_of_accounts coa ON er.account_id = coa.id
         LEFT JOIN vendors v ON er.vendor_id = v.id
-        WHERE 1=1
+        WHERE er.tenant_id = $1
       `;
-      const params = [];
-      let paramCount = 1;
-      
+      const params = [tenantId];
+      let paramCount = 2;
+
       if (status) {
         query += ` AND er.status = $${paramCount}`;
         params.push(status);
         paramCount++;
       }
-      
+
       if (dateFrom) {
         query += ` AND er.expense_date >= $${paramCount}`;
         params.push(dateFrom);
         paramCount++;
       }
-      
+
       if (dateTo) {
         query += ` AND er.expense_date <= $${paramCount}`;
         params.push(dateTo);
         paramCount++;
       }
-      
+
       query += ` ORDER BY er.expense_date DESC`;
-      
+
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
@@ -292,6 +304,7 @@ class FinanceController {
 
   async createExpense(req, res) {
     try {
+      const tenantId = req.tenantId;
       const {
         transaction_date,
         account_id,
@@ -302,33 +315,34 @@ class FinanceController {
         reference_number,
         payment_method,
       } = req.body;
-      
+
       // Generate expense number
-      const expenseNumber = await generateNumber('EXP-', 'expense_records', 'expense_number');
-      
+      const expenseNumber = await generateNumber('EXP-', 'expense_records', 'expense_number', tenantId);
+
       // Calculate VAT and total
       const vatRate = vat_amount ? 0 : 16;
       const finalVatAmount = vat_amount || (amount * 16 / 100);
       const totalAmount = parseFloat(amount) + parseFloat(finalVatAmount);
-      
+
       // Check if approval required
       const settingsResult = await pool.query(`
-        SELECT setting_value FROM finance_settings 
-        WHERE setting_key = 'expense_approval_threshold'
-      `);
-      
+        SELECT setting_value FROM finance_settings
+        WHERE setting_key = 'expense_approval_threshold' AND tenant_id = $1
+      `, [tenantId]);
+
       const threshold = settingsResult.rows[0]?.setting_value || 10000;
       const approvalStatus = amount >= threshold ? 'pending' : 'approved';
       const status = 'pending';
-      
+
       const result = await pool.query(`
         INSERT INTO expense_records (
-          expense_number, expense_date, expense_category, account_id, vendor_id, amount, vat_rate, vat_amount, total_amount,
+          tenant_id, expense_number, expense_date, expense_category, account_id, vendor_id, amount, vat_rate, vat_amount, total_amount,
           description, payment_reference, payment_method,
           approval_status, status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, 'General Expense', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+        ) VALUES ($1, $2, $3, 'General Expense', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
         RETURNING *
       `, [
+        tenantId,
         expenseNumber,
         transaction_date,
         account_id,
@@ -344,7 +358,7 @@ class FinanceController {
         status,
         req.user.id,
       ]);
-      
+
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating expense:', error);
@@ -354,22 +368,23 @@ class FinanceController {
 
   async approveExpense(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const result = await pool.query(`
         UPDATE expense_records
-        SET status = 'paid', 
+        SET status = 'paid',
             approved_by = $1,
             approved_at = NOW(),
             updated_at = NOW()
-        WHERE id = $2 AND status = 'pending'
+        WHERE id = $2 AND tenant_id = $3 AND status = 'pending'
         RETURNING *
-      `, [req.user.id, id]);
-      
+      `, [req.user.id, id, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Expense not found or already processed' });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error approving expense:', error);
@@ -379,24 +394,25 @@ class FinanceController {
 
   async rejectExpense(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
       const { reason } = req.body;
-      
+
       const result = await pool.query(`
-        UPDATE expense_records 
+        UPDATE expense_records
         SET approval_status = 'rejected',
-            status = 'rejected', 
+            status = 'rejected',
             approved_by = $1,
             approved_at = NOW(),
             updated_at = NOW()
-        WHERE id = $2 AND approval_status = 'pending'
+        WHERE id = $2 AND tenant_id = $3 AND approval_status = 'pending'
         RETURNING *
-      `, [req.user.id, id]);
-      
+      `, [req.user.id, id, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Expense not found or already processed' });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error rejecting expense:', error);
@@ -406,21 +422,22 @@ class FinanceController {
 
   async payExpense(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const result = await pool.query(`
-        UPDATE expense_records 
+        UPDATE expense_records
         SET status = 'paid',
             paid_at = NOW(),
             updated_at = NOW()
-        WHERE id = $1 AND status = 'pending'
+        WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
         RETURNING *
-      `, [id]);
-      
+      `, [id, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Expense not found or not approved' });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error marking expense as paid:', error);
@@ -430,10 +447,12 @@ class FinanceController {
 
   async getVendors(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT * FROM vendors 
+        SELECT * FROM vendors
+        WHERE tenant_id = $1
         ORDER BY vendor_name
-      `);
+      `, [tenantId]);
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching vendors:', error);
@@ -443,6 +462,7 @@ class FinanceController {
 
   async createVendor(req, res) {
     try {
+      const tenantId = req.tenantId;
       const {
         vendor_name,
         contact_person,
@@ -451,17 +471,17 @@ class FinanceController {
         address,
         tax_id,
       } = req.body;
-      
+
       // Generate vendor code
-      const vendorCode = await generateNumber('VEN-', 'vendors', 'vendor_code');
-      
+      const vendorCode = await generateNumber('VEN-', 'vendors', 'vendor_code', tenantId);
+
       const result = await pool.query(`
         INSERT INTO vendors (
-          vendor_code, vendor_name, contact_person, email, phone, address, kra_pin, is_active, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, NOW(), NOW())
+          tenant_id, vendor_code, vendor_name, contact_person, email, phone, address, kra_pin, is_active, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, NOW(), NOW())
         RETURNING *
-      `, [vendorCode, vendor_name, contact_person, email, phone, address, tax_id, req.user.id]);
-      
+      `, [tenantId, vendorCode, vendor_name, contact_person, email, phone, address, tax_id, req.user.id]);
+
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating vendor:', error);
@@ -471,10 +491,12 @@ class FinanceController {
 
   async getBankAccounts(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT * FROM bank_accounts 
+        SELECT * FROM bank_accounts
+        WHERE tenant_id = $1
         ORDER BY account_name
-      `);
+      `, [tenantId]);
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching bank accounts:', error);
@@ -484,6 +506,7 @@ class FinanceController {
 
   async createBankAccount(req, res) {
     try {
+      const tenantId = req.tenantId;
       const {
         account_name,
         account_number,
@@ -493,14 +516,15 @@ class FinanceController {
         currency,
         current_balance,
       } = req.body;
-      
+
       const result = await pool.query(`
         INSERT INTO bank_accounts (
-          account_name, account_number, bank_name, branch,
+          tenant_id, account_name, account_number, bank_name, branch,
           account_type, currency, current_balance, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
         RETURNING *
       `, [
+        tenantId,
         account_name,
         account_number,
         bank_name,
@@ -509,7 +533,7 @@ class FinanceController {
         currency || 'KES',
         current_balance || 0,
       ]);
-      
+
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating bank account:', error);
@@ -519,39 +543,40 @@ class FinanceController {
 
   async getPettyCash(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { dateFrom, dateTo, transaction_type } = req.query;
-      
+
       let query = `
-        SELECT 
+        SELECT
           pc.*,
           u.email as created_by_name
         FROM petty_cash pc
         LEFT JOIN users u ON pc.created_by = u.id
-        WHERE 1=1
+        WHERE pc.tenant_id = $1
       `;
-      const params = [];
-      let paramCount = 1;
-      
+      const params = [tenantId];
+      let paramCount = 2;
+
       if (transaction_type) {
         query += ` AND pc.transaction_type = $${paramCount}`;
         params.push(transaction_type);
         paramCount++;
       }
-      
+
       if (dateFrom) {
         query += ` AND pc.transaction_date >= $${paramCount}`;
         params.push(dateFrom);
         paramCount++;
       }
-      
+
       if (dateTo) {
         query += ` AND pc.transaction_date <= $${paramCount}`;
         params.push(dateTo);
         paramCount++;
       }
-      
+
       query += ` ORDER BY pc.transaction_date DESC, pc.created_at DESC`;
-      
+
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
@@ -562,6 +587,7 @@ class FinanceController {
 
   async createPettyCash(req, res) {
     try {
+      const tenantId = req.tenantId;
       const {
         transaction_date,
         transaction_type: raw_transaction_type,
@@ -575,31 +601,33 @@ class FinanceController {
       // Map frontend transaction_type to database constraint
       const transaction_type = raw_transaction_type === 'disbursement' ? 'expense' : raw_transaction_type;
 
-      // Get current balance
+      // Get current balance (scoped to tenant)
       const balanceResult = await pool.query(`
-        SELECT COALESCE(SUM(CASE 
-          WHEN transaction_type = 'replenishment' THEN amount 
-          ELSE -amount 
+        SELECT COALESCE(SUM(CASE
+          WHEN transaction_type = 'replenishment' THEN amount
+          ELSE -amount
         END), 0) as current_balance
         FROM petty_cash
-      `);
-      
+        WHERE tenant_id = $1
+      `, [tenantId]);
+
       const balance_before = parseFloat(balanceResult.rows[0].current_balance);
-      const balance_after = transaction_type === 'replenishment' 
+      const balance_after = transaction_type === 'replenishment'
         ? balance_before + parseFloat(amount)
         : balance_before - parseFloat(amount);
 
       // Generate transaction number
-      const transactionNumber = await generateNumber('PC-', 'petty_cash', 'transaction_number');
+      const transactionNumber = await generateNumber('PC-', 'petty_cash', 'transaction_number', tenantId);
 
       const result = await pool.query(`
         INSERT INTO petty_cash (
-          transaction_number, transaction_date, transaction_type, amount, 
+          tenant_id, transaction_number, transaction_date, transaction_type, amount,
           balance_before, balance_after, description,
           payee_name, receipt_number, category, created_by, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
         RETURNING *
       `, [
+        tenantId,
         transactionNumber,
         transaction_date,
         transaction_type,
@@ -622,34 +650,36 @@ class FinanceController {
 
   async getPettyCashSummary(req, res) {
     try {
+      const tenantId = req.tenantId;
       const summary = await pool.query(`
-        SELECT 
+        SELECT
           COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE 0 END), 0) as total_replenished,
           COALESCE(SUM(CASE WHEN transaction_type = 'disbursement' THEN amount ELSE 0 END), 0) as total_disbursed,
           COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) as current_balance,
-          COALESCE(SUM(CASE 
-            WHEN transaction_type = 'disbursement' 
+          COALESCE(SUM(CASE
+            WHEN transaction_type = 'disbursement'
             AND transaction_date >= date_trunc('month', CURRENT_DATE)
-            THEN amount ELSE 0 
+            THEN amount ELSE 0
           END), 0) as monthly_disbursed,
-          COALESCE(SUM(CASE 
-            WHEN transaction_type = 'replenishment' 
+          COALESCE(SUM(CASE
+            WHEN transaction_type = 'replenishment'
             AND transaction_date >= date_trunc('month', CURRENT_DATE)
-            THEN amount ELSE 0 
+            THEN amount ELSE 0
           END), 0) as monthly_replenished
         FROM petty_cash
-      `);
-      
+        WHERE tenant_id = $1
+      `, [tenantId]);
+
       const custodians = await pool.query(`
-        SELECT 
+        SELECT
           payee_name as custodian,
           COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) as balance
         FROM petty_cash
-        WHERE payee_name IS NOT NULL
+        WHERE payee_name IS NOT NULL AND tenant_id = $1
         GROUP BY payee_name
         HAVING COALESCE(SUM(CASE WHEN transaction_type = 'replenishment' THEN amount ELSE -amount END), 0) > 0
-      `);
-      
+      `, [tenantId]);
+
       res.json({
         ...summary.rows[0],
         custodians: custodians.rows,
@@ -662,18 +692,19 @@ class FinanceController {
 
   async deletePettyCash(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      
+
       const result = await pool.query(`
-        DELETE FROM petty_cash 
-        WHERE id = $1
+        DELETE FROM petty_cash
+        WHERE id = $1 AND tenant_id = $2
         RETURNING *
-      `, [id]);
-      
+      `, [id, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Transaction not found' });
       }
-      
+
       res.json({ message: 'Transaction deleted successfully' });
     } catch (error) {
       console.error('Error deleting petty cash transaction:', error);
@@ -684,7 +715,11 @@ class FinanceController {
   // Assets
   async getAssets(req, res) {
     try {
-      const result = await pool.query(`SELECT * FROM assets ORDER BY purchase_date DESC`);
+      const tenantId = req.tenantId;
+      const result = await pool.query(
+        `SELECT * FROM assets WHERE tenant_id = $1 ORDER BY purchase_date DESC`,
+        [tenantId]
+      );
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching assets:', error);
@@ -694,18 +729,20 @@ class FinanceController {
 
   async createAsset(req, res) {
     try {
+      const tenantId = req.tenantId;
       const data = req.body;
-      
+
       // Generate asset code
-      const asset_code = await generateNumber('AST-', 'assets', 'asset_code');
-      
+      const asset_code = await generateNumber('AST-', 'assets', 'asset_code', tenantId);
+
       const result = await pool.query(`
         INSERT INTO assets (
-          asset_code, asset_name, asset_category, purchase_date, purchase_cost,
+          tenant_id, asset_code, asset_name, asset_category, purchase_date, purchase_cost,
           current_value, location, status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
         RETURNING *
       `, [
+        tenantId,
         asset_code,
         data.asset_name,
         data.category || data.asset_category,
@@ -726,26 +763,27 @@ class FinanceController {
 
   async updateAsset(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
       const data = req.body;
-      
+
       const result = await pool.query(`
-        UPDATE assets 
-        SET 
+        UPDATE assets
+        SET
           asset_name = COALESCE($1, asset_name),
           asset_category = COALESCE($2, asset_category),
           current_value = COALESCE($3, current_value),
           location = COALESCE($4, location),
           status = COALESCE($5, status),
           updated_at = NOW()
-        WHERE id = $6
+        WHERE id = $6 AND tenant_id = $7
         RETURNING *
-      `, [data.asset_name, data.category, data.current_value, data.location, data.status, id]);
-      
+      `, [data.asset_name, data.category, data.current_value, data.location, data.status, id, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Asset not found' });
       }
-      
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error updating asset:', error);
@@ -755,13 +793,17 @@ class FinanceController {
 
   async deleteAsset(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
-      const result = await pool.query(`DELETE FROM assets WHERE id = $1 RETURNING *`, [id]);
-      
+      const result = await pool.query(
+        `DELETE FROM assets WHERE id = $1 AND tenant_id = $2 RETURNING *`,
+        [id, tenantId]
+      );
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Asset not found' });
       }
-      
+
       res.json({ message: 'Asset deleted successfully' });
     } catch (error) {
       console.error('Error deleting asset:', error);
@@ -771,26 +813,28 @@ class FinanceController {
 
   async getAssetsSummary(req, res) {
     try {
+      const tenantId = req.tenantId;
       const summary = await pool.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_assets,
           COALESCE(SUM(purchase_cost), 0) as total_purchase_cost,
           COALESCE(SUM(current_value), 0) as total_current_value,
           COALESCE(SUM(purchase_cost - current_value), 0) as total_depreciation
         FROM assets
-      `);
-      
+        WHERE tenant_id = $1
+      `, [tenantId]);
+
       const byCategory = await pool.query(`
-        SELECT 
+        SELECT
           category,
           COUNT(*) as count,
           COALESCE(SUM(current_value), 0) as total_value
         FROM assets
-        WHERE status = 'active'
+        WHERE status = 'active' AND tenant_id = $1
         GROUP BY category
         ORDER BY total_value DESC
-      `);
-      
+      `, [tenantId]);
+
       res.json({
         ...summary.rows[0],
         by_category: byCategory.rows,
@@ -804,17 +848,18 @@ class FinanceController {
   // Reports
   async getIncomeByCategory(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT 
+        SELECT
           coa.account_name as category,
           COALESCE(SUM(ir.total_amount), 0) as total
         FROM income_records ir
         JOIN chart_of_accounts coa ON ir.account_id = coa.id
-        WHERE ir.status = 'completed'
+        WHERE ir.status = 'completed' AND ir.tenant_id = $1
         GROUP BY coa.account_name
         ORDER BY total DESC
-      `);
-      
+      `, [tenantId]);
+
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching income by category:', error);
@@ -824,17 +869,18 @@ class FinanceController {
 
   async getExpensesByCategory(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT 
+        SELECT
           coa.account_name as category,
           COALESCE(SUM(er.total_amount), 0) as total
         FROM expense_records er
         JOIN chart_of_accounts coa ON er.account_id = coa.id
-        WHERE er.status IN ('approved', 'paid')
+        WHERE er.status IN ('approved', 'paid') AND er.tenant_id = $1
         GROUP BY coa.account_name
         ORDER BY total DESC
-      `);
-      
+      `, [tenantId]);
+
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching expenses by category:', error);
@@ -845,11 +891,13 @@ class FinanceController {
   // Settings
   async getSettings(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT * FROM finance_settings 
+        SELECT * FROM finance_settings
+        WHERE tenant_id = $1
         ORDER BY setting_key
-      `);
-      
+      `, [tenantId]);
+
       const settings = {};
       result.rows.forEach(row => {
         settings[row.setting_key] = {
@@ -858,7 +906,7 @@ class FinanceController {
           description: row.description,
         };
       });
-      
+
       res.json(settings);
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -868,16 +916,17 @@ class FinanceController {
 
   async updateSetting(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { key } = req.params;
       const { value } = req.body;
-      
+
       const result = await pool.query(`
-        UPDATE finance_settings 
+        UPDATE finance_settings
         SET setting_value = $1, updated_at = NOW(), updated_by = $2
-        WHERE setting_key = $3
+        WHERE setting_key = $3 AND tenant_id = $4
         RETURNING *
-      `, [value, req.user.id, key]);
-      
+      `, [value, req.user.id, key, tenantId]);
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Setting not found' });
       }
@@ -886,7 +935,7 @@ class FinanceController {
       res.status(500).json({ error: 'Failed to update setting' });
     }
   }
-      
+
 
   // ==================
   // FEE COLLECTION INTEGRATION
@@ -894,10 +943,12 @@ class FinanceController {
 
   async getFeeCollectionSummary(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
         SELECT * FROM v_fee_collection_summary
-      `);
-      
+        WHERE tenant_id = $1
+      `, [tenantId]);
+
       res.json(result.rows[0] || {
         total_invoices: 0,
         total_students: 0,
@@ -918,21 +969,23 @@ class FinanceController {
 
   async getFeeCollectionByMonth(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { year } = req.query;
       const targetYear = year || new Date().getFullYear();
-      
+
       const result = await pool.query(`
-        SELECT 
+        SELECT
           TO_CHAR(income_date, 'YYYY-MM') as month,
           COUNT(*) as payment_count,
           SUM(total_amount) as total_collected
         FROM income_records
         WHERE income_category = 'Student Fees'
         AND EXTRACT(YEAR FROM income_date) = $1
+        AND tenant_id = $2
         GROUP BY TO_CHAR(income_date, 'YYYY-MM')
         ORDER BY month
-      `, [targetYear]);
-      
+      `, [targetYear, tenantId]);
+
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching fee collection by month:', error);
@@ -942,8 +995,9 @@ class FinanceController {
 
   async getFeeCollectionByClass(req, res) {
     try {
+      const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT 
+        SELECT
           c.name as class_name,
           COUNT(DISTINCT fi.student_id) as student_count,
           COUNT(fi.id) as invoice_count,
@@ -951,20 +1005,21 @@ class FinanceController {
           COALESCE(SUM(fi.paid_amount), 0) as total_collected,
           COALESCE(SUM(fi.balance_amount), 0) as outstanding,
           ROUND(
-            CASE 
-              WHEN SUM(fi.total_amount) > 0 
-              THEN (SUM(fi.paid_amount) / SUM(fi.total_amount) * 100) 
-              ELSE 0 
-            END, 
+            CASE
+              WHEN SUM(fi.total_amount) > 0
+              THEN (SUM(fi.paid_amount) / SUM(fi.total_amount) * 100)
+              ELSE 0
+            END,
             2
           ) as collection_rate
         FROM fee_invoices fi
         JOIN students s ON fi.student_id = s.id
         JOIN classes c ON s.class_id = c.id
+        WHERE fi.tenant_id = $1
         GROUP BY c.id, c.name
         ORDER BY total_collected DESC
-      `);
-      
+      `, [tenantId]);
+
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching fee collection by class:', error);
@@ -974,11 +1029,12 @@ class FinanceController {
 
   async getFeeDefaulters(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { minBalance } = req.query;
       const minimumBalance = minBalance || 1000;
-      
+
       const result = await pool.query(`
-        SELECT 
+        SELECT
           fi.id,
           fi.invoice_number,
           fi.student_id,
@@ -989,7 +1045,7 @@ class FinanceController {
           fi.paid_amount,
           fi.balance_amount,
           fi.due_date,
-          CASE 
+          CASE
             WHEN fi.due_date < CURRENT_DATE THEN 'overdue'
             WHEN fi.due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'due_soon'
             ELSE 'current'
@@ -999,9 +1055,10 @@ class FinanceController {
         JOIN classes c ON s.class_id = c.id
         WHERE fi.balance_amount >= $1
         AND fi.status IN ('pending', 'partial', 'overdue')
+        AND fi.tenant_id = $2
         ORDER BY fi.balance_amount DESC, fi.due_date ASC
-      `, [minimumBalance]);
-      
+      `, [minimumBalance, tenantId]);
+
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching fee defaulters:', error);
@@ -1012,6 +1069,7 @@ class FinanceController {
   // Bank Account Management
   async updateBankAccount(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
       const { account_name, account_number, bank_name, branch, account_type, currency, current_balance } = req.body;
 
@@ -1026,9 +1084,9 @@ class FinanceController {
           currency = COALESCE($6, currency),
           current_balance = COALESCE($7, current_balance),
           updated_at = NOW()
-        WHERE id = $8
+        WHERE id = $8 AND tenant_id = $9
         RETURNING *
-      `, [account_name, account_number, bank_name, branch, account_type, currency, current_balance, id]);
+      `, [account_name, account_number, bank_name, branch, account_type, currency, current_balance, id, tenantId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Bank account not found' });
@@ -1043,13 +1101,14 @@ class FinanceController {
 
   async deleteBankAccount(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
 
       const result = await pool.query(`
         DELETE FROM bank_accounts
-        WHERE id = $1
+        WHERE id = $1 AND tenant_id = $2
         RETURNING *
-      `, [id]);
+      `, [id, tenantId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Bank account not found' });
@@ -1064,6 +1123,7 @@ class FinanceController {
 
   async createBankTransaction(req, res) {
     try {
+      const tenantId = req.tenantId;
       const {
         account_id,
         to_account_id,
@@ -1080,17 +1140,18 @@ class FinanceController {
         await client.query('BEGIN');
 
         // Generate transaction number
-        const transactionNumber = await generateNumber('BTX-', 'bank_transactions', 'transaction_number');
+        const transactionNumber = await generateNumber('BTX-', 'bank_transactions', 'transaction_number', tenantId);
 
         // Create transaction record
         const transaction = await client.query(`
           INSERT INTO bank_transactions (
-            transaction_number, account_id, to_account_id, transaction_type,
+            tenant_id, transaction_number, account_id, to_account_id, transaction_type,
             amount, description, transaction_date, reference_number,
             created_by, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
           RETURNING *
         `, [
+          tenantId,
           transactionNumber,
           account_id,
           to_account_id || null,
@@ -1102,33 +1163,33 @@ class FinanceController {
           req.user.id,
         ]);
 
-        // Update account balances
+        // Update account balances (scoped to tenant for safety)
         if (transaction_type === 'deposit') {
           await client.query(`
             UPDATE bank_accounts
             SET current_balance = current_balance + $1
-            WHERE id = $2
-          `, [amount, account_id]);
+            WHERE id = $2 AND tenant_id = $3
+          `, [amount, account_id, tenantId]);
         } else if (transaction_type === 'withdrawal') {
           await client.query(`
             UPDATE bank_accounts
             SET current_balance = current_balance - $1
-            WHERE id = $2
-          `, [amount, account_id]);
+            WHERE id = $2 AND tenant_id = $3
+          `, [amount, account_id, tenantId]);
         } else if (transaction_type === 'transfer') {
           // Deduct from source account
           await client.query(`
             UPDATE bank_accounts
             SET current_balance = current_balance - $1
-            WHERE id = $2
-          `, [amount, account_id]);
+            WHERE id = $2 AND tenant_id = $3
+          `, [amount, account_id, tenantId]);
 
           // Add to destination account
           await client.query(`
             UPDATE bank_accounts
             SET current_balance = current_balance + $1
-            WHERE id = $2
-          `, [amount, to_account_id]);
+            WHERE id = $2 AND tenant_id = $3
+          `, [amount, to_account_id, tenantId]);
         }
 
         await client.query('COMMIT');
@@ -1147,6 +1208,7 @@ class FinanceController {
 
   async getBankTransactions(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { accountId } = req.query;
 
       let query = `
@@ -1161,12 +1223,12 @@ class FinanceController {
         LEFT JOIN bank_accounts ba1 ON bt.account_id = ba1.id
         LEFT JOIN bank_accounts ba2 ON bt.to_account_id = ba2.id
         LEFT JOIN users u ON bt.created_by = u.id
-        WHERE 1=1
+        WHERE bt.tenant_id = $1
       `;
 
-      const params = [];
+      const params = [tenantId];
       if (accountId) {
-        query += ` AND (bt.account_id = $1 OR bt.to_account_id = $1)`;
+        query += ` AND (bt.account_id = $2 OR bt.to_account_id = $2)`;
         params.push(accountId);
       }
 

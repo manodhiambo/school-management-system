@@ -5,7 +5,7 @@ import ApiResponse from '../utils/ApiResponse.js';
 class AcademicController {
   // ==================== SUBJECTS ====================
   createSubject = asyncHandler(async (req, res) => {
-    const subject = await academicService.createSubject(req.body);
+    const subject = await academicService.createSubject(req.body, req.tenantId);
     res.status(201).json(new ApiResponse(201, subject, 'Subject created successfully'));
   });
 
@@ -15,28 +15,28 @@ class AcademicController {
       isActive: req.query.isActive === 'true',
       search: req.query.search
     };
-    const subjects = await academicService.getSubjects(filters);
+    const subjects = await academicService.getSubjects(filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, subjects, 'Subjects retrieved successfully'));
   });
 
   getSubjectById = asyncHandler(async (req, res) => {
-    const subject = await academicService.getSubjectById(req.params.id);
+    const subject = await academicService.getSubjectById(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, subject, 'Subject retrieved successfully'));
   });
 
   updateSubject = asyncHandler(async (req, res) => {
-    const subject = await academicService.updateSubject(req.params.id, req.body);
+    const subject = await academicService.updateSubject(req.params.id, req.body, req.tenantId);
     res.status(200).json(new ApiResponse(200, subject, 'Subject updated successfully'));
   });
 
   deleteSubject = asyncHandler(async (req, res) => {
-    const result = await academicService.deleteSubject(req.params.id);
+    const result = await academicService.deleteSubject(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Subject deleted successfully'));
   });
 
   // ==================== CLASSES ====================
   createClass = asyncHandler(async (req, res) => {
-    const classData = await academicService.createClass(req.body);
+    const classData = await academicService.createClass(req.body, req.tenantId);
     res.status(201).json(new ApiResponse(201, classData, 'Class created successfully'));
   });
 
@@ -46,34 +46,34 @@ class AcademicController {
       isActive: req.query.isActive === 'true',
       classTeacherId: req.query.classTeacherId
     };
-    const classes = await academicService.getClasses(filters);
+    const classes = await academicService.getClasses(filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, classes, 'Classes retrieved successfully'));
   });
 
   getClassById = asyncHandler(async (req, res) => {
-    const classData = await academicService.getClassById(req.params.id);
+    const classData = await academicService.getClassById(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, classData, 'Class retrieved successfully'));
   });
 
   updateClass = asyncHandler(async (req, res) => {
-    const classData = await academicService.updateClass(req.params.id, req.body);
+    const classData = await academicService.updateClass(req.params.id, req.body, req.tenantId);
     res.status(200).json(new ApiResponse(200, classData, 'Class updated successfully'));
   });
 
   assignSubjectToClass = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { subjectId, teacherId, isOptional, weeklyHours, passingMarks, maxMarks } = req.body;
-    
+
     const classData = await academicService.assignSubjectToClass(
-      id, subjectId, teacherId, isOptional, weeklyHours, passingMarks, maxMarks
+      id, subjectId, teacherId, isOptional, weeklyHours, passingMarks, maxMarks, req.tenantId
     );
-    
+
     res.status(200).json(new ApiResponse(200, classData, 'Subject assigned to class successfully'));
   });
 
   removeSubjectFromClass = asyncHandler(async (req, res) => {
     const { id, subjectId } = req.params;
-    const result = await academicService.removeSubjectFromClass(id, subjectId);
+    const result = await academicService.removeSubjectFromClass(id, subjectId, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Subject removed from class successfully'));
   });
 
@@ -83,7 +83,7 @@ class AcademicController {
       ...req.body,
       createdBy: req.user.id
     };
-    const exam = await academicService.createExam(examData);
+    const exam = await academicService.createExam(examData, req.tenantId);
     res.status(201).json(new ApiResponse(201, exam, 'Exam created successfully'));
   });
 
@@ -94,22 +94,22 @@ class AcademicController {
       classId: req.query.classId,
       isResultsPublished: req.query.isResultsPublished === 'true'
     };
-    const exams = await academicService.getExams(filters);
+    const exams = await academicService.getExams(filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, exams, 'Exams retrieved successfully'));
   });
 
   getExamById = asyncHandler(async (req, res) => {
-    const exam = await academicService.getExamById(req.params.id);
+    const exam = await academicService.getExamById(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, exam, 'Exam retrieved successfully'));
   });
 
   updateExam = asyncHandler(async (req, res) => {
-    const exam = await academicService.updateExam(req.params.id, req.body);
+    const exam = await academicService.updateExam(req.params.id, req.body, req.tenantId);
     res.status(200).json(new ApiResponse(200, exam, 'Exam updated successfully'));
   });
 
   deleteExam = asyncHandler(async (req, res) => {
-    const result = await academicService.deleteExam(req.params.id);
+    const result = await academicService.deleteExam(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Exam deleted successfully'));
   });
 
@@ -119,13 +119,13 @@ class AcademicController {
       ...req.body,
       teacherId: req.user.id
     };
-    const result = await academicService.enterResult(resultData);
+    const result = await academicService.enterResult(resultData, req.tenantId);
     res.status(201).json(new ApiResponse(201, result, 'Result entered successfully'));
   });
 
   bulkEnterResults = asyncHandler(async (req, res) => {
     const { examId, results } = req.body;
-    const result = await academicService.bulkEnterResults(examId, results, req.user.id);
+    const result = await academicService.bulkEnterResults(examId, results, req.user.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Bulk results entered'));
   });
 
@@ -135,17 +135,17 @@ class AcademicController {
       studentId: req.query.studentId,
       subjectId: req.query.subjectId
     };
-    const results = await academicService.getExamResults(examId, filters);
+    const results = await academicService.getExamResults(examId, filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, results, 'Exam results retrieved successfully'));
   });
 
   publishResults = asyncHandler(async (req, res) => {
-    const result = await academicService.publishResults(req.params.examId);
+    const result = await academicService.publishResults(req.params.examId, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Results published successfully'));
   });
 
   unpublishResults = asyncHandler(async (req, res) => {
-    const result = await academicService.unpublishResults(req.params.examId);
+    const result = await academicService.unpublishResults(req.params.examId, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Results unpublished successfully'));
   });
 
@@ -155,7 +155,7 @@ class AcademicController {
       ...req.body,
       teacherId: req.user.id
     };
-    const entry = await academicService.createGradebookEntry(entryData);
+    const entry = await academicService.createGradebookEntry(entryData, req.tenantId);
     res.status(201).json(new ApiResponse(201, entry, 'Gradebook entry created successfully'));
   });
 
@@ -168,37 +168,37 @@ class AcademicController {
       startDate: req.query.startDate,
       endDate: req.query.endDate
     };
-    const entries = await academicService.getGradebookEntries(filters);
+    const entries = await academicService.getGradebookEntries(filters, req.tenantId);
     res.status(200).json(new ApiResponse(200, entries, 'Gradebook entries retrieved successfully'));
   });
 
   updateGradebookEntry = asyncHandler(async (req, res) => {
-    const entry = await academicService.updateGradebookEntry(req.params.id, req.body);
+    const entry = await academicService.updateGradebookEntry(req.params.id, req.body, req.tenantId);
     res.status(200).json(new ApiResponse(200, entry, 'Gradebook entry updated successfully'));
   });
 
   deleteGradebookEntry = asyncHandler(async (req, res) => {
-    const result = await academicService.deleteGradebookEntry(req.params.id);
+    const result = await academicService.deleteGradebookEntry(req.params.id, req.tenantId);
     res.status(200).json(new ApiResponse(200, result, 'Gradebook entry deleted successfully'));
   });
 
   // ==================== REPORTS ====================
   generateStudentReportCard = asyncHandler(async (req, res) => {
     const { studentId, examId } = req.params;
-    const reportCard = await academicService.generateStudentReportCard(studentId, examId);
+    const reportCard = await academicService.generateStudentReportCard(studentId, examId, req.tenantId);
     res.status(200).json(new ApiResponse(200, reportCard, 'Report card generated successfully'));
   });
 
   getClassPerformanceReport = asyncHandler(async (req, res) => {
     const { classId, examId } = req.params;
-    const report = await academicService.getClassPerformanceReport(classId, examId);
+    const report = await academicService.getClassPerformanceReport(classId, examId, req.tenantId);
     res.status(200).json(new ApiResponse(200, report, 'Class performance report generated successfully'));
   });
 
   getSubjectWisePerformance = asyncHandler(async (req, res) => {
     const { examId } = req.params;
     const { classId } = req.query;
-    const report = await academicService.getSubjectWisePerformance(examId, classId);
+    const report = await academicService.getSubjectWisePerformance(examId, classId, req.tenantId);
     res.status(200).json(new ApiResponse(200, report, 'Subject-wise performance retrieved successfully'));
   });
 }

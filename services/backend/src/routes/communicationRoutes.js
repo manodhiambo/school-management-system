@@ -1,6 +1,7 @@
 import express from 'express';
 import communicationController from '../controllers/communicationController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { validateRequest, schemas } from '../utils/validators.js';
 import Joi from 'joi';
@@ -8,6 +9,8 @@ import Joi from 'joi';
 const router = express.Router();
 
 router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
 
 // Validation schemas
 const sendMessageSchema = Joi.object({

@@ -1,13 +1,14 @@
 import pool from '../config/database.js';
 
-// Helper to generate PO number
-async function generatePONumber() {
+// Helper to generate PO number scoped to a tenant
+async function generatePONumber(tenantId) {
   const result = await pool.query(`
     SELECT po_number FROM purchase_orders
     WHERE po_number LIKE 'PO-%'
+    AND tenant_id = $1
     ORDER BY po_number DESC
     LIMIT 1
-  `);
+  `, [tenantId]);
 
   if (result.rows.length === 0) {
     return 'PO-00001';
@@ -21,27 +22,28 @@ async function generatePONumber() {
 class PurchaseOrderController {
   async getPurchaseOrders(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { status } = req.query;
-      
+
       let query = `
-        SELECT 
+        SELECT
           po.*,
           v.vendor_name,
           u.email as created_by_name
         FROM purchase_orders po
-        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN vendors v ON po.vendor_id = v.id AND v.tenant_id = $1
         LEFT JOIN users u ON po.created_by = u.id
-        WHERE 1=1
+        WHERE po.tenant_id = $1
       `;
-      
-      const params = [];
+
+      const params = [tenantId];
       if (status) {
-        query += ` AND po.status = $1`;
         params.push(status);
+        query += ` AND po.status = $${params.length}`;
       }
-      
+
       query += ` ORDER BY po.created_at DESC`;
-      
+
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
@@ -52,6 +54,7 @@ class PurchaseOrderController {
 
   async createPurchaseOrder(req, res) {
     try {
+      const tenantId = req.tenantId;
       const {
         vendor_id,
         po_date,
@@ -63,19 +66,19 @@ class PurchaseOrderController {
         notes
       } = req.body;
 
-      const po_number = await generatePONumber();
+      const po_number = await generatePONumber(tenantId);
 
       const result = await pool.query(`
         INSERT INTO purchase_orders (
           po_number, vendor_id, po_date, expected_delivery_date,
           subtotal, vat_amount, total_amount, terms_conditions, notes,
-          status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft', $10, NOW(), NOW())
+          status, created_by, tenant_id, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft', $10, $11, NOW(), NOW())
         RETURNING *
       `, [
         po_number, vendor_id, po_date, expected_delivery_date,
         subtotal, vat_amount, total_amount, terms_conditions, notes,
-        req.user.id
+        req.user.id, tenantId
       ]);
 
       res.status(201).json(result.rows[0]);
@@ -87,6 +90,7 @@ class PurchaseOrderController {
 
   async updatePurchaseOrder(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
       const data = req.body;
 
@@ -102,12 +106,12 @@ class PurchaseOrderController {
           terms_conditions = COALESCE($7, terms_conditions),
           notes = COALESCE($8, notes),
           updated_at = NOW()
-        WHERE id = $9
+        WHERE id = $9 AND tenant_id = $10
         RETURNING *
       `, [
         data.vendor_id, data.po_date, data.expected_delivery_date,
         data.subtotal, data.vat_amount, data.total_amount,
-        data.terms_conditions, data.notes, id
+        data.terms_conditions, data.notes, id, tenantId
       ]);
 
       if (result.rows.length === 0) {
@@ -123,13 +127,14 @@ class PurchaseOrderController {
 
   async deletePurchaseOrder(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
 
       const result = await pool.query(`
         DELETE FROM purchase_orders
-        WHERE id = $1 AND status = 'draft'
+        WHERE id = $1 AND status = 'draft' AND tenant_id = $2
         RETURNING *
-      `, [id]);
+      `, [id, tenantId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Purchase order not found or cannot be deleted' });
@@ -144,14 +149,15 @@ class PurchaseOrderController {
 
   async approvePurchaseOrder(req, res) {
     try {
+      const tenantId = req.tenantId;
       const { id } = req.params;
 
       const result = await pool.query(`
         UPDATE purchase_orders
         SET status = 'approved', updated_at = NOW()
-        WHERE id = $1 AND status = 'draft'
+        WHERE id = $1 AND status = 'draft' AND tenant_id = $2
         RETURNING *
-      `, [id]);
+      `, [id, tenantId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Purchase order not found or already processed' });

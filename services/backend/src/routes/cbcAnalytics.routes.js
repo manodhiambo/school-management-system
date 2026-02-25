@@ -1,53 +1,55 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import { query } from '../config/database.js';
 
 const router = express.Router();
 
+router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
+
 // GET /cbc-analytics/overview  [admin]
-router.get('/overview', authenticate, async (req, res) => {
+router.get('/overview', async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin only' });
     }
+    const tenantId = req.tenantId;
 
-    // Students by education_level
     const studentsByLevel = await query(`
       SELECT c.education_level, COUNT(s.id) AS student_count
       FROM students s
       JOIN classes c ON c.id = s.class_id
-      WHERE s.status = 'active'
+      WHERE s.tenant_id = $1 AND s.status = 'active'
       GROUP BY c.education_level
       ORDER BY c.education_level
-    `);
+    `, [tenantId]);
 
-    // Avg performance by level (from exam_results)
     const avgByLevel = await query(`
       SELECT c.education_level,
         ROUND(AVG(CASE WHEN er.max_marks > 0 THEN (er.marks_obtained / er.max_marks) * 100 ELSE 0 END), 2) AS avg_percentage
       FROM exam_results er
       JOIN students s ON s.id = er.student_id
       JOIN classes c ON c.id = s.class_id
-      WHERE er.is_absent = false OR er.is_absent IS NULL
+      WHERE er.tenant_id = $1 AND (er.is_absent = false OR er.is_absent IS NULL)
       GROUP BY c.education_level
-    `);
+    `, [tenantId]);
 
-    // Active exams count
     const activeExams = await query(`
       SELECT COUNT(*) AS count FROM exams
-      WHERE is_active = true
+      WHERE tenant_id = $1 AND is_active = true
         AND (start_date IS NULL OR start_date <= NOW())
         AND (end_date IS NULL OR end_date >= NOW())
-    `);
+    `, [tenantId]);
 
-    // Overall pass rate
     const passRate = await query(`
       SELECT
         COUNT(*) FILTER (WHERE (marks_obtained / NULLIF(max_marks, 0)) * 100 >= 50) AS passed,
         COUNT(*) AS total
       FROM exam_results
-      WHERE (is_absent = false OR is_absent IS NULL) AND max_marks > 0
-    `);
+      WHERE tenant_id = $1 AND (is_absent = false OR is_absent IS NULL) AND max_marks > 0
+    `, [tenantId]);
 
     res.json({
       success: true,
@@ -65,26 +67,31 @@ router.get('/overview', authenticate, async (req, res) => {
 });
 
 // GET /cbc-analytics/class/:classId  [admin, teacher]
-router.get('/class/:classId', authenticate, async (req, res) => {
+router.get('/class/:classId', async (req, res) => {
   try {
     if (!['admin','teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
+    const tenantId = req.tenantId;
 
-    // Student rankings
+    // Verify class belongs to this tenant
+    const classCheck = await query('SELECT id FROM classes WHERE id = $1 AND tenant_id = $2', [req.params.classId, tenantId]);
+    if (classCheck.length === 0) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
     const rankings = await query(`
       SELECT
         s.id, s.first_name, s.last_name, s.admission_number,
         ROUND(AVG(CASE WHEN er.max_marks > 0 THEN (er.marks_obtained / er.max_marks) * 100 ELSE 0 END), 2) AS avg_percentage,
         COUNT(er.id) AS exam_count
       FROM students s
-      LEFT JOIN exam_results er ON er.student_id = s.id
-      WHERE s.class_id = $1 AND s.status = 'active'
+      LEFT JOIN exam_results er ON er.student_id = s.id AND er.tenant_id = $2
+      WHERE s.class_id = $1 AND s.tenant_id = $2 AND s.status = 'active'
       GROUP BY s.id, s.first_name, s.last_name, s.admission_number
       ORDER BY avg_percentage DESC NULLS LAST
-    `, [req.params.classId]);
+    `, [req.params.classId, tenantId]);
 
-    // Subject performance
     const subjectPerformance = await query(`
       SELECT
         sub.id, sub.name AS subject_name,
@@ -93,20 +100,19 @@ router.get('/class/:classId', authenticate, async (req, res) => {
       FROM exam_results er
       JOIN students s ON s.id = er.student_id
       LEFT JOIN subjects sub ON sub.id = er.subject_id
-      WHERE s.class_id = $1 AND (er.is_absent = false OR er.is_absent IS NULL)
+      WHERE s.class_id = $1 AND er.tenant_id = $2 AND (er.is_absent = false OR er.is_absent IS NULL)
       GROUP BY sub.id, sub.name
       ORDER BY avg_percentage DESC NULLS LAST
-    `, [req.params.classId]);
+    `, [req.params.classId, tenantId]);
 
-    // CBC grade distribution
     const gradeDistribution = await query(`
       SELECT er.cbc_grade, COUNT(*) AS count
       FROM exam_results er
       JOIN students s ON s.id = er.student_id
-      WHERE s.class_id = $1 AND er.cbc_grade IS NOT NULL
+      WHERE s.class_id = $1 AND er.tenant_id = $2 AND er.cbc_grade IS NOT NULL
       GROUP BY er.cbc_grade
       ORDER BY er.cbc_grade
-    `, [req.params.classId]);
+    `, [req.params.classId, tenantId]);
 
     res.json({
       success: true,
@@ -119,13 +125,16 @@ router.get('/class/:classId', authenticate, async (req, res) => {
 });
 
 // GET /cbc-analytics/student/:studentId  [admin, teacher, student(own), parent(children)]
-router.get('/student/:studentId', authenticate, async (req, res) => {
+router.get('/student/:studentId', async (req, res) => {
   try {
     const role = req.user.role;
+    const tenantId = req.tenantId;
 
-    // Authorization check
     if (role === 'student') {
-      const myRecord = await query('SELECT id FROM students WHERE id = $1 AND user_id = $2', [req.params.studentId, req.user.id]);
+      const myRecord = await query(
+        'SELECT id FROM students WHERE id = $1 AND user_id = $2 AND tenant_id = $3',
+        [req.params.studentId, req.user.id, tenantId]
+      );
       if (myRecord.length === 0) {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
@@ -134,16 +143,21 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
         SELECT s.id FROM students s
         JOIN parent_students ps ON ps.student_id = s.id
         JOIN parents p ON p.id = ps.parent_id
-        WHERE s.id = $1 AND p.user_id = $2
-      `, [req.params.studentId, req.user.id]);
+        WHERE s.id = $1 AND p.user_id = $2 AND s.tenant_id = $3
+      `, [req.params.studentId, req.user.id, tenantId]);
       if (childRecord.length === 0) {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
     } else if (!['admin','teacher'].includes(role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
+    } else {
+      // admin/teacher: verify student belongs to this tenant
+      const check = await query('SELECT id FROM students WHERE id = $1 AND tenant_id = $2', [req.params.studentId, tenantId]);
+      if (check.length === 0) {
+        return res.status(404).json({ success: false, message: 'Student not found' });
+      }
     }
 
-    // Per-subject CBC grade history (last 5 exams per subject)
     const gradeHistory = await query(`
       SELECT
         sub.name AS subject_name,
@@ -156,11 +170,10 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
       FROM exam_results er
       JOIN exams e ON e.id = er.exam_id
       LEFT JOIN subjects sub ON sub.id = er.subject_id
-      WHERE er.student_id = $1
+      WHERE er.student_id = $1 AND er.tenant_id = $2
       ORDER BY sub.name, e.start_date DESC
-    `, [req.params.studentId]);
+    `, [req.params.studentId, tenantId]);
 
-    // Attendance correlation
     const attendance = await query(`
       SELECT
         COUNT(*) FILTER (WHERE status = 'present') AS present,
@@ -168,20 +181,23 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'late') AS late,
         COUNT(*) AS total
       FROM attendance
-      WHERE student_id = $1
-    `, [req.params.studentId]);
+      WHERE student_id = $1 AND tenant_id = $2
+    `, [req.params.studentId, tenantId]);
 
-    // Class rank
-    const studentClass = await query('SELECT class_id FROM students WHERE id = $1', [req.params.studentId]);
+    const studentClass = await query(
+      'SELECT class_id FROM students WHERE id = $1 AND tenant_id = $2',
+      [req.params.studentId, tenantId]
+    );
     let classRank = null;
-    if (studentClass.length > 0) {
+    if (studentClass.length > 0 && studentClass[0].class_id) {
       const rankings = await query(`
         SELECT student_id,
           RANK() OVER (ORDER BY AVG(CASE WHEN max_marks > 0 THEN (marks_obtained / max_marks) * 100 ELSE 0 END) DESC) AS rank
         FROM exam_results
-        WHERE student_id IN (SELECT id FROM students WHERE class_id = $1 AND status = 'active')
+        WHERE tenant_id = $1
+          AND student_id IN (SELECT id FROM students WHERE class_id = $2 AND status = 'active' AND tenant_id = $1)
         GROUP BY student_id
-      `, [studentClass[0].class_id]);
+      `, [tenantId, studentClass[0].class_id]);
 
       const myRank = rankings.find(r => r.student_id === req.params.studentId);
       classRank = myRank ? parseInt(myRank.rank) : null;
@@ -202,20 +218,22 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
 });
 
 // GET /cbc-analytics/parent-overview  [parent]
-router.get('/parent-overview', authenticate, async (req, res) => {
+router.get('/parent-overview', async (req, res) => {
   try {
     if (req.user.role !== 'parent') {
       return res.status(403).json({ success: false, message: 'Parents only' });
     }
+    const tenantId = req.tenantId;
 
-    // Resolve parent_id from user_id
-    const parents = await query('SELECT id FROM parents WHERE user_id = $1', [req.user.id]);
+    const parents = await query(
+      'SELECT id FROM parents WHERE user_id = $1 AND tenant_id = $2',
+      [req.user.id, tenantId]
+    );
     if (parents.length === 0) {
       return res.status(404).json({ success: false, message: 'Parent record not found' });
     }
     const parentId = parents[0].id;
 
-    // All children with latest grades
     const children = await query(`
       SELECT
         s.id, s.first_name, s.last_name, s.admission_number,
@@ -224,7 +242,7 @@ router.get('/parent-overview', authenticate, async (req, res) => {
           SELECT er.cbc_grade
           FROM exam_results er
           JOIN exams e ON e.id = er.exam_id
-          WHERE er.student_id = s.id AND er.cbc_grade IS NOT NULL
+          WHERE er.student_id = s.id AND er.tenant_id = $2 AND er.cbc_grade IS NOT NULL
           ORDER BY e.start_date DESC
           LIMIT 1
         ) AS latest_cbc_grade,
@@ -232,32 +250,32 @@ router.get('/parent-overview', authenticate, async (req, res) => {
           SELECT ROUND((er.marks_obtained / NULLIF(er.max_marks, 0)) * 100, 1)
           FROM exam_results er
           JOIN exams e ON e.id = er.exam_id
-          WHERE er.student_id = s.id AND er.max_marks > 0
+          WHERE er.student_id = s.id AND er.tenant_id = $2 AND er.max_marks > 0
           ORDER BY e.start_date DESC
           LIMIT 1
         ) AS latest_percentage
       FROM students s
       JOIN parent_students ps ON ps.student_id = s.id
       LEFT JOIN classes c ON c.id = s.class_id
-      WHERE ps.parent_id = $1 AND s.status = 'active'
-    `, [parentId]);
+      WHERE ps.parent_id = $1 AND s.tenant_id = $2 AND s.status = 'active'
+    `, [parentId, tenantId]);
 
-    // Upcoming exams for children's classes
-    const childClassIds = children.map(c => c.id);
+    const childStudentIds = children.map(c => c.id);
     let upcomingExams = [];
-    if (childClassIds.length > 0) {
+    if (childStudentIds.length > 0) {
       upcomingExams = await query(`
         SELECT e.*, c.name AS class_name
         FROM exams e
         JOIN classes c ON c.id = e.class_id
-        WHERE e.class_id IN (
-          SELECT class_id FROM students WHERE id = ANY($1::uuid[]) AND class_id IS NOT NULL
-        )
-        AND (e.start_date IS NULL OR e.start_date >= NOW())
-        AND e.is_active = true
+        WHERE e.tenant_id = $1
+          AND e.class_id IN (
+            SELECT class_id FROM students WHERE id = ANY($2::uuid[]) AND class_id IS NOT NULL AND tenant_id = $1
+          )
+          AND (e.start_date IS NULL OR e.start_date >= NOW())
+          AND e.is_active = true
         ORDER BY e.start_date ASC
         LIMIT 10
-      `, [childClassIds]);
+      `, [tenantId, childStudentIds]);
     }
 
     res.json({
@@ -271,13 +289,19 @@ router.get('/parent-overview', authenticate, async (req, res) => {
 });
 
 // GET /cbc-analytics/subject/:subjectId  [admin, teacher]
-router.get('/subject/:subjectId', authenticate, async (req, res) => {
+router.get('/subject/:subjectId', async (req, res) => {
   try {
     if (!['admin','teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
+    const tenantId = req.tenantId;
 
-    // Performance by class
+    // Verify subject belongs to this tenant
+    const subCheck = await query('SELECT id FROM subjects WHERE id = $1 AND tenant_id = $2', [req.params.subjectId, tenantId]);
+    if (subCheck.length === 0) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
     const byClass = await query(`
       SELECT
         c.id AS class_id, c.name AS class_name, c.education_level,
@@ -286,45 +310,42 @@ router.get('/subject/:subjectId', authenticate, async (req, res) => {
       FROM exam_results er
       JOIN students s ON s.id = er.student_id
       JOIN classes c ON c.id = s.class_id
-      WHERE er.subject_id = $1 AND (er.is_absent = false OR er.is_absent IS NULL)
+      WHERE er.subject_id = $1 AND er.tenant_id = $2 AND (er.is_absent = false OR er.is_absent IS NULL)
       GROUP BY c.id, c.name, c.education_level
       ORDER BY avg_percentage DESC
-    `, [req.params.subjectId]);
+    `, [req.params.subjectId, tenantId]);
 
-    // Grade distribution
     const gradeDistribution = await query(`
       SELECT cbc_grade, COUNT(*) AS count
       FROM exam_results
-      WHERE subject_id = $1 AND cbc_grade IS NOT NULL
+      WHERE subject_id = $1 AND tenant_id = $2 AND cbc_grade IS NOT NULL
       GROUP BY cbc_grade
       ORDER BY cbc_grade
-    `, [req.params.subjectId]);
+    `, [req.params.subjectId, tenantId]);
 
-    // Top 5 students
     const topStudents = await query(`
       SELECT
         s.id, s.first_name, s.last_name,
         ROUND(AVG(CASE WHEN er.max_marks > 0 THEN (er.marks_obtained / er.max_marks) * 100 ELSE 0 END), 2) AS avg_percentage
       FROM exam_results er
       JOIN students s ON s.id = er.student_id
-      WHERE er.subject_id = $1 AND (er.is_absent = false OR er.is_absent IS NULL)
+      WHERE er.subject_id = $1 AND er.tenant_id = $2 AND (er.is_absent = false OR er.is_absent IS NULL)
       GROUP BY s.id, s.first_name, s.last_name
       ORDER BY avg_percentage DESC
       LIMIT 5
-    `, [req.params.subjectId]);
+    `, [req.params.subjectId, tenantId]);
 
-    // Bottom 5 students
     const bottomStudents = await query(`
       SELECT
         s.id, s.first_name, s.last_name,
         ROUND(AVG(CASE WHEN er.max_marks > 0 THEN (er.marks_obtained / er.max_marks) * 100 ELSE 0 END), 2) AS avg_percentage
       FROM exam_results er
       JOIN students s ON s.id = er.student_id
-      WHERE er.subject_id = $1 AND (er.is_absent = false OR er.is_absent IS NULL)
+      WHERE er.subject_id = $1 AND er.tenant_id = $2 AND (er.is_absent = false OR er.is_absent IS NULL)
       GROUP BY s.id, s.first_name, s.last_name
       ORDER BY avg_percentage ASC
       LIMIT 5
-    `, [req.params.subjectId]);
+    `, [req.params.subjectId, tenantId]);
 
     res.json({
       success: true,

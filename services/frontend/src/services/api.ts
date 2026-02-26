@@ -32,7 +32,12 @@ class ApiService {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('auth-storage');
-          window.location.href = '/login';
+          sessionStorage.removeItem('accessToken');
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('originalAdminToken');
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
         throw error.response?.data || error;
       }

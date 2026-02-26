@@ -36,8 +36,8 @@ export function LoginPage() {
 
     try {
       const response: any = await api.login(email, password);
-      const { accessToken, user } = response.data;
-      setAuth(user, accessToken, rememberMe);
+      const { accessToken, refreshToken, user } = response.data;
+      setAuth(user, accessToken, rememberMe, refreshToken);
       if (user?.role === 'superadmin') {
         navigate('/superadmin/dashboard');
       } else {

@@ -14,8 +14,9 @@ interface User {
 interface AuthState {
   user: User | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: User, accessToken: string, rememberMe?: boolean) => void;
+  setAuth: (user: User, accessToken: string, rememberMe?: boolean, refreshToken?: string) => void;
   clearAuth: () => void;
 }
 
@@ -24,28 +25,35 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
-      setAuth: (user, accessToken, rememberMe = true) => {
+      setAuth: (user, accessToken, rememberMe = true, refreshToken?: string) => {
         if (rememberMe) {
           localStorage.setItem('accessToken', accessToken);
           localStorage.setItem('token', accessToken);
+          if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
           sessionStorage.removeItem('accessToken');
           sessionStorage.removeItem('token');
+          sessionStorage.removeItem('refreshToken');
         } else {
           sessionStorage.setItem('accessToken', accessToken);
           sessionStorage.setItem('token', accessToken);
+          if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
           localStorage.removeItem('accessToken');
           localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
         }
-        set({ user, accessToken, isAuthenticated: true });
+        set({ user, accessToken, refreshToken: refreshToken || null, isAuthenticated: true });
       },
       clearAuth: () => {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('refreshToken');
         sessionStorage.removeItem('accessToken');
         sessionStorage.removeItem('token');
-        set({ user: null, accessToken: null, isAuthenticated: false });
+        sessionStorage.removeItem('refreshToken');
+        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },
     }),
     {

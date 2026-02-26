@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,8 +8,12 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
+
 // Get gradebook entries
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { classId, studentId, subjectId, teacherId } = req.query;
     const tid = req.user.tenant_id;
@@ -62,7 +67,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Create gradebook entry
-router.post('/', authenticate, requireRole(['admin', 'teacher']), async (req, res) => {
+router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const {
@@ -125,7 +130,7 @@ router.post('/', authenticate, requireRole(['admin', 'teacher']), async (req, re
 });
 
 // Bulk create gradebook entries
-router.post('/bulk', authenticate, requireRole(['admin', 'teacher']), async (req, res) => {
+router.post('/bulk', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { classId, subjectId, assessmentType, title, maxMarks, date, grades } = req.body;
@@ -181,7 +186,7 @@ router.post('/bulk', authenticate, requireRole(['admin', 'teacher']), async (req
 });
 
 // Update gradebook entry
-router.put('/:id', authenticate, requireRole(['admin', 'teacher']), async (req, res) => {
+router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { marks, maxMarks, grade, notes } = req.body;
@@ -215,7 +220,7 @@ router.put('/:id', authenticate, requireRole(['admin', 'teacher']), async (req, 
 });
 
 // Delete gradebook entry
-router.delete('/:id', authenticate, requireRole(['admin', 'teacher']), async (req, res) => {
+router.delete('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('DELETE FROM gradebook WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
@@ -227,7 +232,7 @@ router.delete('/:id', authenticate, requireRole(['admin', 'teacher']), async (re
 });
 
 // Get student grades summary
-router.get('/student/:studentId', authenticate, async (req, res) => {
+router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const entries = await query(

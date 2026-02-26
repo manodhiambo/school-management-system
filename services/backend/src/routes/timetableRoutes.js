@@ -1,11 +1,16 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
 
 const dayToNumber = (day) => {
   if (typeof day === 'number') return day;
@@ -28,7 +33,7 @@ const numberToDay = (num) => {
 };
 
 // Get timetable
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { classId, teacherId } = req.query;
     const tid = req.user.tenant_id;
@@ -81,7 +86,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Get teacher timetable
-router.get('/teacher/:teacherId', authenticate, async (req, res) => {
+router.get('/teacher/:teacherId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const teacher = await query(
@@ -118,7 +123,7 @@ router.get('/teacher/:teacherId', authenticate, async (req, res) => {
 });
 
 // Get student timetable
-router.get('/student/:studentId', authenticate, async (req, res) => {
+router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const student = await query(
@@ -153,7 +158,7 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
 });
 
 // Create timetable entry
-router.post('/', authenticate, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     logger.info('Create timetable request body:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -206,7 +211,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // Create period
-router.post('/period', authenticate, async (req, res) => {
+router.post('/period', async (req, res) => {
   try {
     logger.info('Create period request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -259,7 +264,7 @@ router.post('/period', authenticate, async (req, res) => {
 });
 
 // Assign substitute
-router.post('/substitute', authenticate, async (req, res) => {
+router.post('/substitute', async (req, res) => {
   try {
     res.json({ success: true, message: 'Substitute assigned successfully' });
   } catch (error) {
@@ -269,7 +274,7 @@ router.post('/substitute', authenticate, async (req, res) => {
 });
 
 // Delete single timetable entry (admin only)
-router.delete("/:id", authenticate, requireRole(["admin"]), async (req, res) => {
+router.delete("/:id", requireRole(["admin"]), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const result = await query(
@@ -287,7 +292,7 @@ router.delete("/:id", authenticate, requireRole(["admin"]), async (req, res) => 
 });
 
 // Delete all timetable entries for a class (admin only)
-router.delete("/class/:classId/all", authenticate, requireRole(["admin"]), async (req, res) => {
+router.delete("/class/:classId/all", requireRole(["admin"]), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const result = await query(
@@ -305,7 +310,7 @@ router.delete("/class/:classId/all", authenticate, requireRole(["admin"]), async
 });
 
 // Delete all timetable entries for a teacher (admin only)
-router.delete("/teacher/:teacherId/all", authenticate, requireRole(["admin"]), async (req, res) => {
+router.delete("/teacher/:teacherId/all", requireRole(["admin"]), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const teacher = await query(
@@ -329,7 +334,7 @@ router.delete("/teacher/:teacherId/all", authenticate, requireRole(["admin"]), a
 });
 
 // Reset entire timetable (admin only)
-router.delete("/reset/all", authenticate, requireRole(["admin"]), async (req, res) => {
+router.delete("/reset/all", requireRole(["admin"]), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { confirm } = req.query;

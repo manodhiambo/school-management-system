@@ -1,13 +1,18 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
+
 // Get attendance
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { classId, date, studentId } = req.query;
     const tid = req.user.tenant_id;
@@ -51,7 +56,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Get attendance statistics
-router.get('/statistics', authenticate, async (req, res) => {
+router.get('/statistics', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const stats = await query(`
@@ -72,7 +77,7 @@ router.get('/statistics', authenticate, async (req, res) => {
 });
 
 // Get attendance by class
-router.get('/class/:classId', authenticate, async (req, res) => {
+router.get('/class/:classId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { date } = req.query;
@@ -92,7 +97,7 @@ router.get('/class/:classId', authenticate, async (req, res) => {
 });
 
 // Get student attendance
-router.get('/student/:studentId', authenticate, async (req, res) => {
+router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const studentId = req.params.studentId;
@@ -119,7 +124,7 @@ router.get('/student/:studentId', authenticate, async (req, res) => {
 });
 
 // Mark attendance (single)
-router.post('/', authenticate, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     logger.info('Mark attendance request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -169,7 +174,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // Mark bulk attendance
-router.post('/bulk', authenticate, async (req, res) => {
+router.post('/bulk', async (req, res) => {
   try {
     logger.info('Bulk attendance request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -218,7 +223,7 @@ router.post('/bulk', authenticate, async (req, res) => {
 });
 
 // Legacy route for marking attendance
-router.post('/mark', authenticate, async (req, res) => {
+router.post('/mark', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { studentId, date, status } = req.body;

@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,10 +8,14 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+router.use(authenticate);
+router.use(tenantContext);
+router.use(requireActiveTenant);
+
 // ============== FEE STRUCTURE ROUTES ==============
 
 // Get all fee structures
-router.get('/structure', authenticate, async (req, res) => {
+router.get('/structure', async (req, res) => {
   try {
     const { classId, frequency, isActive } = req.query;
     const tid = req.user.tenant_id;
@@ -53,7 +58,7 @@ router.get('/structure', authenticate, async (req, res) => {
 });
 
 // Get single fee structure
-router.get('/structure/:id', authenticate, async (req, res) => {
+router.get('/structure/:id', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const structures = await query(
@@ -76,7 +81,7 @@ router.get('/structure/:id', authenticate, async (req, res) => {
 });
 
 // Create fee structure
-router.post('/structure', authenticate, requireRole(['admin']), async (req, res) => {
+router.post('/structure', requireRole(['admin']), async (req, res) => {
   try {
     logger.info('Create fee structure:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -137,7 +142,7 @@ router.post('/structure', authenticate, requireRole(['admin']), async (req, res)
 });
 
 // Update fee structure
-router.put('/structure/:id', authenticate, requireRole(['admin']), async (req, res) => {
+router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const {
@@ -198,7 +203,7 @@ router.put('/structure/:id', authenticate, requireRole(['admin']), async (req, r
 });
 
 // Delete fee structure
-router.delete('/structure/:id', authenticate, requireRole(['admin']), async (req, res) => {
+router.delete('/structure/:id', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query(
@@ -216,7 +221,7 @@ router.delete('/structure/:id', authenticate, requireRole(['admin']), async (req
 // ============== FEE INVOICE ROUTES ==============
 
 // Get fee invoices
-router.get('/invoice', authenticate, async (req, res) => {
+router.get('/invoice', async (req, res) => {
   try {
     const { studentId, status, classId } = req.query;
     const tid = req.user.tenant_id;
@@ -260,7 +265,7 @@ router.get('/invoice', authenticate, async (req, res) => {
 });
 
 // Get single invoice
-router.get('/invoice/:id', authenticate, async (req, res) => {
+router.get('/invoice/:id', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const invoices = await query(
@@ -283,7 +288,7 @@ router.get('/invoice/:id', authenticate, async (req, res) => {
 });
 
 // Create single invoice
-router.post('/invoice', authenticate, requireRole(['admin']), async (req, res) => {
+router.post('/invoice', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const {
@@ -333,7 +338,7 @@ router.post('/invoice', authenticate, requireRole(['admin']), async (req, res) =
 });
 
 // Bulk create invoices
-router.post('/invoice/bulk', authenticate, requireRole(['admin']), async (req, res) => {
+router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
   try {
     logger.info('Bulk invoice request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -398,7 +403,7 @@ router.post('/invoice/bulk', authenticate, requireRole(['admin']), async (req, r
 // ============== FEE PAYMENT ROUTES ==============
 
 // Get fee payments
-router.get('/payment', authenticate, async (req, res) => {
+router.get('/payment', async (req, res) => {
   try {
     const { studentId, invoiceId } = req.query;
     const tid = req.user.tenant_id;
@@ -436,7 +441,7 @@ router.get('/payment', authenticate, async (req, res) => {
 });
 
 // Record payment
-router.post('/payment', authenticate, async (req, res) => {
+router.post('/payment', async (req, res) => {
   try {
     logger.info('Record payment request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -501,7 +506,7 @@ router.post('/payment', authenticate, async (req, res) => {
 // ============== STATISTICS ROUTES ==============
 
 // Get fee statistics
-router.get('/statistics', authenticate, async (req, res) => {
+router.get('/statistics', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const stats = await query(`
@@ -525,7 +530,7 @@ router.get('/statistics', authenticate, async (req, res) => {
 });
 
 // Get fee defaulters
-router.get('/defaulters', authenticate, async (req, res) => {
+router.get('/defaulters', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const defaulters = await query(`
@@ -547,7 +552,7 @@ router.get('/defaulters', authenticate, async (req, res) => {
 });
 
 // Get student fee account
-router.get('/student/:studentId', authenticate, async (req, res) => {
+router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const studentId = req.params.studentId;

@@ -79,7 +79,7 @@ router.post('/', requireRole(['admin']), async (req, res) => {
     const userId = uuidv4();
 
     await query(
-      `INSERT INTO users (id, email, password_hash, role, tenant_id, is_active, is_verified)
+      `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified)
        VALUES ($1, $2, $3, $4, $5, TRUE, TRUE)`,
       [userId, email, hashedPassword, role, tenantId]
     );
@@ -206,7 +206,7 @@ router.patch('/:id/reset-password', requireRole(['admin']), async (req, res) => 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     const result = await query(
-      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3 RETURNING id',
+      'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3 RETURNING id',
       [hashedPassword, req.params.id, tenantId]
     );
     if (result.length === 0) {

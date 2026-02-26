@@ -26,14 +26,46 @@ class ApiService {
 
     this.api.interceptors.response.use(
       (response) => response.data,
-      (error) => {
-        if (error.response?.status === 401) {
+      async (error) => {
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && !(originalRequest as any)._retry) {
+          (originalRequest as any)._retry = true;
+
+          const refreshToken =
+            localStorage.getItem('refreshToken') ||
+            sessionStorage.getItem('refreshToken');
+
+          if (refreshToken) {
+            try {
+              const { data } = await axios.post(`${API_URL}/auth/refresh-token`, { refreshToken });
+              const newAccessToken = data?.data?.accessToken;
+
+              if (newAccessToken) {
+                const inLocal = !!localStorage.getItem('accessToken');
+                if (inLocal) {
+                  localStorage.setItem('accessToken', newAccessToken);
+                  localStorage.setItem('token', newAccessToken);
+                } else {
+                  sessionStorage.setItem('accessToken', newAccessToken);
+                  sessionStorage.setItem('token', newAccessToken);
+                }
+                originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+                return this.api(originalRequest);
+              }
+            } catch {
+              // refresh failed — fall through to clear auth
+            }
+          }
+
           localStorage.removeItem('accessToken');
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('auth-storage');
+          localStorage.removeItem('refreshToken');
           sessionStorage.removeItem('accessToken');
           sessionStorage.removeItem('token');
+          sessionStorage.removeItem('refreshToken');
           sessionStorage.removeItem('originalAdminToken');
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';

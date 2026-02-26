@@ -4,8 +4,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const rawUrl = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_eO1vxZ6fhqtU@ep-empty-bush-afudt9bn-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=verify-full';
+const connectionString = rawUrl
+  .replace('sslmode=require', 'sslmode=verify-full')
+  .replace('sslmode=prefer', 'sslmode=verify-full')
+  .replace('sslmode=verify-ca', 'sslmode=verify-full');
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_eO1vxZ6fhqtU@ep-empty-bush-afudt9bn-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require',
+  connectionString,
   ssl: {
     rejectUnauthorized: false
   }

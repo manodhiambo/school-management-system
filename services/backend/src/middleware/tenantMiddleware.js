@@ -29,7 +29,10 @@ export const requireActiveTenant = async (req, res, next) => {
     });
   }
   try {
-    const rows = await query('SELECT status FROM tenants WHERE id = $1', [req.tenantId]);
+    const rows = await query(
+      'SELECT status, trial_ends_at FROM tenants WHERE id = $1',
+      [req.tenantId]
+    );
 
     if (rows.length === 0 || rows[0].status === 'suspended') {
       return res.status(403).json({
@@ -50,6 +53,16 @@ export const requireActiveTenant = async (req, res, next) => {
         success: false,
         message: 'School registration is pending payment. Please complete payment to activate.'
       });
+    }
+
+    // Trial: allow access but block if trial period has ended
+    if (rows[0].status === 'trial' && rows[0].trial_ends_at) {
+      if (new Date(rows[0].trial_ends_at) < new Date()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your free trial has ended. Please pay to continue using the system.'
+        });
+      }
     }
 
     next();

@@ -5,6 +5,7 @@ import { query } from '../config/database.js';
 import { initiateSTKPush, formatPhone } from '../services/mpesaService.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
+import { seedFinanceDataForTenant } from '../utils/seedFinanceData.js';
 
 const router = express.Router();
 
@@ -137,6 +138,13 @@ router.post('/register', async (req, res) => {
       'UPDATE tenants SET admin_user_id = $1, updated_at = NOW() WHERE id = $2',
       [newUserId, tenant.id]
     );
+
+    // Seed default finance data (chart of accounts + settings) for the new tenant
+    try {
+      await seedFinanceDataForTenant(tenant.id);
+    } catch (seedErr) {
+      logger.warn(`Finance seed failed for tenant ${tenant.id}: ${seedErr.message}`);
+    }
 
     logger.info(`Trial registration complete: tenant=${tenant.id}, admin=${adminEmail}, trial_ends=${trialEndsAt.toISOString()}`);
 

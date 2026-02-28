@@ -218,6 +218,9 @@ class FinanceController {
         payment_method,
       } = req.body;
 
+      // Parse integer FK — empty string or missing → null
+      const accountId = account_id ? parseInt(account_id) || null : null;
+
       // Generate income number
       const incomeNumber = await generateNumber('INC-', 'income_records', 'income_number', tenantId);
 
@@ -237,7 +240,7 @@ class FinanceController {
         tenantId,
         incomeNumber,
         transaction_date,
-        account_id,
+        accountId,
         amount,
         vatRate,
         finalVatAmount,
@@ -316,6 +319,10 @@ class FinanceController {
         payment_method,
       } = req.body;
 
+      // Parse integer FKs — empty string or missing → null
+      const accountId = account_id ? parseInt(account_id) || null : null;
+      const vendorId  = vendor_id  ? parseInt(vendor_id)  || null : null;
+
       // Generate expense number
       const expenseNumber = await generateNumber('EXP-', 'expense_records', 'expense_number', tenantId);
 
@@ -345,8 +352,8 @@ class FinanceController {
         tenantId,
         expenseNumber,
         transaction_date,
-        account_id,
-        vendor_id,
+        accountId,
+        vendorId,
         amount,
         vatRate,
         finalVatAmount,

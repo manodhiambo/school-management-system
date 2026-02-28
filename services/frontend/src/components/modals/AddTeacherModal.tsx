@@ -40,12 +40,16 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
     setLoading(true);
 
     try {
-      // Convert experienceYears to number if provided
-      const submitData = {
+      const submitData: Record<string, any> = {
         ...formData,
         experienceYears: formData.experienceYears ? Number(formData.experienceYears) : undefined,
       };
-      
+
+      // Strip empty strings so Joi doesn't reject optional date/string fields
+      Object.keys(submitData).forEach(key => {
+        if (submitData[key] === '') delete submitData[key];
+      });
+
       await api.createTeacher(submitData);
       alert('Teacher added successfully!');
       onSuccess();

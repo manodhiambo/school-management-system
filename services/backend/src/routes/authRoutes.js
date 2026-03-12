@@ -17,7 +17,10 @@ router.post('/login', async (req, res) => {
     
     logger.info(`Login attempt for: ${email}`);
     
-    const users = await query('SELECT * FROM users WHERE email = $1', [email]);
+    const users = await query(
+      'SELECT id, email, password, role, is_active, is_verified, tenant_id FROM users WHERE email = $1',
+      [email]
+    );
 
     if (users.length === 0) {
       logger.warn(`User not found: ${email}`);
@@ -85,8 +88,9 @@ router.post('/login', async (req, res) => {
       { expiresIn: config.jwt.refreshExpiresIn }
     );
 
-    // Update last login
-    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+    // Update last login — fire and forget, don't block the response
+    query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
+      .catch(err => logger.warn('Failed to update last_login:', err.message));
 
     logger.info(`Login successful for: ${email}`);
 

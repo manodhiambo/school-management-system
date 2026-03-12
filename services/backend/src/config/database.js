@@ -14,7 +14,11 @@ const pool = new Pool({
   connectionString,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  max: 10,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  statement_timeout: 15000,
 });
 
 pool.on('connect', () => {
@@ -22,8 +26,8 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
+  // Log but don't crash the server on transient connection errors
   console.error('Unexpected database error:', err);
-  process.exit(-1);
 });
 
 // Export a query function that wraps pool.query and returns rows

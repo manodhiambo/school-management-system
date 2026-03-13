@@ -35,6 +35,10 @@ import {
   ClipboardList,
   CalendarDays,
   BookMarked,
+  Layers,
+  ArrowUpCircle,
+  FolderOpen,
+  Star,
 } from 'lucide-react';
 
 type NavItem = {
@@ -56,26 +60,31 @@ const navigationItems: NavItem[] = [
   { name: 'Parents',         href: '/app/parents',   icon: UserCheck,     roles: ['admin', 'teacher'],                    section: 'People' },
   { name: 'User Management', href: '/app/users',     icon: Shield,        roles: ['admin'],                               section: 'People' },
 
-  // ── Academic (admin / teacher) ────────────────────────────────────────────
-  { name: 'CBC Academics',      href: '/app/academic',         icon: BookOpen,      roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'Attendance',         href: '/app/attendance',       icon: Calendar,      roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'CBC Assessments',    href: '/app/cbc-assessments',  icon: ClipboardList, roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'CBC Report Cards',   href: '/app/cbc-report-cards', icon: BookMarked,    roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'CBC Analytics',      href: '/app/cbc-analytics',    icon: BarChart2,     roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'CBC Curriculum',     href: '/app/curriculum',       icon: GraduationCap, roles: ['admin'],            section: 'Academic' },
-  { name: 'Academic Calendar',  href: '/app/academic-calendar',icon: CalendarDays,  roles: ['admin'],            section: 'Academic' },
+  // ── Academic (admin) ──────────────────────────────────────────────────────
+  { name: 'Classes & Rooms',    href: '/app/academic',           icon: Building2,     roles: ['admin'],            section: 'Academic' },
+  { name: 'Learning Areas',     href: '/app/academic',           icon: Layers,        roles: ['admin'],            section: 'Academic' },
+  { name: 'Schemes of Work',    href: '/app/academic',           icon: ClipboardList, roles: ['admin'],            section: 'Academic' },
+  { name: 'Attendance',         href: '/app/attendance',         icon: Calendar,      roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Assessments',    href: '/app/cbc-assessments',    icon: Star,          roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Report Cards',   href: '/app/cbc-report-cards',   icon: BookMarked,    roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Analytics',      href: '/app/cbc-analytics',      icon: BarChart2,     roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'Projects',           href: '/app/academic',           icon: FolderOpen,    roles: ['admin'],            section: 'Academic' },
+  { name: 'Promotion',          href: '/app/academic',           icon: ArrowUpCircle, roles: ['admin'],            section: 'Academic' },
+  { name: 'Academic Calendar',  href: '/app/academic-calendar',  icon: CalendarDays,  roles: ['admin'],            section: 'Academic' },
 
   // ── Academic (teacher) ────────────────────────────────────────────────────
   { name: 'My Classes',    href: '/app/my-classes',   icon: Users,      roles: ['teacher'], section: 'Academic' },
   { name: 'Grade Book',    href: '/app/gradebook',    icon: Award,      roles: ['teacher'], section: 'Academic' },
-  { name: 'Exams Manager', href: '/app/teacher-exams',icon: ListChecks, roles: ['teacher'], section: 'Academic' },
+  { name: 'Lesson Plans',  href: '/app/academic',     icon: BookOpen,   roles: ['teacher'], section: 'Academic' },
+  { name: 'SBA Marks',     href: '/app/academic',     icon: ClipboardList, roles: ['teacher'], section: 'Academic' },
+  { name: 'Exams',         href: '/app/teacher-exams',icon: ListChecks, roles: ['teacher'], section: 'Academic' },
 
   // ── Academic (student) ────────────────────────────────────────────────────
-  { name: 'My Exams',      href: '/app/my-exams',      icon: Monitor,  roles: ['student'], section: 'Academic' },
-  { name: 'My Courses',    href: '/app/my-courses',    icon: BookOpen, roles: ['student'], section: 'Academic' },
-  { name: 'My Attendance', href: '/app/my-attendance', icon: Calendar, roles: ['student'], section: 'Academic' },
-  { name: 'My Results',    href: '/app/my-results',    icon: Award,    roles: ['student'], section: 'Academic' },
-  { name: 'Learning Materials', href: '/app/academic?tab=materials', icon: BookMarked, roles: ['student'], section: 'Academic' },
+  { name: 'My Exams',          href: '/app/my-exams',      icon: Monitor,   roles: ['student'], section: 'Academic' },
+  { name: 'My Courses',        href: '/app/my-courses',    icon: BookOpen,  roles: ['student'], section: 'Academic' },
+  { name: 'My Attendance',     href: '/app/my-attendance', icon: Calendar,  roles: ['student'], section: 'Academic' },
+  { name: 'My Results',        href: '/app/my-results',    icon: Award,     roles: ['student'], section: 'Academic' },
+  { name: 'Learning Materials',href: '/app/academic',      icon: BookMarked,roles: ['student'], section: 'Academic' },
 
   // ── Finance ───────────────────────────────────────────────────────────────
   { name: 'Finance Overview',  href: '/app/finance',                  icon: Wallet,    roles: ['admin', 'finance_officer'], section: 'Finance', badge: 'New' },

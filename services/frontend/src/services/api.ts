@@ -1186,6 +1186,33 @@ class ApiService {
   promoteStudent(data: any) { return this.api.post('/academics/promotion/promote-student', data); }
   bulkPromoteStudents(data: any) { return this.api.post('/academics/promotion/bulk-promote', data); }
 
+  // Rooms
+  getRooms() { return this.api.get('/academics/rooms'); }
+  createRoom(data: any) { return this.api.post('/academics/rooms', data); }
+  updateRoom(id: string, data: any) { return this.api.put('/academics/rooms/' + id, data); }
+  deleteRoom(id: string) { return this.api.delete('/academics/rooms/' + id); }
+
+  // Class Management (full)
+  getAcademicClasses(params?: any) { return this.api.get('/academics/classes', { params }); }
+  createAcademicClass(data: any) { return this.api.post('/academics/classes', data); }
+  updateAcademicClass(id: string, data: any) { return this.api.put('/academics/classes/' + id, data); }
+  deleteAcademicClass(id: string) { return this.api.delete('/academics/classes/' + id); }
+  getClassSubjects(classId: string) { return this.api.get('/academics/classes/' + classId + '/subjects'); }
+  addSubjectToClass(classId: string, data: any) { return this.api.post('/academics/classes/' + classId + '/subjects', data); }
+  removeSubjectFromClass(classId: string, subjectId: string) { return this.api.delete('/academics/classes/' + classId + '/subjects/' + subjectId); }
+
+  // Subject / Learning Area Management (full)
+  getAcademicSubjects(params?: any) { return this.api.get('/academics/subjects', { params }); }
+  createAcademicSubject(data: any) { return this.api.post('/academics/subjects', data); }
+  updateAcademicSubject(id: string, data: any) { return this.api.put('/academics/subjects/' + id, data); }
+  deleteAcademicSubject(id: string) { return this.api.delete('/academics/subjects/' + id); }
+
+  // Setup / Seed Defaults
+  getSetupStatus() { return this.api.get('/academics/setup/status'); }
+  seedCbcClasses() { return this.api.post('/academics/setup/seed-classes', {}); }
+  seedCbcSubjects() { return this.api.post('/academics/setup/seed-subjects', {}); }
+  seedCbcAll() { return this.api.post('/academics/setup/seed-all', {}); }
+
 }
 
 export default new ApiService();

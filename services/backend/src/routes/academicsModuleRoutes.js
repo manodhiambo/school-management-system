@@ -1043,4 +1043,430 @@ router.get('/dashboard', requireRole(['admin','teacher']), async (req, res) => {
   }
 });
 
+// ================================================================
+// ROOMS MANAGEMENT
+// ================================================================
+
+router.get('/rooms', requireRole(['admin','teacher']), async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT r.*, COUNT(c.id) AS class_count
+       FROM rooms r
+       LEFT JOIN classes c ON c.room_id = r.id
+       WHERE r.tenant_id = $1
+       GROUP BY r.id ORDER BY r.name`,
+      [tid(req)]
+    );
+    res.json({ data: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/rooms', requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, room_number, capacity, building, floor, room_type, features, notes } = req.body;
+    const result = await query(
+      `INSERT INTO rooms (tenant_id, name, room_number, capacity, building, floor, room_type, features, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [tid(req), name, room_number, capacity || 45, building, floor, room_type || 'classroom', features || [], notes]
+    );
+    res.status(201).json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/rooms/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, room_number, capacity, building, floor, room_type, features, is_available, notes } = req.body;
+    const result = await query(
+      `UPDATE rooms SET name=$1, room_number=$2, capacity=$3, building=$4, floor=$5,
+       room_type=$6, features=$7, is_available=$8, notes=$9, updated_at=NOW()
+       WHERE id=$10 AND tenant_id=$11 RETURNING *`,
+      [name, room_number, capacity, building, floor, room_type, features || [], is_available !== false, notes, req.params.id, tid(req)]
+    );
+    res.json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/rooms/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    // Unlink from classes first
+    await query('UPDATE classes SET room_id=NULL WHERE room_id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
+    await query('DELETE FROM rooms WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
+    res.json({ message: 'Room deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ================================================================
+// CLASS MANAGEMENT (with streams, rooms, teacher assignment)
+// ================================================================
+
+router.get('/classes', requireRole(['admin','teacher','student','parent']), async (req, res) => {
+  try {
+    const { education_level } = req.query;
+    let where = 'c.tenant_id = $1';
+    const params = [tid(req)];
+    if (education_level) { where += ' AND c.education_level = $2'; params.push(education_level); }
+
+    const result = await query(`
+      SELECT c.*,
+        u.first_name || ' ' || u.last_name AS class_teacher_name,
+        r.name AS room_name, r.capacity AS room_capacity,
+        COUNT(DISTINCT s.id) AS student_count,
+        COUNT(DISTINCT cs.subject_id) AS subject_count
+      FROM classes c
+      LEFT JOIN users u ON u.id = c.class_teacher_id
+      LEFT JOIN rooms r ON r.id = c.room_id
+      LEFT JOIN students s ON s.class_id = c.id AND s.is_active = TRUE
+      LEFT JOIN class_subjects cs ON cs.class_id = c.id
+      WHERE ${where}
+      GROUP BY c.id, u.first_name, u.last_name, r.name, r.capacity
+      ORDER BY c.sort_order ASC, c.name ASC, c.section ASC
+    `, params);
+    res.json({ data: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/classes', requireRole(['admin']), async (req, res) => {
+  try {
+    const {
+      name, section, education_level, grade_number, capacity,
+      room_id, class_teacher_id, academic_year, sort_order
+    } = req.body;
+    const result = await query(
+      `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, room_id, class_teacher_id, academic_year, sort_order, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE)
+       ON CONFLICT DO NOTHING RETURNING *`,
+      [tid(req), name, section || 'A', education_level || 'lower_primary', grade_number, capacity || 45,
+       room_id || null, class_teacher_id || null, academic_year || new Date().getFullYear().toString(), sort_order || 0]
+    );
+    res.status(201).json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/classes/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, section, capacity, room_id, class_teacher_id, academic_year, is_active, education_level } = req.body;
+    const result = await query(
+      `UPDATE classes SET name=$1, section=$2, capacity=$3, room_id=$4,
+       class_teacher_id=$5, academic_year=$6, is_active=$7, education_level=$8, updated_at=NOW()
+       WHERE id=$9 AND tenant_id=$10 RETURNING *`,
+      [name, section, capacity || 45, room_id || null, class_teacher_id || null,
+       academic_year, is_active !== false, education_level, req.params.id, tid(req)]
+    );
+    res.json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/classes/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const count = await query('SELECT COUNT(*) FROM students WHERE class_id=$1', [req.params.id]);
+    if (parseInt(count.rows[0].count) > 0) {
+      return res.status(400).json({ error: 'Cannot delete class with enrolled students' });
+    }
+    await query('DELETE FROM classes WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
+    res.json({ message: 'Class deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /classes/:id/subjects — subjects linked to this class
+router.get('/classes/:id/subjects', requireRole(['admin','teacher']), async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT cs.*, s.name AS subject_name, s.code, s.education_level, s.color, s.is_elective, s.weekly_periods,
+        u.first_name || ' ' || u.last_name AS teacher_name
+      FROM class_subjects cs
+      JOIN subjects s ON s.id = cs.subject_id
+      LEFT JOIN users u ON u.id = cs.teacher_id
+      WHERE cs.class_id = $1 AND cs.tenant_id = $2
+      ORDER BY s.sort_order, s.name
+    `, [req.params.id, tid(req)]);
+    res.json({ data: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /classes/:id/subjects — link subject to class
+router.post('/classes/:id/subjects', requireRole(['admin']), async (req, res) => {
+  try {
+    const { subject_id, teacher_id, is_optional, weekly_periods } = req.body;
+    const result = await query(
+      `INSERT INTO class_subjects (class_id, subject_id, teacher_id, tenant_id, is_optional, weekly_periods)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (class_id, subject_id) DO UPDATE SET teacher_id=EXCLUDED.teacher_id, weekly_periods=EXCLUDED.weekly_periods
+       RETURNING *`,
+      [req.params.id, subject_id, teacher_id || null, tid(req), is_optional || false, weekly_periods || 5]
+    );
+    res.status(201).json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /classes/:id/subjects/:subjectId — unlink
+router.delete('/classes/:id/subjects/:subjectId', requireRole(['admin']), async (req, res) => {
+  try {
+    await query('DELETE FROM class_subjects WHERE class_id=$1 AND subject_id=$2 AND tenant_id=$3',
+      [req.params.id, req.params.subjectId, tid(req)]);
+    res.json({ message: 'Subject removed from class' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ================================================================
+// SUBJECT / LEARNING AREA MANAGEMENT
+// ================================================================
+
+router.get('/subjects', requireRole(['admin','teacher','student','parent']), async (req, res) => {
+  try {
+    const { education_level, subject_group, is_elective } = req.query;
+    let where = ['s.tenant_id = $1'];
+    const params = [tid(req)];
+    let i = 2;
+    if (education_level) { where.push(`s.education_level = $${i++}`); params.push(education_level); }
+    if (subject_group) { where.push(`s.subject_group = $${i++}`); params.push(subject_group); }
+    if (is_elective !== undefined) { where.push(`s.is_elective = $${i++}`); params.push(is_elective === 'true'); }
+
+    const result = await query(`
+      SELECT s.*, COUNT(DISTINCT cs.class_id) AS class_count
+      FROM subjects s
+      LEFT JOIN class_subjects cs ON cs.subject_id = s.id
+      WHERE ${where.join(' AND ')}
+      GROUP BY s.id
+      ORDER BY s.sort_order ASC, s.education_level, s.name
+    `, params);
+    res.json({ data: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/subjects', requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, code, description, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order } = req.body;
+    const result = await query(
+      `INSERT INTO subjects (tenant_id, name, code, description, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)
+       ON CONFLICT DO NOTHING RETURNING *`,
+      [tid(req), name, code, description, education_level, category || 'core',
+       subject_group, is_elective || false, weekly_periods || 5, color, sort_order || 0]
+    );
+    res.status(201).json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/subjects/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, code, description, education_level, category, subject_group, is_elective, weekly_periods, color, is_active } = req.body;
+    const result = await query(
+      `UPDATE subjects SET name=$1, code=$2, description=$3, education_level=$4, category=$5,
+       subject_group=$6, is_elective=$7, weekly_periods=$8, color=$9, is_active=$10, updated_at=NOW()
+       WHERE id=$11 AND tenant_id=$12 RETURNING *`,
+      [name, code, description, education_level, category || 'core',
+       subject_group, is_elective || false, weekly_periods || 5, color, is_active !== false,
+       req.params.id, tid(req)]
+    );
+    res.json({ data: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/subjects/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    await query('DELETE FROM subjects WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
+    res.json({ message: 'Subject deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ================================================================
+// SEED CBC DEFAULTS (classes + subjects)
+// ================================================================
+
+const CBC_CLASSES = [
+  // sort, name, section, education_level, grade_number, capacity
+  { sort: 1,  name: 'Playgroup', section: 'A', education_level: 'pre_primary',       grade_number: 0,  capacity: 20 },
+  { sort: 2,  name: 'PP 1',      section: 'A', education_level: 'pre_primary',       grade_number: 1,  capacity: 25 },
+  { sort: 3,  name: 'PP 2',      section: 'A', education_level: 'pre_primary',       grade_number: 2,  capacity: 25 },
+  { sort: 4,  name: 'Grade 1',   section: 'A', education_level: 'lower_primary',     grade_number: 1,  capacity: 40 },
+  { sort: 5,  name: 'Grade 2',   section: 'A', education_level: 'lower_primary',     grade_number: 2,  capacity: 40 },
+  { sort: 6,  name: 'Grade 3',   section: 'A', education_level: 'lower_primary',     grade_number: 3,  capacity: 40 },
+  { sort: 7,  name: 'Grade 4',   section: 'A', education_level: 'upper_primary',     grade_number: 4,  capacity: 45 },
+  { sort: 8,  name: 'Grade 5',   section: 'A', education_level: 'upper_primary',     grade_number: 5,  capacity: 45 },
+  { sort: 9,  name: 'Grade 6',   section: 'A', education_level: 'upper_primary',     grade_number: 6,  capacity: 45 },
+  { sort: 10, name: 'Grade 7',   section: 'A', education_level: 'junior_secondary',  grade_number: 7,  capacity: 45 },
+  { sort: 11, name: 'Grade 8',   section: 'A', education_level: 'junior_secondary',  grade_number: 8,  capacity: 45 },
+  { sort: 12, name: 'Grade 9',   section: 'A', education_level: 'junior_secondary',  grade_number: 9,  capacity: 45 },
+  { sort: 13, name: 'Grade 10',  section: 'A', education_level: 'senior_secondary',  grade_number: 10, capacity: 45 },
+  { sort: 14, name: 'Grade 11',  section: 'A', education_level: 'senior_secondary',  grade_number: 11, capacity: 45 },
+  { sort: 15, name: 'Grade 12',  section: 'A', education_level: 'senior_secondary',  grade_number: 12, capacity: 45 },
+];
+
+const CBC_SUBJECTS = [
+  // Pre-Primary
+  { name: 'Activities for Early Learning', code: 'AEL', education_level: 'pre_primary', category: 'core', subject_group: 'other', weekly_periods: 5, sort_order: 1, color: '#ec4899' },
+  { name: 'Literacy Activities',           code: 'LTA', education_level: 'pre_primary', category: 'core', subject_group: 'languages', weekly_periods: 6, sort_order: 2, color: '#f97316' },
+  { name: 'Numeracy Activities',           code: 'NMA', education_level: 'pre_primary', category: 'core', subject_group: 'stem', weekly_periods: 6, sort_order: 3, color: '#3b82f6' },
+  { name: 'Environmental Activities',      code: 'ENA', education_level: 'pre_primary', category: 'core', subject_group: 'stem', weekly_periods: 4, sort_order: 4, color: '#22c55e' },
+  { name: 'Psychomotor & Creative Arts',   code: 'PCA', education_level: 'pre_primary', category: 'core', subject_group: 'arts', weekly_periods: 4, sort_order: 5, color: '#a855f7' },
+  { name: 'Religious Education (PP)',      code: 'REP', education_level: 'pre_primary', category: 'core', subject_group: 'humanities', weekly_periods: 2, sort_order: 6, color: '#eab308' },
+
+  // Lower Primary (Grade 1–3)
+  { name: 'English Literacy',             code: 'ENG', education_level: 'lower_primary', category: 'core', subject_group: 'languages', weekly_periods: 6, sort_order: 10, color: '#f97316' },
+  { name: 'Kiswahili Literacy',           code: 'KIS', education_level: 'lower_primary', category: 'core', subject_group: 'languages', weekly_periods: 5, sort_order: 11, color: '#84cc16' },
+  { name: 'Mathematics',                  code: 'MTH', education_level: 'lower_primary', category: 'core', subject_group: 'stem', weekly_periods: 6, sort_order: 12, color: '#3b82f6' },
+  { name: 'Environmental Activities (LP)',code: 'ENV', education_level: 'lower_primary', category: 'core', subject_group: 'stem', weekly_periods: 4, sort_order: 13, color: '#22c55e' },
+  { name: 'Creative Arts (LP)',           code: 'CRA', education_level: 'lower_primary', category: 'core', subject_group: 'arts', weekly_periods: 3, sort_order: 14, color: '#a855f7' },
+  { name: 'Physical & Health Education',  code: 'PHE', education_level: 'lower_primary', category: 'core', subject_group: 'sports', weekly_periods: 3, sort_order: 15, color: '#f43f5e' },
+  { name: 'Religious Education',          code: 'REL', education_level: 'lower_primary', category: 'core', subject_group: 'humanities', weekly_periods: 2, sort_order: 16, color: '#eab308' },
+
+  // Upper Primary (Grade 4–6)
+  { name: 'English',                      code: 'ENG4', education_level: 'upper_primary', category: 'core', subject_group: 'languages', weekly_periods: 6, sort_order: 20, color: '#f97316' },
+  { name: 'Kiswahili',                    code: 'KIS4', education_level: 'upper_primary', category: 'core', subject_group: 'languages', weekly_periods: 5, sort_order: 21, color: '#84cc16' },
+  { name: 'Mathematics',                  code: 'MTH4', education_level: 'upper_primary', category: 'core', subject_group: 'stem', weekly_periods: 6, sort_order: 22, color: '#3b82f6' },
+  { name: 'Integrated Science',           code: 'ISC',  education_level: 'upper_primary', category: 'core', subject_group: 'stem', weekly_periods: 5, sort_order: 23, color: '#06b6d4' },
+  { name: 'Social Studies',               code: 'SST',  education_level: 'upper_primary', category: 'core', subject_group: 'humanities', weekly_periods: 4, sort_order: 24, color: '#8b5cf6' },
+  { name: 'Agriculture',                  code: 'AGR',  education_level: 'upper_primary', category: 'core', subject_group: 'technical', weekly_periods: 3, sort_order: 25, color: '#16a34a' },
+  { name: 'Home Science',                 code: 'HMS',  education_level: 'upper_primary', category: 'core', subject_group: 'technical', weekly_periods: 3, sort_order: 26, color: '#db2777' },
+  { name: 'Creative Arts & Crafts',       code: 'CAC',  education_level: 'upper_primary', category: 'core', subject_group: 'arts', weekly_periods: 3, sort_order: 27, color: '#a855f7' },
+  { name: 'Physical & Health Education',  code: 'PHE4', education_level: 'upper_primary', category: 'core', subject_group: 'sports', weekly_periods: 3, sort_order: 28, color: '#f43f5e' },
+  { name: 'Religious Education',          code: 'REL4', education_level: 'upper_primary', category: 'core', subject_group: 'humanities', weekly_periods: 2, sort_order: 29, color: '#eab308' },
+
+  // Junior Secondary (Grade 7–9) — Core
+  { name: 'English',                         code: 'ENGJ', education_level: 'junior_secondary', category: 'core', subject_group: 'languages', weekly_periods: 6, sort_order: 30, color: '#f97316' },
+  { name: 'Kiswahili',                       code: 'KISJ', education_level: 'junior_secondary', category: 'core', subject_group: 'languages', weekly_periods: 5, sort_order: 31, color: '#84cc16' },
+  { name: 'Mathematics',                     code: 'MTHJ', education_level: 'junior_secondary', category: 'core', subject_group: 'stem', weekly_periods: 6, sort_order: 32, color: '#3b82f6' },
+  { name: 'Integrated Science',              code: 'ISCJ', education_level: 'junior_secondary', category: 'core', subject_group: 'stem', weekly_periods: 5, sort_order: 33, color: '#06b6d4' },
+  { name: 'Social Studies',                  code: 'SSTJ', education_level: 'junior_secondary', category: 'core', subject_group: 'humanities', weekly_periods: 4, sort_order: 34, color: '#8b5cf6' },
+  { name: 'Pre-Technical & Pre-Career Ed',   code: 'PTC',  education_level: 'junior_secondary', category: 'core', subject_group: 'technical', weekly_periods: 4, sort_order: 35, color: '#78716c' },
+  { name: 'Agriculture & Nutrition',         code: 'AGN',  education_level: 'junior_secondary', category: 'core', subject_group: 'technical', weekly_periods: 3, sort_order: 36, color: '#16a34a' },
+  { name: 'Physical & Health Education',     code: 'PHEJ', education_level: 'junior_secondary', category: 'core', subject_group: 'sports', weekly_periods: 3, sort_order: 37, color: '#f43f5e' },
+  { name: 'Creative Arts & Sports',          code: 'CAS',  education_level: 'junior_secondary', category: 'core', subject_group: 'arts', weekly_periods: 3, sort_order: 38, color: '#a855f7' },
+  { name: 'Religious Education',             code: 'RELJ', education_level: 'junior_secondary', category: 'core', subject_group: 'humanities', weekly_periods: 2, sort_order: 39, color: '#eab308' },
+  // Junior Secondary — Electives
+  { name: 'Business Studies',    code: 'BST',  education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'business', weekly_periods: 3, sort_order: 40, color: '#0ea5e9' },
+  { name: 'Computer Science',    code: 'CSC',  education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'stem', weekly_periods: 3, sort_order: 41, color: '#6366f1' },
+  { name: 'Home Science (JSS)',  code: 'HMSJ', education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'technical', weekly_periods: 3, sort_order: 42, color: '#db2777' },
+  { name: 'Visual Arts',         code: 'VAR',  education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'arts', weekly_periods: 3, sort_order: 43, color: '#d946ef' },
+  { name: 'Performing Arts',     code: 'PAR',  education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'arts', weekly_periods: 3, sort_order: 44, color: '#ec4899' },
+  { name: 'French',              code: 'FRE',  education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'languages', weekly_periods: 3, sort_order: 45, color: '#64748b' },
+  { name: 'German',              code: 'GER',  education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'languages', weekly_periods: 3, sort_order: 46, color: '#64748b' },
+  { name: 'Arabic',              code: 'ARB',  education_level: 'junior_secondary', category: 'elective', is_elective: true, subject_group: 'languages', weekly_periods: 3, sort_order: 47, color: '#64748b' },
+
+  // Senior Secondary (Grade 10–12) — Core
+  { name: 'English',    code: 'ENGS', education_level: 'senior_secondary', category: 'core', subject_group: 'languages', weekly_periods: 6, sort_order: 50, color: '#f97316' },
+  { name: 'Kiswahili',  code: 'KISS', education_level: 'senior_secondary', category: 'core', subject_group: 'languages', weekly_periods: 5, sort_order: 51, color: '#84cc16' },
+  { name: 'Mathematics',code: 'MTHS', education_level: 'senior_secondary', category: 'core', subject_group: 'stem', weekly_periods: 6, sort_order: 52, color: '#3b82f6' },
+  { name: 'Physical Education (SS)',code: 'PHES',education_level: 'senior_secondary', category: 'core', subject_group: 'sports', weekly_periods: 2, sort_order: 53, color: '#f43f5e' },
+  // Senior Secondary — Electives (pathway-based)
+  { name: 'Physics',              code: 'PHY',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'stem', weekly_periods: 4, sort_order: 60, color: '#0284c7' },
+  { name: 'Chemistry',            code: 'CHE',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'stem', weekly_periods: 4, sort_order: 61, color: '#7c3aed' },
+  { name: 'Biology',              code: 'BIO',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'stem', weekly_periods: 4, sort_order: 62, color: '#16a34a' },
+  { name: 'Further Mathematics',  code: 'FMT',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'stem', weekly_periods: 4, sort_order: 63, color: '#2563eb' },
+  { name: 'Computer Science (SS)',code: 'CSCS', education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'stem', weekly_periods: 4, sort_order: 64, color: '#6366f1' },
+  { name: 'History & Government', code: 'HIG',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'humanities', weekly_periods: 4, sort_order: 65, color: '#92400e' },
+  { name: 'Geography',            code: 'GEO',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'humanities', weekly_periods: 4, sort_order: 66, color: '#065f46' },
+  { name: 'Economics',            code: 'ECO',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'business', weekly_periods: 4, sort_order: 67, color: '#0369a1' },
+  { name: 'Business Studies (SS)',code: 'BSTS', education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'business', weekly_periods: 4, sort_order: 68, color: '#0ea5e9' },
+  { name: 'Agriculture (SS)',     code: 'AGRS', education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'technical', weekly_periods: 4, sort_order: 69, color: '#15803d' },
+  { name: 'Home Science (SS)',    code: 'HMSS', education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'technical', weekly_periods: 4, sort_order: 70, color: '#be185d' },
+  { name: 'Religious Education (SS)', code: 'RELS', education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'humanities', weekly_periods: 2, sort_order: 71, color: '#eab308' },
+  { name: 'Art & Design',         code: 'ART',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'arts', weekly_periods: 4, sort_order: 72, color: '#d946ef' },
+  { name: 'Music',                code: 'MUS',  education_level: 'senior_secondary', category: 'elective', is_elective: true, subject_group: 'arts', weekly_periods: 4, sort_order: 73, color: '#ec4899' },
+];
+
+// POST /setup/seed-classes
+router.post('/setup/seed-classes', requireRole(['admin']), async (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear().toString();
+    let created = 0, skipped = 0;
+
+    for (const cls of CBC_CLASSES) {
+      const existing = await query(
+        'SELECT id FROM classes WHERE tenant_id=$1 AND name=$2 AND section=$3',
+        [tid(req), cls.name, cls.section]
+      );
+      if (existing.rows.length > 0) { skipped++; continue; }
+
+      await query(
+        `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE)`,
+        [tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
+      );
+      created++;
+    }
+    res.json({ message: `Classes seeded: ${created} created, ${skipped} already exist` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /setup/seed-subjects
+router.post('/setup/seed-subjects', requireRole(['admin']), async (req, res) => {
+  try {
+    let created = 0, skipped = 0;
+
+    for (const sub of CBC_SUBJECTS) {
+      const existing = await query(
+        'SELECT id FROM subjects WHERE tenant_id=$1 AND code=$2',
+        [tid(req), sub.code]
+      );
+      if (existing.rows.length > 0) { skipped++; continue; }
+
+      await query(
+        `INSERT INTO subjects (tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE)`,
+        [tid(req), sub.name, sub.code, sub.education_level, sub.category,
+         sub.subject_group, sub.is_elective || false, sub.weekly_periods, sub.color, sub.sort_order]
+      );
+      created++;
+    }
+    res.json({ message: `Subjects seeded: ${created} created, ${skipped} already exist` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /setup/seed-all
+router.post('/setup/seed-all', requireRole(['admin']), async (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear().toString();
+    let classesCreated = 0, subjectsCreated = 0;
+
+    for (const cls of CBC_CLASSES) {
+      const existing = await query('SELECT id FROM classes WHERE tenant_id=$1 AND name=$2 AND section=$3', [tid(req), cls.name, cls.section]);
+      if (existing.rows.length === 0) {
+        await query(
+          `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE)`,
+          [tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
+        );
+        classesCreated++;
+      }
+    }
+
+    for (const sub of CBC_SUBJECTS) {
+      const existing = await query('SELECT id FROM subjects WHERE tenant_id=$1 AND code=$2', [tid(req), sub.code]);
+      if (existing.rows.length === 0) {
+        await query(
+          `INSERT INTO subjects (tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE)`,
+          [tid(req), sub.name, sub.code, sub.education_level, sub.category,
+           sub.subject_group, sub.is_elective || false, sub.weekly_periods, sub.color, sub.sort_order]
+        );
+        subjectsCreated++;
+      }
+    }
+
+    res.json({
+      message: `Seeding complete: ${classesCreated} classes + ${subjectsCreated} subjects created`,
+      classes_created: classesCreated,
+      subjects_created: subjectsCreated,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /setup/status — check if tenant has classes/subjects seeded
+router.get('/setup/status', requireRole(['admin']), async (req, res) => {
+  try {
+    const [cls, sub] = await Promise.all([
+      query('SELECT COUNT(*) FROM classes WHERE tenant_id=$1', [tid(req)]),
+      query('SELECT COUNT(*) FROM subjects WHERE tenant_id=$1', [tid(req)]),
+    ]);
+    res.json({
+      data: {
+        class_count: parseInt(cls.rows[0].count),
+        subject_count: parseInt(sub.rows[0].count),
+        needs_setup: parseInt(cls.rows[0].count) === 0,
+      }
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

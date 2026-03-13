@@ -29,6 +29,12 @@ import {
   BarChart2,
   ListChecks,
   ChevronRight,
+  Bus,
+  Heart,
+  AlertTriangle,
+  ClipboardList,
+  CalendarDays,
+  BookMarked,
 } from 'lucide-react';
 
 type NavItem = {
@@ -51,10 +57,13 @@ const navigationItems: NavItem[] = [
   { name: 'User Management', href: '/app/users',     icon: Shield,        roles: ['admin'],                               section: 'People' },
 
   // ── Academic (admin / teacher) ────────────────────────────────────────────
-  { name: 'Academic',      href: '/app/academic',      icon: BookOpen,   roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'Attendance',    href: '/app/attendance',    icon: Calendar,   roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'CBC Analytics', href: '/app/cbc-analytics', icon: BarChart2,  roles: ['admin', 'teacher'], section: 'Academic' },
-  { name: 'CBC Curriculum',href: '/app/curriculum',    icon: GraduationCap, roles: ['admin'],          section: 'Academic' },
+  { name: 'Academic',           href: '/app/academic',         icon: BookOpen,      roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'Attendance',         href: '/app/attendance',       icon: Calendar,      roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Assessments',    href: '/app/cbc-assessments',  icon: ClipboardList, roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Report Cards',   href: '/app/cbc-report-cards', icon: BookMarked,    roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Analytics',      href: '/app/cbc-analytics',    icon: BarChart2,     roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Curriculum',     href: '/app/curriculum',       icon: GraduationCap, roles: ['admin'],            section: 'Academic' },
+  { name: 'Academic Calendar',  href: '/app/academic-calendar',icon: CalendarDays,  roles: ['admin'],            section: 'Academic' },
 
   // ── Academic (teacher) ────────────────────────────────────────────────────
   { name: 'My Classes',    href: '/app/my-classes',   icon: Users,      roles: ['teacher'], section: 'Academic' },
@@ -82,9 +91,10 @@ const navigationItems: NavItem[] = [
   { name: 'My Fees',           href: '/app/my-fees',                  icon: DollarSign,roles: ['student'],                  section: 'Finance' },
 
   // ── Family (parent) ───────────────────────────────────────────────────────
-  { name: 'My Children',       href: '/app/my-children',       icon: Users,      roles: ['parent'], section: 'Family' },
-  { name: 'Children Progress', href: '/app/children-progress', icon: TrendingUp, roles: ['parent'], section: 'Family' },
-  { name: 'Fee Payments',      href: '/app/fee-payments',      icon: DollarSign, roles: ['parent'], section: 'Family' },
+  { name: 'My Children',       href: '/app/my-children',       icon: Users,         roles: ['parent'], section: 'Family' },
+  { name: 'Children Progress', href: '/app/children-progress', icon: TrendingUp,    roles: ['parent'], section: 'Family' },
+  { name: 'Fee Payments',      href: '/app/fee-payments',      icon: DollarSign,    roles: ['parent'], section: 'Family' },
+  { name: 'My Alerts',         href: '/app/my-alerts',         icon: Bell,          roles: ['parent'], section: 'Family' },
 
   // ── Schedule ──────────────────────────────────────────────────────────────
   { name: 'Timetable',    href: '/app/timetable',    icon: Clock,    roles: ['admin', 'teacher'],           section: 'Schedule' },
@@ -95,6 +105,11 @@ const navigationItems: NavItem[] = [
   { name: 'Communication', href: '/app/communication', icon: MessageSquare, roles: ['admin', 'teacher'],          section: 'Messages' },
   { name: 'Messages',      href: '/app/messages',      icon: MessageSquare, roles: ['student'],                   section: 'Messages' },
   { name: 'Notifications', href: '/app/notifications', icon: Bell,          roles: ['parent', 'student'],         section: 'Messages' },
+
+  // ── Student Welfare ───────────────────────────────────────────────────────
+  { name: 'Discipline',  href: '/app/discipline', icon: AlertTriangle, roles: ['admin', 'teacher'], section: 'Welfare' },
+  { name: 'Health',      href: '/app/health',     icon: Heart,         roles: ['admin', 'teacher'], section: 'Welfare' },
+  { name: 'Transport',   href: '/app/transport',  icon: Bus,           roles: ['admin'],            section: 'Welfare' },
 
   // ── Library ───────────────────────────────────────────────────────────────
   { name: 'Library Catalog',    href: '/app/library',            icon: Library,  roles: ['admin', 'teacher', 'student', 'parent'], section: 'Library' },

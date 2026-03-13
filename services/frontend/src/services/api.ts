@@ -952,6 +952,95 @@ class ApiService {
   }
 
   // ======================
+  // CBC COMPREHENSIVE
+  // ======================
+
+  // Strands
+  getCbcStrands(params?: any) { return this.api.get('/cbc/strands', { params }); }
+  createCbcStrand(data: any) { return this.api.post('/cbc/strands', data); }
+  updateCbcStrand(id: string, data: any) { return this.api.put('/cbc/strands/' + id, data); }
+  deleteCbcStrand(id: string) { return this.api.delete('/cbc/strands/' + id); }
+
+  // Sub-strands
+  getCbcSubStrands(params?: any) { return this.api.get('/cbc/sub-strands', { params }); }
+  createCbcSubStrand(data: any) { return this.api.post('/cbc/sub-strands', data); }
+  updateCbcSubStrand(id: string, data: any) { return this.api.put('/cbc/sub-strands/' + id, data); }
+  deleteCbcSubStrand(id: string) { return this.api.delete('/cbc/sub-strands/' + id); }
+
+  // Assessments
+  getCbcAssessments(params?: any) { return this.api.get('/cbc/assessments', { params }); }
+  createCbcAssessment(data: any) { return this.api.post('/cbc/assessments', data); }
+  updateCbcAssessment(id: string, data: any) { return this.api.put('/cbc/assessments/' + id, data); }
+  deleteCbcAssessment(id: string) { return this.api.delete('/cbc/assessments/' + id); }
+
+  // Competency Summary
+  getCbcCompetencySummary(params?: any) { return this.api.get('/cbc/competency-summary', { params }); }
+  saveCbcCompetencySummary(data: any) { return this.api.post('/cbc/competency-summary', data); }
+
+  // Report Cards
+  getCbcReportCards(params?: any) { return this.api.get('/cbc/report-cards', { params }); }
+  getCbcReportCard(id: string) { return this.api.get('/cbc/report-cards/' + id); }
+  createCbcReportCard(data: any) { return this.api.post('/cbc/report-cards', data); }
+  publishCbcReportCard(id: string) { return this.api.put('/cbc/report-cards/' + id + '/publish'); }
+  acknowledgeCbcReportCard(id: string, data: any) { return this.api.put('/cbc/report-cards/' + id + '/acknowledge', data); }
+
+  // Portfolios
+  getCbcPortfolios(params?: any) { return this.api.get('/cbc/portfolios', { params }); }
+  createCbcPortfolio(data: any) { return this.api.post('/cbc/portfolios', data); }
+  deleteCbcPortfolio(id: string) { return this.api.delete('/cbc/portfolios/' + id); }
+
+  // Academic Terms
+  getAcademicTerms() { return this.api.get('/cbc/terms'); }
+  getCurrentTerm() { return this.api.get('/cbc/terms/current'); }
+  createAcademicTerm(data: any) { return this.api.post('/cbc/terms', data); }
+  setCurrentTerm(id: string) { return this.api.put('/cbc/terms/' + id + '/set-current'); }
+
+  // CBC Class Summary
+  getCbcClassSummary(classId: string, params?: any) { return this.api.get('/cbc/class-summary/' + classId, { params }); }
+
+  // ======================
+  // PARENT ALERTS
+  // ======================
+  getParentAlerts(params?: any) { return this.api.get('/parent-alerts', { params }); }
+  getParentAlertsCount() { return this.api.get('/parent-alerts/unread-count'); }
+  markParentAlertRead(id: string) { return this.api.put('/parent-alerts/' + id + '/read'); }
+  markAllParentAlertsRead() { return this.api.put('/parent-alerts/mark-all-read'); }
+  sendParentAlert(data: any) { return this.api.post('/parent-alerts/send', data); }
+  broadcastParentAlert(data: any) { return this.api.post('/parent-alerts/broadcast', data); }
+  getStudentAlerts(studentId: string) { return this.api.get('/parent-alerts/student/' + studentId); }
+
+  // ======================
+  // DISCIPLINE
+  // ======================
+  getDisciplineIncidents(params?: any) { return this.api.get('/discipline', { params }); }
+  getDisciplineStats(params?: any) { return this.api.get('/discipline/stats', { params }); }
+  getDisciplineIncident(id: string) { return this.api.get('/discipline/' + id); }
+  createDisciplineIncident(data: any) { return this.api.post('/discipline', data); }
+  updateDisciplineIncident(id: string, data: any) { return this.api.put('/discipline/' + id, data); }
+  deleteDisciplineIncident(id: string) { return this.api.delete('/discipline/' + id); }
+
+  // ======================
+  // TRANSPORT
+  // ======================
+  getTransportRoutes() { return this.api.get('/transport/routes'); }
+  getTransportRoute(id: string) { return this.api.get('/transport/routes/' + id); }
+  createTransportRoute(data: any) { return this.api.post('/transport/routes', data); }
+  updateTransportRoute(id: string, data: any) { return this.api.put('/transport/routes/' + id, data); }
+  deleteTransportRoute(id: string) { return this.api.delete('/transport/routes/' + id); }
+  getTransportStudents(params?: any) { return this.api.get('/transport/students', { params }); }
+  assignStudentTransport(data: any) { return this.api.post('/transport/students', data); }
+  removeStudentTransport(id: string) { return this.api.delete('/transport/students/' + id); }
+
+  // ======================
+  // STUDENT HEALTH
+  // ======================
+  getHealthRecords(params?: any) { return this.api.get('/health/records', { params }); }
+  createHealthRecord(data: any) { return this.api.post('/health/records', data); }
+  deleteHealthRecord(id: string) { return this.api.delete('/health/records/' + id); }
+  getStudentHealthProfile(studentId: string) { return this.api.get('/health/profile/' + studentId); }
+  saveStudentHealthProfile(data: any) { return this.api.post('/health/profile', data); }
+
+  // ======================
   // SCHOOL REGISTRATION (Public — no auth header needed)
   // ======================
   registerSchool(data: {

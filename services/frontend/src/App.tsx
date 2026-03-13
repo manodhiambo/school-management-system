@@ -72,6 +72,17 @@ import FinancialYears from "./pages/finance/FinancialYears";
 // CBC / Academic Pages
 import { CbcAnalyticsPage } from './pages/academic/CbcAnalyticsPage';
 import { CurriculumPage } from './pages/academic/CurriculumPage';
+import { CbcAssessmentPage } from './pages/cbc/CbcAssessmentPage';
+import { CbcReportCardPage } from './pages/cbc/CbcReportCardPage';
+import { AcademicCalendarPage } from './pages/cbc/AcademicCalendarPage';
+
+// Discipline / Transport / Health
+import { DisciplinePage } from './pages/discipline/DisciplinePage';
+import { TransportPage } from './pages/transport/TransportPage';
+import { HealthPage } from './pages/health/HealthPage';
+
+// Parent Alerts
+import { ParentAlertsPage } from './pages/parent/ParentAlertsPage';
 
 // Shared Pages
 import { ProfilePage } from './pages/settings/ProfilePage';
@@ -184,6 +195,17 @@ function App() {
               {/* CBC Routes */}
               <Route path="cbc-analytics" element={<CbcAnalyticsPage />} />
               <Route path="curriculum" element={<CurriculumPage />} />
+              <Route path="cbc-assessments" element={<CbcAssessmentPage />} />
+              <Route path="cbc-report-cards" element={<CbcReportCardPage />} />
+              <Route path="academic-calendar" element={<AcademicCalendarPage />} />
+
+              {/* Discipline / Transport / Health */}
+              <Route path="discipline" element={<DisciplinePage />} />
+              <Route path="transport" element={<TransportPage />} />
+              <Route path="health" element={<HealthPage />} />
+
+              {/* Parent Alerts */}
+              <Route path="my-alerts" element={<ParentAlertsPage />} />
 
               {/* Shared Routes */}
               <Route path="profile" element={<ProfilePage />} />

@@ -55,7 +55,7 @@ router.get('/schemes', requireRole(['admin','teacher']), async (req, res) => {
       GROUP BY s.id, sub.name, c.name, u.first_name, u.last_name
       ORDER BY s.created_at DESC
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -69,7 +69,7 @@ router.post('/schemes', requireRole(['admin','teacher']), async (req, res) => {
       INSERT INTO schemes_of_work (tenant_id, subject_id, class_id, teacher_id, academic_year, term, title, strand_id, total_weeks, objectives, resources)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *
     `, [tid(req), subject_id, class_id, uid(req), academic_year, term, title, strand_id, total_weeks || 13, objectives, resources]);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -87,13 +87,13 @@ router.get('/schemes/:id', requireRole(['admin','teacher']), async (req, res) =>
       LEFT JOIN users u ON u.id = s.teacher_id
       WHERE s.id = $1 AND s.tenant_id = $2
     `, [req.params.id, tid(req)]);
-    if (!scheme.rows[0]) return res.status(404).json({ error: 'Not found' });
+    if (!scheme[0]) return res.status(404).json({ error: 'Not found' });
 
     const weeks = await query(
       'SELECT sw.*, ss.title AS sub_strand_name FROM scheme_weeks sw LEFT JOIN cbc_sub_strands ss ON ss.id = sw.sub_strand_id WHERE sw.scheme_id = $1 ORDER BY sw.week_number',
       [req.params.id]
     );
-    res.json({ data: { ...scheme.rows[0], weeks: weeks.rows } });
+    res.json({ data: { ...scheme[0], weeks: weeks } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -121,7 +121,7 @@ router.put('/schemes/:id', requireRole(['admin','teacher']), async (req, res) =>
       `UPDATE schemes_of_work SET ${fields.join(',')} WHERE id=$${i++} AND tenant_id=$${i} RETURNING *`,
       params
     );
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -139,7 +139,7 @@ router.post('/schemes/:id/weeks', requireRole(['admin','teacher']), async (req, 
       `, [req.params.id, w.week_number, w.topic, w.sub_strand_id || null, w.learning_outcomes, w.activities, w.resources, w.assessment_type, w.remarks]);
     }
     const result = await query('SELECT * FROM scheme_weeks WHERE scheme_id = $1 ORDER BY week_number', [req.params.id]);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -186,7 +186,7 @@ router.get('/lesson-plans', requireRole(['admin','teacher']), async (req, res) =
       WHERE ${where.join(' AND ')}
       ORDER BY lp.date DESC, lp.week_number, lp.lesson_number
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -216,7 +216,7 @@ router.post('/lesson-plans', requireRole(['admin','teacher']), async (req, res) 
         topic, learning_objectives, key_vocabulary, prior_knowledge,
         teaching_methods, introduction, development, conclusion,
         activities, homework, resources, assessment_method]);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -234,8 +234,8 @@ router.get('/lesson-plans/:id', requireRole(['admin','teacher']), async (req, re
       LEFT JOIN users u ON u.id = lp.teacher_id
       WHERE lp.id = $1 AND lp.tenant_id = $2
     `, [req.params.id, tid(req)]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
-    res.json({ data: result.rows[0] });
+    if (!result[0]) return res.status(404).json({ error: 'Not found' });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -264,7 +264,7 @@ router.put('/lesson-plans/:id', requireRole(['admin','teacher']), async (req, re
       `UPDATE lesson_plans SET ${fields.join(',')} WHERE id=$${i++} AND tenant_id=$${i} RETURNING *`,
       params
     );
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -316,7 +316,7 @@ router.get('/sba', requireRole(['admin','teacher']), async (req, res) => {
       GROUP BY s.id, sub.name, c.name, u.first_name, u.last_name
       ORDER BY s.created_at DESC
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -338,7 +338,7 @@ router.post('/sba', requireRole(['admin','teacher']), async (req, res) => {
     `, [tid(req), class_id, subject_id, uid(req), strand_id, sub_strand_id,
         academic_year, term, title, assessment_type, description, max_score || 100,
         weight_percentage || 10, assessment_date, submission_deadline, instructions, rubric]);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -354,7 +354,7 @@ router.get('/sba/:id/records', requireRole(['admin','teacher']), async (req, res
       WHERE sr.sba_setup_id = $1
       ORDER BY s.first_name
     `, [req.params.id]);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -367,8 +367,8 @@ router.post('/sba/:id/records', requireRole(['admin','teacher']), async (req, re
     const sba = await query(
       'SELECT * FROM sba_setups WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]
     );
-    if (!sba.rows[0]) return res.status(404).json({ error: 'SBA not found' });
-    const maxScore = parseFloat(sba.rows[0].max_score);
+    if (!sba[0]) return res.status(404).json({ error: 'SBA not found' });
+    const maxScore = parseFloat(sba[0].max_score);
 
     for (const r of records) {
       const score = r.is_absent ? null : parseFloat(r.score);
@@ -413,7 +413,7 @@ router.put('/sba/:id', requireRole(['admin','teacher']), async (req, res) => {
       `UPDATE sba_setups SET ${fields.join(',')} WHERE id=$${i++} AND tenant_id=$${i} RETURNING *`,
       params
     );
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -454,7 +454,7 @@ router.get('/projects', requireRole(['admin','teacher','student']), async (req, 
       GROUP BY p.id, sub.name, c.name, u.first_name, u.last_name
       ORDER BY p.created_at DESC
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -477,7 +477,7 @@ router.post('/projects', requireRole(['admin','teacher']), async (req, res) => {
         academic_year, term, title, description, project_type || 'individual',
         is_stem || false, start_date, due_date, max_score || 100,
         rubric, learning_outcomes, materials_needed]);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -493,7 +493,7 @@ router.get('/projects/:id', requireRole(['admin','teacher','student']), async (r
       LEFT JOIN classes c ON c.id = p.class_id
       WHERE p.id = $1 AND p.tenant_id = $2
     `, [req.params.id, tid(req)]);
-    if (!project.rows[0]) return res.status(404).json({ error: 'Not found' });
+    if (!project[0]) return res.status(404).json({ error: 'Not found' });
 
     const milestones = await query('SELECT * FROM project_milestones WHERE project_id=$1 ORDER BY sort_order', [req.params.id]);
     const submissions = await query(`
@@ -504,7 +504,7 @@ router.get('/projects/:id', requireRole(['admin','teacher','student']), async (r
       ORDER BY ps.submission_date DESC
     `, [req.params.id]);
 
-    res.json({ data: { ...project.rows[0], milestones: milestones.rows, submissions: submissions.rows } });
+    res.json({ data: { ...project[0], milestones: milestones, submissions: submissions } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -518,7 +518,7 @@ router.post('/projects/:id/milestones', requireRole(['admin','teacher']), async 
       'INSERT INTO project_milestones (project_id, title, description, due_date, sort_order) VALUES ($1,$2,$3,$4,$5) RETURNING *',
       [req.params.id, title, description, due_date, sort_order || 0]
     );
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -529,15 +529,15 @@ router.post('/projects/:id/submissions', requireRole(['admin','teacher','student
   try {
     const { student_id, project_group_id, title, description, evidence_urls, milestone_id } = req.body;
     const project = await query('SELECT * FROM projects WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
-    if (!project.rows[0]) return res.status(404).json({ error: 'Not found' });
+    if (!project[0]) return res.status(404).json({ error: 'Not found' });
     const now = new Date();
-    const isLate = project.rows[0].due_date && now > new Date(project.rows[0].due_date);
+    const isLate = project[0].due_date && now > new Date(project[0].due_date);
     const result = await query(`
       INSERT INTO project_submissions (project_id, student_id, project_group_id, title, description, evidence_urls, milestone_id, is_late)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
     `, [req.params.id, student_id, project_group_id, title, description,
         evidence_urls || [], milestone_id, isLate]);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -548,14 +548,14 @@ router.put('/projects/:projectId/submissions/:subId/grade', requireRole(['admin'
   try {
     const { score, teacher_remarks } = req.body;
     const project = await query('SELECT max_score FROM projects WHERE id=$1', [req.params.projectId]);
-    const maxScore = parseFloat(project.rows[0]?.max_score || 100);
+    const maxScore = parseFloat(project[0]?.max_score || 100);
     const pct = (parseFloat(score) / maxScore) * 100;
     const cbc_grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
     const result = await query(`
       UPDATE project_submissions SET score=$1, cbc_grade=$2, teacher_remarks=$3, graded_at=NOW(), graded_by=$4
       WHERE id=$5 RETURNING *
     `, [score, cbc_grade, teacher_remarks, uid(req), req.params.subId]);
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -587,7 +587,7 @@ router.get('/life-skills', requireRole(['admin','teacher','parent']), async (req
       WHERE ${where.join(' AND ')}
       ORDER BY s.first_name
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -627,7 +627,7 @@ router.post('/life-skills', requireRole(['admin','teacher']), async (req, res) =
         communication, collaboration, critical_thinking, creativity,
         digital_literacy, self_management, leadership, physical_health,
         teacher_remarks, areas_of_improvement, strengths]);
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -677,7 +677,7 @@ router.get('/career/pathways', async (req, res) => {
       'SELECT * FROM career_pathways WHERE (tenant_id=$1 OR tenant_id IS NULL) AND is_active=TRUE ORDER BY name',
       [tid(req)]
     );
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -691,7 +691,7 @@ router.post('/career/pathways', requireRole(['admin']), async (req, res) => {
       INSERT INTO career_pathways (tenant_id, name, category, description, required_subjects, key_competencies, career_options, institutions)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
     `, [tid(req), name, category, description, required_subjects, key_competencies, career_options, institutions]);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -722,7 +722,7 @@ router.get('/career/profiles', requireRole(['admin','teacher']), async (req, res
       WHERE ${where.join(' AND ')}
       ORDER BY s.first_name
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -759,7 +759,7 @@ router.post('/career/profiles', requireRole(['admin','teacher']), async (req, re
         stem_interest, arts_interest, social_sciences_interest, technical_interest,
         business_interest, health_interest, recommended_pathway_id,
         career_aspirations, teacher_recommendation, counselor_notes, subject_combination, uid(req)]);
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -776,7 +776,7 @@ router.get('/career/profiles/student/:studentId', requireRole(['admin','teacher'
       WHERE cp.student_id = $1 AND cp.tenant_id = $2
       ORDER BY cp.academic_year DESC
     `, [req.params.studentId, tid(req)]);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -814,7 +814,7 @@ router.get('/materials', requireRole(['admin','teacher','student','parent']), as
       WHERE ${where.join(' AND ')}
       ORDER BY m.created_at DESC
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -835,7 +835,7 @@ router.post('/materials', requireRole(['admin','teacher']), async (req, res) => 
     `, [tid(req), uid(req), subject_id, class_id, strand_id, title, description,
         material_type, education_level, academic_year, term, file_url,
         external_url, is_public || false, tags || []]);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -849,7 +849,7 @@ router.put('/materials/:id', requireRole(['admin','teacher']), async (req, res) 
       UPDATE learning_materials SET title=$1, description=$2, is_public=$3, tags=$4, updated_at=NOW()
       WHERE id=$5 AND tenant_id=$6 RETURNING *
     `, [title, description, is_public, tags || [], req.params.id, tid(req)]);
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -872,7 +872,7 @@ router.put('/materials/:id/download', async (req, res) => {
       'UPDATE learning_materials SET download_count=download_count+1 WHERE id=$1 AND tenant_id=$2 RETURNING file_url, external_url, title',
       [req.params.id, tid(req)]
     );
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -893,7 +893,7 @@ router.get('/promotion/rules', requireRole(['admin']), async (req, res) => {
       WHERE pr.tenant_id = $1
       ORDER BY fc.name
     `, [tid(req)]);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -920,7 +920,7 @@ router.post('/promotion/rules', requireRole(['admin']), async (req, res) => {
         min_attendance_percent || 75, min_subjects_passed || 5,
         min_average_percent || 40, cbc_min_me_count || 3,
         auto_promote || false, notes]);
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -949,7 +949,7 @@ router.get('/promotion/history', requireRole(['admin','teacher']), async (req, r
       WHERE ${where.join(' AND ')}
       ORDER BY sp.promoted_at DESC
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -980,7 +980,7 @@ router.post('/promotion/promote-student', requireRole(['admin']), async (req, re
     if (to_class_id && promotion_type !== 'repeated') {
       await query('UPDATE students SET class_id=$1 WHERE id=$2', [to_class_id, student_id]);
     }
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1031,11 +1031,11 @@ router.get('/dashboard', requireRole(['admin','teacher']), async (req, res) => {
 
     res.json({
       data: {
-        schemes: { total: parseInt(schemes.rows[0].total), approved: parseInt(schemes.rows[0].approved || 0) },
-        lesson_plans: { total: parseInt(lessonPlans.rows[0].total), approved: parseInt(lessonPlans.rows[0].approved || 0) },
-        sbas: { total: parseInt(sbas.rows[0].total) },
-        projects: { total: parseInt(projects.rows[0].total), active: parseInt(projects.rows[0].active || 0) },
-        materials: { total: parseInt(materials.rows[0].total) },
+        schemes: { total: parseInt(schemes[0].total), approved: parseInt(schemes[0].approved || 0) },
+        lesson_plans: { total: parseInt(lessonPlans[0].total), approved: parseInt(lessonPlans[0].approved || 0) },
+        sbas: { total: parseInt(sbas[0].total) },
+        projects: { total: parseInt(projects[0].total), active: parseInt(projects[0].active || 0) },
+        materials: { total: parseInt(materials[0].total) },
       }
     });
   } catch (err) {
@@ -1057,7 +1057,7 @@ router.get('/rooms', requireRole(['admin','teacher']), async (req, res) => {
        GROUP BY r.id ORDER BY r.name`,
       [tid(req)]
     );
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1069,7 +1069,7 @@ router.post('/rooms', requireRole(['admin']), async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [tid(req), name, room_number, capacity || 45, building, floor, room_type || 'classroom', features || [], notes]
     );
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1082,7 +1082,7 @@ router.put('/rooms/:id', requireRole(['admin']), async (req, res) => {
        WHERE id=$10 AND tenant_id=$11 RETURNING *`,
       [name, room_number, capacity, building, floor, room_type, features || [], is_available !== false, notes, req.params.id, tid(req)]
     );
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1121,7 +1121,7 @@ router.get('/classes', requireRole(['admin','teacher','student','parent']), asyn
       GROUP BY c.id, u.first_name, u.last_name, r.name, r.capacity
       ORDER BY c.sort_order ASC, c.name ASC, c.section ASC
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1138,7 +1138,7 @@ router.post('/classes', requireRole(['admin']), async (req, res) => {
       [tid(req), name, section || 'A', education_level || 'lower_primary', grade_number, capacity || 45,
        room_id || null, class_teacher_id || null, academic_year || new Date().getFullYear().toString(), sort_order || 0]
     );
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1152,14 +1152,14 @@ router.put('/classes/:id', requireRole(['admin']), async (req, res) => {
       [name, section, capacity || 45, room_id || null, class_teacher_id || null,
        academic_year, is_active !== false, education_level, req.params.id, tid(req)]
     );
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/classes/:id', requireRole(['admin']), async (req, res) => {
   try {
     const count = await query('SELECT COUNT(*) FROM students WHERE class_id=$1', [req.params.id]);
-    if (parseInt(count.rows[0].count) > 0) {
+    if (parseInt(count[0].count) > 0) {
       return res.status(400).json({ error: 'Cannot delete class with enrolled students' });
     }
     await query('DELETE FROM classes WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
@@ -1179,7 +1179,7 @@ router.get('/classes/:id/subjects', requireRole(['admin','teacher']), async (req
       WHERE cs.class_id = $1 AND cs.tenant_id = $2
       ORDER BY s.sort_order, s.name
     `, [req.params.id, tid(req)]);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1194,7 +1194,7 @@ router.post('/classes/:id/subjects', requireRole(['admin']), async (req, res) =>
        RETURNING *`,
       [req.params.id, subject_id, teacher_id || null, tid(req), is_optional || false, weekly_periods || 5]
     );
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1229,7 +1229,7 @@ router.get('/subjects', requireRole(['admin','teacher','student','parent']), asy
       GROUP BY s.id
       ORDER BY s.sort_order ASC, s.education_level, s.name
     `, params);
-    res.json({ data: result.rows });
+    res.json({ data: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1243,7 +1243,7 @@ router.post('/subjects', requireRole(['admin']), async (req, res) => {
       [tid(req), name, code, description, education_level, category || 'core',
        subject_group, is_elective || false, weekly_periods || 5, color, sort_order || 0]
     );
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: result[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1258,7 +1258,7 @@ router.put('/subjects/:id', requireRole(['admin']), async (req, res) => {
        subject_group, is_elective || false, weekly_periods || 5, color, is_active !== false,
        req.params.id, tid(req)]
     );
-    res.json({ data: result.rows[0] });
+    res.json({ data: result[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1376,7 +1376,7 @@ router.post('/setup/seed-classes', requireRole(['admin']), async (req, res) => {
         'SELECT id FROM classes WHERE tenant_id=$1 AND name=$2 AND section=$3',
         [tid(req), cls.name, cls.section]
       );
-      if (existing.rows.length > 0) { skipped++; continue; }
+      if (existing.length > 0) { skipped++; continue; }
 
       await query(
         `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
@@ -1399,7 +1399,7 @@ router.post('/setup/seed-subjects', requireRole(['admin']), async (req, res) => 
         'SELECT id FROM subjects WHERE tenant_id=$1 AND code=$2',
         [tid(req), sub.code]
       );
-      if (existing.rows.length > 0) { skipped++; continue; }
+      if (existing.length > 0) { skipped++; continue; }
 
       await query(
         `INSERT INTO subjects (tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
@@ -1421,7 +1421,7 @@ router.post('/setup/seed-all', requireRole(['admin']), async (req, res) => {
 
     for (const cls of CBC_CLASSES) {
       const existing = await query('SELECT id FROM classes WHERE tenant_id=$1 AND name=$2 AND section=$3', [tid(req), cls.name, cls.section]);
-      if (existing.rows.length === 0) {
+      if (existing.length === 0) {
         await query(
           `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE)`,
@@ -1433,7 +1433,7 @@ router.post('/setup/seed-all', requireRole(['admin']), async (req, res) => {
 
     for (const sub of CBC_SUBJECTS) {
       const existing = await query('SELECT id FROM subjects WHERE tenant_id=$1 AND code=$2', [tid(req), sub.code]);
-      if (existing.rows.length === 0) {
+      if (existing.length === 0) {
         await query(
           `INSERT INTO subjects (tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE)`,
@@ -1461,9 +1461,9 @@ router.get('/setup/status', requireRole(['admin']), async (req, res) => {
     ]);
     res.json({
       data: {
-        class_count: parseInt(cls.rows[0].count),
-        subject_count: parseInt(sub.rows[0].count),
-        needs_setup: parseInt(cls.rows[0].count) === 0,
+        class_count: parseInt(cls[0].count),
+        subject_count: parseInt(sub[0].count),
+        needs_setup: parseInt(cls[0].count) === 0,
       }
     });
   } catch (err) { res.status(500).json({ error: err.message }); }

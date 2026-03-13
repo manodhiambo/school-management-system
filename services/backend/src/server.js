@@ -36,6 +36,13 @@ import onlineExamRoutes from './routes/onlineExam.routes.js';
 import offlineResultsRoutes from './routes/offlineResults.routes.js';
 import cbcAnalyticsRoutes from './routes/cbcAnalytics.routes.js';
 
+// New comprehensive Kenya CBC routes
+import cbcRoutes from './routes/cbcRoutes.js';
+import parentAlertsRoutes from './routes/parentAlertsRoutes.js';
+import disciplineRoutes from './routes/disciplineRoutes.js';
+import transportRoutes from './routes/transportRoutes.js';
+import healthRoutes from './routes/healthRoutes.js';
+
 dotenv.config();
 
 const app = express();
@@ -91,6 +98,14 @@ app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/online-exams', onlineExamRoutes);
 app.use('/api/v1/offline-results', offlineResultsRoutes);
 app.use('/api/v1/cbc-analytics', cbcAnalyticsRoutes);
+
+// Comprehensive Kenya CBC routes
+app.use('/api/v1/cbc', cbcRoutes);
+app.use('/api/v1/parent-alerts', parentAlertsRoutes);
+app.use('/api/v1/discipline', disciplineRoutes);
+app.use('/api/v1/transport', transportRoutes);
+app.use('/api/v1/health', healthRoutes);
+
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', schoolRegistrationRoutes);
 

@@ -8,6 +8,7 @@ import {
   ClipboardList, FolderOpen, Star, Lightbulb, Target, Users,
   BookMarked, TrendingUp, Award, ChevronDown, ChevronRight,
   Edit2, Trash2, X, Save, Eye, ArrowUpCircle, BarChart2,
+  Building2, Layers, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
@@ -52,15 +53,17 @@ const StatusBadge = ({ status }: { status?: string }) => {
 
 // ── Tabs ─────────────────────────────────────────────────────
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: BarChart2 },
-  { id: 'schemes', label: 'Schemes of Work', icon: ClipboardList },
-  { id: 'lessons', label: 'Lesson Plans', icon: BookOpen },
-  { id: 'sba', label: 'SBA', icon: Target },
-  { id: 'projects', label: 'Projects', icon: FolderOpen },
-  { id: 'lifeskills', label: 'Values & Life Skills', icon: Star },
-  { id: 'career', label: 'Career Guidance', icon: Lightbulb },
-  { id: 'materials', label: 'Learning Materials', icon: BookMarked },
-  { id: 'promotion', label: 'Promotion', icon: ArrowUpCircle },
+  { id: 'overview',   label: 'Overview',           icon: BarChart2 },
+  { id: 'classes',    label: 'Classes & Rooms',     icon: Building2 },
+  { id: 'subjects',   label: 'Learning Areas',      icon: Layers },
+  { id: 'schemes',    label: 'Schemes of Work',     icon: ClipboardList },
+  { id: 'lessons',    label: 'Lesson Plans',        icon: BookOpen },
+  { id: 'sba',        label: 'SBA',                 icon: Target },
+  { id: 'projects',   label: 'Projects',            icon: FolderOpen },
+  { id: 'lifeskills', label: 'Values & Life Skills',icon: Star },
+  { id: 'career',     label: 'Career Guidance',     icon: Lightbulb },
+  { id: 'materials',  label: 'Learning Materials',  icon: BookMarked },
+  { id: 'promotion',  label: 'Promotion',           icon: ArrowUpCircle },
 ];
 
 type Tab = typeof TABS[number]['id'];
@@ -78,8 +81,8 @@ export function AcademicPage() {
 
   useEffect(() => {
     Promise.all([
-      api.getClasses().catch(() => ({ data: [] })),
-      api.getSubjects().catch(() => ({ data: [] })),
+      api.getAcademicClasses().catch(() => ({ data: [] })),
+      api.getAcademicSubjects().catch(() => ({ data: [] })),
       api.getCbcStrands().catch(() => ({ data: [] })),
       api.getAcademicsDashboard().catch(() => ({ data: null })),
     ]).then(([c, s, st, d]: any) => {
@@ -124,7 +127,28 @@ export function AcademicPage() {
       {/* Tab Content */}
       <div className="min-h-[500px]">
         {activeTab === 'overview' && (
-          <OverviewTab dashboard={dashboard} />
+          <OverviewTab dashboard={dashboard} isAdmin={isAdmin} onSetupDone={() => {
+            Promise.all([
+              api.getAcademicClasses().catch(() => ({ data: [] })),
+              api.getAcademicSubjects().catch(() => ({ data: [] })),
+            ]).then(([c, s]: any) => {
+              setClasses(c.data || []);
+              setSubjects(s.data || []);
+            });
+          }} />
+        )}
+        {activeTab === 'classes' && (
+          <ClassesRoomsTab
+            classes={classes} subjects={subjects}
+            isAdmin={isAdmin}
+            onRefresh={() => api.getAcademicClasses().then((r: any) => setClasses(r.data || []))}
+          />
+        )}
+        {activeTab === 'subjects' && (
+          <SubjectsTab
+            subjects={subjects} isAdmin={isAdmin}
+            onRefresh={() => api.getAcademicSubjects().then((r: any) => setSubjects(r.data || []))}
+          />
         )}
         {activeTab === 'schemes' && (
           <SchemesTab classes={classes} subjects={subjects} strands={strands} currentYear={currentYear} isAdmin={isAdmin} isTeacher={isTeacher} />
@@ -156,7 +180,26 @@ export function AcademicPage() {
 }
 
 // ── OVERVIEW TAB ─────────────────────────────────────────────
-function OverviewTab({ dashboard }: { dashboard: any }) {
+function OverviewTab({ dashboard, isAdmin, onSetupDone }: { dashboard: any; isAdmin: boolean; onSetupDone: () => void }) {
+  const [seeding, setSeeding] = useState(false);
+  const [setupStatus, setSetupStatus] = useState<any>(null);
+
+  useEffect(() => {
+    if (isAdmin) {
+      api.getSetupStatus().then((r: any) => setSetupStatus(r.data)).catch(() => {});
+    }
+  }, [isAdmin]);
+
+  const seedAll = async () => {
+    setSeeding(true);
+    try {
+      const res: any = await api.seedCbcAll();
+      alert(res.message || 'Seeding complete!');
+      onSetupDone();
+      api.getSetupStatus().then((r: any) => setSetupStatus(r.data)).catch(() => {});
+    } catch (e: any) { alert(e.message); }
+    finally { setSeeding(false); }
+  };
   const stats = [
     { label: 'Schemes of Work', value: dashboard?.schemes?.total ?? '—', sub: `${dashboard?.schemes?.approved ?? 0} approved`, icon: ClipboardList, color: 'text-blue-600 bg-blue-50' },
     { label: 'Lesson Plans', value: dashboard?.lesson_plans?.total ?? '—', sub: `${dashboard?.lesson_plans?.approved ?? 0} approved`, icon: BookOpen, color: 'text-emerald-600 bg-emerald-50' },
@@ -167,6 +210,34 @@ function OverviewTab({ dashboard }: { dashboard: any }) {
 
   return (
     <div className="space-y-6">
+      {/* Setup Wizard Banner */}
+      {isAdmin && setupStatus?.needs_setup && (
+        <div className="border-2 border-dashed border-indigo-300 rounded-xl p-6 bg-indigo-50 flex flex-col md:flex-row items-center gap-4">
+          <AlertCircle className="h-10 w-10 text-indigo-500 flex-shrink-0" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-indigo-800">Set Up Your School's Academic Structure</h3>
+            <p className="text-sm text-indigo-600 mt-0.5">
+              No classes or subjects found. Load the complete Kenya CBC curriculum — all classes from Playgroup to Grade 12
+              and all learning areas per level — with one click. You can add more or customize after.
+            </p>
+          </div>
+          <Button onClick={seedAll} disabled={seeding} className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
+            {seeding ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Loading...</> : '🇰🇪 Load CBC Defaults'}
+          </Button>
+        </div>
+      )}
+      {isAdmin && setupStatus && !setupStatus.needs_setup && (
+        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border text-sm">
+          <span className="text-gray-600">
+            <span className="font-medium">{setupStatus.class_count}</span> classes · <span className="font-medium">{setupStatus.subject_count}</span> learning areas configured
+          </span>
+          <Button size="sm" variant="outline" onClick={seedAll} disabled={seeding}>
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${seeding ? 'animate-spin' : ''}`} />
+            Add Missing CBC Defaults
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {stats.map((s) => {
           const Icon = s.icon;
@@ -1718,6 +1789,677 @@ function BulkPromotePanel({ classes, currentYear, onSaved }: any) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── CLASSES & ROOMS TAB ──────────────────────────────────────
+const LEVEL_ORDER = ['pre_primary','lower_primary','upper_primary','junior_secondary','senior_secondary'];
+const LEVEL_LABELS: Record<string, string> = {
+  pre_primary: 'Pre-Primary (Playgroup, PP1, PP2)',
+  lower_primary: 'Lower Primary (Grade 1–3)',
+  upper_primary: 'Upper Primary (Grade 4–6)',
+  junior_secondary: 'Junior Secondary (Grade 7–9)',
+  senior_secondary: 'Senior Secondary (Grade 10–12)',
+};
+const LEVEL_COLORS: Record<string, string> = {
+  pre_primary: 'bg-pink-50 border-pink-200 text-pink-700',
+  lower_primary: 'bg-blue-50 border-blue-200 text-blue-700',
+  upper_primary: 'bg-indigo-50 border-indigo-200 text-indigo-700',
+  junior_secondary: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  senior_secondary: 'bg-orange-50 border-orange-200 text-orange-700',
+};
+
+function ClassesRoomsTab({ classes, subjects, isAdmin, onRefresh }: any) {
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [activeView, setActiveView] = useState<'classes' | 'rooms'>('classes');
+  const [showClassForm, setShowClassForm] = useState(false);
+  const [showRoomForm, setShowRoomForm] = useState(false);
+  const [editingClass, setEditingClass] = useState<any>(null);
+  const [editingRoom, setEditingRoom] = useState<any>(null);
+  const [selectedClass, setSelectedClass] = useState<any>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set(LEVEL_ORDER));
+
+  const [classForm, setClassForm] = useState<any>({
+    name: '', section: 'A', education_level: 'lower_primary', grade_number: '',
+    capacity: 45, room_id: '', class_teacher_id: '', academic_year: new Date().getFullYear().toString()
+  });
+  const [roomForm, setRoomForm] = useState<any>({
+    name: '', room_number: '', capacity: 45, building: '', floor: '', room_type: 'classroom', notes: ''
+  });
+
+  useEffect(() => {
+    loadRooms();
+    // Load teachers
+    (api as any).getTeachers ? (api as any).getTeachers().then((r: any) => setTeachers(r.data || [])).catch(() => {}) : null;
+  }, []);
+
+  const loadRooms = () => {
+    api.getRooms().then((r: any) => setRooms(r.data || [])).catch(() => {});
+  };
+
+  // Group classes by education level
+  const grouped: Record<string, any[]> = {};
+  for (const cls of classes) {
+    const level = cls.education_level || 'lower_primary';
+    if (!grouped[level]) grouped[level] = [];
+    grouped[level].push(cls);
+  }
+
+  const saveClass = async () => {
+    try {
+      if (editingClass) {
+        await api.updateAcademicClass(editingClass.id, classForm);
+      } else {
+        await api.createAcademicClass(classForm);
+      }
+      setShowClassForm(false);
+      setEditingClass(null);
+      onRefresh();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const saveRoom = async () => {
+    try {
+      if (editingRoom) {
+        await api.updateRoom(editingRoom.id, roomForm);
+      } else {
+        await api.createRoom(roomForm);
+      }
+      setShowRoomForm(false);
+      setEditingRoom(null);
+      loadRooms();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const deleteClass = async (id: string) => {
+    if (!confirm('Delete this class?')) return;
+    try { await api.deleteAcademicClass(id); onRefresh(); }
+    catch (e: any) { alert(e.message); }
+  };
+
+  const deleteRoom = async (id: string) => {
+    if (!confirm('Delete this room?')) return;
+    try { await api.deleteRoom(id); loadRooms(); }
+    catch (e: any) { alert(e.message); }
+  };
+
+  const openEditClass = (cls: any) => {
+    setEditingClass(cls);
+    setClassForm({
+      name: cls.name, section: cls.section || 'A', education_level: cls.education_level,
+      grade_number: cls.grade_number || '', capacity: cls.capacity || 45,
+      room_id: cls.room_id || '', class_teacher_id: cls.class_teacher_id || '',
+      academic_year: cls.academic_year || new Date().getFullYear().toString()
+    });
+    setShowClassForm(true);
+  };
+
+  const openEditRoom = (room: any) => {
+    setEditingRoom(room);
+    setRoomForm({
+      name: room.name, room_number: room.room_number || '', capacity: room.capacity,
+      building: room.building || '', floor: room.floor || '',
+      room_type: room.room_type, notes: room.notes || ''
+    });
+    setShowRoomForm(true);
+  };
+
+  const seedClasses = async () => {
+    setSeeding(true);
+    try {
+      const res: any = await api.seedCbcClasses();
+      alert(res.message);
+      onRefresh();
+    } catch (e: any) { alert(e.message); }
+    finally { setSeeding(false); }
+  };
+
+  const toggleLevel = (level: string) => {
+    setExpandedLevels(prev => {
+      const next = new Set(prev);
+      if (next.has(level)) next.delete(level); else next.add(level);
+      return next;
+    });
+  };
+
+  const ROOM_TYPE_ICONS: Record<string, string> = {
+    classroom: '🏫', laboratory: '🔬', computer_lab: '💻', library: '📚',
+    hall: '🏛️', sports_room: '⚽', art_room: '🎨', music_room: '🎵',
+    staffroom: '👔', office: '🏢', store: '📦', other: '🏠',
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* View toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          <button onClick={() => setActiveView('classes')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeView === 'classes' ? 'bg-white shadow text-indigo-700' : 'text-gray-600 hover:text-gray-800'}`}>
+            Classes ({classes.length})
+          </button>
+          <button onClick={() => setActiveView('rooms')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeView === 'rooms' ? 'bg-white shadow text-indigo-700' : 'text-gray-600 hover:text-gray-800'}`}>
+            Rooms ({rooms.length})
+          </button>
+        </div>
+        {isAdmin && activeView === 'classes' && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={seedClasses} disabled={seeding}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${seeding ? 'animate-spin' : ''}`} />
+              Load CBC Defaults
+            </Button>
+            <Button size="sm" onClick={() => { setEditingClass(null); setClassForm({ name: '', section: 'A', education_level: 'lower_primary', grade_number: '', capacity: 45, room_id: '', class_teacher_id: '', academic_year: new Date().getFullYear().toString() }); setShowClassForm(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Add Class
+            </Button>
+          </div>
+        )}
+        {isAdmin && activeView === 'rooms' && (
+          <Button size="sm" onClick={() => { setEditingRoom(null); setRoomForm({ name: '', room_number: '', capacity: 45, building: '', floor: '', room_type: 'classroom', notes: '' }); setShowRoomForm(true); }}>
+            <Plus className="h-4 w-4 mr-1" /> Add Room
+          </Button>
+        )}
+      </div>
+
+      {/* CLASS FORM */}
+      {showClassForm && activeView === 'classes' && (
+        <Card className="border-indigo-200">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">{editingClass ? 'Edit Class' : 'Add New Class'}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <Label className="text-xs">Class Name *</Label>
+                <Input value={classForm.name} onChange={e => setClassForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="e.g. Grade 1" />
+              </div>
+              <div>
+                <Label className="text-xs">Stream/Section</Label>
+                <Input value={classForm.section} onChange={e => setClassForm((f: any) => ({ ...f, section: e.target.value }))} placeholder="A" />
+              </div>
+              <div>
+                <Label className="text-xs">Education Level</Label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm" value={classForm.education_level} onChange={e => setClassForm((f: any) => ({ ...f, education_level: e.target.value }))}>
+                  {LEVEL_ORDER.map(l => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs">Grade Number</Label>
+                <Input type="number" value={classForm.grade_number} onChange={e => setClassForm((f: any) => ({ ...f, grade_number: e.target.value }))} placeholder="e.g. 1" />
+              </div>
+              <div>
+                <Label className="text-xs">Capacity</Label>
+                <Input type="number" value={classForm.capacity} onChange={e => setClassForm((f: any) => ({ ...f, capacity: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Assign Room</Label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm" value={classForm.room_id} onChange={e => setClassForm((f: any) => ({ ...f, room_id: e.target.value }))}>
+                  <option value="">No room assigned</option>
+                  {rooms.map(r => <option key={r.id} value={r.id}>{r.name} (cap: {r.capacity})</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs">Class Teacher</Label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm" value={classForm.class_teacher_id} onChange={e => setClassForm((f: any) => ({ ...f, class_teacher_id: e.target.value }))}>
+                  <option value="">Not assigned</option>
+                  {teachers.map((t: any) => <option key={t.id} value={t.user_id || t.id}>{t.first_name} {t.last_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs">Academic Year</Label>
+                <Input value={classForm.academic_year} onChange={e => setClassForm((f: any) => ({ ...f, academic_year: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={saveClass}><Save className="h-4 w-4 mr-1" /> Save</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowClassForm(false); setEditingClass(null); }}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ROOM FORM */}
+      {showRoomForm && activeView === 'rooms' && (
+        <Card className="border-emerald-200">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">{editingRoom ? 'Edit Room' : 'Add New Room'}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div><Label className="text-xs">Room Name *</Label><Input value={roomForm.name} onChange={e => setRoomForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="e.g. Room 1A" /></div>
+              <div><Label className="text-xs">Room Number</Label><Input value={roomForm.room_number} onChange={e => setRoomForm((f: any) => ({ ...f, room_number: e.target.value }))} placeholder="101" /></div>
+              <div><Label className="text-xs">Capacity</Label><Input type="number" value={roomForm.capacity} onChange={e => setRoomForm((f: any) => ({ ...f, capacity: e.target.value }))} /></div>
+              <div><Label className="text-xs">Room Type</Label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm" value={roomForm.room_type} onChange={e => setRoomForm((f: any) => ({ ...f, room_type: e.target.value }))}>
+                  {['classroom','laboratory','computer_lab','library','hall','sports_room','art_room','music_room','staffroom','office','store','other'].map(t => (
+                    <option key={t} value={t}>{ROOM_TYPE_ICONS[t]} {t.replace(/_/g,' ')}</option>
+                  ))}
+                </select>
+              </div>
+              <div><Label className="text-xs">Building</Label><Input value={roomForm.building} onChange={e => setRoomForm((f: any) => ({ ...f, building: e.target.value }))} placeholder="Main Block" /></div>
+              <div><Label className="text-xs">Floor</Label><Input value={roomForm.floor} onChange={e => setRoomForm((f: any) => ({ ...f, floor: e.target.value }))} placeholder="Ground Floor" /></div>
+              <div className="col-span-2"><Label className="text-xs">Notes</Label><Input value={roomForm.notes} onChange={e => setRoomForm((f: any) => ({ ...f, notes: e.target.value }))} placeholder="e.g. Has projector, AC" /></div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={saveRoom}><Save className="h-4 w-4 mr-1" /> Save</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowRoomForm(false); setEditingRoom(null); }}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* CLASSES VIEW */}
+      {activeView === 'classes' && (
+        <div className="space-y-3">
+          {classes.length === 0 && (
+            <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
+              <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">No classes yet</p>
+              <p className="text-sm mt-1">Click "Load CBC Defaults" to add all Kenya CBC classes automatically</p>
+            </div>
+          )}
+          {LEVEL_ORDER.filter(l => grouped[l]?.length > 0).map(level => (
+            <div key={level} className="border rounded-xl overflow-hidden">
+              <button
+                onClick={() => toggleLevel(level)}
+                className={`w-full flex items-center justify-between px-4 py-3 font-medium text-sm ${LEVEL_COLORS[level] || 'bg-gray-50'}`}
+              >
+                <span>{LEVEL_LABELS[level]} ({grouped[level]?.length || 0} classes)</span>
+                {expandedLevels.has(level) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+              {expandedLevels.has(level) && (
+                <div className="divide-y">
+                  {(grouped[level] || []).map((cls: any) => (
+                    <div key={cls.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className="text-center bg-white border rounded-lg px-2 py-1 min-w-[48px]">
+                          <div className="text-xs font-bold text-gray-700">{cls.section}</div>
+                          <div className="text-xs text-gray-400">Stream</div>
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">{cls.name}</div>
+                          <div className="text-xs text-gray-400 flex gap-2">
+                            <span>{cls.student_count || 0}/{cls.capacity || 45} students</span>
+                            {cls.room_name && <span>· 🏫 {cls.room_name}</span>}
+                            {cls.class_teacher_name && <span>· 👤 {cls.class_teacher_name}</span>}
+                            {cls.subject_count > 0 && <span>· {cls.subject_count} subjects</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => setSelectedClass(cls)}>
+                          <Layers className="h-4 w-4" />
+                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => openEditClass(cls)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-600" onClick={() => deleteClass(cls.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {/* Add stream button */}
+                  {isAdmin && (
+                    <div className="px-4 py-2">
+                      <button
+                        onClick={() => {
+                          const lastInLevel = grouped[level]?.[grouped[level].length - 1];
+                          const nextSection = lastInLevel
+                            ? String.fromCharCode((lastInLevel.section || 'A').charCodeAt(0) + 1)
+                            : 'B';
+                          setEditingClass(null);
+                          setClassForm({
+                            name: lastInLevel?.name || '', section: nextSection,
+                            education_level: level, grade_number: lastInLevel?.grade_number || '',
+                            capacity: 45, room_id: '', class_teacher_id: '',
+                            academic_year: new Date().getFullYear().toString()
+                          });
+                          setShowClassForm(true);
+                          setActiveView('classes');
+                        }}
+                        className="text-xs text-indigo-500 hover:text-indigo-700 flex items-center gap-1"
+                      >
+                        <Plus className="h-3 w-3" /> Add stream to this level
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ROOMS VIEW */}
+      {activeView === 'rooms' && (
+        <div className="space-y-2">
+          {rooms.length === 0 && (
+            <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
+              <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No rooms configured. Add rooms and assign them to classes.</p>
+            </div>
+          )}
+          <div className="grid md:grid-cols-2 gap-3">
+            {rooms.map((r: any) => (
+              <div key={r.id} className="border rounded-xl p-4 hover:bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{ROOM_TYPE_ICONS[r.room_type] || '🏠'}</span>
+                    <div>
+                      <div className="font-medium">{r.name}</div>
+                      <div className="text-xs text-gray-500 flex gap-2">
+                        {r.room_number && <span>#{r.room_number}</span>}
+                        <span>Cap: {r.capacity}</span>
+                        {r.building && <span>· {r.building}</span>}
+                        {r.floor && <span>· {r.floor}</span>}
+                      </div>
+                      {r.class_count > 0 && <div className="text-xs text-indigo-600 mt-0.5">{r.class_count} class(es) assigned</div>}
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => openEditRoom(r)}><Edit2 className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-600" onClick={() => deleteRoom(r.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  )}
+                </div>
+                {r.notes && <p className="text-xs text-gray-400 mt-1 pl-9">{r.notes}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Class subjects modal */}
+      {selectedClass && (
+        <ClassSubjectsModal cls={selectedClass} onClose={() => setSelectedClass(null)} isAdmin={isAdmin} />
+      )}
+    </div>
+  );
+}
+
+function ClassSubjectsModal({ cls, onClose, isAdmin }: any) {
+  const [linked, setLinked] = useState<any[]>([]);
+  const [allSubjects, setAllSubjects] = useState<any[]>([]);
+  const [addingId, setAddingId] = useState('');
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [teacherMap, setTeacherMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    api.getClassSubjects(cls.id).then((r: any) => setLinked(r.data || []));
+    api.getAcademicSubjects({ education_level: cls.education_level }).then((r: any) => setAllSubjects(r.data || []));
+    (api as any).getTeachers?.().then((r: any) => setTeachers(r.data || [])).catch(() => {});
+  }, [cls.id]);
+
+  const unlinkedSubjects = allSubjects.filter(s => !linked.find(l => l.subject_id === s.id));
+
+  const addSubject = async () => {
+    if (!addingId) return;
+    await api.addSubjectToClass(cls.id, { subject_id: addingId, teacher_id: teacherMap[addingId] || null });
+    const r: any = await api.getClassSubjects(cls.id);
+    setLinked(r.data || []);
+    setAddingId('');
+  };
+
+  const removeSubject = async (subjectId: string) => {
+    await api.removeSubjectFromClass(cls.id, subjectId);
+    setLinked(prev => prev.filter(l => l.subject_id !== subjectId));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h3 className="font-semibold">{cls.name} {cls.section} — Subjects</h3>
+            <p className="text-xs text-gray-500">{LEVEL_LABELS[cls.education_level]}</p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+        </div>
+        <div className="overflow-y-auto p-4 space-y-3">
+          {/* Add subject */}
+          {isAdmin && unlinkedSubjects.length > 0 && (
+            <div className="flex gap-2">
+              <select className="flex-1 border rounded px-2 py-1.5 text-sm" value={addingId} onChange={e => setAddingId(e.target.value)}>
+                <option value="">Select subject to add...</option>
+                {unlinkedSubjects.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name} {s.is_elective ? '(Elective)' : ''}</option>
+                ))}
+              </select>
+              <Button size="sm" onClick={addSubject} disabled={!addingId}><Plus className="h-4 w-4" /></Button>
+            </div>
+          )}
+
+          {/* Linked subjects */}
+          <div className="space-y-1">
+            {linked.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No subjects assigned. Add from above.</p>}
+            {linked.map((l: any) => (
+              <div key={l.subject_id} className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-gray-50">
+                <div className="flex items-center gap-2">
+                  {l.color && <div className="h-3 w-3 rounded-full" style={{ backgroundColor: l.color }} />}
+                  <div>
+                    <span className="text-sm font-medium">{l.subject_name}</span>
+                    {l.is_elective && <span className="ml-1 text-xs bg-orange-100 text-orange-700 px-1 rounded">Elective</span>}
+                    <div className="text-xs text-gray-400">{l.code} · {l.weekly_periods} periods/week
+                      {l.teacher_name && ` · ${l.teacher_name}`}
+                    </div>
+                  </div>
+                </div>
+                {isAdmin && (
+                  <button className="text-red-400 hover:text-red-600" onClick={() => removeSubject(l.subject_id)}>
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SUBJECTS / LEARNING AREAS TAB ────────────────────────────
+const SUBJECT_GROUP_COLORS: Record<string, string> = {
+  stem: 'bg-blue-100 text-blue-700',
+  languages: 'bg-orange-100 text-orange-700',
+  humanities: 'bg-purple-100 text-purple-700',
+  arts: 'bg-pink-100 text-pink-700',
+  technical: 'bg-stone-100 text-stone-700',
+  business: 'bg-teal-100 text-teal-700',
+  sports: 'bg-red-100 text-red-700',
+  other: 'bg-gray-100 text-gray-600',
+};
+
+function SubjectsTab({ subjects, isAdmin, onRefresh }: any) {
+  const [showForm, setShowForm] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<any>(null);
+  const [filterLevel, setFilterLevel] = useState('');
+  const [filterGroup, setFilterGroup] = useState('');
+  const [seeding, setSeeding] = useState(false);
+  const [form, setForm] = useState<any>({
+    name: '', code: '', description: '', education_level: 'lower_primary',
+    category: 'core', subject_group: 'stem', is_elective: false,
+    weekly_periods: 5, color: '#3b82f6'
+  });
+
+  const filtered = subjects.filter((s: any) => {
+    if (filterLevel && s.education_level !== filterLevel) return false;
+    if (filterGroup && s.subject_group !== filterGroup) return false;
+    return true;
+  });
+
+  // Group by education level
+  const grouped: Record<string, any[]> = {};
+  for (const s of filtered) {
+    const level = s.education_level || 'other';
+    if (!grouped[level]) grouped[level] = [];
+    grouped[level].push(s);
+  }
+
+  const saveSubject = async () => {
+    try {
+      if (editingSubject) {
+        await api.updateAcademicSubject(editingSubject.id, form);
+      } else {
+        await api.createAcademicSubject(form);
+      }
+      setShowForm(false);
+      setEditingSubject(null);
+      onRefresh();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const deleteSubject = async (id: string) => {
+    if (!confirm('Delete this subject?')) return;
+    try { await api.deleteAcademicSubject(id); onRefresh(); }
+    catch (e: any) { alert(e.message); }
+  };
+
+  const openEdit = (s: any) => {
+    setEditingSubject(s);
+    setForm({
+      name: s.name, code: s.code, description: s.description || '',
+      education_level: s.education_level || 'lower_primary',
+      category: s.category || 'core', subject_group: s.subject_group || 'stem',
+      is_elective: s.is_elective || false, weekly_periods: s.weekly_periods || 5, color: s.color || '#3b82f6'
+    });
+    setShowForm(true);
+  };
+
+  const seedSubjects = async () => {
+    setSeeding(true);
+    try {
+      const res: any = await api.seedCbcSubjects();
+      alert(res.message);
+      onRefresh();
+    } catch (e: any) { alert(e.message); }
+    finally { setSeeding(false); }
+  };
+
+  const displayLevels = filterLevel
+    ? [filterLevel]
+    : LEVEL_ORDER.filter(l => grouped[l]?.length > 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-2">
+          <select className="border rounded px-2 py-1.5 text-sm" value={filterLevel} onChange={e => setFilterLevel(e.target.value)}>
+            <option value="">All Levels</option>
+            {LEVEL_ORDER.map(l => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
+          </select>
+          <select className="border rounded px-2 py-1.5 text-sm" value={filterGroup} onChange={e => setFilterGroup(e.target.value)}>
+            <option value="">All Groups</option>
+            {['stem','languages','humanities','arts','technical','business','sports','other'].map(g => (
+              <option key={g} value={g}>{g.replace('_',' ')}</option>
+            ))}
+          </select>
+        </div>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={seedSubjects} disabled={seeding}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${seeding ? 'animate-spin' : ''}`} />
+              Load CBC Defaults
+            </Button>
+            <Button size="sm" onClick={() => { setEditingSubject(null); setForm({ name: '', code: '', description: '', education_level: 'lower_primary', category: 'core', subject_group: 'stem', is_elective: false, weekly_periods: 5, color: '#3b82f6' }); setShowForm(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Add Subject
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Subject Form */}
+      {showForm && (
+        <Card className="border-blue-200">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">{editingSubject ? 'Edit Learning Area' : 'New Learning Area'}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div><Label className="text-xs">Name *</Label><Input value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="e.g. Mathematics" /></div>
+              <div><Label className="text-xs">Code *</Label><Input value={form.code} onChange={e => setForm((f: any) => ({ ...f, code: e.target.value }))} placeholder="MTH" /></div>
+              <div><Label className="text-xs">Education Level</Label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm" value={form.education_level} onChange={e => setForm((f: any) => ({ ...f, education_level: e.target.value }))}>
+                  {LEVEL_ORDER.map(l => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
+                </select>
+              </div>
+              <div><Label className="text-xs">Subject Group</Label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm" value={form.subject_group} onChange={e => setForm((f: any) => ({ ...f, subject_group: e.target.value }))}>
+                  {['stem','languages','humanities','arts','technical','business','sports','other'].map(g => (
+                    <option key={g} value={g}>{g.replace('_',' ')}</option>
+                  ))}
+                </select>
+              </div>
+              <div><Label className="text-xs">Category</Label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm" value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))}>
+                  <option value="core">Core</option>
+                  <option value="elective">Elective</option>
+                  <option value="co_curricular">Co-Curricular</option>
+                  <option value="extra_curricular">Extra-Curricular</option>
+                </select>
+              </div>
+              <div><Label className="text-xs">Weekly Periods</Label><Input type="number" value={form.weekly_periods} onChange={e => setForm((f: any) => ({ ...f, weekly_periods: e.target.value }))} /></div>
+              <div><Label className="text-xs">Color</Label><input type="color" value={form.color} onChange={e => setForm((f: any) => ({ ...f, color: e.target.value }))} className="h-9 w-full cursor-pointer rounded border" /></div>
+              <div className="flex items-center gap-2 mt-5">
+                <input type="checkbox" id="is_elective" checked={form.is_elective} onChange={e => setForm((f: any) => ({ ...f, is_elective: e.target.checked, category: e.target.checked ? 'elective' : 'core' }))} />
+                <Label htmlFor="is_elective" className="text-xs font-normal cursor-pointer">Elective Subject</Label>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={saveSubject}><Save className="h-4 w-4 mr-1" /> Save</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setEditingSubject(null); }}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Subjects list grouped by level */}
+      {subjects.length === 0 && (
+        <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
+          <Layers className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No learning areas yet</p>
+          <p className="text-sm mt-1">Click "Load CBC Defaults" to add all Kenya CBC learning areas automatically</p>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {displayLevels.map(level => (
+          <div key={level}>
+            <h3 className={`text-sm font-semibold px-3 py-1.5 rounded-lg mb-2 inline-block border ${LEVEL_COLORS[level] || 'bg-gray-50'}`}>
+              {LEVEL_LABELS[level]} — {grouped[level]?.length || 0} learning areas
+            </h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {(grouped[level] || []).map((s: any) => (
+                <div key={s.id} className="border rounded-lg p-3 flex items-start gap-2 hover:bg-gray-50">
+                  <div className="h-4 w-4 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: s.color || '#94a3b8' }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-medium text-sm truncate">{s.name}</span>
+                      {s.is_elective && <span className="text-xs bg-orange-100 text-orange-700 px-1 rounded">Elective</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-400 font-mono">{s.code}</span>
+                      {s.subject_group && (
+                        <span className={`text-xs px-1 rounded ${SUBJECT_GROUP_COLORS[s.subject_group] || 'bg-gray-100 text-gray-600'}`}>
+                          {s.subject_group}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400">{s.weekly_periods}p/wk</span>
+                      {s.class_count > 0 && <span className="text-xs text-indigo-500">{s.class_count} classes</span>}
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button className="text-gray-400 hover:text-indigo-600" onClick={() => openEdit(s)}><Edit2 className="h-3.5 w-3.5" /></button>
+                      <button className="text-gray-400 hover:text-red-600" onClick={() => deleteSubject(s.id)}><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

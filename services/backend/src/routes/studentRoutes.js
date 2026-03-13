@@ -74,14 +74,30 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
       SELECT
         COUNT(*) as total_students,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_students,
-        SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_students
+        SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_students,
+        SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as male_students,
+        SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as female_students
       FROM students
       WHERE tenant_id = $1
     `, [tid]);
 
+    const byClass = await query(`
+      SELECT
+        c.id as class_id,
+        c.name as class_name,
+        c.section,
+        c.education_level,
+        COUNT(s.id) as student_count
+      FROM classes c
+      LEFT JOIN students s ON s.class_id = c.id AND s.status = 'active' AND s.tenant_id = $1
+      WHERE c.tenant_id = $1
+      GROUP BY c.id, c.name, c.section, c.education_level
+      ORDER BY c.name, c.section
+    `, [tid]);
+
     res.json({
       success: true,
-      data: stats[0] || {}
+      data: { ...(stats[0] || {}), by_class: byClass }
     });
   } catch (error) {
     logger.error('Get statistics error:', error);
@@ -219,32 +235,37 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
     const {
       firstName, first_name, lastName, last_name, dateOfBirth, date_of_birth,
       gender, bloodGroup, blood_group, classId, class_id, parentId, parent_id,
-      address, city, state, pincode, phone, status
+      address, city, state, pincode, phone, status, admission_number
     } = req.body;
+
+    // Convert empty strings to null for UUID fields
+    const actualClassId = (classId || class_id) || null;
+    const actualParentId = (parentId || parent_id) || null;
+    const actualDob = (dateOfBirth || date_of_birth) || null;
 
     await query(
       `UPDATE students SET
         first_name = COALESCE($1, first_name),
         last_name = COALESCE($2, last_name),
-        date_of_birth = COALESCE($3, date_of_birth),
-        gender = COALESCE($4, gender),
-        blood_group = COALESCE($5, blood_group),
-        class_id = COALESCE($6, class_id),
+        date_of_birth = COALESCE(NULLIF($3, '')::date, date_of_birth),
+        gender = COALESCE(NULLIF($4, ''), gender),
+        blood_group = COALESCE(NULLIF($5, ''), blood_group),
+        class_id = $6,
         parent_id = COALESCE($7, parent_id),
-        address = COALESCE($8, address),
-        city = COALESCE($9, city),
-        state = COALESCE($10, state),
-        pincode = COALESCE($11, pincode),
-        phone = COALESCE($12, phone),
-        status = COALESCE($13, status),
+        address = COALESCE(NULLIF($8, ''), address),
+        city = COALESCE(NULLIF($9, ''), city),
+        state = COALESCE(NULLIF($10, ''), state),
+        pincode = COALESCE(NULLIF($11, ''), pincode),
+        phone = COALESCE(NULLIF($12, ''), phone),
+        status = COALESCE(NULLIF($13, ''), status),
         updated_at = NOW()
        WHERE id = $14 AND tenant_id = $15`,
       [
         firstName || first_name, lastName || last_name,
-        dateOfBirth || date_of_birth, gender,
-        bloodGroup || blood_group, classId || class_id,
-        parentId || parent_id, address, city, state, pincode,
-        phone, status, req.params.id, tid
+        actualDob, gender,
+        bloodGroup || blood_group, actualClassId,
+        actualParentId, address || null, city || null, state || null, pincode || null,
+        phone || null, status, req.params.id, tid
       ]
     );
 

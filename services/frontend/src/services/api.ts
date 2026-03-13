@@ -127,6 +127,10 @@ class ApiService {
     return this.api.delete('/students/' + id);
   }
 
+  getStudentStatistics() {
+    return this.api.get('/students/statistics');
+  }
+
   getStudentAttendance(studentId: string, params?: any) {
     return this.api.get('/attendance/student/' + studentId, { params });
   }

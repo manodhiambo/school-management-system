@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, Key, Mail, Users, Shield, Bell } from 'lucide-react';
 import { AddUserModal } from '@/components/modals/AddUserModal';
+import { EditUserModal } from '@/components/modals/EditUserModal';
 import { ResetPasswordModal } from '@/components/modals/ResetPasswordModal';
 import { SendAnnouncementModal } from '@/components/modals/SendAnnouncementModal';
 import api from '@/services/api';
@@ -28,6 +29,7 @@ export function UsersPage() {
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -48,6 +50,11 @@ export function UsersPage() {
   const handleResetPassword = (user: User) => {
     setSelectedUser(user);
     setShowResetModal(true);
+  };
+
+  const handleEdit = (user: User) => {
+    setSelectedUser(user);
+    setShowEditModal(true);
   };
 
   const handleToggleStatus = async (user: User) => {
@@ -251,6 +258,7 @@ export function UsersPage() {
                             variant="ghost"
                             size="icon"
                             title="Edit User"
+                            onClick={() => handleEdit(user)}
                           >
                             <Edit className="h-4 w-4 text-blue-500" />
                           </Button>
@@ -277,6 +285,13 @@ export function UsersPage() {
       <AddUserModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
+        onSuccess={loadUsers}
+      />
+
+      <EditUserModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        user={selectedUser}
         onSuccess={loadUsers}
       />
 

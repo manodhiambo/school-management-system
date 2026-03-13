@@ -49,7 +49,7 @@ router.get('/schemes', requireRole(['admin','teacher']), async (req, res) => {
       FROM schemes_of_work s
       LEFT JOIN subjects sub ON sub.id = s.subject_id
       LEFT JOIN classes c ON c.id = s.class_id
-      LEFT JOIN users u ON u.id = s.teacher_id
+      LEFT JOIN teachers u ON u.user_id = s.teacher_id
       LEFT JOIN scheme_weeks sw ON sw.scheme_id = s.id
       WHERE ${where.join(' AND ')}
       GROUP BY s.id, sub.name, c.name, u.first_name, u.last_name
@@ -84,7 +84,7 @@ router.get('/schemes/:id', requireRole(['admin','teacher']), async (req, res) =>
       FROM schemes_of_work s
       LEFT JOIN subjects sub ON sub.id = s.subject_id
       LEFT JOIN classes c ON c.id = s.class_id
-      LEFT JOIN users u ON u.id = s.teacher_id
+      LEFT JOIN teachers u ON u.user_id = s.teacher_id
       WHERE s.id = $1 AND s.tenant_id = $2
     `, [req.params.id, tid(req)]);
     if (!scheme[0]) return res.status(404).json({ error: 'Not found' });
@@ -182,7 +182,7 @@ router.get('/lesson-plans', requireRole(['admin','teacher']), async (req, res) =
       FROM lesson_plans lp
       LEFT JOIN subjects sub ON sub.id = lp.subject_id
       LEFT JOIN classes c ON c.id = lp.class_id
-      LEFT JOIN users u ON u.id = lp.teacher_id
+      LEFT JOIN teachers u ON u.user_id = lp.teacher_id
       WHERE ${where.join(' AND ')}
       ORDER BY lp.date DESC, lp.week_number, lp.lesson_number
     `, params);
@@ -231,7 +231,7 @@ router.get('/lesson-plans/:id', requireRole(['admin','teacher']), async (req, re
       FROM lesson_plans lp
       LEFT JOIN subjects sub ON sub.id = lp.subject_id
       LEFT JOIN classes c ON c.id = lp.class_id
-      LEFT JOIN users u ON u.id = lp.teacher_id
+      LEFT JOIN teachers u ON u.user_id = lp.teacher_id
       WHERE lp.id = $1 AND lp.tenant_id = $2
     `, [req.params.id, tid(req)]);
     if (!result[0]) return res.status(404).json({ error: 'Not found' });
@@ -309,7 +309,7 @@ router.get('/sba', requireRole(['admin','teacher']), async (req, res) => {
       FROM sba_setups s
       LEFT JOIN subjects sub ON sub.id = s.subject_id
       LEFT JOIN classes c ON c.id = s.class_id
-      LEFT JOIN users u ON u.id = s.teacher_id
+      LEFT JOIN teachers u ON u.user_id = s.teacher_id
       LEFT JOIN sba_student_records sr ON sr.sba_setup_id = s.id
       LEFT JOIN students st ON st.class_id = s.class_id AND st.status = 'active'
       WHERE ${where.join(' AND ')}
@@ -447,7 +447,7 @@ router.get('/projects', requireRole(['admin','teacher','student']), async (req, 
       FROM projects p
       LEFT JOIN subjects sub ON sub.id = p.subject_id
       LEFT JOIN classes c ON c.id = p.class_id
-      LEFT JOIN users u ON u.id = p.teacher_id
+      LEFT JOIN teachers u ON u.user_id = p.teacher_id
       LEFT JOIN project_submissions ps ON ps.project_id = p.id
       LEFT JOIN project_milestones pm ON pm.project_id = p.id
       WHERE ${where.join(' AND ')}
@@ -583,7 +583,7 @@ router.get('/life-skills', requireRole(['admin','teacher','parent']), async (req
       FROM life_skills_assessments ls
       JOIN students s ON s.id = ls.student_id
       JOIN classes c ON c.id = ls.class_id
-      JOIN users u ON u.id = ls.teacher_id
+      LEFT JOIN teachers u ON u.user_id = ls.teacher_id
       WHERE ${where.join(' AND ')}
       ORDER BY s.first_name
     `, params);
@@ -810,7 +810,7 @@ router.get('/materials', requireRole(['admin','teacher','student','parent']), as
       FROM learning_materials m
       LEFT JOIN subjects sub ON sub.id = m.subject_id
       LEFT JOIN classes c ON c.id = m.class_id
-      LEFT JOIN users u ON u.id = m.uploaded_by
+      LEFT JOIN teachers u ON u.user_id = m.uploaded_by
       WHERE ${where.join(' AND ')}
       ORDER BY m.created_at DESC
     `, params);
@@ -945,7 +945,7 @@ router.get('/promotion/history', requireRole(['admin','teacher']), async (req, r
       JOIN students s ON s.id = sp.student_id
       JOIN classes fc ON fc.id = sp.from_class_id
       LEFT JOIN classes tc ON tc.id = sp.to_class_id
-      LEFT JOIN users u ON u.id = sp.promoted_by
+      LEFT JOIN teachers u ON u.user_id = sp.promoted_by
       WHERE ${where.join(' AND ')}
       ORDER BY sp.promoted_at DESC
     `, params);
@@ -1113,7 +1113,7 @@ router.get('/classes', requireRole(['admin','teacher','student','parent']), asyn
         COUNT(DISTINCT s.id) AS student_count,
         COUNT(DISTINCT cs.subject_id) AS subject_count
       FROM classes c
-      LEFT JOIN users u ON u.id = c.class_teacher_id
+      LEFT JOIN teachers u ON u.user_id = c.class_teacher_id
       LEFT JOIN rooms r ON r.id = c.room_id
       LEFT JOIN students s ON s.class_id = c.id AND s.status = 'active'
       LEFT JOIN class_subjects cs ON cs.class_id = c.id
@@ -1175,7 +1175,7 @@ router.get('/classes/:id/subjects', requireRole(['admin','teacher']), async (req
         u.first_name || ' ' || u.last_name AS teacher_name
       FROM class_subjects cs
       JOIN subjects s ON s.id = cs.subject_id
-      LEFT JOIN users u ON u.id = cs.teacher_id
+      LEFT JOIN teachers u ON u.user_id = cs.teacher_id
       WHERE cs.class_id = $1 AND cs.tenant_id = $2
       ORDER BY s.sort_order, s.name
     `, [req.params.id, tid(req)]);

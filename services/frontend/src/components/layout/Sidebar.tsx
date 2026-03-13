@@ -57,7 +57,7 @@ const navigationItems: NavItem[] = [
   { name: 'User Management', href: '/app/users',     icon: Shield,        roles: ['admin'],                               section: 'People' },
 
   // ── Academic (admin / teacher) ────────────────────────────────────────────
-  { name: 'Academic',           href: '/app/academic',         icon: BookOpen,      roles: ['admin', 'teacher'], section: 'Academic' },
+  { name: 'CBC Academics',      href: '/app/academic',         icon: BookOpen,      roles: ['admin', 'teacher'], section: 'Academic' },
   { name: 'Attendance',         href: '/app/attendance',       icon: Calendar,      roles: ['admin', 'teacher'], section: 'Academic' },
   { name: 'CBC Assessments',    href: '/app/cbc-assessments',  icon: ClipboardList, roles: ['admin', 'teacher'], section: 'Academic' },
   { name: 'CBC Report Cards',   href: '/app/cbc-report-cards', icon: BookMarked,    roles: ['admin', 'teacher'], section: 'Academic' },
@@ -75,6 +75,7 @@ const navigationItems: NavItem[] = [
   { name: 'My Courses',    href: '/app/my-courses',    icon: BookOpen, roles: ['student'], section: 'Academic' },
   { name: 'My Attendance', href: '/app/my-attendance', icon: Calendar, roles: ['student'], section: 'Academic' },
   { name: 'My Results',    href: '/app/my-results',    icon: Award,    roles: ['student'], section: 'Academic' },
+  { name: 'Learning Materials', href: '/app/academic?tab=materials', icon: BookMarked, roles: ['student'], section: 'Academic' },
 
   // ── Finance ───────────────────────────────────────────────────────────────
   { name: 'Finance Overview',  href: '/app/finance',                  icon: Wallet,    roles: ['admin', 'finance_officer'], section: 'Finance', badge: 'New' },

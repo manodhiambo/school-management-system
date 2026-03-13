@@ -42,6 +42,7 @@ import parentAlertsRoutes from './routes/parentAlertsRoutes.js';
 import disciplineRoutes from './routes/disciplineRoutes.js';
 import transportRoutes from './routes/transportRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
+import academicsModuleRoutes from './routes/academicsModuleRoutes.js';
 
 dotenv.config();
 
@@ -105,6 +106,9 @@ app.use('/api/v1/parent-alerts', parentAlertsRoutes);
 app.use('/api/v1/discipline', disciplineRoutes);
 app.use('/api/v1/transport', transportRoutes);
 app.use('/api/v1/health', healthRoutes);
+
+// Comprehensive CBC Academics Module
+app.use('/api/v1/academics', academicsModuleRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', schoolRegistrationRoutes);

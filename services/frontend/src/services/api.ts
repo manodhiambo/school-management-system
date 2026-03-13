@@ -1121,6 +1121,71 @@ class ApiService {
     return this.api.put('/superadmin/profile', data);
   }
 
+  // ======================
+  // ACADEMICS MODULE (CBC Comprehensive)
+  // ======================
+
+  // Dashboard
+  getAcademicsDashboard(params?: any) { return this.api.get('/academics/dashboard', { params }); }
+
+  // Schemes of Work
+  getSchemes(params?: any) { return this.api.get('/academics/schemes', { params }); }
+  getScheme(id: string) { return this.api.get('/academics/schemes/' + id); }
+  createScheme(data: any) { return this.api.post('/academics/schemes', data); }
+  updateScheme(id: string, data: any) { return this.api.put('/academics/schemes/' + id, data); }
+  deleteScheme(id: string) { return this.api.delete('/academics/schemes/' + id); }
+  saveSchemeWeeks(id: string, weeks: any[]) { return this.api.post('/academics/schemes/' + id + '/weeks', { weeks }); }
+
+  // Lesson Plans
+  getLessonPlans(params?: any) { return this.api.get('/academics/lesson-plans', { params }); }
+  getLessonPlan(id: string) { return this.api.get('/academics/lesson-plans/' + id); }
+  createLessonPlan(data: any) { return this.api.post('/academics/lesson-plans', data); }
+  updateLessonPlan(id: string, data: any) { return this.api.put('/academics/lesson-plans/' + id, data); }
+  deleteLessonPlan(id: string) { return this.api.delete('/academics/lesson-plans/' + id); }
+
+  // School Based Assessments (SBA)
+  getSbaSetups(params?: any) { return this.api.get('/academics/sba', { params }); }
+  createSbaSetup(data: any) { return this.api.post('/academics/sba', data); }
+  updateSbaSetup(id: string, data: any) { return this.api.put('/academics/sba/' + id, data); }
+  getSbaRecords(id: string) { return this.api.get('/academics/sba/' + id + '/records'); }
+  saveSbaRecords(id: string, records: any[]) { return this.api.post('/academics/sba/' + id + '/records', { records }); }
+
+  // Projects
+  getProjects(params?: any) { return this.api.get('/academics/projects', { params }); }
+  getProject(id: string) { return this.api.get('/academics/projects/' + id); }
+  createProject(data: any) { return this.api.post('/academics/projects', data); }
+  addProjectMilestone(id: string, data: any) { return this.api.post('/academics/projects/' + id + '/milestones', data); }
+  addProjectSubmission(id: string, data: any) { return this.api.post('/academics/projects/' + id + '/submissions', data); }
+  gradeProjectSubmission(projectId: string, subId: string, data: any) {
+    return this.api.put('/academics/projects/' + projectId + '/submissions/' + subId + '/grade', data);
+  }
+
+  // Life Skills & Values
+  getLifeSkills(params?: any) { return this.api.get('/academics/life-skills', { params }); }
+  saveLifeSkills(data: any) { return this.api.post('/academics/life-skills', data); }
+  saveLifeSkillsBulk(records: any[]) { return this.api.post('/academics/life-skills/bulk', { records }); }
+
+  // Career Guidance
+  getCareerPathways() { return this.api.get('/academics/career/pathways'); }
+  createCareerPathway(data: any) { return this.api.post('/academics/career/pathways', data); }
+  getCareerProfiles(params?: any) { return this.api.get('/academics/career/profiles', { params }); }
+  saveCareerProfile(data: any) { return this.api.post('/academics/career/profiles', data); }
+  getStudentCareerProfile(studentId: string) { return this.api.get('/academics/career/profiles/student/' + studentId); }
+
+  // Learning Materials
+  getLearningMaterials(params?: any) { return this.api.get('/academics/materials', { params }); }
+  createLearningMaterial(data: any) { return this.api.post('/academics/materials', data); }
+  updateLearningMaterial(id: string, data: any) { return this.api.put('/academics/materials/' + id, data); }
+  deleteLearningMaterial(id: string) { return this.api.delete('/academics/materials/' + id); }
+  trackMaterialDownload(id: string) { return this.api.put('/academics/materials/' + id + '/download'); }
+
+  // Promotion & Progression
+  getPromotionRules() { return this.api.get('/academics/promotion/rules'); }
+  savePromotionRule(data: any) { return this.api.post('/academics/promotion/rules', data); }
+  getPromotionHistory(params?: any) { return this.api.get('/academics/promotion/history', { params }); }
+  promoteStudent(data: any) { return this.api.post('/academics/promotion/promote-student', data); }
+  bulkPromoteStudents(data: any) { return this.api.post('/academics/promotion/bulk-promote', data); }
+
 }
 
 export default new ApiService();

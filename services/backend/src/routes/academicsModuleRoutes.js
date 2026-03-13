@@ -311,7 +311,7 @@ router.get('/sba', requireRole(['admin','teacher']), async (req, res) => {
       LEFT JOIN classes c ON c.id = s.class_id
       LEFT JOIN users u ON u.id = s.teacher_id
       LEFT JOIN sba_student_records sr ON sr.sba_setup_id = s.id
-      LEFT JOIN students st ON st.class_id = s.class_id AND st.is_active = TRUE
+      LEFT JOIN students st ON st.class_id = s.class_id AND st.status = 'active'
       WHERE ${where.join(' AND ')}
       GROUP BY s.id, sub.name, c.name, u.first_name, u.last_name
       ORDER BY s.created_at DESC
@@ -1115,7 +1115,7 @@ router.get('/classes', requireRole(['admin','teacher','student','parent']), asyn
       FROM classes c
       LEFT JOIN users u ON u.id = c.class_teacher_id
       LEFT JOIN rooms r ON r.id = c.room_id
-      LEFT JOIN students s ON s.class_id = c.id AND s.is_active = TRUE
+      LEFT JOIN students s ON s.class_id = c.id AND s.status = 'active'
       LEFT JOIN class_subjects cs ON cs.class_id = c.id
       WHERE ${where}
       GROUP BY c.id, u.first_name, u.last_name, r.name, r.capacity

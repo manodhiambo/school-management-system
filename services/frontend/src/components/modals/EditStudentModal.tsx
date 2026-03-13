@@ -17,6 +17,7 @@ interface EditStudentModalProps {
 export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: EditStudentModalProps) {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [classes, setClasses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     admission_number: '',
     first_name: '',
@@ -26,6 +27,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
     date_of_birth: '',
     gender: 'male',
     blood_group: '',
+    class_id: '',
     address: '',
     city: '',
     state: '',
@@ -36,8 +38,18 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
   useEffect(() => {
     if (open && studentId) {
       loadStudent();
+      loadClasses();
     }
   }, [open, studentId]);
+
+  const loadClasses = async () => {
+    try {
+      const response: any = await api.getClasses();
+      setClasses(response.data || []);
+    } catch (error) {
+      console.error('Error loading classes:', error);
+    }
+  };
 
   const loadStudent = async () => {
     try {
@@ -53,6 +65,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
         date_of_birth: student.date_of_birth?.split('T')[0] || '',
         gender: student.gender || 'male',
         blood_group: student.blood_group || '',
+        class_id: student.class_id || '',
         address: student.address || '',
         city: student.city || '',
         state: student.state || '',
@@ -74,7 +87,6 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       await api.updateStudent(studentId, formData);
       alert('Student updated successfully!');
@@ -112,12 +124,11 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                 <h3 className="font-semibold mb-3">Personal Information</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="admission_number">Admission Number *</Label>
+                    <Label htmlFor="admission_number">Admission Number</Label>
                     <Input
                       id="admission_number"
                       value={formData.admission_number}
                       onChange={(e) => handleChange('admission_number', e.target.value)}
-                      required
                     />
                   </div>
                   <div>
@@ -139,13 +150,12 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                     />
                   </div>
                   <div>
-                    <Label htmlFor="date_of_birth">Date of Birth *</Label>
+                    <Label htmlFor="date_of_birth">Date of Birth</Label>
                     <Input
                       id="date_of_birth"
                       type="date"
                       value={formData.date_of_birth}
                       onChange={(e) => handleChange('date_of_birth', e.target.value)}
-                      required
                     />
                   </div>
                   <div>
@@ -177,6 +187,21 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                       <option value="O-">O-</option>
                       <option value="AB+">AB+</option>
                       <option value="AB-">AB-</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="class_id">Class/Grade</Label>
+                    <Select
+                      id="class_id"
+                      value={formData.class_id}
+                      onChange={(e) => handleChange('class_id', e.target.value)}
+                    >
+                      <option value="">No Class Assigned</option>
+                      {classes.map((cls: any) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.name}{cls.section ? ` - ${cls.section}` : ''}
+                        </option>
+                      ))}
                     </Select>
                   </div>
                   <div>
@@ -234,7 +259,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                     />
                   </div>
                   <div>
-                    <Label htmlFor="state">State</Label>
+                    <Label htmlFor="state">State/County</Label>
                     <Input
                       id="state"
                       value={formData.state}

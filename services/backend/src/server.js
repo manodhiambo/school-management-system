@@ -115,8 +115,14 @@ app.use('/api/v1/registration', schoolRegistrationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  const status = err.statusCode || err.status || 500;
+  const message = err.message || 'Something went wrong!';
+  if (status < 500) {
+    res.status(status).json({ success: false, message });
+  } else {
+    console.error(err.stack);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 });
 
 const PORT = process.env.PORT || 5000;

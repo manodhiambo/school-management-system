@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
-import { FileText, CheckCircle, Eye, Download } from 'lucide-react';
+import { FileText, CheckCircle, Download, PlusCircle, Users, Share2, Mail, MessageCircle, X, Phone, AtSign, AlertCircle } from 'lucide-react';
 
 const GRADE_COLORS: Record<string, string> = {
   EE: 'bg-green-100 text-green-800 border-green-200',
@@ -19,6 +19,8 @@ export function CbcReportCardPage() {
   const qc = useQueryClient();
   const [filters, setFilters] = useState({ class_id: '', term: 'term1', academic_year: new Date().getFullYear().toString() });
   const [selectedCard, setSelectedCard] = useState<any>(null);
+  const [showShare, setShowShare] = useState(false);
+  const [shareResult, setShareResult] = useState<any>(null);
 
   const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => api.getClasses() });
   const { data: cardsData, isLoading } = useQuery({
@@ -37,13 +39,28 @@ export function CbcReportCardPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cbc-report-cards'] }),
   });
 
+  const generateMutation = useMutation({
+    mutationFn: () => api.generateCbcReportCards({
+      class_id: filters.class_id,
+      term: filters.term,
+      academic_year: filters.academic_year,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cbc-report-cards'] }),
+  });
+
+  const shareMutation = useMutation({
+    mutationFn: (channels: string[]) => api.shareReportCard(detail?.id, channels),
+    onSuccess: (res: any) => setShareResult(res?.data?.results || res?.results || {}),
+  });
+
   const classes = (classesData as any)?.data || [];
   const cards = (cardsData as any)?.data || [];
   const detail = (cardDetail as any)?.data;
 
-  const statusBadge = (status: string) => {
+  const statusBadge = (status: string | null) => {
     if (status === 'published') return <Badge className="bg-green-100 text-green-800">Published</Badge>;
     if (status === 'acknowledged') return <Badge className="bg-purple-100 text-purple-800">Acknowledged</Badge>;
+    if (!status) return <Badge variant="outline" className="text-gray-400">No Card</Badge>;
     return <Badge variant="outline">Draft</Badge>;
   };
 
@@ -62,11 +79,19 @@ export function CbcReportCardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label>Class *</Label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm mt-1"
-                value={filters.class_id} onChange={e => setFilters({ ...filters, class_id: e.target.value })}>
-                <option value="">Select a class</option>
-                {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <select
+                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+                value={filters.class_id}
+                onChange={e => { setSelectedCard(null); setFilters({ ...filters, class_id: e.target.value }); }}
+              >
+                <option value="">— Select a class —</option>
+                {classes.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.section ? ` (${c.section})` : ''}</option>
+                ))}
               </select>
+              {classes.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">No classes found. Add classes first.</p>
+              )}
             </div>
             <div>
               <Label>Term</Label>
@@ -82,6 +107,29 @@ export function CbcReportCardPage() {
               <Input value={filters.academic_year} onChange={e => setFilters({ ...filters, academic_year: e.target.value })} />
             </div>
           </div>
+
+          {/* Generate button — shown when a class is selected */}
+          {filters.class_id && (
+            <div className="mt-4 flex items-center gap-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+                className="flex items-center gap-2"
+              >
+                <PlusCircle className="h-4 w-4" />
+                {generateMutation.isPending ? 'Generating…' : 'Generate Report Cards for All Students'}
+              </Button>
+              {generateMutation.isSuccess && (
+                <span className="text-xs text-green-600">
+                  {(generateMutation.data as any)?.data?.created === 0
+                    ? 'All students already have report cards.'
+                    : `Created ${(generateMutation.data as any)?.data?.created} new report card(s).`}
+                </span>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -90,23 +138,46 @@ export function CbcReportCardPage() {
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Learners ({cards.length})</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4 text-gray-400" />
+                  Learners ({cards.length})
+                </CardTitle>
+                {cards.length > 0 && (
+                  <span className="text-xs text-gray-400">
+                    {cards.filter((c: any) => c.id).length} with card
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {!filters.class_id ? (
-                <p className="p-4 text-sm text-gray-500">Select a class to view report cards.</p>
+                <div className="p-6 text-center">
+                  <FileText className="h-10 w-10 text-gray-200 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">Select a class above to view students.</p>
+                </div>
               ) : isLoading ? (
-                <p className="p-4 text-sm text-gray-500">Loading...</p>
+                <div className="p-4 space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
+                  ))}
+                </div>
               ) : cards.length === 0 ? (
-                <div className="p-4 text-center">
-                  <FileText className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No report cards found.</p>
+                <div className="p-6 text-center">
+                  <Users className="h-10 w-10 text-gray-200 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500 font-medium">No students in this class</p>
+                  <p className="text-xs text-gray-400 mt-1">Enroll students first, then generate report cards.</p>
                 </div>
               ) : (
-                <div className="divide-y">
+                <div className="divide-y max-h-[60vh] overflow-y-auto">
                   {cards.map((card: any) => (
-                    <button key={card.id} onClick={() => setSelectedCard(card)}
-                      className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${selectedCard?.id === card.id ? 'bg-indigo-50' : ''}`}>
+                    <button
+                      key={card.student_id}
+                      onClick={() => card.id ? setSelectedCard(card) : null}
+                      className={`w-full text-left px-4 py-3 transition-colors
+                        ${card.id ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default opacity-60'}
+                        ${selectedCard?.id === card.id ? 'bg-indigo-50' : ''}`}
+                    >
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">{card.student_name}</p>
@@ -142,7 +213,7 @@ export function CbcReportCardPage() {
                     </p>
                     <p className="text-xs text-gray-400">Admission: {detail.admission_number}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {statusBadge(detail.status)}
                     {detail.status === 'draft' && (
                       <Button size="sm" onClick={() => publishMutation.mutate(detail.id)} disabled={publishMutation.isPending}>
@@ -150,6 +221,13 @@ export function CbcReportCardPage() {
                         {publishMutation.isPending ? 'Publishing...' : 'Publish'}
                       </Button>
                     )}
+                    {detail.status === 'published' || detail.status === 'acknowledged' ? (
+                      <Button size="sm" variant="outline" onClick={() => { setShowShare(true); setShareResult(null); }}
+                        className="flex items-center gap-1 border-green-300 text-green-700 hover:bg-green-50">
+                        <Share2 className="h-4 w-4" />
+                        Share with Parent
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </CardHeader>
@@ -237,6 +315,141 @@ export function CbcReportCardPage() {
           )}
         </div>
       </div>
+
+      {/* ── Share Dialog ─────────────────────────────────────────────────── */}
+      {showShare && detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b">
+              <div className="flex items-center gap-2">
+                <Share2 className="h-5 w-5 text-indigo-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Share Report Card</h2>
+              </div>
+              <button onClick={() => { setShowShare(false); setShareResult(null); }}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Student info */}
+              <div className="bg-indigo-50 rounded-xl p-3">
+                <p className="font-semibold text-indigo-900">{detail.student_name}</p>
+                <p className="text-sm text-indigo-600">{detail.class_name} · {detail.term?.replace('term', 'Term ')} {detail.academic_year}</p>
+              </div>
+
+              {/* Parent contact info (read-only) */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Registered Parent / Guardian Contact</p>
+                {detail.guardian_name && (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span>{detail.guardian_name}
+                      {detail.guardian_relationship ? ` (${detail.guardian_relationship})` : ''}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  {detail.guardian_phone ? (
+                    <span className="text-gray-700 font-mono">{detail.guardian_phone}</span>
+                  ) : (
+                    <span className="text-red-500 italic">No phone number registered</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <AtSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  {detail.guardian_email ? (
+                    <span className="text-gray-700">{detail.guardian_email}</span>
+                  ) : (
+                    <span className="text-red-500 italic">No email address registered</span>
+                  )}
+                </div>
+                {!detail.guardian_phone && !detail.guardian_email && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">No parent contact details found. Ask the school office to link a parent/guardian to this student.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Share results */}
+              {shareResult && (
+                <div className="space-y-2">
+                  {shareResult.email !== undefined && (
+                    <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${shareResult.email?.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      <Mail className="h-4 w-4 flex-shrink-0" />
+                      {shareResult.email?.success
+                        ? 'Email sent successfully to parent.'
+                        : `Email failed: ${shareResult.email?.error}`}
+                    </div>
+                  )}
+                  {shareResult.whatsapp !== undefined && shareResult.whatsapp?.success && (
+                    <a
+                      href={shareResult.whatsapp.waUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
+                    >
+                      <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                      Open WhatsApp to send message →
+                    </a>
+                  )}
+                  {shareResult.whatsapp !== undefined && !shareResult.whatsapp?.success && (
+                    <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-red-50 text-red-700">
+                      <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                      WhatsApp: {shareResult.whatsapp?.error}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2 pt-2 border-t">
+                {/* Email */}
+                <button
+                  onClick={() => shareMutation.mutate(['email'])}
+                  disabled={shareMutation.isPending || !detail.guardian_email}
+                  className="flex items-center justify-center gap-2 w-full rounded-xl py-3 px-4 font-semibold text-sm
+                    bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Mail className="h-4 w-4" />
+                  {shareMutation.isPending ? 'Sending…' : `Send Email to ${detail.guardian_email || 'parent'}`}
+                </button>
+
+                {/* WhatsApp */}
+                <button
+                  onClick={() => shareMutation.mutate(['whatsapp'])}
+                  disabled={shareMutation.isPending || !detail.guardian_phone}
+                  className="flex items-center justify-center gap-2 w-full rounded-xl py-3 px-4 font-semibold text-sm
+                    bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  {shareMutation.isPending ? 'Preparing…' : `Send via WhatsApp to ${detail.guardian_phone || 'parent'}`}
+                </button>
+
+                {/* Both */}
+                {detail.guardian_email && detail.guardian_phone && (
+                  <button
+                    onClick={() => shareMutation.mutate(['email', 'whatsapp'])}
+                    disabled={shareMutation.isPending}
+                    className="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 px-4 font-medium text-sm
+                      border border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Send via Both (Email + WhatsApp)
+                  </button>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-400 text-center">
+                Messages are sent only to the registered contact details shown above.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

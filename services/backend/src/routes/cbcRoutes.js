@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
+import { sendEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -321,24 +322,60 @@ router.post('/competency-summary', authenticate, async (req, res) => {
 // ============================================================
 
 // GET /api/v1/cbc/report-cards?student_id=&term=&academic_year=&class_id=
+// When class_id is provided, returns ALL students in that class (LEFT JOIN) so students without
+// a report card yet still appear in the list.
 router.get('/report-cards', authenticate, async (req, res) => {
   try {
     const { student_id, term, academic_year, class_id, status } = req.query;
     const tid = req.user.tenant_id;
-    let sql = `SELECT rc.*,
-               s.first_name||' '||s.last_name as student_name,
-               s.admission_number, c.name as class_name
-               FROM cbc_report_cards rc
-               JOIN students s ON s.id = rc.student_id
-               JOIN classes c ON c.id = rc.class_id
-               WHERE rc.tenant_id = $1`;
-    const params = [tid];
-    if (student_id) { sql += ` AND rc.student_id = $${params.length+1}`; params.push(student_id); }
-    if (class_id) { sql += ` AND rc.class_id = $${params.length+1}`; params.push(class_id); }
-    if (term) { sql += ` AND rc.term = $${params.length+1}`; params.push(term); }
-    if (academic_year) { sql += ` AND rc.academic_year = $${params.length+1}`; params.push(academic_year); }
-    if (status) { sql += ` AND rc.status = $${params.length+1}`; params.push(status); }
-    sql += ' ORDER BY s.first_name, s.last_name';
+    let sql, params;
+
+    if (class_id) {
+      // Start from students so all class members are visible even without a report card
+      params = [tid, class_id];
+      sql = `SELECT
+               s.id AS student_id,
+               s.first_name||' '||s.last_name AS student_name,
+               s.admission_number,
+               c.name AS class_name,
+               rc.id,
+               rc.status,
+               rc.term,
+               rc.academic_year,
+               rc.overall_grade,
+               rc.published_at,
+               rc.days_present,
+               rc.days_absent,
+               rc.days_late,
+               rc.class_teacher_comment
+             FROM students s
+             JOIN classes c ON c.id = s.class_id
+             LEFT JOIN cbc_report_cards rc
+               ON rc.student_id = s.id
+               AND rc.class_id = s.class_id
+               AND rc.tenant_id = $1`;
+      if (term)          { sql += ` AND rc.term = $${params.length+1}`;          params.push(term); }
+      if (academic_year) { sql += ` AND rc.academic_year = $${params.length+1}`; params.push(academic_year); }
+      sql += ` WHERE s.class_id = $2 AND s.tenant_id = $1 AND s.status = 'active'`;
+      if (status) { sql += ` AND (rc.status = $${params.length+1} OR rc.status IS NULL)`; params.push(status); }
+      sql += ' ORDER BY s.first_name, s.last_name';
+    } else {
+      // No class filter: return only existing report card records (original behaviour)
+      params = [tid];
+      sql = `SELECT rc.*,
+               s.first_name||' '||s.last_name AS student_name,
+               s.admission_number, c.name AS class_name
+             FROM cbc_report_cards rc
+             JOIN students s ON s.id = rc.student_id
+             JOIN classes c ON c.id = rc.class_id
+             WHERE rc.tenant_id = $1`;
+      if (student_id)    { sql += ` AND rc.student_id = $${params.length+1}`;    params.push(student_id); }
+      if (term)          { sql += ` AND rc.term = $${params.length+1}`;          params.push(term); }
+      if (academic_year) { sql += ` AND rc.academic_year = $${params.length+1}`; params.push(academic_year); }
+      if (status)        { sql += ` AND rc.status = $${params.length+1}`;        params.push(status); }
+      sql += ' ORDER BY s.first_name, s.last_name';
+    }
+
     const rows = await query(sql, params);
     res.json({ success: true, data: rows });
   } catch (err) {
@@ -347,20 +384,69 @@ router.get('/report-cards', authenticate, async (req, res) => {
   }
 });
 
-// GET single report card with full details
+// POST /api/v1/cbc/report-cards/generate — bulk-create draft report cards for all students in a class
+router.post('/report-cards/generate', authenticate, async (req, res) => {
+  try {
+    const { class_id, term, academic_year } = req.body;
+    if (!class_id || !term || !academic_year) {
+      return res.status(400).json({ success: false, message: 'class_id, term and academic_year are required' });
+    }
+    const tid = req.user.tenant_id;
+    const { v4: uuidv4 } = await import('uuid');
+
+    // Fetch all active students in the class
+    const students = await query(
+      `SELECT id FROM students WHERE class_id = $1 AND tenant_id = $2 AND status = 'active'`,
+      [class_id, tid]
+    );
+    if (!students.length) {
+      return res.json({ success: true, created: 0, message: 'No active students in this class' });
+    }
+
+    let created = 0;
+    for (const s of students) {
+      // Skip if report card already exists for this student/term/year
+      const existing = await query(
+        `SELECT id FROM cbc_report_cards WHERE student_id=$1 AND class_id=$2 AND term=$3 AND academic_year=$4 AND tenant_id=$5`,
+        [s.id, class_id, term, academic_year, tid]
+      );
+      if (existing.length) continue;
+
+      await query(
+        `INSERT INTO cbc_report_cards (id, tenant_id, student_id, class_id, term, academic_year, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,'draft',NOW(),NOW())`,
+        [uuidv4(), tid, s.id, class_id, term, academic_year]
+      );
+      created++;
+    }
+
+    res.json({ success: true, created, total: students.length });
+  } catch (err) {
+    logger.error('Generate report cards error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET single report card with full details + parent/guardian contact info
 router.get('/report-cards/:id', authenticate, async (req, res) => {
   try {
     const rows = await query(
-      `SELECT rc.*, s.first_name||' '||s.last_name as student_name,
+      `SELECT rc.*,
+       s.first_name||' '||s.last_name AS student_name,
        s.admission_number, s.date_of_birth, s.nemis_number,
-       c.name as class_name, c.education_level
+       c.name AS class_name, c.education_level,
+       p.first_name||' '||p.last_name AS guardian_name,
+       p.relationship AS guardian_relationship,
+       p.phone_primary AS guardian_phone,
+       pu.email AS guardian_email
        FROM cbc_report_cards rc
        JOIN students s ON s.id = rc.student_id
        JOIN classes c ON c.id = rc.class_id
+       LEFT JOIN parents p ON p.id = s.parent_id
+       LEFT JOIN users pu ON pu.id = p.user_id
        WHERE rc.id = $1`, [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
-    // Get competency summaries
     const rc = rows[0];
     const competencies = await query(
       `SELECT cs.*, sub.name as subject_name FROM student_competency_summary cs
@@ -370,6 +456,108 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
     );
     res.json({ success: true, data: { ...rc, competencies } });
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/v1/cbc/report-cards/:id/share — send report card to parent via email and/or WhatsApp
+router.post('/report-cards/:id/share', authenticate, async (req, res) => {
+  try {
+    const { channels = ['email'] } = req.body; // channels: ['email', 'whatsapp']
+    const tid = req.user.tenant_id;
+
+    // Load report card with parent contacts + school name
+    const rows = await query(
+      `SELECT rc.*,
+       s.first_name||' '||s.last_name AS student_name,
+       s.admission_number,
+       c.name AS class_name,
+       p.first_name||' '||p.last_name AS guardian_name,
+       p.phone_primary AS guardian_phone,
+       pu.email AS guardian_email,
+       t.name AS school_name
+       FROM cbc_report_cards rc
+       JOIN students s ON s.id = rc.student_id
+       JOIN classes c ON c.id = rc.class_id
+       LEFT JOIN parents p ON p.id = s.parent_id
+       LEFT JOIN users pu ON pu.id = p.user_id
+       LEFT JOIN tenants t ON t.id = rc.tenant_id
+       WHERE rc.id = $1 AND rc.tenant_id = $2`,
+      [req.params.id, tid]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Report card not found' });
+
+    const rc = rows[0];
+    const termLabel = (rc.term || '').replace('term', 'Term ');
+    const gradeLabel = rc.overall_grade
+      ? `${rc.overall_grade} (${
+          rc.overall_grade === 'EE' ? 'Exceeding Expectations' :
+          rc.overall_grade === 'ME' ? 'Meeting Expectations' :
+          rc.overall_grade === 'AE' ? 'Approaching Expectations' :
+          rc.overall_grade === 'BE' ? 'Below Expectations' : rc.overall_grade
+        })`
+      : 'Not yet graded';
+
+    const results = {};
+
+    // ── Email ────────────────────────────────────────────────────────────────
+    if (channels.includes('email') && rc.guardian_email) {
+      const emailResult = await sendEmail(rc.guardian_email, 'reportCard', {
+        guardianName: rc.guardian_name || 'Parent/Guardian',
+        studentName: rc.student_name,
+        className: rc.class_name,
+        term: termLabel,
+        academicYear: rc.academic_year,
+        overallGrade: gradeLabel,
+        daysPresent: rc.days_present ?? 'N/A',
+        daysAbsent: rc.days_absent ?? 'N/A',
+        teacherComment: rc.class_teacher_comment || '',
+        schoolName: rc.school_name || 'the school',
+        loginUrl: process.env.FRONTEND_URL || 'https://skulmanager.org/login',
+      });
+      results.email = emailResult;
+    } else if (channels.includes('email')) {
+      results.email = { success: false, error: 'No email address registered for this parent' };
+    }
+
+    // ── WhatsApp (return data for client-side wa.me link) ────────────────────
+    if (channels.includes('whatsapp')) {
+      if (rc.guardian_phone) {
+        // Normalise phone to international format (Kenya +254)
+        let phone = rc.guardian_phone.replace(/\D/g, '');
+        if (phone.startsWith('0')) phone = '254' + phone.slice(1);
+        else if (!phone.startsWith('254')) phone = '254' + phone;
+
+        const message =
+          `Dear ${rc.guardian_name || 'Parent/Guardian'},\n\n` +
+          `${rc.student_name}'s CBC Report Card for ${termLabel} ${rc.academic_year} is ready.\n\n` +
+          `📚 Class: ${rc.class_name}\n` +
+          `🏅 Overall Grade: ${gradeLabel}\n` +
+          `✅ Days Present: ${rc.days_present ?? 'N/A'}\n` +
+          (rc.class_teacher_comment ? `\n💬 Teacher's Comment:\n"${rc.class_teacher_comment}"\n` : '') +
+          `\nPlease log in to SkulManager to view the full report card:\n` +
+          `${process.env.FRONTEND_URL || 'https://skulmanager.org/login'}\n\n` +
+          `${rc.school_name || 'School Management'}`;
+
+        results.whatsapp = {
+          success: true,
+          phone,
+          waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+        };
+      } else {
+        results.whatsapp = { success: false, error: 'No phone number registered for this parent' };
+      }
+    }
+
+    // Mark report card as shared (update shared_at timestamp if column exists, otherwise skip)
+    await query(
+      `UPDATE cbc_report_cards SET updated_at = NOW() WHERE id = $1`,
+      [req.params.id]
+    ).catch(() => {}); // non-fatal
+
+    res.json({ success: true, results });
+  } catch (err) {
+    logger.error('Share report card error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

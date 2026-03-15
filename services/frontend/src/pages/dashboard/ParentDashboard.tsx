@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
+import {
   Users, Calendar, Clock, CheckCircle, Award,
   Bell, ArrowRight, DollarSign, AlertCircle, TrendingUp
 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
+import { UserManualCard } from '@/components/UserManualCard';
 
 export function ParentDashboard() {
   const { user } = useAuthStore();
@@ -241,8 +242,8 @@ export function ParentDashboard() {
               <Bell className="h-8 w-8 mb-2 text-blue-600" />
               <span>Messages</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-purple-50 hover:border-purple-300"
               onClick={() => navigate('/app/profile')}
             >
@@ -252,6 +253,9 @@ export function ParentDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* User Manual Download */}
+      <UserManualCard />
     </div>
   );
 }

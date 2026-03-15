@@ -232,6 +232,95 @@ const templates = {
     text: `Fee Reminder\n\nStudent: ${data.studentName}\nAmount: KES ${data.amount.toLocaleString()}\nDue: ${data.dueDate}`
   }),
 
+  reportCard: (data) => ({
+    subject: `CBC Report Card — ${data.studentName} | ${data.term} ${data.academicYear}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f6f9; }
+          .container { max-width: 620px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
+          .header h1 { margin: 0 0 6px; font-size: 22px; }
+          .header p { margin: 0; opacity: 0.85; font-size: 14px; }
+          .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
+          .greeting { font-size: 16px; color: #374151; margin-bottom: 16px; }
+          .student-card { background: #f0f4ff; border: 1px solid #c7d2fe; border-radius: 10px; padding: 20px; margin: 20px 0; }
+          .student-card h2 { margin: 0 0 4px; font-size: 18px; color: #1e1b4b; }
+          .student-card .meta { color: #6b7280; font-size: 13px; margin: 0 0 16px; }
+          .grade-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+          .grade-badge { display: inline-block; padding: 6px 18px; border-radius: 20px; font-weight: 700; font-size: 16px; background: #4f46e5; color: white; }
+          .stat-grid { display: flex; gap: 12px; margin: 16px 0; }
+          .stat-box { flex: 1; background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; text-align: center; }
+          .stat-box .val { font-size: 22px; font-weight: 700; color: #1f2937; }
+          .stat-box .lbl { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+          .comment-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 14px 16px; margin-top: 16px; }
+          .comment-box p { margin: 0; font-size: 14px; color: #78350f; font-style: italic; }
+          .cta { display: block; width: fit-content; margin: 24px auto 0; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; }
+          .footer { background: #f3f4f6; padding: 18px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 12px 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📋 CBC Report Card</h1>
+            <p>${data.schoolName}</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Dear <strong>${data.guardianName}</strong>,</p>
+            <p style="color:#4b5563;">The CBC Report Card for <strong>${data.term} ${data.academicYear}</strong> is now available for your child:</p>
+
+            <div class="student-card">
+              <h2>${data.studentName}</h2>
+              <p class="meta">Class: ${data.className} &bull; ${data.term} ${data.academicYear}</p>
+
+              <div class="grade-row">
+                <span style="font-size:14px;color:#374151;font-weight:600;">Overall Grade:</span>
+                <span class="grade-badge">${data.overallGrade}</span>
+              </div>
+
+              <div class="stat-grid">
+                <div class="stat-box">
+                  <div class="val" style="color:#16a34a;">${data.daysPresent}</div>
+                  <div class="lbl">Days Present</div>
+                </div>
+                <div class="stat-box">
+                  <div class="val" style="color:#dc2626;">${data.daysAbsent}</div>
+                  <div class="lbl">Days Absent</div>
+                </div>
+              </div>
+
+              ${data.teacherComment ? `
+              <div class="comment-box">
+                <p style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:6px;">CLASS TEACHER'S COMMENT</p>
+                <p>"${data.teacherComment}"</p>
+              </div>` : ''}
+            </div>
+
+            <p style="color:#4b5563;font-size:14px;">Log in to SkulManager to view the full report card including all learning areas, values, and competencies.</p>
+            <a href="${data.loginUrl}" class="cta">View Full Report Card</a>
+          </div>
+          <div class="footer">
+            <p>This message was sent by ${data.schoolName} via Skul Manager.</p>
+            <p style="margin-top:4px;">Please do not reply to this email — contact the school office directly.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text:
+      `Dear ${data.guardianName},\n\n` +
+      `The CBC Report Card for ${data.term} ${data.academicYear} is available for ${data.studentName}.\n\n` +
+      `Class: ${data.className}\nOverall Grade: ${data.overallGrade}\n` +
+      `Days Present: ${data.daysPresent} | Days Absent: ${data.daysAbsent}\n` +
+      (data.teacherComment ? `\nTeacher's Comment:\n"${data.teacherComment}"\n` : '') +
+      `\nView the full report card at: ${data.loginUrl}\n\n` +
+      `${data.schoolName}`,
+  }),
+
   message: (data) => ({
     subject: `New Message: ${data.subject || 'You have a message'}`,
     html: `

@@ -985,7 +985,9 @@ class ApiService {
   getCbcReportCards(params?: any) { return this.api.get('/cbc/report-cards', { params }); }
   getCbcReportCard(id: string) { return this.api.get('/cbc/report-cards/' + id); }
   createCbcReportCard(data: any) { return this.api.post('/cbc/report-cards', data); }
+  generateCbcReportCards(data: any) { return this.api.post('/cbc/report-cards/generate', data); }
   publishCbcReportCard(id: string) { return this.api.put('/cbc/report-cards/' + id + '/publish'); }
+  shareReportCard(id: string, channels: string[]) { return this.api.post('/cbc/report-cards/' + id + '/share', { channels }); }
   acknowledgeCbcReportCard(id: string, data: any) { return this.api.put('/cbc/report-cards/' + id + '/acknowledge', data); }
 
   // Portfolios

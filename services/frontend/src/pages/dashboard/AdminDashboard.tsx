@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Users, GraduationCap, DollarSign, Calendar, TrendingUp, TrendingDown, 
+import {
+  Users, GraduationCap, DollarSign, Calendar, TrendingUp, TrendingDown,
   UserPlus, CreditCard, BookOpen, Bell, ArrowUpRight, ArrowDownRight,
   Clock, CheckCircle, AlertTriangle, Activity
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import { UserManualCard } from '@/components/UserManualCard';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
@@ -404,6 +405,9 @@ export function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* User Manual Download */}
+      <UserManualCard />
     </div>
   );
 }

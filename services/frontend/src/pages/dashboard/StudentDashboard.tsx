@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
+import {
   BookOpen, Calendar, Clock, FileText, CheckCircle, Award,
   TrendingUp, Bell, ArrowRight, DollarSign, AlertCircle
 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
+import { UserManualCard } from '@/components/UserManualCard';
 
 export function StudentDashboard() {
   const { user } = useAuthStore();
@@ -311,8 +312,8 @@ export function StudentDashboard() {
               <DollarSign className="h-8 w-8 mb-2 text-purple-600" />
               <span>My Fees</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-orange-50 hover:border-orange-300"
               onClick={() => navigate('/app/communication')}
             >
@@ -322,6 +323,9 @@ export function StudentDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* User Manual Download */}
+      <UserManualCard />
     </div>
   );
 }

@@ -1219,6 +1219,15 @@ class ApiService {
   seedCbcSubjects() { return this.api.post('/academics/setup/seed-subjects', {}); }
   seedCbcAll() { return this.api.post('/academics/setup/seed-all', {}); }
 
+  // ======================
+  // STAFF LEAVE REQUESTS
+  // ======================
+  getStaffLeaveRequests(params?: any) { return this.api.get('/staff-leave', { params }); }
+  createStaffLeaveRequest(data: any) { return this.api.post('/staff-leave', data); }
+  reviewStaffLeaveRequest(id: string, data: any) { return this.api.put('/staff-leave/' + id + '/review', data); }
+  cancelStaffLeaveRequest(id: string) { return this.api.put('/staff-leave/' + id + '/cancel', {}); }
+  deleteStaffLeaveRequest(id: string) { return this.api.delete('/staff-leave/' + id); }
+
 }
 
 export default new ApiService();

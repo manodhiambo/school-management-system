@@ -43,6 +43,7 @@ import disciplineRoutes from './routes/disciplineRoutes.js';
 import transportRoutes from './routes/transportRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import academicsModuleRoutes from './routes/academicsModuleRoutes.js';
+import staffLeaveRoutes from './routes/staffLeaveRoutes.js';
 
 dotenv.config();
 
@@ -109,6 +110,9 @@ app.use('/api/v1/health', healthRoutes);
 
 // Comprehensive CBC Academics Module
 app.use('/api/v1/academics', academicsModuleRoutes);
+
+// Staff Leave / Permission Requests
+app.use('/api/v1/staff-leave', staffLeaveRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', schoolRegistrationRoutes);

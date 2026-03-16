@@ -29,6 +29,15 @@ function cbcGradeLabel(grade) {
   return labels[grade] || grade;
 }
 
+function autoComment(grade) {
+  const comments = {
+    EE: 'EXCELLENT', ME: 'GOOD',
+    AE: 'Can do better', BE: 'Put More Effort',
+    WD: 'EXCELLENT', D: 'Can do better', B: 'Put More Effort'
+  };
+  return comments[grade] || null;
+}
+
 // ============================================================
 // STRANDS
 // ============================================================
@@ -189,12 +198,14 @@ router.post('/assessments', authenticate, async (req, res) => {
     const {
       student_id, subject_id, strand_id, sub_strand_id, class_id,
       assessment_type, assessment_date, term, academic_year,
-      score, max_score, teacher_comments, education_level
+      score, max_score, teacher_comments, education_level,
+      exam_period, result_code
     } = req.body;
 
     let cbc_grade = null;
     let pre_primary_grade = null;
-    if (score != null && max_score > 0) {
+    // result_code WD/Y means no score-based grade
+    if (!result_code && score != null && max_score > 0) {
       const pct = (score / max_score) * 100;
       if (['playgroup', 'pre_primary'].includes(education_level)) {
         pre_primary_grade = computeCBCGrade(pct, education_level);
@@ -203,17 +214,21 @@ router.post('/assessments', authenticate, async (req, res) => {
       }
     }
 
+    // Auto-generate comment if none provided
+    const finalGrade = cbc_grade || pre_primary_grade;
+    const finalComment = teacher_comments || (finalGrade ? autoComment(finalGrade) : null);
+
     const tid = req.user.tenant_id;
     const rows = await query(
       `INSERT INTO cbc_assessments
        (student_id, subject_id, strand_id, sub_strand_id, class_id, assessment_type,
         assessment_date, term, academic_year, cbc_grade, pre_primary_grade,
-        score, max_score, teacher_comments, teacher_id, tenant_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        score, max_score, teacher_comments, teacher_id, tenant_id, exam_period, result_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
       [student_id, subject_id, strand_id || null, sub_strand_id || null, class_id,
        assessment_type, assessment_date || new Date(), term, academic_year,
-       cbc_grade, pre_primary_grade, score, max_score, teacher_comments,
-       req.user.id, tid]
+       cbc_grade, pre_primary_grade, result_code ? null : (score || null), max_score || null,
+       finalComment, req.user.id, tid, exam_period || null, result_code || null]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -225,10 +240,10 @@ router.post('/assessments', authenticate, async (req, res) => {
 // PUT /api/v1/cbc/assessments/:id
 router.put('/assessments/:id', authenticate, async (req, res) => {
   try {
-    const { score, max_score, cbc_grade, pre_primary_grade, teacher_comments, education_level } = req.body;
+    const { score, max_score, cbc_grade, pre_primary_grade, teacher_comments, education_level, exam_period, result_code } = req.body;
     let grade = cbc_grade;
     let ppGrade = pre_primary_grade;
-    if (score != null && max_score > 0 && !cbc_grade && !pre_primary_grade) {
+    if (!result_code && score != null && max_score > 0 && !cbc_grade && !pre_primary_grade) {
       const pct = (score / max_score) * 100;
       if (['playgroup', 'pre_primary'].includes(education_level)) {
         ppGrade = computeCBCGrade(pct, education_level);
@@ -236,10 +251,13 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
         grade = computeCBCGrade(pct, 'primary');
       }
     }
+    const finalGrade = grade || ppGrade;
+    const finalComment = teacher_comments || (finalGrade ? autoComment(finalGrade) : null);
     const rows = await query(
       `UPDATE cbc_assessments SET score=$1, max_score=$2, cbc_grade=$3, pre_primary_grade=$4,
-       teacher_comments=$5, updated_at=NOW() WHERE id=$6 RETURNING *`,
-      [score, max_score, grade, ppGrade, teacher_comments, req.params.id]
+       teacher_comments=$5, exam_period=$6, result_code=$7, updated_at=NOW() WHERE id=$8 RETURNING *`,
+      [result_code ? null : (score || null), max_score || null, result_code ? null : grade, result_code ? null : ppGrade,
+       finalComment, exam_period || null, result_code || null, req.params.id]
     );
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -467,20 +485,24 @@ router.post('/report-cards/:id/share', authenticate, async (req, res) => {
     const tid = req.user.tenant_id;
 
     // Load report card with parent contacts + school name
+    // Check both direct parent_id link and parent_students junction table
     const rows = await query(
       `SELECT rc.*,
        s.first_name||' '||s.last_name AS student_name,
        s.admission_number,
        c.name AS class_name,
-       p.first_name||' '||p.last_name AS guardian_name,
-       p.phone_primary AS guardian_phone,
-       pu.email AS guardian_email,
+       COALESCE(p.first_name||' '||p.last_name, p2.first_name||' '||p2.last_name) AS guardian_name,
+       COALESCE(p.phone_primary, p2.phone_primary) AS guardian_phone,
+       COALESCE(pu.email, pu2.email) AS guardian_email,
        t.name AS school_name
        FROM cbc_report_cards rc
        JOIN students s ON s.id = rc.student_id
        JOIN classes c ON c.id = rc.class_id
        LEFT JOIN parents p ON p.id = s.parent_id
        LEFT JOIN users pu ON pu.id = p.user_id
+       LEFT JOIN parent_students ps ON ps.student_id = s.id
+       LEFT JOIN parents p2 ON p2.id = ps.parent_id AND p2.id != COALESCE(s.parent_id, '00000000-0000-0000-0000-000000000000'::uuid)
+       LEFT JOIN users pu2 ON pu2.id = p2.user_id
        LEFT JOIN tenants t ON t.id = rc.tenant_id
        WHERE rc.id = $1 AND rc.tenant_id = $2`,
       [req.params.id, tid]

@@ -28,6 +28,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
     gender: 'male',
     blood_group: '',
     class_id: '',
+    student_type: 'day_scholar',
     address: '',
     city: '',
     state: '',
@@ -66,6 +67,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
         gender: student.gender || 'male',
         blood_group: student.blood_group || '',
         class_id: student.class_id || '',
+        student_type: student.student_type || 'day_scholar',
         address: student.address || '',
         city: student.city || '',
         state: student.state || '',
@@ -216,6 +218,17 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                       <option value="inactive">Inactive</option>
                       <option value="suspended">Suspended</option>
                       <option value="transferred">Transferred</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="student_type">Student Category *</Label>
+                    <Select
+                      id="student_type"
+                      value={formData.student_type}
+                      onChange={(e) => handleChange('student_type', e.target.value)}
+                    >
+                      <option value="day_scholar">Day Scholar</option>
+                      <option value="boarder">Boarder</option>
                     </Select>
                   </div>
                 </div>

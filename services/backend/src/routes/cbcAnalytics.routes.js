@@ -80,13 +80,15 @@ router.get('/class/:classId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
+    // Use cbc_assessments (CBC data source) for class view
     const rankings = await query(`
       SELECT
         s.id, s.first_name, s.last_name, s.admission_number,
-        ROUND(AVG(CASE WHEN er.max_marks > 0 THEN (er.marks_obtained / er.max_marks) * 100 ELSE 0 END), 2) AS avg_percentage,
-        COUNT(er.id) AS exam_count
+        ROUND(AVG(CASE WHEN a.max_score > 0 THEN (a.score / a.max_score) * 100 ELSE 0 END), 2) AS avg_percentage,
+        COUNT(a.id) AS exam_count
       FROM students s
-      LEFT JOIN exam_results er ON er.student_id = s.id AND er.tenant_id = $2
+      LEFT JOIN cbc_assessments a ON a.student_id = s.id AND a.tenant_id = $2
+        AND (a.result_code IS NULL)
       WHERE s.class_id = $1 AND s.tenant_id = $2 AND s.status = 'active'
       GROUP BY s.id, s.first_name, s.last_name, s.admission_number
       ORDER BY avg_percentage DESC NULLS LAST
@@ -95,23 +97,27 @@ router.get('/class/:classId', async (req, res) => {
     const subjectPerformance = await query(`
       SELECT
         sub.id, sub.name AS subject_name,
-        ROUND(AVG(CASE WHEN er.max_marks > 0 THEN (er.marks_obtained / er.max_marks) * 100 ELSE 0 END), 2) AS avg_percentage,
-        COUNT(er.id) AS result_count
-      FROM exam_results er
-      JOIN students s ON s.id = er.student_id
-      LEFT JOIN subjects sub ON sub.id = er.subject_id
-      WHERE s.class_id = $1 AND er.tenant_id = $2 AND (er.is_absent = false OR er.is_absent IS NULL)
+        ROUND(AVG(CASE WHEN a.max_score > 0 THEN (a.score / a.max_score) * 100 ELSE 0 END), 2) AS avg_percentage,
+        COUNT(a.id) AS result_count
+      FROM cbc_assessments a
+      JOIN students s ON s.id = a.student_id
+      LEFT JOIN subjects sub ON sub.id = a.subject_id
+      WHERE s.class_id = $1 AND a.tenant_id = $2 AND (a.result_code IS NULL)
       GROUP BY sub.id, sub.name
       ORDER BY avg_percentage DESC NULLS LAST
     `, [req.params.classId, tenantId]);
 
     const gradeDistribution = await query(`
-      SELECT er.cbc_grade, COUNT(*) AS count
-      FROM exam_results er
-      JOIN students s ON s.id = er.student_id
-      WHERE s.class_id = $1 AND er.tenant_id = $2 AND er.cbc_grade IS NOT NULL
-      GROUP BY er.cbc_grade
-      ORDER BY er.cbc_grade
+      SELECT
+        COALESCE(a.cbc_grade, a.pre_primary_grade) AS cbc_grade,
+        COUNT(*) AS count
+      FROM cbc_assessments a
+      JOIN students s ON s.id = a.student_id
+      WHERE s.class_id = $1 AND a.tenant_id = $2
+        AND COALESCE(a.cbc_grade, a.pre_primary_grade) IS NOT NULL
+        AND (a.result_code IS NULL)
+      GROUP BY COALESCE(a.cbc_grade, a.pre_primary_grade)
+      ORDER BY cbc_grade
     `, [req.params.classId, tenantId]);
 
     res.json({

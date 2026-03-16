@@ -80,6 +80,7 @@ import { AcademicCalendarPage } from './pages/cbc/AcademicCalendarPage';
 import { DisciplinePage } from './pages/discipline/DisciplinePage';
 import { TransportPage } from './pages/transport/TransportPage';
 import { HealthPage } from './pages/health/HealthPage';
+import { StaffLeavePage } from './pages/staff/StaffLeavePage';
 
 // Parent Alerts
 import { ParentAlertsPage } from './pages/parent/ParentAlertsPage';
@@ -203,6 +204,7 @@ function App() {
               <Route path="discipline" element={<DisciplinePage />} />
               <Route path="transport" element={<TransportPage />} />
               <Route path="health" element={<HealthPage />} />
+              <Route path="staff-leave" element={<StaffLeavePage />} />
 
               {/* Parent Alerts */}
               <Route path="my-alerts" element={<ParentAlertsPage />} />

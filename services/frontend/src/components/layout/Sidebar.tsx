@@ -117,8 +117,9 @@ const navigationItems: NavItem[] = [
   { name: 'Notifications', href: '/app/notifications', icon: Bell,          roles: ['parent', 'student'],         section: 'Messages' },
 
   // ── Student Welfare ───────────────────────────────────────────────────────
-  { name: 'Discipline',  href: '/app/discipline', icon: AlertTriangle, roles: ['admin', 'teacher'], section: 'Welfare' },
-  { name: 'Health',      href: '/app/health',     icon: Heart,         roles: ['admin', 'teacher'], section: 'Welfare' },
+  { name: 'Discipline',    href: '/app/discipline',  icon: AlertTriangle, roles: ['admin', 'teacher'], section: 'Welfare' },
+  { name: 'Health',        href: '/app/health',      icon: Heart,         roles: ['admin', 'teacher'], section: 'Welfare' },
+  { name: 'Staff Leave',   href: '/app/staff-leave', icon: ClipboardList, roles: ['admin', 'teacher'], section: 'Welfare' },
   { name: 'Transport',   href: '/app/transport',  icon: Bus,           roles: ['admin'],            section: 'Welfare' },
 
   // ── Library ───────────────────────────────────────────────────────────────

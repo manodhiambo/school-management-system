@@ -26,6 +26,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
     gender: 'male',
     bloodGroup: '',
     classId: '',
+    student_type: 'day_scholar',
     address: '',
     city: '',
     state: '',
@@ -68,6 +69,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
         gender: 'male',
         bloodGroup: '',
         classId: '',
+        student_type: 'day_scholar',
         address: '',
         city: '',
         state: '',
@@ -151,6 +153,19 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
                     value={formData.bloodGroup}
                     onChange={(e) => handleChange('bloodGroup', e.target.value)}
                   />
+                </div>
+                <div>
+                  <Label htmlFor="student_type">Student Category *</Label>
+                  <select
+                    id="student_type"
+                    value={formData.student_type}
+                    onChange={(e) => handleChange('student_type', e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    required
+                  >
+                    <option value="day_scholar">Day Scholar</option>
+                    <option value="boarder">Boarder</option>
+                  </select>
                 </div>
                 <div>
                   <Label htmlFor="classId">Class/Grade *</Label>

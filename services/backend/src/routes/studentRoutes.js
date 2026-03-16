@@ -142,7 +142,8 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
       email, password, firstName, first_name, lastName, last_name,
       dateOfBirth, date_of_birth, gender, bloodGroup, blood_group,
       classId, class_id, parentId, parent_id, admissionDate, admission_date,
-      address, city, state, pincode, phonePrimary, phone_primary, phone
+      address, city, state, pincode, phonePrimary, phone_primary, phone,
+      student_type, studentType
     } = req.body;
 
     const actualFirstName = firstName || first_name;
@@ -155,6 +156,7 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     const actualBloodGroup = bloodGroup || blood_group || null;
     const actualAdmissionDate = admissionDate || admission_date || new Date();
     const actualPhone = phonePrimary || phone_primary || phone || null;
+    const actualStudentType = student_type || studentType || 'day_scholar';
 
     if (!actualEmail || !actualFirstName || !actualLastName) {
       return res.status(400).json({
@@ -200,13 +202,14 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
       `INSERT INTO students (
         id, user_id, admission_number, first_name, last_name, date_of_birth,
         gender, blood_group, class_id, parent_id, admission_date,
-        address, city, state, pincode, phone, tenant_id, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'active')`,
+        address, city, state, pincode, phone, student_type, tenant_id, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'active')`,
       [
         studentId, userId, admissionNumber, actualFirstName, actualLastName,
         actualDateOfBirth, actualGender, actualBloodGroup,
         actualClassId, actualParentId, actualAdmissionDate,
-        address || null, city || null, state || null, pincode || null, actualPhone, tid
+        address || null, city || null, state || null, pincode || null, actualPhone,
+        actualStudentType, tid
       ]
     );
 
@@ -235,7 +238,7 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
     const {
       firstName, first_name, lastName, last_name, dateOfBirth, date_of_birth,
       gender, bloodGroup, blood_group, classId, class_id, parentId, parent_id,
-      address, city, state, pincode, phone, status, admission_number
+      address, city, state, pincode, phone, status, admission_number, student_type
     } = req.body;
 
     // Convert empty strings to null for UUID fields
@@ -258,14 +261,17 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
         pincode = COALESCE(NULLIF($11, ''), pincode),
         phone = COALESCE(NULLIF($12, ''), phone),
         status = COALESCE(NULLIF($13, ''), status),
+        admission_number = COALESCE(NULLIF($14, ''), admission_number),
+        student_type = COALESCE(NULLIF($15, ''), student_type),
         updated_at = NOW()
-       WHERE id = $14 AND tenant_id = $15`,
+       WHERE id = $16 AND tenant_id = $17`,
       [
         firstName || first_name, lastName || last_name,
         actualDob, gender,
         bloodGroup || blood_group, actualClassId,
         actualParentId, address || null, city || null, state || null, pincode || null,
-        phone || null, status, req.params.id, tid
+        phone || null, status, admission_number || null, student_type || null,
+        req.params.id, tid
       ]
     );
 

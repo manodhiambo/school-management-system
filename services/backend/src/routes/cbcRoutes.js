@@ -6,33 +6,61 @@ import { sendEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
-// Helper: compute CBC grade from percentage and level
+// Helper: compute CBC grade from percentage and education level
 function computeCBCGrade(percentage, level) {
   if (['playgroup', 'pre_primary'].includes(level)) {
     if (percentage >= 75) return 'WD'; // Well Developed
     if (percentage >= 40) return 'D';  // Developing
     return 'B';                         // Beginning
   }
-  // Standard CBC for primary & above
+  // Kenya 2025 KJSEA 8-level grading for Junior Secondary (Grade 7–9)
+  if (level === 'junior_secondary') {
+    if (percentage >= 90) return 'EE1'; // Exceeding Expectations Level 1
+    if (percentage >= 75) return 'EE2'; // Exceeding Expectations Level 2
+    if (percentage >= 58) return 'ME1'; // Meeting Expectations Level 1
+    if (percentage >= 41) return 'ME2'; // Meeting Expectations Level 2
+    if (percentage >= 31) return 'AE1'; // Approaching Expectations Level 1
+    if (percentage >= 21) return 'AE2'; // Approaching Expectations Level 2
+    if (percentage >= 11) return 'BE1'; // Below Expectations Level 1
+    return 'BE2';                        // Below Expectations Level 2
+  }
+  // Standard CBC for lower_primary, upper_primary, senior_secondary
   if (percentage >= 80) return 'EE'; // Exceeding Expectations
   if (percentage >= 60) return 'ME'; // Meeting Expectations
   if (percentage >= 40) return 'AE'; // Approaching Expectations
   return 'BE';                        // Below Expectations
 }
 
+// Helper: grade points for JSS (1–8 scale)
+function gradePoints(grade) {
+  const points = {
+    EE1: 8, EE2: 7, ME1: 6, ME2: 5,
+    AE1: 4, AE2: 3, BE1: 2, BE2: 1,
+    EE: null, ME: null, AE: null, BE: null,
+    WD: null, D: null, B: null
+  };
+  return points[grade] ?? null;
+}
+
 function cbcGradeLabel(grade) {
   const labels = {
     EE: 'Exceeding Expectations', ME: 'Meeting Expectations',
     AE: 'Approaching Expectations', BE: 'Below Expectations',
-    WD: 'Well Developed', D: 'Developing', B: 'Beginning'
+    WD: 'Well Developed', D: 'Developing', B: 'Beginning',
+    EE1: 'Exceeding Expectations Level 1', EE2: 'Exceeding Expectations Level 2',
+    ME1: 'Meeting Expectations Level 1',   ME2: 'Meeting Expectations Level 2',
+    AE1: 'Approaching Expectations Level 1', AE2: 'Approaching Expectations Level 2',
+    BE1: 'Below Expectations Level 1',     BE2: 'Below Expectations Level 2',
   };
   return labels[grade] || grade;
 }
 
 function autoComment(grade) {
   const comments = {
-    EE: 'EXCELLENT', ME: 'GOOD',
-    AE: 'Can do better', BE: 'Put More Effort',
+    EE: 'EXCELLENT', EE1: 'EXCELLENT', EE2: 'EXCELLENT',
+    ME: 'GOOD',      ME1: 'GOOD',      ME2: 'GOOD',
+    AE: 'Can do better', AE1: 'Can do better', AE2: 'Can do better',
+    BE: 'Put More Effort', BE1: 'Put More Effort', BE2: 'Put More Effort',
     WD: 'EXCELLENT', D: 'Can do better', B: 'Put More Effort'
   };
   return comments[grade] || null;
@@ -204,13 +232,15 @@ router.post('/assessments', authenticate, async (req, res) => {
 
     let cbc_grade = null;
     let pre_primary_grade = null;
+    let grade_pts = null;
     // result_code WD/Y means no score-based grade
     if (!result_code && score != null && max_score > 0) {
       const pct = (score / max_score) * 100;
       if (['playgroup', 'pre_primary'].includes(education_level)) {
         pre_primary_grade = computeCBCGrade(pct, education_level);
       } else {
-        cbc_grade = computeCBCGrade(pct, education_level || 'primary');
+        cbc_grade = computeCBCGrade(pct, education_level || 'lower_primary');
+        grade_pts = gradePoints(cbc_grade);
       }
     }
 
@@ -223,12 +253,12 @@ router.post('/assessments', authenticate, async (req, res) => {
       `INSERT INTO cbc_assessments
        (student_id, subject_id, strand_id, sub_strand_id, class_id, assessment_type,
         assessment_date, term, academic_year, cbc_grade, pre_primary_grade,
-        score, max_score, teacher_comments, teacher_id, tenant_id, exam_period, result_code)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+        score, max_score, teacher_comments, teacher_id, tenant_id, exam_period, result_code, grade_points)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
       [student_id, subject_id, strand_id || null, sub_strand_id || null, class_id,
        assessment_type, assessment_date || new Date(), term, academic_year,
        cbc_grade, pre_primary_grade, result_code ? null : (score || null), max_score || null,
-       finalComment, req.user.id, tid, exam_period || null, result_code || null]
+       finalComment, req.user.id, tid, exam_period || null, result_code || null, grade_pts]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -246,21 +276,23 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
     const { score, max_score, cbc_grade, pre_primary_grade, teacher_comments, education_level, exam_period, result_code } = req.body;
     let grade = cbc_grade;
     let ppGrade = pre_primary_grade;
+    let grade_pts = null;
     if (!result_code && score != null && max_score > 0 && !cbc_grade && !pre_primary_grade) {
       const pct = (score / max_score) * 100;
       if (['playgroup', 'pre_primary'].includes(education_level)) {
         ppGrade = computeCBCGrade(pct, education_level);
       } else {
-        grade = computeCBCGrade(pct, 'primary');
+        grade = computeCBCGrade(pct, education_level || 'lower_primary');
       }
     }
+    if (!result_code && grade) grade_pts = gradePoints(grade);
     const finalGrade = grade || ppGrade;
     const finalComment = teacher_comments || (finalGrade ? autoComment(finalGrade) : null);
     const rows = await query(
       `UPDATE cbc_assessments SET score=$1, max_score=$2, cbc_grade=$3, pre_primary_grade=$4,
-       teacher_comments=$5, exam_period=$6, result_code=$7, updated_at=NOW() WHERE id=$8 RETURNING *`,
+       teacher_comments=$5, exam_period=$6, result_code=$7, grade_points=$8, updated_at=NOW() WHERE id=$9 RETURNING *`,
       [result_code ? null : (score || null), max_score || null, result_code ? null : grade, result_code ? null : ppGrade,
-       finalComment, exam_period || null, result_code || null, req.params.id]
+       finalComment, exam_period || null, result_code || null, result_code ? null : grade_pts, req.params.id]
     );
     res.json({ success: true, data: rows[0] });
   } catch (err) {

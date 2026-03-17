@@ -10,20 +10,32 @@ import { useAuthStore } from '@/store/authStore';
 import { Plus, BookOpen, Download, Pencil, Trash2, X, Check } from 'lucide-react';
 
 const CBC_GRADES = ['EE', 'ME', 'AE', 'BE'];
+const JSS_GRADES = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2'];
 const PP_GRADES = ['WD', 'D', 'B'];
 const GRADE_COLORS: Record<string, string> = {
-  EE: 'bg-green-100 text-green-800', ME: 'bg-blue-100 text-blue-800',
-  AE: 'bg-yellow-100 text-yellow-800', BE: 'bg-red-100 text-red-800',
-  WD: 'bg-green-100 text-green-800', D: 'bg-yellow-100 text-yellow-800',
-  B: 'bg-red-100 text-red-800',
+  EE: 'bg-green-100 text-green-800', EE1: 'bg-green-200 text-green-900', EE2: 'bg-green-100 text-green-800',
+  ME: 'bg-blue-100 text-blue-800',   ME1: 'bg-blue-200 text-blue-900',   ME2: 'bg-blue-100 text-blue-800',
+  AE: 'bg-yellow-100 text-yellow-800', AE1: 'bg-yellow-200 text-yellow-900', AE2: 'bg-yellow-100 text-yellow-800',
+  BE: 'bg-red-100 text-red-800',     BE1: 'bg-red-200 text-red-900',     BE2: 'bg-red-100 text-red-800',
+  WD: 'bg-green-100 text-green-800', D: 'bg-yellow-100 text-yellow-800', B: 'bg-red-100 text-red-800',
 };
 const GRADE_LABELS: Record<string, string> = {
   EE: 'Exceeding Expectations', ME: 'Meeting Expectations',
   AE: 'Approaching Expectations', BE: 'Below Expectations',
   WD: 'Well Developed', D: 'Developing', B: 'Beginning',
+  EE1: 'EE Level 1 (90–100%)', EE2: 'EE Level 2 (75–89%)',
+  ME1: 'ME Level 1 (58–74%)',  ME2: 'ME Level 2 (41–57%)',
+  AE1: 'AE Level 1 (31–40%)',  AE2: 'AE Level 2 (21–30%)',
+  BE1: 'BE Level 1 (11–20%)',  BE2: 'BE Level 2 (1–10%)',
+};
+const GRADE_POINTS: Record<string, number> = {
+  EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
 };
 const AUTO_COMMENTS: Record<string, string> = {
-  EE: 'EXCELLENT', ME: 'GOOD', AE: 'Can do better', BE: 'Put More Effort',
+  EE: 'EXCELLENT', EE1: 'EXCELLENT', EE2: 'EXCELLENT',
+  ME: 'GOOD',      ME1: 'GOOD',      ME2: 'GOOD',
+  AE: 'Can do better', AE1: 'Can do better', AE2: 'Can do better',
+  BE: 'Put More Effort', BE1: 'Put More Effort', BE2: 'Put More Effort',
   WD: 'EXCELLENT', D: 'Can do better', B: 'Put More Effort',
 };
 
@@ -36,10 +48,11 @@ const EMPTY_FORM = {
   max_score: '',
   result_code: '',
   teacher_comments: '',
+  education_level: '',
 };
 
 function downloadCSV(assessments: any[]) {
-  const headers = ['Student', 'Subject', 'Strand', 'Type', 'Exam Period', 'Term', 'Year', 'Score', 'Max Score', 'CBC Grade', 'Result Code', 'Date', 'Comments'];
+  const headers = ['Student', 'Subject', 'Strand', 'Type', 'Exam Period', 'Term', 'Year', 'Score', 'Max Score', 'CBC Grade', 'Grade Points', 'Result Code', 'Date', 'Comments'];
   const rows = assessments.map((a: any) => [
     a.student_name,
     a.subject_name,
@@ -51,6 +64,7 @@ function downloadCSV(assessments: any[]) {
     a.score ?? '',
     a.max_score ?? '',
     a.cbc_grade || a.pre_primary_grade || '',
+    a.grade_points ?? '',
     a.result_code || '',
     a.assessment_date ? new Date(a.assessment_date).toLocaleDateString() : '',
     (a.teacher_comments || '').replace(/,/g, ';'),
@@ -130,7 +144,13 @@ export function CbcAssessmentPage() {
         updated.teacher_comments = '';
       } else if (updated.score && updated.max_score && Number(updated.max_score) > 0) {
         const pct = (Number(updated.score) / Number(updated.max_score)) * 100;
-        const grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
+        let grade: string;
+        const level = form.education_level || '';
+        if (level === 'junior_secondary') {
+          grade = pct >= 90 ? 'EE1' : pct >= 75 ? 'EE2' : pct >= 58 ? 'ME1' : pct >= 41 ? 'ME2' : pct >= 31 ? 'AE1' : pct >= 21 ? 'AE2' : pct >= 11 ? 'BE1' : 'BE2';
+        } else {
+          grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
+        }
         updated.teacher_comments = AUTO_COMMENTS[grade] || '';
       }
     }
@@ -174,14 +194,36 @@ export function CbcAssessmentPage() {
 
       {/* Grade Legend */}
       <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap gap-3">
-            {[...CBC_GRADES, ...PP_GRADES].map(g => (
-              <div key={g} className="flex items-center gap-2">
-                <Badge className={GRADE_COLORS[g]}>{g}</Badge>
-                <span className="text-xs text-gray-600">{GRADE_LABELS[g]}</span>
-              </div>
-            ))}
+        <CardContent className="pt-4 space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Standard CBC (Primary &amp; Senior Secondary)</p>
+            <div className="flex flex-wrap gap-3">
+              {CBC_GRADES.map(g => (
+                <div key={g} className="flex items-center gap-2">
+                  <Badge className={GRADE_COLORS[g]}>{g}</Badge>
+                  <span className="text-xs text-gray-600">{GRADE_LABELS[g]}</span>
+                </div>
+              ))}
+              {PP_GRADES.map(g => (
+                <div key={g} className="flex items-center gap-2">
+                  <Badge className={GRADE_COLORS[g]}>{g}</Badge>
+                  <span className="text-xs text-gray-600">{GRADE_LABELS[g]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">JSS 2025 KJSEA (Grade 7–9) — 8-Level System</p>
+            <div className="flex flex-wrap gap-3">
+              {JSS_GRADES.map(g => (
+                <div key={g} className="flex items-center gap-2">
+                  <Badge className={GRADE_COLORS[g]}>{g}</Badge>
+                  <span className="text-xs text-gray-600">{GRADE_LABELS[g]} · {GRADE_POINTS[g]}pts</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3 border-t pt-2">
             <div className="flex items-center gap-2">
               <Badge className="bg-gray-100 text-gray-800">WD</Badge>
               <span className="text-xs text-gray-600">Withheld Result</span>
@@ -222,6 +264,17 @@ export function CbcAssessmentPage() {
                   value={form.subject_id || ''} onChange={e => handleFormChange('subject_id', e.target.value)} required>
                   <option value="">Select subject</option>
                   {subjects.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>Education Level</Label>
+                <select className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+                  value={form.education_level} onChange={e => handleFormChange('education_level', e.target.value)}>
+                  <option value="">Standard CBC (Primary)</option>
+                  <option value="pre_primary">Pre-Primary (PP1/PP2)</option>
+                  <option value="playgroup">Playgroup</option>
+                  <option value="junior_secondary">Junior Secondary (Grade 7–9)</option>
+                  <option value="senior_secondary">Senior Secondary (Grade 10–12)</option>
                 </select>
               </div>
               <div>
@@ -377,6 +430,7 @@ export function CbcAssessmentPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Period</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Score</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Grade</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Pts</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Comments</th>
                     {isAdmin && <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>}
@@ -435,6 +489,11 @@ export function CbcAssessmentPage() {
                             </Badge>
                           ) : '—'
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 font-medium">
+                        {a.grade_points != null ? (
+                          <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">{a.grade_points}</span>
+                        ) : '—'}
                       </td>
                       <td className="px-4 py-3 text-gray-500">
                         {a.assessment_date ? new Date(a.assessment_date).toLocaleDateString() : '—'}

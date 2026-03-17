@@ -8,11 +8,20 @@ import api from '@/services/api';
 import { jsPDF } from 'jspdf';
 
 const GRADE_COLORS_HEX: Record<string, [number, number, number]> = {
-  EE: [22, 163, 74], ME: [37, 99, 235], AE: [202, 138, 4], BE: [220, 38, 38],
+  EE: [22, 163, 74],   EE1: [15, 118, 54],  EE2: [22, 163, 74],
+  ME: [37, 99, 235],   ME1: [29, 78, 216],  ME2: [37, 99, 235],
+  AE: [202, 138, 4],   AE1: [180, 120, 2],  AE2: [202, 138, 4],
+  BE: [220, 38, 38],   BE1: [185, 28, 28],  BE2: [220, 38, 38],
   WD: [22, 163, 74], D: [202, 138, 4], B: [220, 38, 38],
 };
+const GRADE_POINTS: Record<string, number> = {
+  EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
+};
 const AUTO_COMMENTS: Record<string, string> = {
-  EE: 'EXCELLENT', ME: 'GOOD', AE: 'Can do better', BE: 'Put More Effort',
+  EE: 'EXCELLENT', EE1: 'EXCELLENT', EE2: 'EXCELLENT',
+  ME: 'GOOD',      ME1: 'GOOD',      ME2: 'GOOD',
+  AE: 'Can do better', AE1: 'Can do better', AE2: 'Can do better',
+  BE: 'Put More Effort', BE1: 'Put More Effort', BE2: 'Put More Effort',
   WD: 'EXCELLENT', D: 'Can do better', B: 'Put More Effort',
 };
 
@@ -97,8 +106,14 @@ async function generateStudentReportPDF(
     doc.setTextColor(0, 0, 0);
 
     // Table header
-    const colX = [margin, margin + 52, margin + 88, margin + 110, margin + 124, margin + 140];
-    const colHeads = ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Comment'];
+    // Detect if any assessments are JSS (have grade_points)
+    const hasJSS = assessments.some((a: any) => a.grade_points != null);
+    const colX = hasJSS
+      ? [margin, margin + 48, margin + 80, margin + 100, margin + 116, margin + 128, margin + 148]
+      : [margin, margin + 52, margin + 88, margin + 110, margin + 124, margin + 140];
+    const colHeads = hasJSS
+      ? ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Pts', 'Comment']
+      : ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Comment'];
     doc.setFillColor(219, 234, 254);
     doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
     doc.setFont('helvetica', 'bold');
@@ -107,7 +122,7 @@ async function generateStudentReportPDF(
     y += 8;
 
     doc.setFont('helvetica', 'normal');
-    assessments.forEach((a, idx) => {
+    assessments.forEach((a: any, idx: number) => {
       if (y > 240) { doc.addPage(); y = 20; }
       if (idx % 2 === 0) {
         doc.setFillColor(249, 250, 251);
@@ -127,10 +142,10 @@ async function generateStudentReportPDF(
         const [r, g, b] = GRADE_COLORS_HEX[grade] || [100, 100, 100];
         doc.setFillColor(r, g, b);
         doc.setTextColor(255, 255, 255);
-        doc.roundedRect(colX[3], y + 0.5, 12, 6, 1, 1, 'F');
+        doc.roundedRect(colX[3], y + 0.5, hasJSS ? 14 : 12, 6, 1, 1, 'F');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
-        doc.text(grade, colX[3] + 2, y + 5);
+        doc.text(grade, colX[3] + 1.5, y + 5);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(0, 0, 0);
@@ -138,7 +153,16 @@ async function generateStudentReportPDF(
         doc.text('—', colX[3], y + 5);
       }
 
-      doc.text(comment.slice(0, 24), colX[4], y + 5);
+      if (hasJSS) {
+        const pts = a.grade_points != null ? String(a.grade_points) : '—';
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(pts, colX[4], y + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.text(comment.slice(0, 22), colX[5], y + 5);
+      } else {
+        doc.text(comment.slice(0, 24), colX[4], y + 5);
+      }
       y += 7;
     });
     y += 4;

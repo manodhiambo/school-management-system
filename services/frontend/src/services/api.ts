@@ -168,6 +168,18 @@ class ApiService {
     return this.api.get('/teachers/' + teacherId + '/classes');
   }
 
+  getTeacherSubjectAssignments(teacherId: string) {
+    return this.api.get('/teachers/' + teacherId + '/assignments');
+  }
+
+  addTeacherAssignment(teacherId: string, data: { class_id: string; subject_id: string }) {
+    return this.api.post('/teachers/' + teacherId + '/assignments', data);
+  }
+
+  removeTeacherAssignment(teacherId: string, csId: string) {
+    return this.api.delete('/teachers/' + teacherId + '/assignments/' + csId);
+  }
+
   // Parents
   getParents(params?: any) {
     return this.api.get('/parents', { params });

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Check } from 'lucide-react';
+import { X, Check, Search } from 'lucide-react';
 import api from '@/services/api';
 
 interface AddParentModalProps {
@@ -17,6 +17,7 @@ interface AddParentModalProps {
 export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModalProps) {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: 'parent123',
@@ -255,48 +256,73 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
 
             {/* Student Association */}
             <div className="pb-4">
-              <h3 className="font-semibold mb-3 text-blue-600">Link Children (Students)</h3>
-              <p className="text-sm text-gray-500 mb-3">Select the students who are children of this parent</p>
-              
-              {students.length > 0 ? (
-                <div className="grid gap-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
-                  {students.map((student: any) => {
-                    const isSelected = formData.studentIds.includes(student.id);
-                    return (
-                      <div 
-                        key={student.id} 
-                        onClick={() => toggleStudent(student.id)}
-                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
-                          isSelected 
-                            ? 'bg-blue-100 border-2 border-blue-500' 
-                            : 'bg-white border border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
-                        <div>
-                          <p className="font-medium">{student.first_name} {student.last_name}</p>
-                          <p className="text-sm text-gray-500">
-                            {student.admission_number} 
-                            {student.class_name && ` • ${student.class_name}`}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <div className="h-6 w-6 bg-blue-500 rounded-full flex items-center justify-center">
-                            <Check className="h-4 w-4 text-white" />
-                          </div>
-                        )}
+              <h3 className="font-semibold mb-1 text-blue-600">Link Children (Students)</h3>
+              <p className="text-sm text-gray-500 mb-3">Search and select the student(s) who belong to this parent</p>
+
+              {/* Search box */}
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search by name, admission no, or class..."
+                  value={studentSearch}
+                  onChange={e => setStudentSearch(e.target.value)}
+                  className="pl-9 text-sm"
+                />
+              </div>
+
+              {students.length > 0 ? (() => {
+                const q = studentSearch.toLowerCase();
+                const filtered = q
+                  ? students.filter(s =>
+                      `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) ||
+                      (s.admission_number || '').toLowerCase().includes(q) ||
+                      (s.class_name || '').toLowerCase().includes(q)
+                    )
+                  : students;
+                return (
+                  <div className="border rounded-lg bg-gray-50 overflow-hidden">
+                    {filtered.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-6">No students match your search.</p>
+                    ) : (
+                      <div className="divide-y max-h-52 overflow-y-auto">
+                        {filtered.map((student: any) => {
+                          const isSelected = formData.studentIds.includes(student.id);
+                          return (
+                            <div
+                              key={student.id}
+                              onClick={() => toggleStudent(student.id)}
+                              className={`flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors ${
+                                isSelected ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'
+                              }`}
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{student.first_name} {student.last_name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {student.admission_number}{student.class_name ? ` • ${student.class_name}` : ''}
+                                  {student.student_type === 'boarder' ? ' • Boarder' : ''}
+                                </p>
+                              </div>
+                              <div className={`h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                              }`}>
+                                {isSelected && <Check className="h-3 w-3 text-white" />}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
+                    )}
+                  </div>
+                );
+              })() : (
                 <div className="text-center py-8 bg-gray-50 rounded-lg border">
                   <p className="text-gray-500">No students available</p>
                   <p className="text-sm text-gray-400">Add students first to link them to parents</p>
                 </div>
               )}
-              
+
               {formData.studentIds.length > 0 && (
-                <p className="text-sm text-blue-600 mt-2">
+                <p className="text-sm text-blue-600 mt-2 font-medium">
                   {formData.studentIds.length} student(s) selected
                 </p>
               )}

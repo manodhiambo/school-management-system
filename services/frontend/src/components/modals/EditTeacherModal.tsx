@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import api from '@/services/api';
 
 interface EditTeacherModalProps {
@@ -18,6 +18,13 @@ interface EditTeacherModalProps {
 export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: EditTeacherModalProps) {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [newClassId, setNewClassId] = useState('');
+  const [newSubjectId, setNewSubjectId] = useState('');
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     employee_id: '',
     first_name: '',
@@ -38,6 +45,9 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
   useEffect(() => {
     if (open && teacherId) {
       loadTeacher();
+      loadAssignments();
+      api.getClasses().then((r: any) => setClasses(r.data || r.classes || [])).catch(() => {});
+      api.getSubjects().then((r: any) => setSubjects(r.data || r.subjects || [])).catch(() => {});
     }
   }, [open, teacherId]);
 
@@ -70,8 +80,46 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
     }
   };
 
+  const loadAssignments = async () => {
+    try {
+      const response: any = await api.getTeacherSubjectAssignments(teacherId);
+      setAssignments(response.data || []);
+    } catch (error) {
+      console.error('Error loading assignments:', error);
+    }
+  };
+
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddAssignment = async () => {
+    if (!newClassId || !newSubjectId) return;
+    const alreadyExists = assignments.some(a => a.class_id === newClassId && a.subject_id === newSubjectId);
+    if (alreadyExists) return;
+    try {
+      setAssignmentSaving(true);
+      const response: any = await api.addTeacherAssignment(teacherId, { class_id: newClassId, subject_id: newSubjectId });
+      setAssignments(response.data || []);
+      setNewClassId('');
+      setNewSubjectId('');
+    } catch (error: any) {
+      alert(error.message || 'Failed to add assignment');
+    } finally {
+      setAssignmentSaving(false);
+    }
+  };
+
+  const handleRemoveAssignment = async (csId: string) => {
+    try {
+      setAssignmentSaving(true);
+      await api.removeTeacherAssignment(teacherId, csId);
+      setAssignments(prev => prev.filter(a => a.id !== csId));
+    } catch (error: any) {
+      alert(error.message || 'Failed to remove assignment');
+    } finally {
+      setAssignmentSaving(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,7 +140,7 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Edit Teacher</DialogTitle>
           <button
@@ -108,19 +156,17 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <div className="space-y-4 overflow-y-auto flex-1 px-1 pb-4">
               {/* Personal Information */}
               <div className="border-b pb-4">
-                <h3 className="font-semibold mb-3">Personal Information</h3>
+                <h3 className="font-semibold mb-3 text-blue-600">Personal Information</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="employee_id">Employee ID *</Label>
+                    <Label htmlFor="employee_id">Employee ID</Label>
                     <Input
                       id="employee_id"
                       value={formData.employee_id}
-                      onChange={(e) => handleChange('employee_id', e.target.value)}
-                      required
                       disabled
                     />
                   </div>
@@ -193,7 +239,7 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
 
               {/* Contact Information */}
               <div className="border-b pb-4">
-                <h3 className="font-semibold mb-3">Contact Information</h3>
+                <h3 className="font-semibold mb-3 text-blue-600">Contact Information</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <Label htmlFor="email">Email *</Label>
@@ -227,16 +273,15 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
               </div>
 
               {/* Professional Information */}
-              <div className="pb-4">
-                <h3 className="font-semibold mb-3">Professional Information</h3>
+              <div className="border-b pb-4">
+                <h3 className="font-semibold mb-3 text-blue-600">Professional Information</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="designation">Designation *</Label>
+                    <Label htmlFor="designation">Designation</Label>
                     <Input
                       id="designation"
                       value={formData.designation}
                       onChange={(e) => handleChange('designation', e.target.value)}
-                      required
                     />
                   </div>
                   <div>
@@ -267,9 +312,77 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
                   </div>
                 </div>
               </div>
+
+              {/* Teaching Assignments */}
+              <div className="pb-4">
+                <h3 className="font-semibold mb-1 text-blue-600">Teaching Assignments</h3>
+                <p className="text-sm text-gray-500 mb-3">Classes and subjects this teacher is assigned to teach</p>
+
+                {/* Add row */}
+                <div className="flex gap-2 mb-3">
+                  <div className="flex-1">
+                    <Select value={newClassId} onChange={e => setNewClassId(e.target.value)}>
+                      <option value="">Select class...</option>
+                      {classes.map((cls: any) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.name}{cls.section ? ' ' + cls.section : ''}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="flex-1">
+                    <Select value={newSubjectId} onChange={e => setNewSubjectId(e.target.value)}>
+                      <option value="">Select subject...</option>
+                      {subjects.map((sub: any) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name}{sub.code ? ` (${sub.code})` : ''}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddAssignment}
+                    disabled={!newClassId || !newSubjectId || assignmentSaving}
+                    className="shrink-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Assignment list */}
+                {assignments.length === 0 ? (
+                  <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed">
+                    <p className="text-sm text-gray-400">No teaching assignments yet.</p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg divide-y">
+                    {assignments.map((a: any) => (
+                      <div key={a.id} className="flex items-center justify-between px-3 py-2">
+                        <div>
+                          <span className="text-sm font-medium">{a.subject_name}</span>
+                          {a.subject_code && <span className="text-xs text-gray-400 ml-1">({a.subject_code})</span>}
+                          <span className="text-xs text-gray-500 ml-2">
+                            — {a.class_name}{a.class_section ? ' ' + a.class_section : ''}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAssignment(a.id)}
+                          disabled={assignmentSaving}
+                          className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="border-t pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>

@@ -5,6 +5,8 @@ import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddlewa
 import requireRole from '../middleware/roleMiddleware.js';
 import { validateRequest, schemas } from '../utils/validators.js';
 import Joi from 'joi';
+import { query } from '../config/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
@@ -249,4 +251,85 @@ router.get(
   requireRole(['admin', 'teacher']),
   teacherController.getTeacherTimetable
 );
+
+// ── Teaching Assignments (class + subject pairs) ─────────────────────────────
+
+// GET /:id/assignments — list all class-subject assignments for a teacher
+router.get('/:id/assignments', requireRole(['admin', 'teacher']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const rows = await query(
+      `SELECT cs.id, cs.class_id, cs.subject_id,
+              c.name AS class_name, c.section AS class_section,
+              s.name AS subject_name, s.code AS subject_code
+       FROM class_subjects cs
+       JOIN classes c ON c.id = cs.class_id
+       JOIN subjects s ON s.id = cs.subject_id
+       WHERE cs.teacher_id = $1 AND cs.tenant_id = $2
+       ORDER BY c.name, s.name`,
+      [req.params.id, tid]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /:id/assignments — assign teacher to a class+subject
+router.post('/:id/assignments', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { class_id, subject_id } = req.body;
+    if (!class_id || !subject_id) {
+      return res.status(400).json({ success: false, message: 'class_id and subject_id are required' });
+    }
+    // Upsert: if this class-subject pair exists update teacher, else insert
+    const existing = await query(
+      'SELECT id FROM class_subjects WHERE class_id=$1 AND subject_id=$2 AND tenant_id=$3',
+      [class_id, subject_id, tid]
+    );
+    if (existing.length > 0) {
+      await query(
+        'UPDATE class_subjects SET teacher_id=$1 WHERE id=$2',
+        [req.params.id, existing[0].id]
+      );
+    } else {
+      await query(
+        `INSERT INTO class_subjects (id, class_id, subject_id, teacher_id, tenant_id)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [uuidv4(), class_id, subject_id, req.params.id, tid]
+      );
+    }
+    // Return updated list
+    const rows = await query(
+      `SELECT cs.id, cs.class_id, cs.subject_id,
+              c.name AS class_name, c.section AS class_section,
+              s.name AS subject_name, s.code AS subject_code
+       FROM class_subjects cs
+       JOIN classes c ON c.id = cs.class_id
+       JOIN subjects s ON s.id = cs.subject_id
+       WHERE cs.teacher_id = $1 AND cs.tenant_id = $2
+       ORDER BY c.name, s.name`,
+      [req.params.id, tid]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE /:id/assignments/:csId — remove a teaching assignment
+router.delete('/:id/assignments/:csId', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    await query(
+      'UPDATE class_subjects SET teacher_id=NULL WHERE id=$1 AND teacher_id=$2 AND tenant_id=$3',
+      [req.params.csId, req.params.id, tid]
+    );
+    res.json({ success: true, message: 'Assignment removed' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 export default router;

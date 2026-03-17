@@ -518,11 +518,35 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
     if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     const rc = rows[0];
     const competencies = await query(
-      `SELECT cs.*, sub.name as subject_name FROM student_competency_summary cs
+      `SELECT cs.*, sub.name as subject_name,
+              UPPER(u.first_name || ' ' || u.last_name) AS teacher_name
+       FROM student_competency_summary cs
        JOIN subjects sub ON sub.id = cs.subject_id
+       LEFT JOIN class_subjects csj ON csj.class_id = $4 AND csj.subject_id = cs.subject_id
+       LEFT JOIN users u ON u.id = csj.teacher_id
        WHERE cs.student_id = $1 AND cs.term = $2 AND cs.academic_year = $3`,
-      [rc.student_id, rc.term, rc.academic_year]
+      [rc.student_id, rc.term, rc.academic_year, rc.class_id]
     );
+
+    // Class teacher name (teacher marked as class teacher for this class)
+    const classTeacherRows = await query(
+      `SELECT UPPER(t.first_name || ' ' || t.last_name) AS name
+       FROM teachers t WHERE t.class_id = $1 AND t.is_class_teacher = TRUE AND t.tenant_id = $2 LIMIT 1`,
+      [rc.class_id, rc.tenant_id]
+    ).catch(() => []);
+    const classTeacherName = classTeacherRows[0]?.name || null;
+
+    // Term dates from academic_terms
+    const termDates = await query(
+      `SELECT start_date, end_date FROM academic_terms
+       WHERE term_name ILIKE $1 AND academic_year = $2 AND tenant_id = $3 LIMIT 1`,
+      [rc.term, rc.academic_year, rc.tenant_id]
+    ).catch(() => []);
+    const nextTermDates = await query(
+      `SELECT start_date FROM academic_terms
+       WHERE tenant_id = $1 AND (start_date > $2) ORDER BY start_date ASC LIMIT 1`,
+      [rc.tenant_id, termDates[0]?.end_date || new Date()]
+    ).catch(() => []);
 
     // Fee breakdown: pending/partial/overdue invoices for this student
     const feeBreakdown = await query(
@@ -545,7 +569,15 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       [rc.student_id, rc.tenant_id]
     );
 
-    res.json({ success: true, data: { ...rc, competencies, fee_breakdown: feeBreakdown } });
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
+    res.json({ success: true, data: {
+      ...rc,
+      class_teacher_name: classTeacherName,
+      term_end_date: fmtDate(termDates[0]?.end_date),
+      next_term_start_date: fmtDate(nextTermDates[0]?.start_date),
+      competencies,
+      fee_breakdown: feeBreakdown,
+    } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

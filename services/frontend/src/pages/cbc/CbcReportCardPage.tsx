@@ -9,7 +9,7 @@ import api from '@/services/api';
 import { jsPDF } from 'jspdf';
 import { FileText, CheckCircle, Download, PlusCircle, Users, Share2, Mail, MessageCircle, X, Phone, AtSign, AlertCircle, Loader2 } from 'lucide-react';
 
-// ── Grade color helpers for PDF (hex RGB) ───────────────────────────────────
+// ── Grade helpers ─────────────────────────────────────────────────────────────
 const GRADE_HEX: Record<string, [number, number, number]> = {
   EE: [22, 163, 74],   EE1: [15, 118, 54],  EE2: [22, 163, 74],
   ME: [37, 99, 235],   ME1: [29, 78, 216],  ME2: [37, 99, 235],
@@ -17,15 +17,27 @@ const GRADE_HEX: Record<string, [number, number, number]> = {
   BE: [220, 38, 38],   BE1: [185, 28, 28],  BE2: [220, 38, 38],
   WD: [22, 163, 74],   D:   [202, 138, 4],  B:   [220, 38, 38],
 };
-const GRADE_LABEL: Record<string, string> = {
-  EE: 'Exceeding', EE1: 'EE Level 1', EE2: 'EE Level 2',
-  ME: 'Meeting',   ME1: 'ME Level 1', ME2: 'ME Level 2',
-  AE: 'Approaching', AE1: 'AE Level 1', AE2: 'AE Level 2',
-  BE: 'Below',     BE1: 'BE Level 1', BE2: 'BE Level 2',
-  WD: 'Well Dev.', D: 'Developing',   B: 'Beginning',
+const GRADE_LABEL_FULL: Record<string, string> = {
+  EE: 'Exceeding Expectations',  EE1: 'Exceeding Expectations', EE2: 'Exceeding Expectations',
+  ME: 'Meeting Expectations',    ME1: 'Meeting Expectations',   ME2: 'Meeting Expectations',
+  AE: 'Approaching Expectations',AE1: 'Approaching Expectations',AE2: 'Approaching Expectations',
+  BE: 'Below Expectations',      BE1: 'Below Expectations',     BE2: 'Below Expectations',
+  WD: 'Well Developed', D: 'Developing', B: 'Beginning',
+};
+const GRADE_POINTS: Record<string, number> = {
+  EE: 4, EE1: 4, EE2: 4, ME: 3, ME1: 3, ME2: 3,
+  AE: 2, AE1: 2, AE2: 2, BE: 1, BE1: 1, BE2: 1,
+  WD: 4, D: 2, B: 1,
 };
 
-// ── Generate a single report card page in the jsPDF doc ─────────────────────
+// Draw a bordered cell
+function cell(doc: jsPDF, x: number, y: number, w: number, h: number, fill?: [number,number,number]) {
+  if (fill) { doc.setFillColor(...fill); doc.rect(x, y, w, h, 'F'); }
+  doc.setDrawColor(180, 180, 180);
+  doc.rect(x, y, w, h, 'D');
+}
+
+// ── Generate a single report card page (Kenya CBC format) ────────────────────
 async function renderReportCardPage(
   doc: jsPDF,
   detail: any,
@@ -34,233 +46,358 @@ async function renderReportCardPage(
   academicYear: string,
   isFirstPage: boolean
 ) {
-  const pageW = doc.internal.pageSize.getWidth();
-  const margin = 14;
+  const W = 210; // A4 width mm
+  const M = 10;  // margin
+  const CW = W - 2 * M; // content width = 190mm
   let y = 0;
 
   if (!isFirstPage) doc.addPage();
+  doc.setTextColor(0, 0, 0);
 
-  // ── Header ─────────────────────────────────────────────────────────────────
-  doc.setFillColor(37, 99, 235);
-  doc.rect(0, 0, pageW, 38, 'F');
-
+  // ── 1. SCHOOL HEADER ───────────────────────────────────────────────────────
+  // Logo
   if (school?.school_logo_url) {
     try {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       await new Promise<void>((resolve) => {
-        img.onload = () => { try { doc.addImage(img, 'PNG', margin, 5, 22, 22); } catch { /* skip */ } resolve(); };
+        img.onload = () => { try { doc.addImage(img, 'PNG', M, 4, 24, 24); } catch { /* skip */ } resolve(); };
         img.onerror = () => resolve();
         img.src = school.school_logo_url;
       });
     } catch { /* skip */ }
   }
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(15); doc.setFont('helvetica', 'bold');
-  doc.text(school?.school_name || 'School Report Card', pageW / 2, 12, { align: 'center' });
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-  const addrLine = [school?.address, school?.city, school?.state].filter(Boolean).join(', ');
-  if (addrLine) doc.text(addrLine, pageW / 2, 19, { align: 'center' });
-  const contactLine = [school?.phone, school?.email].filter(Boolean).join('  |  ');
-  if (contactLine) doc.text(contactLine, pageW / 2, 25, { align: 'center' });
-  doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-  doc.text(`LEARNER PROGRESS REPORT — ${term.replace('term', 'Term ')} ${academicYear}`, pageW / 2, 33, { align: 'center' });
-  y = 46;
+  // School name
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.text((school?.school_name || 'SCHOOL NAME').toUpperCase(), W / 2, 10, { align: 'center' });
 
-  // ── Student Details ─────────────────────────────────────────────────────────
+  // Address / Tel / Email
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  const addrParts = [school?.address, school?.city, school?.state].filter(Boolean).join(', ');
+  if (addrParts) doc.text(`Address: ${addrParts}`, W / 2, 16, { align: 'center' });
+  if (school?.phone) doc.text(`Tel: ${school.phone}`, W / 2, 21, { align: 'center' });
+  if (school?.email) doc.text(`Email: ${school.email}`, W / 2, 26, { align: 'center' });
+
+  // Blue title banner
+  const termRoman = term === 'term1' ? 'I' : term === 'term2' ? 'II' : 'III';
+  const termLabel = `END TERM ${termRoman}`;
+  doc.setFillColor(21, 101, 192);
+  doc.rect(M, 29, CW, 10, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text(
+    `ACADEMIC REPORT FORM – ${(detail.class_name || '').toUpperCase()} – ${termLabel} – (${academicYear} TERM ${termRoman})`,
+    W / 2, 35.5, { align: 'center' }
+  );
   doc.setTextColor(0, 0, 0);
-  doc.setFillColor(243, 244, 246);
-  doc.roundedRect(margin, y, pageW - 2 * margin, 22, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-  doc.text('LEARNER INFORMATION', margin + 4, y + 7);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-  const lc = margin + 4, rc = pageW / 2 + 4;
-  doc.text(`Name: ${detail.student_name || '—'}`, lc, y + 13);
-  doc.text(`Admission No: ${detail.admission_number || '—'}`, rc, y + 13);
-  doc.text(`Class: ${detail.class_name || '—'}`, lc, y + 19);
-  doc.text(`NEMIS: ${detail.nemis_number || '—'}`, rc, y + 19);
-  y += 28;
+  y = 42;
 
-  // ── Attendance ─────────────────────────────────────────────────────────────
-  const attBoxW = (pageW - 2 * margin - 8) / 3;
-  const attData = [
-    { label: 'Days Present', val: detail.days_present ?? 0, bg: [220, 252, 231] as [number,number,number], fg: [22, 101, 52] as [number,number,number] },
-    { label: 'Days Absent',  val: detail.days_absent ?? 0,  bg: [254, 226, 226] as [number,number,number], fg: [153, 27, 27] as [number,number,number] },
-    { label: 'Days Late',    val: detail.days_late ?? 0,    bg: [254, 249, 195] as [number,number,number], fg: [133, 77, 14] as [number,number,number] },
-  ];
-  attData.forEach((a, i) => {
-    const bx = margin + i * (attBoxW + 4);
-    doc.setFillColor(...a.bg); doc.roundedRect(bx, y, attBoxW, 14, 2, 2, 'F');
-    doc.setTextColor(...a.fg);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-    doc.text(String(a.val), bx + attBoxW / 2, y + 9, { align: 'center' });
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-    doc.text(a.label, bx + attBoxW / 2, y + 13, { align: 'center' });
+  // ── 2. STUDENT INFO + PERFORMANCE SNAPSHOT ────────────────────────────────
+  // Photo placeholder
+  doc.setFillColor(220, 220, 220); doc.setDrawColor(160, 160, 160);
+  doc.rect(M, y, 28, 36, 'FD');
+  doc.setTextColor(140, 140, 140); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+  doc.text('PHOTO', M + 14, y + 19, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
+
+  // Student details (right of photo)
+  const sd = M + 32;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text((detail.student_name || '').toUpperCase(), sd, y + 8);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.text(`ADMNO:${detail.admission_number || ''}`, sd, y + 15);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.setTextColor(22, 163, 74);
+  doc.text(`GRADE:${detail.class_name || ''}`, sd, y + 22);
+  doc.setTextColor(0, 0, 0);
+
+  // Performance snapshot (right side, small box)
+  const comps: any[] = detail.competencies || [];
+  const totalPts = comps.reduce((s: number, c: any) => s + (GRADE_POINTS[c.overall_cbc_grade || c.pre_primary_grade || ''] || 0), 0);
+  const maxPts = comps.length * 4;
+  const meanPts = comps.length ? totalPts / comps.length : 0;
+  const perfLevel = meanPts >= 3.5 ? 'Exceeding Expectations' : meanPts >= 2.5 ? 'Meeting Expectations' : meanPts >= 1.5 ? 'Approaching Expectations' : 'Below Expectations';
+
+  const snapX = M + CW - 62;
+  doc.setFillColor(248, 248, 248); doc.setDrawColor(200, 200, 200);
+  doc.rect(snapX, y, 62, 36, 'FD');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(80, 80, 80);
+  doc.text('Learning Area Performance', snapX + 31, y + 5, { align: 'center' });
+  // Mini bar chart for each subject
+  const barMaxW = 40;
+  const barH = 3;
+  const barStartX = snapX + 4;
+  const barY0 = y + 9;
+  comps.slice(0, 8).forEach((c: any, i: number) => {
+    const pct = Number(c.percentage) || 0;
+    const barW = (pct / 100) * barMaxW;
+    const grade = c.overall_cbc_grade || c.pre_primary_grade || '';
+    const [r, g, b] = GRADE_HEX[grade] || [150, 150, 150];
+    doc.setFillColor(r, g, b);
+    doc.rect(barStartX, barY0 + i * 3.5, barW, barH, 'F');
+    doc.setFontSize(5); doc.setTextColor(80, 80, 80);
+    doc.text(`${Math.round(pct)}%`, barStartX + barMaxW + 1, barY0 + i * 3.5 + 2.5);
   });
   doc.setTextColor(0, 0, 0);
+  y += 39;
+
+  // ── 3. STATS BAR ─────────────────────────────────────────────────────────
+  const statW = CW / 4;
+  doc.setFillColor(240, 240, 240);
+  doc.rect(M, y, CW, 18, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(M, y, CW, 18, 'D');
+
+  const totalMarksSum = comps.reduce((s: number, c: any) => s + (Number(c.score) || 0), 0);
+  const totalMaxSum = comps.reduce((s: number, c: any) => s + (Number(c.max_score) || 0), 0);
+  const statsData = [
+    { label: 'Performance Level', val: perfLevel, small: true },
+    { label: 'Total Marks', val: totalMaxSum > 0 ? `${totalMarksSum}/${totalMaxSum}` : `${comps.reduce((s: number, c: any) => s + (Number(c.percentage) || 0), 0).toFixed(0)}%`, small: false },
+    { label: 'Total Points', val: `${totalPts}/${maxPts}`, small: false },
+    { label: 'Mean Points', val: meanPts.toFixed(2), small: false },
+  ];
+  statsData.forEach((s, i) => {
+    const sx = M + i * statW;
+    if (i > 0) { doc.setDrawColor(200, 200, 200); doc.line(sx, y, sx, y + 18); }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(80, 80, 80);
+    doc.text(s.label, sx + statW / 2, y + 5, { align: 'center' });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(s.small ? 7.5 : 10); doc.setTextColor(0, 0, 0);
+    // Color performance level
+    if (i === 0) {
+      const [pr, pg, pb] = meanPts >= 3.5 ? [22, 163, 74] : meanPts >= 2.5 ? [37, 99, 235] : meanPts >= 1.5 ? [202, 138, 4] : [220, 38, 38];
+      doc.setTextColor(pr, pg, pb);
+    }
+    doc.text(s.val, sx + statW / 2, y + 13, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+  });
   y += 20;
 
-  // ── Learning Areas ──────────────────────────────────────────────────────────
-  if (detail.competencies?.length > 0) {
-    doc.setFillColor(37, 99, 235);
-    doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-    doc.text('LEARNING AREAS', margin + 4, y + 5.5);
-    y += 10; doc.setTextColor(0, 0, 0);
+  // ── 4. LEARNING AREAS TABLE ────────────────────────────────────────────────
+  // Section header
+  doc.setFillColor(21, 101, 192);
+  doc.rect(M, y, CW, 8, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('LEARNING AREAS PERFORMANCE', W / 2, y + 5.5, { align: 'center' });
+  y += 9; doc.setTextColor(0, 0, 0);
 
-    // Header row
-    const cx = [margin, margin + 72, margin + 108, margin + 134, margin + 154];
-    doc.setFillColor(219, 234, 254); doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-    ['Learning Area', 'Score %', 'Grade', 'Grade Label', 'Comment'].forEach((h, i) => doc.text(h, cx[i], y + 5));
-    y += 8;
+  // Column config: LEARNING AREAS | MARKS | DEV. | GRADE | PERFORMANCE LEVEL | TEACHER
+  const COL = {
+    subject: { x: M,        w: 58 },
+    marks:   { x: M + 58,   w: 16 },
+    dev:     { x: M + 74,   w: 14 },
+    grade:   { x: M + 88,   w: 16 },
+    perf:    { x: M + 104,  w: 46 },
+    teacher: { x: M + 150,  w: CW - 150 },
+  };
 
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-    detail.competencies.forEach((c: any, idx: number) => {
-      if (y > 230) { doc.addPage(); y = 20; }
-      if (idx % 2 === 0) { doc.setFillColor(249, 250, 251); doc.rect(margin, y, pageW - 2 * margin, 7, 'F'); }
-      const grade = c.overall_cbc_grade || c.pre_primary_grade || '';
-      doc.text((c.subject_name || '—').slice(0, 26), cx[0], y + 5);
-      doc.text(c.percentage != null ? `${c.percentage}%` : '—', cx[1], y + 5);
+  // Column header row
+  doc.setFillColor(189, 214, 238);
+  doc.rect(M, y, CW, 8, 'F');
+  doc.setDrawColor(160, 160, 160);
+  doc.rect(M, y, CW, 8, 'D');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
+  [
+    { k: 'subject', t: 'LEARNING AREAS' },
+    { k: 'marks',   t: 'MARKS' },
+    { k: 'dev',     t: 'DEV.' },
+    { k: 'grade',   t: 'GRADE' },
+    { k: 'perf',    t: 'PERFORMANCE LEVEL' },
+    { k: 'teacher', t: 'TEACHER' },
+  ].forEach(({ k, t }) => {
+    const c = COL[k as keyof typeof COL];
+    doc.text(t, c.x + 2, y + 5.5);
+    // vertical divider
+    doc.setDrawColor(160, 160, 160);
+    doc.line(c.x, y, c.x, y + 8);
+  });
+  y += 8;
 
-      if (grade) {
-        const [r, g, b] = GRADE_HEX[grade] || [100, 100, 100];
-        doc.setFillColor(r, g, b); doc.setTextColor(255, 255, 255);
-        doc.roundedRect(cx[2], y + 0.5, 18, 6, 1, 1, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
-        doc.text(grade, cx[2] + 2, y + 5);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-        doc.text((GRADE_LABEL[grade] || grade).slice(0, 16), cx[3], y + 5);
-      } else {
-        doc.text('—', cx[2], y + 5);
-      }
-      doc.text((c.teacher_comment || '—').slice(0, 22), cx[4], y + 5);
-      y += 7;
+  // Data rows
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  const rowH = 8;
+  comps.forEach((c: any, idx: number) => {
+    if (y + rowH > 250) { doc.addPage(); y = 10; }
+    const bg: [number,number,number] = idx % 2 === 1 ? [245, 245, 245] : [255, 255, 255];
+    doc.setFillColor(...bg); doc.rect(M, y, CW, rowH, 'F');
+    doc.setDrawColor(200, 200, 200); doc.rect(M, y, CW, rowH, 'D');
+
+    const grade = c.overall_cbc_grade || c.pre_primary_grade || '';
+    const pct = c.percentage != null ? `${Math.round(Number(c.percentage))}%` : '—';
+
+    // vertical dividers
+    Object.values(COL).forEach(col => {
+      doc.setDrawColor(200, 200, 200);
+      doc.line(col.x, y, col.x, y + rowH);
     });
-    y += 4;
-  }
 
-  // ── Overall Grade ───────────────────────────────────────────────────────────
-  if (detail.overall_grade) {
-    const og = detail.overall_grade;
-    const [r, g, b] = GRADE_HEX[og] || [100, 100, 100];
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
-    doc.text('Overall Grade:', margin, y + 5);
-    doc.setFillColor(r, g, b); doc.setTextColor(255, 255, 255);
-    doc.roundedRect(margin + 32, y, 18, 7, 1.5, 1.5, 'F');
-    doc.text(og, margin + 33, y + 5);
-    doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
-    y += 12;
-  }
+    doc.setTextColor(0, 0, 0);
+    doc.text((c.subject_name || '').slice(0, 28), COL.subject.x + 2, y + 5.5);
+    doc.text(pct, COL.marks.x + 2, y + 5.5);
+    doc.text('—', COL.dev.x + 2, y + 5.5); // DEV not yet computed
 
-  // ── Comments ────────────────────────────────────────────────────────────────
-  if (y < 220 && (detail.class_teacher_comment || detail.head_teacher_comment)) {
-    if (detail.class_teacher_comment) {
-      doc.setFillColor(239, 246, 255); doc.roundedRect(margin, y, pageW - 2 * margin, 12, 2, 2, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(30, 64, 175);
-      doc.text('Class Teacher:', margin + 4, y + 5);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
-      doc.text(String(detail.class_teacher_comment).slice(0, 80), margin + 30, y + 5);
-      y += 14;
+    // Grade badge
+    if (grade) {
+      const [r, g, b] = GRADE_HEX[grade] || [100, 100, 100];
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(COL.grade.x + 1, y + 1, 14, 6, 1, 1, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+      doc.text(grade, COL.grade.x + 8, y + 5.5, { align: 'center' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+    } else {
+      doc.text('—', COL.grade.x + 2, y + 5.5);
     }
-    if (detail.head_teacher_comment) {
-      doc.setFillColor(245, 243, 255); doc.roundedRect(margin, y, pageW - 2 * margin, 12, 2, 2, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(88, 28, 135);
-      doc.text('Head Teacher:', margin + 4, y + 5);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
-      doc.text(String(detail.head_teacher_comment).slice(0, 80), margin + 30, y + 5);
-      y += 14;
-    }
-  }
 
-  // ── Fee Statement ───────────────────────────────────────────────────────────
+    doc.text((GRADE_LABEL_FULL[grade] || '—').slice(0, 22), COL.perf.x + 2, y + 5.5);
+    doc.text((c.teacher_name || '').slice(0, 20), COL.teacher.x + 2, y + 5.5);
+    y += rowH;
+  });
+  y += 4;
+
+  // ── 5. REMARKS (2 columns) ────────────────────────────────────────────────
+  if (y + 42 > 265) { doc.addPage(); y = 10; }
+  const remW = (CW - 4) / 2;
+  const remH = 38;
+  const remY = y;
+
+  // Class Teacher box
+  doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
+  doc.rect(M, remY, remW, remH, 'FD');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+  doc.text(`Class Teacher Remarks: ${detail.class_teacher_name || ''}`, M + 3, remY + 6);
+  if (detail.class_teacher_comment) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    const lines = doc.splitTextToSize(String(detail.class_teacher_comment), remW - 6);
+    doc.text(lines.slice(0, 4), M + 3, remY + 12);
+  }
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.text('Signature:', M + 3, remY + remH - 5);
+  doc.setDrawColor(0, 0, 0);
+  doc.line(M + 26, remY + remH - 5, M + remW - 3, remY + remH - 5);
+
+  // Principal box
+  const prX = M + remW + 4;
+  doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
+  doc.rect(prX, remY, remW, remH, 'FD');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.text(`Principal Remarks: ${school?.school_name ? '' : ''}`, prX + 3, remY + 6);
+  if (detail.head_teacher_comment) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    const lines2 = doc.splitTextToSize(String(detail.head_teacher_comment), remW - 6);
+    doc.text(lines2.slice(0, 4), prX + 3, remY + 12);
+  }
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.text('Signature:', prX + 3, remY + remH - 5);
+  doc.setDrawColor(0, 0, 0);
+  doc.line(prX + 26, remY + remH - 5, prX + remW - 3, remY + remH - 5);
+
+  y += remH + 5;
+
+  // ── 6. GRADE DESCRIPTORS TABLE ────────────────────────────────────────────
+  if (y + 30 > 268) { doc.addPage(); y = 10; }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+  doc.text('GRADE DESCRIPTORS', M, y + 5);
+  y += 7;
+
+  const dCols = [M, M + 38, M + 38 + 38, M + 38 + 38 + 38, M + 38 + 38 + 38 + 38];
+  const dWidths = [38, 38, 38, 38, CW - 38 * 4];
+  const dH = 7;
+
+  // Header row
+  doc.setFillColor(240, 240, 240);
+  doc.rect(M, y, CW, dH, 'F');
+  doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+  ['Performance Level', 'Exceeding Expectations', 'Meeting Expectations', 'Approaching Expectations', 'Below Expectations'].forEach((h, i) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+    doc.text(h.slice(0, 20), dCols[i] + 2, y + 4.5);
+    doc.setDrawColor(160, 160, 160); doc.line(dCols[i], y, dCols[i], y + dH);
+  });
+  y += dH;
+
+  // Points row
+  doc.setFillColor(255, 255, 255); doc.rect(M, y, CW, dH, 'F');
+  doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.text('Points', dCols[0] + 2, y + 5);
+  ['4', '3', '2', '1'].forEach((v, i) => {
+    doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
+    doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 5, { align: 'center' });
+  });
+  y += dH;
+
+  // Range row
+  doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
+  doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.text('Range (%)', dCols[0] + 2, y + 5);
+  ['75-100', '50-74', '25-49', '0-24'].forEach((v, i) => {
+    doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
+    doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 5, { align: 'center' });
+  });
+  y += dH + 5;
+
+  // ── 7. FEES + TERM DATES ──────────────────────────────────────────────────
+  if (y + 28 > 272) { doc.addPage(); y = 10; }
+  const feeW = CW * 0.56;
+  const dateW = CW - feeW - 4;
+  const feeX = M;
+  const dateX = M + feeW + 4;
+
+  // FEES header
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.text('FEES', feeX, y + 5);
+  doc.text('TERM DATES', dateX, y + 5);
+  y += 7;
+
+  // Fee table columns: CURRENT BALANCE | NEXT TERM BALANCE | TOTAL BALANCE
   const feeRows: any[] = detail.fee_breakdown || [];
   const totalBalance = feeRows.reduce((s: number, r: any) => s + Number(r.balance_amount || 0), 0);
-  const totalPaid    = feeRows.reduce((s: number, r: any) => s + Number(r.paid_amount || 0), 0);
-  const totalCharged = feeRows.reduce((s: number, r: any) => s + Number(r.total_amount || 0), 0);
+  const fColW = feeW / 3;
+  const fCols = [feeX, feeX + fColW, feeX + fColW * 2];
 
-  const fmtKes = (n: number) => `KES ${n.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+  // Fee header cells
+  ['CURRENT BALANCE', 'NEXT TERM BALANCE', 'TOTAL BALANCE'].forEach((h, i) => {
+    cell(doc, fCols[i], y, fColW, 7, [235, 235, 235]);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
+    doc.text(h, fCols[i] + fColW / 2, y + 4.5, { align: 'center' });
+  });
 
-  if (feeRows.length > 0 || totalBalance > 0) {
-    if (y + 6 + feeRows.length * 6 + 22 > 270) { doc.addPage(); y = 20; }
+  // Fee value cells
+  const currentBal = totalBalance;
+  [currentBal, 0, totalBalance].forEach((v, i) => {
+    cell(doc, fCols[i], y + 7, fColW, 8);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
+    doc.text(v > 0 ? v.toLocaleString('en-KE') : '0', fCols[i] + fColW / 2, y + 13, { align: 'center' });
+  });
 
-    // Section header
-    doc.setFillColor(37, 99, 235);
-    doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-    doc.text('FEE STATEMENT (Outstanding)', margin + 4, y + 5.5);
-    y += 10; doc.setTextColor(0, 0, 0);
+  // M-Pesa note
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(60, 60, 60);
+  doc.text('Dial *657*66# on Safaricom to pay school fees from your M-Pesa', feeX, y + 18.5);
 
-    if (feeRows.length === 0) {
-      // No outstanding fees
-      doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(22, 163, 74);
-      doc.text('No outstanding fees — fully paid.', margin + 4, y + 5);
-      y += 10;
-    } else {
-      // Column headers
-      const fc = [margin, margin + 70, margin + 110, margin + 142, margin + 168];
-      doc.setFillColor(219, 234, 254); doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(30, 58, 138);
-      ['Fee Type', 'Charged', 'Paid', 'Balance', 'Due Date'].forEach((h, i) => doc.text(h, fc[i], y + 5));
-      y += 8; doc.setTextColor(0, 0, 0);
+  // Term dates table
+  const dColW = dateW / 2;
+  ['TERM ENDS', 'NEXT TERM BEGINS'].forEach((h, i) => {
+    cell(doc, dateX + i * dColW, y, dColW, 7, [235, 235, 235]);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
+    doc.text(h, dateX + i * dColW + dColW / 2, y + 4.5, { align: 'center' });
+  });
+  const termEndStr = detail.term_end_date || '—';
+  const nextTermStr = detail.next_term_start_date || '—';
+  [termEndStr, nextTermStr].forEach((v, i) => {
+    cell(doc, dateX + i * dColW, y + 7, dColW, 8);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
+    doc.text(v, dateX + i * dColW + dColW / 2, y + 13, { align: 'center' });
+  });
 
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-      feeRows.forEach((fee: any, idx: number) => {
-        if (idx % 2 === 0) { doc.setFillColor(249, 250, 251); doc.rect(margin, y, pageW - 2 * margin, 6.5, 'F'); }
-        const bal = Number(fee.balance_amount || 0);
-        const isOverdue = fee.statuses?.includes('overdue');
+  y += 22;
 
-        // Fee name (with transport icon as text prefix)
-        const feeLabel = (fee.is_transport_fee ? '[Bus] ' : '') + String(fee.fee_name || 'School Fee').slice(0, 28);
-        doc.setTextColor(0, 0, 0);
-        doc.text(feeLabel, fc[0], y + 5);
-        doc.text(fmtKes(Number(fee.total_amount || 0)), fc[1], y + 5);
-        doc.text(fmtKes(Number(fee.paid_amount || 0)), fc[2], y + 5);
-
-        // Balance in red if overdue, orange if pending
-        doc.setTextColor(isOverdue ? 185 : bal > 0 ? 180 : 22, isOverdue ? 28 : bal > 0 ? 80 : 163, isOverdue ? 28 : bal > 0 ? 2 : 74);
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-        doc.text(fmtKes(bal), fc[3], y + 5);
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
-
-        const dueStr = fee.due_date ? new Date(fee.due_date).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-        doc.text(dueStr, fc[4], y + 5);
-        y += 6.5;
-      });
-
-      // Totals row
-      doc.setFillColor(239, 246, 255); doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-      doc.setTextColor(30, 58, 138);
-      doc.text('TOTAL', fc[0], y + 5.5);
-      doc.text(fmtKes(totalCharged), fc[1], y + 5.5);
-      doc.text(fmtKes(totalPaid), fc[2], y + 5.5);
-      doc.setTextColor(totalBalance > 0 ? 185 : 22, totalBalance > 0 ? 28 : 163, totalBalance > 0 ? 28 : 74);
-      doc.text(fmtKes(totalBalance), fc[3], y + 5.5);
-      doc.setTextColor(0, 0, 0);
-      y += 12;
-    }
-  } else {
-    // No invoices at all — show a clean paid notice
-    doc.setFillColor(240, 253, 244); doc.roundedRect(margin, y, pageW - 2 * margin, 10, 2, 2, 'F');
-    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(22, 101, 52);
-    doc.text('Fee account is clear — no outstanding invoices.', margin + 4, y + 6.5);
-    y += 14;
-  }
-
-  // ── Signature Lines ─────────────────────────────────────────────────────────
-  if (y < 250) {
-    const sigY = Math.max(y + 6, 255);
-    const sigW = (pageW - 2 * margin - 8) / 3;
-    doc.setDrawColor(180, 180, 180);
-    ['Class Teacher', 'Head Teacher', 'Parent / Guardian'].forEach((label, i) => {
-      const sx = margin + i * (sigW + 4);
-      doc.line(sx, sigY, sx + sigW, sigY);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
-      doc.text(label, sx + sigW / 2, sigY + 5, { align: 'center' });
-    });
-    doc.setTextColor(0, 0, 0);
+  // ── 8. FOOTER ─────────────────────────────────────────────────────────────
+  const footerY = 287;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(120, 120, 120);
+  doc.text(`Verification Code: ${detail.admission_number || ''}${detail.term || ''}`, M, footerY);
+  doc.text('Generated by SkulManager', W / 2, footerY, { align: 'center' });
+  if (school?.motto) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(21, 101, 192);
+    doc.text(`School Motto: ${school.motto}`, W - M, footerY, { align: 'right' });
   }
 }
 

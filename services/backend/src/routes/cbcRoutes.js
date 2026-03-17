@@ -510,7 +510,29 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
        WHERE cs.student_id = $1 AND cs.term = $2 AND cs.academic_year = $3`,
       [rc.student_id, rc.term, rc.academic_year]
     );
-    res.json({ success: true, data: { ...rc, competencies } });
+
+    // Fee breakdown: pending/partial/overdue invoices for this student
+    const feeBreakdown = await query(
+      `SELECT
+         COALESCE(fi.description, fs.name, 'School Fee') AS fee_name,
+         COALESCE(fs.is_transport_fee, FALSE) AS is_transport_fee,
+         SUM(fi.total_amount) AS total_amount,
+         SUM(COALESCE(fi.paid_amount, 0)) AS paid_amount,
+         SUM(fi.balance_amount) AS balance_amount,
+         MIN(fi.due_date) AS due_date,
+         COUNT(*) AS invoice_count,
+         STRING_AGG(DISTINCT fi.status, ', ') AS statuses
+       FROM fee_invoices fi
+       LEFT JOIN fee_structure fs ON fs.id = fi.fee_structure_id
+       WHERE fi.student_id = $1
+         AND fi.tenant_id = $2
+         AND fi.status IN ('pending', 'partial', 'overdue')
+       GROUP BY COALESCE(fi.description, fs.name, 'School Fee'), COALESCE(fs.is_transport_fee, FALSE)
+       ORDER BY is_transport_fee, fee_name`,
+      [rc.student_id, rc.tenant_id]
+    );
+
+    res.json({ success: true, data: { ...rc, competencies, fee_breakdown: feeBreakdown } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -174,6 +174,81 @@ async function renderReportCardPage(
     }
   }
 
+  // ── Fee Statement ───────────────────────────────────────────────────────────
+  const feeRows: any[] = detail.fee_breakdown || [];
+  const totalBalance = feeRows.reduce((s: number, r: any) => s + Number(r.balance_amount || 0), 0);
+  const totalPaid    = feeRows.reduce((s: number, r: any) => s + Number(r.paid_amount || 0), 0);
+  const totalCharged = feeRows.reduce((s: number, r: any) => s + Number(r.total_amount || 0), 0);
+
+  const fmtKes = (n: number) => `KES ${n.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+
+  if (feeRows.length > 0 || totalBalance > 0) {
+    if (y + 6 + feeRows.length * 6 + 22 > 270) { doc.addPage(); y = 20; }
+
+    // Section header
+    doc.setFillColor(37, 99, 235);
+    doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('FEE STATEMENT (Outstanding)', margin + 4, y + 5.5);
+    y += 10; doc.setTextColor(0, 0, 0);
+
+    if (feeRows.length === 0) {
+      // No outstanding fees
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(22, 163, 74);
+      doc.text('No outstanding fees — fully paid.', margin + 4, y + 5);
+      y += 10;
+    } else {
+      // Column headers
+      const fc = [margin, margin + 70, margin + 110, margin + 142, margin + 168];
+      doc.setFillColor(219, 234, 254); doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(30, 58, 138);
+      ['Fee Type', 'Charged', 'Paid', 'Balance', 'Due Date'].forEach((h, i) => doc.text(h, fc[i], y + 5));
+      y += 8; doc.setTextColor(0, 0, 0);
+
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      feeRows.forEach((fee: any, idx: number) => {
+        if (idx % 2 === 0) { doc.setFillColor(249, 250, 251); doc.rect(margin, y, pageW - 2 * margin, 6.5, 'F'); }
+        const bal = Number(fee.balance_amount || 0);
+        const isOverdue = fee.statuses?.includes('overdue');
+
+        // Fee name (with transport icon as text prefix)
+        const feeLabel = (fee.is_transport_fee ? '[Bus] ' : '') + String(fee.fee_name || 'School Fee').slice(0, 28);
+        doc.setTextColor(0, 0, 0);
+        doc.text(feeLabel, fc[0], y + 5);
+        doc.text(fmtKes(Number(fee.total_amount || 0)), fc[1], y + 5);
+        doc.text(fmtKes(Number(fee.paid_amount || 0)), fc[2], y + 5);
+
+        // Balance in red if overdue, orange if pending
+        doc.setTextColor(isOverdue ? 185 : bal > 0 ? 180 : 22, isOverdue ? 28 : bal > 0 ? 80 : 163, isOverdue ? 28 : bal > 0 ? 2 : 74);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+        doc.text(fmtKes(bal), fc[3], y + 5);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+
+        const dueStr = fee.due_date ? new Date(fee.due_date).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        doc.text(dueStr, fc[4], y + 5);
+        y += 6.5;
+      });
+
+      // Totals row
+      doc.setFillColor(239, 246, 255); doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+      doc.setTextColor(30, 58, 138);
+      doc.text('TOTAL', fc[0], y + 5.5);
+      doc.text(fmtKes(totalCharged), fc[1], y + 5.5);
+      doc.text(fmtKes(totalPaid), fc[2], y + 5.5);
+      doc.setTextColor(totalBalance > 0 ? 185 : 22, totalBalance > 0 ? 28 : 163, totalBalance > 0 ? 28 : 74);
+      doc.text(fmtKes(totalBalance), fc[3], y + 5.5);
+      doc.setTextColor(0, 0, 0);
+      y += 12;
+    }
+  } else {
+    // No invoices at all — show a clean paid notice
+    doc.setFillColor(240, 253, 244); doc.roundedRect(margin, y, pageW - 2 * margin, 10, 2, 2, 'F');
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(22, 101, 52);
+    doc.text('Fee account is clear — no outstanding invoices.', margin + 4, y + 6.5);
+    y += 14;
+  }
+
   // ── Signature Lines ─────────────────────────────────────────────────────────
   if (y < 250) {
     const sigY = Math.max(y + 6, 255);

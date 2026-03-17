@@ -406,9 +406,9 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
         await query(
           `INSERT INTO fee_invoices (
             id, invoice_number, student_id, total_amount,
-            net_amount, balance_amount, due_date, status, tenant_id
-          ) VALUES ($1, $2, $3, $4, $4, $4, $5, 'pending', $6)`,
-          [invoiceId, invoiceNumber, studentId, structure.amount, actualDueDate, tid]
+            net_amount, balance_amount, due_date, status, tenant_id, description, fee_structure_id
+          ) VALUES ($1, $2, $3, $4, $4, $4, $5, 'pending', $6, $7, $8)`,
+          [invoiceId, invoiceNumber, studentId, structure.amount, actualDueDate, tid, structure.name, structure.id]
         );
 
         created.push({ studentId, invoiceId, invoiceNumber });
@@ -502,9 +502,9 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
             const invoiceId = uuidv4();
             const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
             await query(
-              `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount, due_date, status, tenant_id)
-               VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6)`,
-              [invoiceId, invoiceNumber, student.id, amount, due_date || null, tid]
+              `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount, due_date, status, tenant_id, description, fee_structure_id)
+               VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8)`,
+              [invoiceId, invoiceNumber, student.id, amount, due_date || null, tid, struct.name, struct.id]
             );
             summary.created.push({ student_id: student.id, name: `${student.first_name} ${student.last_name}`, fee: struct.name, amount });
           } catch (err) {

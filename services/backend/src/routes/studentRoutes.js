@@ -132,8 +132,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create student
-router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
+// Create student — admin only
+router.post('/', requireRole(['admin']), async (req, res) => {
   try {
     logger.info('Create student request body:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -231,8 +231,8 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
   }
 });
 
-// Update student
-router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
+// Update student — admin only
+router.put('/:id', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const {

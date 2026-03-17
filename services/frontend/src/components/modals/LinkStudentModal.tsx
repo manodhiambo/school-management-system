@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { X, Check, UserPlus } from 'lucide-react';
+import { X, Check, UserPlus, Search } from 'lucide-react';
 import api from '@/services/api';
 
 interface LinkStudentModalProps {
@@ -19,6 +20,8 @@ export function LinkStudentModal({ open, onOpenChange, parent, onSuccess }: Link
   const [linkedStudents, setLinkedStudents] = useState<string[]>([]);
   const [selectedStudent, setSelectedStudent] = useState('');
   const [relationship, setRelationship] = useState('guardian');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     if (open && parent) {
@@ -68,8 +71,12 @@ export function LinkStudentModal({ open, onOpenChange, parent, onSuccess }: Link
     }
   };
 
-  // Filter out already linked students
+  // Filter out already linked students + apply search
   const availableStudents = students.filter(s => !linkedStudents.includes(s.id));
+  const searchedStudents = availableStudents.filter(s =>
+    !studentSearch || `${s.first_name} ${s.last_name} ${s.admission_number} ${s.class_name || ''}`.toLowerCase().includes(studentSearch.toLowerCase())
+  );
+  const selectedStudentObj = students.find(s => s.id === selectedStudent);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -111,20 +118,41 @@ export function LinkStudentModal({ open, onOpenChange, parent, onSuccess }: Link
             {availableStudents.length > 0 ? (
               <div className="space-y-3 mt-2">
                 <div>
-                  <Label htmlFor="student">Select Student</Label>
-                  <Select
-                    id="student"
-                    value={selectedStudent}
-                    onChange={(e) => setSelectedStudent(e.target.value)}
-                  >
-                    <option value="">-- Select a student --</option>
-                    {availableStudents.map(student => (
-                      <option key={student.id} value={student.id}>
-                        {student.first_name} {student.last_name} - {student.admission_number}
-                        {student.class_name && ` (${student.class_name})`}
-                      </option>
-                    ))}
-                  </Select>
+                  <Label htmlFor="studentSearch">Search Student</Label>
+                  <div className="relative mt-1">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="studentSearch"
+                      className="pl-9"
+                      placeholder="Type name, admission no, or class..."
+                      value={studentSearch}
+                      onChange={e => { setStudentSearch(e.target.value); setShowDropdown(true); setSelectedStudent(''); }}
+                      onFocus={() => setShowDropdown(true)}
+                      autoComplete="off"
+                    />
+                    {showDropdown && studentSearch && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-white border rounded-lg shadow-lg divide-y">
+                        {searchedStudents.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-gray-500">No students found</div>
+                        ) : searchedStudents.map(s => (
+                          <button key={s.id} type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between"
+                            onClick={() => { setSelectedStudent(s.id); setStudentSearch(`${s.first_name} ${s.last_name} (${s.admission_number})`); setShowDropdown(false); }}>
+                            <span className="font-medium">{s.first_name} {s.last_name}</span>
+                            <span className="text-xs text-gray-500 ml-2">{s.admission_number}{s.class_name ? ` · ${s.class_name}` : ''}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {selectedStudentObj && (
+                    <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700 flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      <span className="font-medium">{selectedStudentObj.first_name} {selectedStudentObj.last_name}</span>
+                      <span className="text-blue-500">({selectedStudentObj.admission_number})</span>
+                      {selectedStudentObj.class_name && <span className="text-blue-400">· {selectedStudentObj.class_name}</span>}
+                    </div>
+                  )}
                 </div>
 
                 <div>

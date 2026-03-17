@@ -237,8 +237,11 @@ router.post('/assessments', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/assessments/:id
+// PUT /api/v1/cbc/assessments/:id — admin only
 router.put('/assessments/:id', authenticate, async (req, res) => {
+  if (!['admin', 'superadmin'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Only admins can edit assessments' });
+  }
   try {
     const { score, max_score, cbc_grade, pre_primary_grade, teacher_comments, education_level, exam_period, result_code } = req.body;
     let grade = cbc_grade;
@@ -265,8 +268,11 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/v1/cbc/assessments/:id
+// DELETE /api/v1/cbc/assessments/:id — admin only
 router.delete('/assessments/:id', authenticate, async (req, res) => {
+  if (!['admin', 'superadmin'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Only admins can delete assessments' });
+  }
   try {
     await query('DELETE FROM cbc_assessments WHERE id=$1', [req.params.id]);
     res.json({ success: true, message: 'Assessment deleted' });

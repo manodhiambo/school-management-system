@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import { Plus, BookOpen, Download, Pencil, Trash2, X, Check } from 'lucide-react';
 
 const CBC_GRADES = ['EE', 'ME', 'AE', 'BE'];
@@ -66,6 +67,8 @@ function downloadCSV(assessments: any[]) {
 
 export function CbcAssessmentPage() {
   const qc = useQueryClient();
+  const user = useAuthStore((s: any) => s.user);
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const [filters, setFilters] = useState({ class_id: '', subject_id: '', term: 'term1', academic_year: new Date().getFullYear().toString() });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<any>({ ...EMPTY_FORM });
@@ -161,9 +164,11 @@ export function CbcAssessmentPage() {
               <Download className="h-4 w-4 mr-2" /> Download CSV
             </Button>
           )}
-          <Button onClick={() => setShowForm(!showForm)}>
-            <Plus className="h-4 w-4 mr-2" /> Record Assessment
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setShowForm(!showForm)}>
+              <Plus className="h-4 w-4 mr-2" /> Record Assessment
+            </Button>
+          )}
         </div>
       </div>
 
@@ -189,8 +194,8 @@ export function CbcAssessmentPage() {
         </CardContent>
       </Card>
 
-      {/* New Assessment Form */}
-      {showForm && (
+      {/* New Assessment Form — admin only */}
+      {showForm && isAdmin && (
         <Card className="border-indigo-200">
           <CardHeader><CardTitle className="text-lg">New Assessment Record</CardTitle></CardHeader>
           <CardContent>
@@ -374,7 +379,7 @@ export function CbcAssessmentPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Grade</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Comments</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
+                    {isAdmin && <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -442,31 +447,33 @@ export function CbcAssessmentPage() {
                           <span className="truncate block">{a.teacher_comments || '—'}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        {editId === a.id ? (
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => updateMutation.mutate({ id: a.id, data: editForm })}
-                              className="p-1 text-green-600 hover:bg-green-50 rounded"
-                              title="Save"
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => setEditId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancel">
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex gap-1">
-                            <button onClick={() => startEdit(a)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Edit">
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => setDeleteId(a.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                      {isAdmin && (
+                        <td className="px-4 py-3">
+                          {editId === a.id ? (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => updateMutation.mutate({ id: a.id, data: editForm })}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                title="Save"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => setEditId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancel">
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1">
+                              <button onClick={() => startEdit(a)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Edit">
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => setDeleteId(a.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

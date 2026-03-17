@@ -16,6 +16,7 @@ import { ProtectedSuperAdmin } from './components/auth/ProtectedSuperAdmin';
 // Dashboard & Main Pages
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { StudentsPage } from './pages/students/StudentsPage';
+import { StudentReportPage } from './pages/students/StudentReportPage';
 import { TeachersPage } from './pages/teachers/TeachersPage';
 import { ParentsPage } from './pages/parents/ParentsPage';
 import { AcademicPage } from './pages/academic/AcademicPage';
@@ -142,6 +143,7 @@ function App() {
 
               {/* Admin & Teacher Routes */}
               <Route path="students" element={<StudentsPage />} />
+              <Route path="student-report" element={<StudentReportPage />} />
               <Route path="teachers" element={<TeachersPage />} />
               <Route path="parents" element={<ParentsPage />} />
               <Route path="academic" element={<AcademicPage />} />

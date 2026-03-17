@@ -55,10 +55,11 @@ const navigationItems: NavItem[] = [
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer'], section: '' },
 
   // ── People ────────────────────────────────────────────────────────────────
-  { name: 'Students',        href: '/app/students',  icon: Users,         roles: ['admin', 'teacher'],                    section: 'People' },
-  { name: 'Teachers',        href: '/app/teachers',  icon: GraduationCap, roles: ['admin'],                               section: 'People' },
-  { name: 'Parents',         href: '/app/parents',   icon: UserCheck,     roles: ['admin', 'teacher'],                    section: 'People' },
-  { name: 'User Management', href: '/app/users',     icon: Shield,        roles: ['admin'],                               section: 'People' },
+  { name: 'Students',        href: '/app/students',       icon: Users,         roles: ['admin', 'teacher'], section: 'People' },
+  { name: 'Student Report',  href: '/app/student-report', icon: FileText,      roles: ['admin', 'teacher'], section: 'People' },
+  { name: 'Teachers',        href: '/app/teachers',       icon: GraduationCap, roles: ['admin'],            section: 'People' },
+  { name: 'Parents',         href: '/app/parents',        icon: UserCheck,     roles: ['admin', 'teacher'], section: 'People' },
+  { name: 'User Management', href: '/app/users',          icon: Shield,        roles: ['admin'],            section: 'People' },
 
   // ── Academic (admin) ──────────────────────────────────────────────────────
   { name: 'Classes & Rooms',    href: '/app/academic',           icon: Building2,     roles: ['admin'],            section: 'Academic' },

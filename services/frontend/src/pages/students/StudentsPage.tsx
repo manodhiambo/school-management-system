@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Download, Upload, Eye, Users, FileText } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Download, Upload, Eye, Users, FileText, Bus } from 'lucide-react';
 import AddStudentModal from '@/components/modals/AddStudentModal';
 import { EditStudentModal } from '@/components/modals/EditStudentModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
@@ -27,6 +27,7 @@ interface Student {
   status: string;
   class_name: string;
   student_type: string;
+  uses_transport: boolean;
   created_at: string;
 }
 
@@ -43,7 +44,7 @@ type ViewTab = 'all' | 'by-class';
 // ── Download helpers ────────────────────────────────────────────────────────
 
 function exportToExcel(rows: Student[], filename: string, className?: string) {
-  const headers = ['#', 'Admission No', 'Name', 'Gender', 'Class', 'Category', 'Phone', 'Status'];
+  const headers = ['#', 'Admission No', 'Name', 'Gender', 'Class', 'Category', 'Transport', 'Phone', 'Status'];
   const csvData = rows.map((s, i) => [
     i + 1,
     s.admission_number,
@@ -51,6 +52,7 @@ function exportToExcel(rows: Student[], filename: string, className?: string) {
     s.gender,
     s.class_name || (className ?? '—'),
     s.student_type === 'boarder' ? 'Boarder' : 'Day Scholar',
+    s.uses_transport ? 'Yes' : 'No',
     s.phone || '—',
     s.status,
   ]);
@@ -94,8 +96,8 @@ async function exportToPDF(rows: Student[], filename: string, title: string) {
   doc.setFontSize(8);
 
   // Table header
-  const cols = [10, 28, 62, 90, 115, 145, 170, 205];
-  const heads = ['#', 'Adm No', 'Full Name', 'Gender', 'Class', 'Category', 'Phone', 'Status'];
+  const cols = [10, 28, 62, 88, 113, 140, 163, 190, 220];
+  const heads = ['#', 'Adm No', 'Full Name', 'Gender', 'Class', 'Category', 'Transport', 'Phone', 'Status'];
   doc.setFillColor(240, 245, 255);
   doc.rect(8, y - 4, pageW - 16, 8, 'F');
   doc.setFont('helvetica', 'bold');
@@ -117,11 +119,12 @@ async function exportToPDF(rows: Student[], filename: string, title: string) {
     [
       String(idx + 1),
       s.admission_number || '—',
-      name.length > 22 ? name.slice(0, 22) + '…' : name,
+      name.length > 20 ? name.slice(0, 20) + '…' : name,
       s.gender || '—',
-      (s.class_name || '—').slice(0, 16),
+      (s.class_name || '—').slice(0, 14),
       s.student_type === 'boarder' ? 'Boarder' : 'Day Scholar',
-      (s.phone || '—').slice(0, 14),
+      s.uses_transport ? 'Yes' : 'No',
+      (s.phone || '—').slice(0, 12),
       s.status,
     ].forEach((v, i) => doc.text(v, cols[i], y));
     y += 7;
@@ -322,9 +325,16 @@ export function StudentsPage() {
                           <td className="p-4">{student.first_name} {student.last_name}</td>
                           <td className="p-4 hidden md:table-cell">{student.class_name || '—'}</td>
                           <td className="p-4 hidden md:table-cell">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${student.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                              {student.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}
-                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${student.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                                {student.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}
+                              </span>
+                              {student.uses_transport && (
+                                <span className="flex items-center gap-0.5 text-xs text-orange-600 font-medium">
+                                  <Bus className="h-3 w-3" /> Transport
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 hidden sm:table-cell">{student.phone || 'N/A'}</td>
                           <td className="p-4 capitalize hidden lg:table-cell">{student.gender}</td>
@@ -422,9 +432,16 @@ export function StudentsPage() {
                             <td className="px-4 py-3 font-medium">{s.first_name} {s.last_name}</td>
                             <td className="px-4 py-3 capitalize">{s.gender}</td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${s.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                                {s.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}
-                              </span>
+                              <div className="flex flex-col gap-1">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${s.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                                  {s.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}
+                                </span>
+                                {s.uses_transport && (
+                                  <span className="flex items-center gap-0.5 text-xs text-orange-600 font-medium">
+                                    <Bus className="h-3 w-3" /> Transport
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3">{s.phone || '—'}</td>
                             <td className="px-4 py-3">

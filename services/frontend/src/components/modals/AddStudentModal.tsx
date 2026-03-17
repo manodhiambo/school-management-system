@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X } from 'lucide-react';
+import { X, Bus } from 'lucide-react';
 import api from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -27,6 +27,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
     bloodGroup: '',
     classId: '',
     student_type: 'day_scholar',
+    uses_transport: false,
     address: '',
     city: '',
     state: '',
@@ -45,7 +46,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
     if (open) fetchClasses();
   }, [open]);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -70,6 +71,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
         bloodGroup: '',
         classId: '',
         student_type: 'day_scholar',
+        uses_transport: false,
         address: '',
         city: '',
         state: '',
@@ -154,18 +156,52 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
                     onChange={(e) => handleChange('bloodGroup', e.target.value)}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="student_type">Student Category *</Label>
-                  <select
-                    id="student_type"
-                    value={formData.student_type}
-                    onChange={(e) => handleChange('student_type', e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    required
-                  >
-                    <option value="day_scholar">Day Scholar</option>
-                    <option value="boarder">Boarder</option>
-                  </select>
+                <div className="md:col-span-2">
+                  <Label>Student Category *</Label>
+                  <div className="flex gap-2 mt-1">
+                    {[
+                      { value: 'day_scholar', label: 'Day Scholar' },
+                      { value: 'boarder', label: 'Boarder' },
+                    ].map(opt => (
+                      <button key={opt.value} type="button"
+                        onClick={() => handleChange('student_type', opt.value)}
+                        className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                          formData.student_type === opt.value
+                            ? opt.value === 'boarder'
+                              ? 'bg-purple-600 text-white border-purple-600'
+                              : 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                        }`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="flex items-center gap-1"><Bus className="h-4 w-4 text-orange-500" /> School Transport</Label>
+                  <div className="flex gap-2 mt-1">
+                    {[
+                      { value: true, label: 'Uses school transport' },
+                      { value: false, label: 'Does not use transport' },
+                    ].map(opt => (
+                      <button key={String(opt.value)} type="button"
+                        onClick={() => handleChange('uses_transport', opt.value)}
+                        className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                          formData.uses_transport === opt.value
+                            ? opt.value
+                              ? 'bg-orange-500 text-white border-orange-500'
+                              : 'bg-gray-600 text-white border-gray-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                        }`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {formData.uses_transport && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      Remember to assign this student to a transport route under Welfare → Transport after registration.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="classId">Class/Grade *</Label>

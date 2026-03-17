@@ -449,7 +449,7 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
 
     // Load students (filter by class_ids if given)
     let studentSql = `SELECT s.id, s.first_name, s.last_name, s.admission_number,
-      s.student_type, s.class_id, c.name as class_name
+      s.student_type, s.uses_transport, s.class_id, c.name as class_name
       FROM students s LEFT JOIN classes c ON c.id = s.class_id
       WHERE s.tenant_id = $1 AND s.status = 'active'`;
     const studentParams = [tid];
@@ -479,8 +479,8 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
           summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'student_type_mismatch' });
           continue;
         }
-        // Transport fee: only for students with active transport
-        if (struct.is_transport_fee && !transportMap[student.id]) {
+        // Transport fee: only for students who use school transport
+        if (struct.is_transport_fee && !student.uses_transport) {
           summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'no_transport' });
           continue;
         }

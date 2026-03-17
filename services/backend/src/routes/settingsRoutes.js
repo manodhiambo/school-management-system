@@ -37,8 +37,14 @@ router.put('/', requireRole(['admin']), async (req, res) => {
     const {
       school_name, school_code, phone, email, address, city, state, pincode,
       website, current_academic_year, timezone, currency, date_format, time_format,
-      school_logo_url
+      school_logo_url, motto
     } = req.body;
+
+    // school_logo_url can be explicitly set to null (remove logo) or a base64/url string
+    // Use a sentinel: if key exists in body use the value (even null), else keep existing
+    const logoValue = Object.prototype.hasOwnProperty.call(req.body, 'school_logo_url')
+      ? (school_logo_url || null)
+      : undefined;
 
     // Check if settings exist for this tenant
     const existing = await query('SELECT * FROM settings WHERE tenant_id = $1 LIMIT 1', [tenantId]);
@@ -48,11 +54,11 @@ router.put('/', requireRole(['admin']), async (req, res) => {
       const settingsId = uuidv4();
       await query(
         `INSERT INTO settings (id, tenant_id, school_name, school_code, phone, email, address, city, state, pincode,
-          website, current_academic_year, timezone, currency, date_format, time_format, school_logo_url, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())`,
+          website, current_academic_year, timezone, currency, date_format, time_format, school_logo_url, motto, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())`,
         [settingsId, tenantId, school_name, school_code, phone, email, address, city, state, pincode,
           website, current_academic_year, timezone || 'Africa/Nairobi', currency || 'KES',
-          date_format || 'DD/MM/YYYY', time_format || '12h', school_logo_url]
+          date_format || 'DD/MM/YYYY', time_format || '12h', logoValue ?? null, motto || null]
       );
     } else {
       await query(
@@ -71,12 +77,13 @@ router.put('/', requireRole(['admin']), async (req, res) => {
           currency = COALESCE($12, currency),
           date_format = COALESCE($13, date_format),
           time_format = COALESCE($14, time_format),
-          school_logo_url = COALESCE($15, school_logo_url),
+          school_logo_url = CASE WHEN $15::boolean THEN $16 ELSE school_logo_url END,
+          motto = COALESCE($17, motto),
           updated_at = NOW()
-         WHERE tenant_id = $16`,
+         WHERE tenant_id = $18`,
         [school_name, school_code, phone, email, address, city, state, pincode,
           website, current_academic_year, timezone, currency, date_format, time_format,
-          school_logo_url, tenantId]
+          logoValue !== undefined, logoValue ?? null, motto || null, tenantId]
       );
     }
 

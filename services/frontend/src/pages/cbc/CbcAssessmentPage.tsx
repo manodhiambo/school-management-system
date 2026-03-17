@@ -184,7 +184,7 @@ export function CbcAssessmentPage() {
               <Download className="h-4 w-4 mr-2" /> Download CSV
             </Button>
           )}
-          {isAdmin && (
+          {(isAdmin || user?.role === 'teacher') && (
             <Button onClick={() => setShowForm(!showForm)}>
               <Plus className="h-4 w-4 mr-2" /> Record Assessment
             </Button>
@@ -236,8 +236,8 @@ export function CbcAssessmentPage() {
         </CardContent>
       </Card>
 
-      {/* New Assessment Form — admin only */}
-      {showForm && isAdmin && (
+      {/* New Assessment Form */}
+      {showForm && (isAdmin || user?.role === 'teacher') && (
         <Card className="border-indigo-200">
           <CardHeader><CardTitle className="text-lg">New Assessment Record</CardTitle></CardHeader>
           <CardContent>
@@ -433,7 +433,7 @@ export function CbcAssessmentPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Pts</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Comments</th>
-                    {isAdmin && <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>}
+                    {(isAdmin || user?.role === 'teacher') && <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -506,30 +506,34 @@ export function CbcAssessmentPage() {
                           <span className="truncate block">{a.teacher_comments || '—'}</span>
                         )}
                       </td>
-                      {isAdmin && (
+                      {(isAdmin || user?.role === 'teacher') && (
                         <td className="px-4 py-3">
-                          {editId === a.id ? (
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => updateMutation.mutate({ id: a.id, data: editForm })}
-                                className="p-1 text-green-600 hover:bg-green-50 rounded"
-                                title="Save"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                              <button onClick={() => setEditId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancel">
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
+                          {(isAdmin || a.teacher_id === user?.id) ? (
+                            editId === a.id ? (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => updateMutation.mutate({ id: a.id, data: editForm })}
+                                  className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                  title="Save"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => setEditId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancel">
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-1">
+                                <button onClick={() => startEdit(a)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Edit">
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => setDeleteId(a.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )
                           ) : (
-                            <div className="flex gap-1">
-                              <button onClick={() => startEdit(a)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Edit">
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button onClick={() => setDeleteId(a.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
+                            <span className="text-xs text-gray-400">—</span>
                           )}
                         </td>
                       )}

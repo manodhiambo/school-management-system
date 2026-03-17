@@ -267,10 +267,17 @@ router.post('/assessments', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/assessments/:id — admin only
+// PUT /api/v1/cbc/assessments/:id — admin or teacher who created it
 router.put('/assessments/:id', authenticate, async (req, res) => {
-  if (!['admin', 'superadmin'].includes(req.user.role)) {
-    return res.status(403).json({ success: false, message: 'Only admins can edit assessments' });
+  if (!['admin', 'superadmin', 'teacher'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Access denied' });
+  }
+  // Teachers can only edit their own assessments
+  if (req.user.role === 'teacher') {
+    const existing = await query('SELECT teacher_id FROM cbc_assessments WHERE id=$1', [req.params.id]);
+    if (!existing.length || existing[0].teacher_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You can only edit your own assessments' });
+    }
   }
   try {
     const { score, max_score, cbc_grade, pre_primary_grade, teacher_comments, education_level, exam_period, result_code } = req.body;
@@ -300,10 +307,16 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/v1/cbc/assessments/:id — admin only
+// DELETE /api/v1/cbc/assessments/:id — admin or teacher who created it
 router.delete('/assessments/:id', authenticate, async (req, res) => {
-  if (!['admin', 'superadmin'].includes(req.user.role)) {
-    return res.status(403).json({ success: false, message: 'Only admins can delete assessments' });
+  if (!['admin', 'superadmin', 'teacher'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Access denied' });
+  }
+  if (req.user.role === 'teacher') {
+    const existing = await query('SELECT teacher_id FROM cbc_assessments WHERE id=$1', [req.params.id]);
+    if (!existing.length || existing[0].teacher_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own assessments' });
+    }
   }
   try {
     await query('DELETE FROM cbc_assessments WHERE id=$1', [req.params.id]);

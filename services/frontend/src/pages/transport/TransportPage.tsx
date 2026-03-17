@@ -5,17 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
-import { Bus, Plus } from 'lucide-react';
+import { Bus, Plus, Edit, Trash2 } from 'lucide-react';
 
 export function TransportPage() {
   const qc = useQueryClient();
   const [showRouteForm, setShowRouteForm] = useState(false);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
+  const [editingRoute, setEditingRoute] = useState<any>(null);
   const [routeForm, setRouteForm] = useState<any>({
-    route_name: '', vehicle_registration: '', vehicle_capacity: 30,
+    route_name: '', route_code: '', vehicle_registration: '', vehicle_capacity: 30,
     driver_name: '', driver_phone: '', morning_pickup_time: '',
-    afternoon_dropoff_time: '', monthly_fee: 0,
+    afternoon_dropoff_time: '', monthly_fee: 0, term_fee: 0,
+    fare_per_km: 0, distance_km: 0,
   });
   const [assignForm, setAssignForm] = useState<any>({ student_id: '', pickup_stop: '', dropoff_stop: '' });
 
@@ -34,9 +36,40 @@ export function TransportPage() {
     enabled: showAssignForm,
   });
 
+  const EMPTY_ROUTE = {
+    route_name: '', route_code: '', vehicle_registration: '', vehicle_capacity: 30,
+    driver_name: '', driver_phone: '', morning_pickup_time: '',
+    afternoon_dropoff_time: '', monthly_fee: 0, term_fee: 0,
+    fare_per_km: 0, distance_km: 0,
+  };
+
   const createRouteMutation = useMutation({
     mutationFn: (data: any) => (api as any).createTransportRoute(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['transport-routes'] }); setShowRouteForm(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transport-routes'] });
+      setShowRouteForm(false);
+      setRouteForm({ ...EMPTY_ROUTE });
+      setEditingRoute(null);
+    },
+  });
+
+  const updateRouteMutation = useMutation({
+    mutationFn: ({ id, data }: any) => (api as any).updateTransportRoute(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transport-routes'] });
+      qc.invalidateQueries({ queryKey: ['transport-route', editingRoute?.id] });
+      setShowRouteForm(false);
+      setRouteForm({ ...EMPTY_ROUTE });
+      setEditingRoute(null);
+    },
+  });
+
+  const deleteRouteMutation = useMutation({
+    mutationFn: (id: string) => (api as any).deleteTransportRoute(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transport-routes'] });
+      setSelectedRoute(null);
+    },
   });
   const assignMutation = useMutation({
     mutationFn: (data: any) => (api as any).assignStudentTransport(data),
@@ -87,15 +120,24 @@ export function TransportPage() {
         </CardContent></Card>
       </div>
 
-      {/* Add Route Form */}
+      {/* Add / Edit Route Form */}
       {showRouteForm && (
         <Card className="border-indigo-200">
-          <CardHeader><CardTitle className="text-lg">New Transport Route</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">{editingRoute ? 'Edit Route' : 'New Transport Route'}</CardTitle></CardHeader>
           <CardContent>
-            <form onSubmit={e => { e.preventDefault(); createRouteMutation.mutate(routeForm); }}
-              className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (editingRoute) {
+                updateRouteMutation.mutate({ id: editingRoute.id, data: routeForm });
+              } else {
+                createRouteMutation.mutate(routeForm);
+              }
+            }} className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div><Label>Route Name *</Label>
                 <Input value={routeForm.route_name} onChange={e => setRouteForm({ ...routeForm, route_name: e.target.value })} required />
+              </div>
+              <div><Label>Route Code</Label>
+                <Input value={routeForm.route_code} onChange={e => setRouteForm({ ...routeForm, route_code: e.target.value })} placeholder="e.g. RT01" />
               </div>
               <div><Label>Vehicle Registration</Label>
                 <Input value={routeForm.vehicle_registration} onChange={e => setRouteForm({ ...routeForm, vehicle_registration: e.target.value })} placeholder="KCB 123A" />
@@ -109,9 +151,36 @@ export function TransportPage() {
               <div><Label>Driver Phone</Label>
                 <Input value={routeForm.driver_phone} onChange={e => setRouteForm({ ...routeForm, driver_phone: e.target.value })} placeholder="0712345678" />
               </div>
-              <div><Label>Monthly Fee (KES)</Label>
-                <Input type="number" value={routeForm.monthly_fee} onChange={e => setRouteForm({ ...routeForm, monthly_fee: parseFloat(e.target.value) })} />
+
+              {/* Fee section */}
+              <div className="md:col-span-3 border-t pt-3">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Transport Fees</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label>Monthly Fee (KES)</Label>
+                    <Input type="number" value={routeForm.monthly_fee} onChange={e => setRouteForm({ ...routeForm, monthly_fee: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                  <div>
+                    <Label>Term Fee (KES)</Label>
+                    <Input type="number" value={routeForm.term_fee} onChange={e => setRouteForm({ ...routeForm, term_fee: parseFloat(e.target.value) || 0 })} />
+                    <p className="text-xs text-gray-400 mt-0.5">Used for bulk invoice generation</p>
+                  </div>
+                  <div>
+                    <Label>Distance (km)</Label>
+                    <Input type="number" step="0.1" value={routeForm.distance_km} onChange={e => setRouteForm({ ...routeForm, distance_km: parseFloat(e.target.value) || 0 })} placeholder="e.g. 12.5" />
+                  </div>
+                  <div>
+                    <Label>Fare per km (KES)</Label>
+                    <Input type="number" step="0.5" value={routeForm.fare_per_km} onChange={e => setRouteForm({ ...routeForm, fare_per_km: parseFloat(e.target.value) || 0 })} placeholder="e.g. 50" />
+                    {routeForm.distance_km > 0 && routeForm.fare_per_km > 0 && (
+                      <p className="text-xs text-green-600 mt-0.5">
+                        = KES {(routeForm.distance_km * routeForm.fare_per_km).toLocaleString()}/trip
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
+
               <div><Label>Morning Pickup</Label>
                 <Input type="time" value={routeForm.morning_pickup_time} onChange={e => setRouteForm({ ...routeForm, morning_pickup_time: e.target.value })} />
               </div>
@@ -119,10 +188,10 @@ export function TransportPage() {
                 <Input type="time" value={routeForm.afternoon_dropoff_time} onChange={e => setRouteForm({ ...routeForm, afternoon_dropoff_time: e.target.value })} />
               </div>
               <div className="md:col-span-3 flex gap-3">
-                <Button type="submit" disabled={createRouteMutation.isPending}>
-                  {createRouteMutation.isPending ? 'Saving...' : 'Add Route'}
+                <Button type="submit" disabled={createRouteMutation.isPending || updateRouteMutation.isPending}>
+                  {(createRouteMutation.isPending || updateRouteMutation.isPending) ? 'Saving...' : (editingRoute ? 'Update Route' : 'Add Route')}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setShowRouteForm(false)}>Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => { setShowRouteForm(false); setEditingRoute(null); }}>Cancel</Button>
               </div>
             </form>
           </CardContent>
@@ -176,15 +245,44 @@ export function TransportPage() {
           ) : routeDetail ? (
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>{routeDetail.route_name}</CardTitle>
-                  <Button size="sm" onClick={() => setShowAssignForm(!showAssignForm)}>
-                    <Plus className="h-4 w-4 mr-1" /> Assign Student
-                  </Button>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle>{routeDetail.route_name} {routeDetail.route_code && <span className="text-sm font-normal text-gray-400">({routeDetail.route_code})</span>}</CardTitle>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setEditingRoute(routeDetail);
+                      setRouteForm({
+                        route_name: routeDetail.route_name || '',
+                        route_code: routeDetail.route_code || '',
+                        vehicle_registration: routeDetail.vehicle_registration || '',
+                        vehicle_capacity: routeDetail.vehicle_capacity || 30,
+                        driver_name: routeDetail.driver_name || '',
+                        driver_phone: routeDetail.driver_phone || '',
+                        morning_pickup_time: routeDetail.morning_pickup_time || '',
+                        afternoon_dropoff_time: routeDetail.afternoon_dropoff_time || '',
+                        monthly_fee: routeDetail.monthly_fee || 0,
+                        term_fee: routeDetail.term_fee || 0,
+                        fare_per_km: routeDetail.fare_per_km || 0,
+                        distance_km: routeDetail.distance_km || 0,
+                      });
+                      setShowRouteForm(true);
+                    }}>
+                      <Edit className="h-4 w-4 mr-1" /> Edit
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-red-600" onClick={() => {
+                      if (confirm(`Delete route "${routeDetail.route_name}"? Students assigned will be unlinked.`)) {
+                        deleteRouteMutation.mutate(routeDetail.id);
+                      }
+                    }}>
+                      <Trash2 className="h-4 w-4 mr-1" /> Delete
+                    </Button>
+                    <Button size="sm" onClick={() => setShowAssignForm(!showAssignForm)}>
+                      <Plus className="h-4 w-4 mr-1" /> Assign Student
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
                   {routeDetail.driver_name && (
-                    <p><span className="font-medium">Driver:</span> {routeDetail.driver_name} ({routeDetail.driver_phone})</p>
+                    <p><span className="font-medium">Driver:</span> {routeDetail.driver_name} {routeDetail.driver_phone && `(${routeDetail.driver_phone})`}</p>
                   )}
                   {routeDetail.vehicle_registration && (
                     <p><span className="font-medium">Vehicle:</span> {routeDetail.vehicle_registration}</p>
@@ -192,8 +290,14 @@ export function TransportPage() {
                   {routeDetail.morning_pickup_time && (
                     <p><span className="font-medium">Morning:</span> {routeDetail.morning_pickup_time}</p>
                   )}
-                  {routeDetail.monthly_fee > 0 && (
-                    <p><span className="font-medium">Monthly Fee:</span> KES {Number(routeDetail.monthly_fee).toLocaleString()}</p>
+                  {Number(routeDetail.term_fee) > 0 && (
+                    <p><span className="font-medium">Term Fee:</span> KES {Number(routeDetail.term_fee).toLocaleString()}</p>
+                  )}
+                  {Number(routeDetail.distance_km) > 0 && (
+                    <p><span className="font-medium">Distance:</span> {routeDetail.distance_km} km</p>
+                  )}
+                  {Number(routeDetail.fare_per_km) > 0 && (
+                    <p><span className="font-medium">Fare/km:</span> KES {Number(routeDetail.fare_per_km).toLocaleString()}</p>
                   )}
                 </div>
               </CardHeader>

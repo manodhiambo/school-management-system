@@ -50,19 +50,22 @@ router.post('/routes', authenticate, async (req, res) => {
     const {
       route_name, route_code, description, vehicle_registration, vehicle_capacity,
       driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
-      morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee
+      morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee,
+      fare_per_km, distance_km
     } = req.body;
     const tid = req.user.tenant_id;
     const rows = await query(
       `INSERT INTO transport_routes
        (route_name, route_code, description, vehicle_registration, vehicle_capacity,
         driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
-        morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee, tenant_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee,
+        fare_per_km, distance_km, tenant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
       [route_name, route_code, description, vehicle_registration, vehicle_capacity || 30,
        driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
        morning_pickup_time, afternoon_dropoff_time,
-       JSON.stringify(stops || []), monthly_fee || 0, term_fee || 0, tid]
+       JSON.stringify(stops || []), monthly_fee || 0, term_fee || 0,
+       fare_per_km || 0, distance_km || 0, tid]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -77,7 +80,8 @@ router.put('/routes/:id', authenticate, async (req, res) => {
     const {
       route_name, route_code, description, vehicle_registration, vehicle_capacity,
       driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
-      morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee, is_active
+      morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee, is_active,
+      fare_per_km, distance_km
     } = req.body;
     const rows = await query(
       `UPDATE transport_routes SET
@@ -89,13 +93,16 @@ router.put('/routes/:id', authenticate, async (req, res) => {
        morning_pickup_time=COALESCE($11,morning_pickup_time),
        afternoon_dropoff_time=COALESCE($12,afternoon_dropoff_time),
        stops=COALESCE($13,stops), monthly_fee=COALESCE($14,monthly_fee),
-       term_fee=COALESCE($15,term_fee), is_active=COALESCE($16,is_active), updated_at=NOW()
-       WHERE id=$17 RETURNING *`,
+       term_fee=COALESCE($15,term_fee), is_active=COALESCE($16,is_active),
+       fare_per_km=COALESCE($17,fare_per_km), distance_km=COALESCE($18,distance_km),
+       updated_at=NOW()
+       WHERE id=$19 RETURNING *`,
       [route_name, route_code, description, vehicle_registration, vehicle_capacity,
        driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
        morning_pickup_time, afternoon_dropoff_time,
        stops ? JSON.stringify(stops) : null,
-       monthly_fee, term_fee, is_active, req.params.id]
+       monthly_fee, term_fee, is_active,
+       fare_per_km, distance_km, req.params.id]
     );
     res.json({ success: true, data: rows[0] });
   } catch (err) {

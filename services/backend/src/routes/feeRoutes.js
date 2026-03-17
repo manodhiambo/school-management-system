@@ -17,13 +17,14 @@ router.use(requireActiveTenant);
 // Get all fee structures
 router.get('/structure', async (req, res) => {
   try {
-    const { classId, frequency, isActive } = req.query;
+    const { classId, frequency, isActive, student_type, is_transport_fee } = req.query;
     const tid = req.user.tenant_id;
 
     let sql = `
-      SELECT fs.*, c.name as class_name
+      SELECT fs.*, c.name as class_name, tr.route_name
       FROM fee_structure fs
       LEFT JOIN classes c ON fs.class_id = c.id
+      LEFT JOIN transport_routes tr ON fs.route_id = tr.id
       WHERE fs.tenant_id = $1
     `;
     const params = [tid];
@@ -31,23 +32,27 @@ router.get('/structure', async (req, res) => {
 
     if (classId) {
       sql += ` AND (fs.class_id = $${paramIndex} OR fs.class_id IS NULL)`;
-      params.push(classId);
-      paramIndex++;
+      params.push(classId); paramIndex++;
     }
-
     if (frequency) {
       sql += ` AND fs.frequency = $${paramIndex}`;
-      params.push(frequency);
-      paramIndex++;
+      params.push(frequency); paramIndex++;
+    }
+    // Default: only show active structures
+    const activeFilter = isActive !== undefined ? isActive === 'true' : true;
+    sql += ` AND fs.is_active = $${paramIndex}`;
+    params.push(activeFilter); paramIndex++;
+
+    if (student_type) {
+      sql += ` AND (fs.student_type = $${paramIndex} OR fs.student_type = 'all')`;
+      params.push(student_type); paramIndex++;
+    }
+    if (is_transport_fee !== undefined) {
+      sql += ` AND fs.is_transport_fee = $${paramIndex}`;
+      params.push(is_transport_fee === 'true'); paramIndex++;
     }
 
-    if (isActive !== undefined) {
-      sql += ` AND fs.is_active = $${paramIndex}`;
-      params.push(isActive === 'true');
-      paramIndex++;
-    }
-
-    sql += ' ORDER BY fs.name';
+    sql += ' ORDER BY fs.student_type, fs.is_transport_fee, fs.name';
 
     const structures = await query(sql, params);
     res.json({ success: true, data: structures });
@@ -90,7 +95,8 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
       name, amount, frequency, description, due_day, dueDay,
       class_id, classId, academic_year, academicYear,
       is_mandatory, isMandatory, late_fee_amount, lateFeeAmount,
-      late_fee_per_day, lateFeePerDay, grace_period_days, gracePeriodDays
+      late_fee_per_day, lateFeePerDay, grace_period_days, gracePeriodDays,
+      student_type, is_transport_fee, route_id
     } = req.body;
 
     if (!name || !amount || !frequency) {
@@ -114,8 +120,9 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
       `INSERT INTO fee_structure (
         id, name, amount, frequency, description, due_day,
         class_id, academic_year, is_mandatory,
-        late_fee_amount, late_fee_per_day, grace_period_days, tenant_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        late_fee_amount, late_fee_per_day, grace_period_days,
+        student_type, is_transport_fee, route_id, tenant_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         structureId, name, amount, frequency, description || null,
         due_day || dueDay || 15, class_id || classId || null,
@@ -124,6 +131,9 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
         late_fee_amount || lateFeeAmount || 0,
         late_fee_per_day || lateFeePerDay || 0,
         grace_period_days || gracePeriodDays || 0,
+        student_type || 'all',
+        is_transport_fee ?? false,
+        route_id || null,
         tid
       ]
     );
@@ -150,7 +160,8 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
       class_id, classId, academic_year, academicYear,
       is_mandatory, isMandatory, is_active, isActive,
       late_fee_amount, lateFeeAmount, late_fee_per_day, lateFeePerDay,
-      grace_period_days, gracePeriodDays
+      grace_period_days, gracePeriodDays,
+      student_type, is_transport_fee, route_id
     } = req.body;
 
     if (frequency) {
@@ -177,14 +188,19 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
         late_fee_amount = COALESCE($10, late_fee_amount),
         late_fee_per_day = COALESCE($11, late_fee_per_day),
         grace_period_days = COALESCE($12, grace_period_days),
+        student_type = COALESCE($13, student_type),
+        is_transport_fee = COALESCE($14, is_transport_fee),
+        route_id = $15,
         updated_at = NOW()
-       WHERE id = $13 AND tenant_id = $14`,
+       WHERE id = $16 AND tenant_id = $17`,
       [
         name, amount, frequency, description,
         due_day || dueDay, class_id || classId,
         academic_year || academicYear, is_mandatory ?? isMandatory,
         is_active ?? isActive, late_fee_amount || lateFeeAmount,
         late_fee_per_day || lateFeePerDay, grace_period_days || gracePeriodDays,
+        student_type || null, is_transport_fee ?? null,
+        route_id || null,
         req.params.id, tid
       ]
     );
@@ -202,15 +218,28 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
   }
 });
 
-// Delete fee structure
-router.delete('/structure/:id', requireRole(['admin']), async (req, res) => {
+// Deactivate fee structure (soft)
+router.put('/structure/:id/deactivate', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query(
       'UPDATE fee_structure SET is_active = false, updated_at = NOW() WHERE id = $1 AND tenant_id = $2',
       [req.params.id, tid]
     );
+    res.json({ success: true, message: 'Fee structure deactivated' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error deactivating fee structure' });
+  }
+});
 
+// Delete fee structure (hard delete)
+router.delete('/structure/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    await query(
+      'DELETE FROM fee_structure WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, tid]
+    );
     res.json({ success: true, message: 'Fee structure deleted successfully' });
   } catch (error) {
     logger.error('Delete fee structure error:', error);
@@ -397,6 +426,105 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
   } catch (error) {
     logger.error('Bulk create invoices error:', error);
     res.status(500).json({ success: false, message: 'Error creating invoices' });
+  }
+});
+
+// Smart bulk generate — respects student_type and transport assignments
+// POST /fee/invoice/bulk-smart
+router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { class_ids, fee_structure_ids, due_date, term, academic_year, dry_run } = req.body;
+
+    if (!fee_structure_ids?.length) {
+      return res.status(400).json({ success: false, message: 'Select at least one fee structure' });
+    }
+
+    // Load fee structures
+    const placeholders = fee_structure_ids.map((_, i) => `$${i + 2}`).join(',');
+    const structures = await query(
+      `SELECT * FROM fee_structure WHERE id IN (${placeholders}) AND tenant_id = $1`,
+      [tid, ...fee_structure_ids]
+    );
+
+    // Load students (filter by class_ids if given)
+    let studentSql = `SELECT s.id, s.first_name, s.last_name, s.admission_number,
+      s.student_type, s.class_id, c.name as class_name
+      FROM students s LEFT JOIN classes c ON c.id = s.class_id
+      WHERE s.tenant_id = $1 AND s.status = 'active'`;
+    const studentParams = [tid];
+    if (class_ids?.length) {
+      studentSql += ` AND s.class_id = ANY($2::uuid[])`;
+      studentParams.push(class_ids);
+    }
+    const allStudents = await query(studentSql, studentParams);
+
+    // Load transport assignments
+    const transportMap = {};
+    const transportRows = await query(
+      `SELECT st.student_id, st.route_id, r.term_fee, r.monthly_fee, r.route_name
+       FROM student_transport st
+       JOIN transport_routes r ON r.id = st.route_id
+       WHERE st.tenant_id = $1 AND st.is_active = TRUE`,
+      [tid]
+    );
+    for (const t of transportRows) transportMap[t.student_id] = t;
+
+    const summary = { created: [], skipped: [], errors: [] };
+
+    for (const struct of structures) {
+      for (const student of allStudents) {
+        // Filter by student_type
+        if (struct.student_type !== 'all' && student.student_type !== struct.student_type) {
+          summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'student_type_mismatch' });
+          continue;
+        }
+        // Transport fee: only for students with active transport
+        if (struct.is_transport_fee && !transportMap[student.id]) {
+          summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'no_transport' });
+          continue;
+        }
+        // Route-specific transport: only for students on that route
+        if (struct.is_transport_fee && struct.route_id && transportMap[student.id]?.route_id !== struct.route_id) {
+          summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'route_mismatch' });
+          continue;
+        }
+
+        // Determine amount — use route fee if transport fee and route has term_fee
+        let amount = parseFloat(struct.amount);
+        if (struct.is_transport_fee && transportMap[student.id]) {
+          const tf = parseFloat(transportMap[student.id].term_fee);
+          if (tf > 0) amount = tf;
+        }
+
+        if (!dry_run) {
+          try {
+            const invoiceId = uuidv4();
+            const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+            await query(
+              `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount, due_date, status, tenant_id)
+               VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6)`,
+              [invoiceId, invoiceNumber, student.id, amount, due_date || null, tid]
+            );
+            summary.created.push({ student_id: student.id, name: `${student.first_name} ${student.last_name}`, fee: struct.name, amount });
+          } catch (err) {
+            summary.errors.push({ student_id: student.id, fee: struct.name, error: err.message });
+          }
+        } else {
+          summary.created.push({ student_id: student.id, name: `${student.first_name} ${student.last_name}`, class_name: student.class_name, fee: struct.name, amount, student_type: student.student_type });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      dry_run: !!dry_run,
+      message: dry_run ? `Preview: ${summary.created.length} invoices would be created` : `${summary.created.length} invoices created, ${summary.errors.length} errors`,
+      data: summary
+    });
+  } catch (error) {
+    logger.error('Smart bulk invoice error:', error);
+    res.status(500).json({ success: false, message: 'Error generating invoices' });
   }
 });
 

@@ -539,8 +539,16 @@ class ApiService {
     return this.api.delete('/fee/structure/' + id);
   }
 
+  deactivateFeeStructure(id: string) {
+    return this.api.put('/fee/structure/' + id + '/deactivate', {});
+  }
+
   getFeeStructure(id: string) {
     return this.api.get('/fee/structure/' + id);
+  }
+
+  bulkSmartGenerateInvoices(data: any) {
+    return this.api.post('/fee/invoice/bulk-smart', data);
   }
 
   // Timetable Delete/Reset (Admin only)

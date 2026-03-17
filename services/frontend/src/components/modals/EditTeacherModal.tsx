@@ -127,7 +127,25 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
     setLoading(true);
 
     try {
-      await api.updateTeacher(teacherId, formData);
+      // Backend schema expects camelCase; strip unknown/read-only fields
+      const payload: Record<string, any> = {
+        firstName: formData.first_name,
+        lastName: formData.last_name,
+        gender: formData.gender,
+        designation: formData.designation,
+        specialization: formData.specialization,
+        qualification: formData.qualification,
+        address: formData.address,
+      };
+      if (formData.date_of_birth) payload.dateOfBirth = formData.date_of_birth;
+      if (formData.date_of_joining) payload.dateOfJoining = formData.date_of_joining;
+      if (formData.experience_years) payload.experienceYears = Number(formData.experience_years);
+      if (formData.phone) payload.phone = formData.phone;
+
+      // Strip empty strings
+      Object.keys(payload).forEach(k => { if (payload[k] === '' || payload[k] === undefined) delete payload[k]; });
+
+      await api.updateTeacher(teacherId, payload);
       alert('Teacher updated successfully!');
       onSuccess();
       onOpenChange(false);

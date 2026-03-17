@@ -6,7 +6,205 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
-import { FileText, CheckCircle, Download, PlusCircle, Users, Share2, Mail, MessageCircle, X, Phone, AtSign, AlertCircle } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import { FileText, CheckCircle, Download, PlusCircle, Users, Share2, Mail, MessageCircle, X, Phone, AtSign, AlertCircle, Loader2 } from 'lucide-react';
+
+// ── Grade color helpers for PDF (hex RGB) ───────────────────────────────────
+const GRADE_HEX: Record<string, [number, number, number]> = {
+  EE: [22, 163, 74],   EE1: [15, 118, 54],  EE2: [22, 163, 74],
+  ME: [37, 99, 235],   ME1: [29, 78, 216],  ME2: [37, 99, 235],
+  AE: [202, 138, 4],   AE1: [180, 120, 2],  AE2: [202, 138, 4],
+  BE: [220, 38, 38],   BE1: [185, 28, 28],  BE2: [220, 38, 38],
+  WD: [22, 163, 74],   D:   [202, 138, 4],  B:   [220, 38, 38],
+};
+const GRADE_LABEL: Record<string, string> = {
+  EE: 'Exceeding', EE1: 'EE Level 1', EE2: 'EE Level 2',
+  ME: 'Meeting',   ME1: 'ME Level 1', ME2: 'ME Level 2',
+  AE: 'Approaching', AE1: 'AE Level 1', AE2: 'AE Level 2',
+  BE: 'Below',     BE1: 'BE Level 1', BE2: 'BE Level 2',
+  WD: 'Well Dev.', D: 'Developing',   B: 'Beginning',
+};
+
+// ── Generate a single report card page in the jsPDF doc ─────────────────────
+async function renderReportCardPage(
+  doc: jsPDF,
+  detail: any,
+  school: any,
+  term: string,
+  academicYear: string,
+  isFirstPage: boolean
+) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  let y = 0;
+
+  if (!isFirstPage) doc.addPage();
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  doc.setFillColor(37, 99, 235);
+  doc.rect(0, 0, pageW, 38, 'F');
+
+  if (school?.school_logo_url) {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve) => {
+        img.onload = () => { try { doc.addImage(img, 'PNG', margin, 5, 22, 22); } catch { /* skip */ } resolve(); };
+        img.onerror = () => resolve();
+        img.src = school.school_logo_url;
+      });
+    } catch { /* skip */ }
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(15); doc.setFont('helvetica', 'bold');
+  doc.text(school?.school_name || 'School Report Card', pageW / 2, 12, { align: 'center' });
+  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+  const addrLine = [school?.address, school?.city, school?.state].filter(Boolean).join(', ');
+  if (addrLine) doc.text(addrLine, pageW / 2, 19, { align: 'center' });
+  const contactLine = [school?.phone, school?.email].filter(Boolean).join('  |  ');
+  if (contactLine) doc.text(contactLine, pageW / 2, 25, { align: 'center' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+  doc.text(`LEARNER PROGRESS REPORT — ${term.replace('term', 'Term ')} ${academicYear}`, pageW / 2, 33, { align: 'center' });
+  y = 46;
+
+  // ── Student Details ─────────────────────────────────────────────────────────
+  doc.setTextColor(0, 0, 0);
+  doc.setFillColor(243, 244, 246);
+  doc.roundedRect(margin, y, pageW - 2 * margin, 22, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('LEARNER INFORMATION', margin + 4, y + 7);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  const lc = margin + 4, rc = pageW / 2 + 4;
+  doc.text(`Name: ${detail.student_name || '—'}`, lc, y + 13);
+  doc.text(`Admission No: ${detail.admission_number || '—'}`, rc, y + 13);
+  doc.text(`Class: ${detail.class_name || '—'}`, lc, y + 19);
+  doc.text(`NEMIS: ${detail.nemis_number || '—'}`, rc, y + 19);
+  y += 28;
+
+  // ── Attendance ─────────────────────────────────────────────────────────────
+  const attBoxW = (pageW - 2 * margin - 8) / 3;
+  const attData = [
+    { label: 'Days Present', val: detail.days_present ?? 0, bg: [220, 252, 231] as [number,number,number], fg: [22, 101, 52] as [number,number,number] },
+    { label: 'Days Absent',  val: detail.days_absent ?? 0,  bg: [254, 226, 226] as [number,number,number], fg: [153, 27, 27] as [number,number,number] },
+    { label: 'Days Late',    val: detail.days_late ?? 0,    bg: [254, 249, 195] as [number,number,number], fg: [133, 77, 14] as [number,number,number] },
+  ];
+  attData.forEach((a, i) => {
+    const bx = margin + i * (attBoxW + 4);
+    doc.setFillColor(...a.bg); doc.roundedRect(bx, y, attBoxW, 14, 2, 2, 'F');
+    doc.setTextColor(...a.fg);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    doc.text(String(a.val), bx + attBoxW / 2, y + 9, { align: 'center' });
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+    doc.text(a.label, bx + attBoxW / 2, y + 13, { align: 'center' });
+  });
+  doc.setTextColor(0, 0, 0);
+  y += 20;
+
+  // ── Learning Areas ──────────────────────────────────────────────────────────
+  if (detail.competencies?.length > 0) {
+    doc.setFillColor(37, 99, 235);
+    doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('LEARNING AREAS', margin + 4, y + 5.5);
+    y += 10; doc.setTextColor(0, 0, 0);
+
+    // Header row
+    const cx = [margin, margin + 72, margin + 108, margin + 134, margin + 154];
+    doc.setFillColor(219, 234, 254); doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    ['Learning Area', 'Score %', 'Grade', 'Grade Label', 'Comment'].forEach((h, i) => doc.text(h, cx[i], y + 5));
+    y += 8;
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+    detail.competencies.forEach((c: any, idx: number) => {
+      if (y > 230) { doc.addPage(); y = 20; }
+      if (idx % 2 === 0) { doc.setFillColor(249, 250, 251); doc.rect(margin, y, pageW - 2 * margin, 7, 'F'); }
+      const grade = c.overall_cbc_grade || c.pre_primary_grade || '';
+      doc.text((c.subject_name || '—').slice(0, 26), cx[0], y + 5);
+      doc.text(c.percentage != null ? `${c.percentage}%` : '—', cx[1], y + 5);
+
+      if (grade) {
+        const [r, g, b] = GRADE_HEX[grade] || [100, 100, 100];
+        doc.setFillColor(r, g, b); doc.setTextColor(255, 255, 255);
+        doc.roundedRect(cx[2], y + 0.5, 18, 6, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+        doc.text(grade, cx[2] + 2, y + 5);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+        doc.text((GRADE_LABEL[grade] || grade).slice(0, 16), cx[3], y + 5);
+      } else {
+        doc.text('—', cx[2], y + 5);
+      }
+      doc.text((c.teacher_comment || '—').slice(0, 22), cx[4], y + 5);
+      y += 7;
+    });
+    y += 4;
+  }
+
+  // ── Overall Grade ───────────────────────────────────────────────────────────
+  if (detail.overall_grade) {
+    const og = detail.overall_grade;
+    const [r, g, b] = GRADE_HEX[og] || [100, 100, 100];
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
+    doc.text('Overall Grade:', margin, y + 5);
+    doc.setFillColor(r, g, b); doc.setTextColor(255, 255, 255);
+    doc.roundedRect(margin + 32, y, 18, 7, 1.5, 1.5, 'F');
+    doc.text(og, margin + 33, y + 5);
+    doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
+    y += 12;
+  }
+
+  // ── Comments ────────────────────────────────────────────────────────────────
+  if (y < 220 && (detail.class_teacher_comment || detail.head_teacher_comment)) {
+    if (detail.class_teacher_comment) {
+      doc.setFillColor(239, 246, 255); doc.roundedRect(margin, y, pageW - 2 * margin, 12, 2, 2, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(30, 64, 175);
+      doc.text('Class Teacher:', margin + 4, y + 5);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+      doc.text(String(detail.class_teacher_comment).slice(0, 80), margin + 30, y + 5);
+      y += 14;
+    }
+    if (detail.head_teacher_comment) {
+      doc.setFillColor(245, 243, 255); doc.roundedRect(margin, y, pageW - 2 * margin, 12, 2, 2, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(88, 28, 135);
+      doc.text('Head Teacher:', margin + 4, y + 5);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+      doc.text(String(detail.head_teacher_comment).slice(0, 80), margin + 30, y + 5);
+      y += 14;
+    }
+  }
+
+  // ── Signature Lines ─────────────────────────────────────────────────────────
+  if (y < 250) {
+    const sigY = Math.max(y + 6, 255);
+    const sigW = (pageW - 2 * margin - 8) / 3;
+    doc.setDrawColor(180, 180, 180);
+    ['Class Teacher', 'Head Teacher', 'Parent / Guardian'].forEach((label, i) => {
+      const sx = margin + i * (sigW + 4);
+      doc.line(sx, sigY, sx + sigW, sigY);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
+      doc.text(label, sx + sigW / 2, sigY + 5, { align: 'center' });
+    });
+    doc.setTextColor(0, 0, 0);
+  }
+}
+
+// ── Build and save PDF (one or many students) ────────────────────────────────
+async function downloadReportCardsPDF(
+  cardsToDownload: any[],
+  school: any,
+  term: string,
+  academicYear: string,
+  className: string
+) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  for (let i = 0; i < cardsToDownload.length; i++) {
+    await renderReportCardPage(doc, cardsToDownload[i], school, term, academicYear, i === 0);
+  }
+  const safeName = className.replace(/[^a-z0-9]/gi, '_');
+  const termLabel = term.replace('term', 'T');
+  doc.save(`ReportCards_${safeName}_${termLabel}_${academicYear}.pdf`);
+}
 
 const GRADE_COLORS: Record<string, string> = {
   EE: 'bg-green-100 text-green-800 border-green-200',
@@ -32,6 +230,8 @@ export function CbcReportCardPage() {
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [showShare, setShowShare] = useState(false);
   const [shareResult, setShareResult] = useState<any>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => api.getClasses() });
   const { data: cardsData, isLoading } = useQuery({
@@ -67,6 +267,43 @@ export function CbcReportCardPage() {
   const classes = (classesData as any)?.data || [];
   const cards = (cardsData as any)?.data || [];
   const detail = (cardDetail as any)?.data;
+  const cardsWithId = cards.filter((c: any) => c.id);
+  const selectedClass = classes.find((c: any) => c.id === filters.class_id);
+
+  // ── Download handler ────────────────────────────────────────────────────────
+  const handleDownload = async (scope: 'class' | 'selected' | 'published') => {
+    setShowDownloadMenu(false);
+    setDownloading(true);
+    try {
+      const school = (await api.getSettings() as any)?.data || {};
+
+      let targetCards: any[] = [];
+      if (scope === 'selected' && detail) {
+        targetCards = [detail];
+      } else {
+        // Fetch full details for each card
+        const pool = scope === 'published'
+          ? cardsWithId.filter((c: any) => c.status === 'published' || c.status === 'acknowledged')
+          : cardsWithId;
+        if (pool.length === 0) { alert('No report cards to download for this selection.'); return; }
+        const results = await Promise.all(pool.map((c: any) => api.getCbcReportCard(c.id)));
+        targetCards = results.map((r: any) => r?.data).filter(Boolean);
+      }
+
+      if (targetCards.length === 0) { alert('No report cards available.'); return; }
+      await downloadReportCardsPDF(
+        targetCards,
+        school,
+        filters.term,
+        filters.academic_year,
+        selectedClass?.name || 'Class'
+      );
+    } catch (e: any) {
+      alert('Failed to generate PDF: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const statusBadge = (status: string | null) => {
     if (status === 'published') return <Badge className="bg-green-100 text-green-800">Published</Badge>;
@@ -77,11 +314,71 @@ export function CbcReportCardPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">CBC Report Cards</h1>
           <p className="text-sm text-gray-500 mt-1">Holistic Learner Progress Reports — Kenya CBC</p>
         </div>
+
+        {/* Download PDF dropdown */}
+        {filters.class_id && cardsWithId.length > 0 && (
+          <div className="relative">
+            <Button
+              variant="outline"
+              onClick={() => setShowDownloadMenu(v => !v)}
+              disabled={downloading}
+              className="flex items-center gap-2"
+            >
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {downloading ? 'Generating PDF…' : 'Download PDF'}
+            </Button>
+            {showDownloadMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-xl z-30 w-64 py-1">
+                <p className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b">Download Options</p>
+                <button
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-blue-50 flex items-start gap-3"
+                  onClick={() => handleDownload('class')}
+                >
+                  <Users className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <span>
+                    <span className="font-medium block">All Students — {selectedClass?.name}</span>
+                    <span className="text-xs text-gray-500">{cardsWithId.length} report cards in one PDF</span>
+                  </span>
+                </button>
+                <button
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-green-50 flex items-start gap-3"
+                  onClick={() => handleDownload('published')}
+                >
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>
+                    <span className="font-medium block">Published / Acknowledged Only</span>
+                    <span className="text-xs text-gray-500">
+                      {cardsWithId.filter((c: any) => c.status === 'published' || c.status === 'acknowledged').length} cards
+                    </span>
+                  </span>
+                </button>
+                {detail && (
+                  <button
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 flex items-start gap-3 border-t"
+                    onClick={() => handleDownload('selected')}
+                  >
+                    <FileText className="h-4 w-4 text-indigo-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <span className="font-medium block">Selected Student Only</span>
+                      <span className="text-xs text-gray-500">{detail?.student_name}</span>
+                    </span>
+                  </button>
+                )}
+                <button
+                  className="w-full text-left px-4 py-3 text-xs text-gray-400 hover:bg-gray-50 border-t"
+                  onClick={() => setShowDownloadMenu(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters */}

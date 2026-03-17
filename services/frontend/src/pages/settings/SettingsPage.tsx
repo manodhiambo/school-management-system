@@ -1,18 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Save, School, Bell, Lock, Globe, Clock } from 'lucide-react';
+import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon } from 'lucide-react';
 import api from '@/services/api';
+
+// Resize an image file to max 256x256 and return a base64 data URL
+function resizeImageToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 256;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system'>('general');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSettings();
@@ -47,6 +75,23 @@ export function SettingsPage() {
 
   const handleChange = (field: string, value: any) => {
     setSettings({ ...settings, [field]: value });
+  };
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5 MB.'); return; }
+    try {
+      setLogoUploading(true);
+      const base64 = await resizeImageToBase64(file);
+      setSettings((s: any) => ({ ...s, school_logo_url: base64 }));
+    } catch {
+      alert('Failed to process image. Please try another file.');
+    } finally {
+      setLogoUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   if (loading) {
@@ -131,13 +176,54 @@ export function SettingsPage() {
                 />
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="school_logo_url">Logo URL</Label>
-                <Input
-                  id="school_logo_url"
-                  value={settings?.school_logo_url || ''}
-                  onChange={(e) => handleChange('school_logo_url', e.target.value)}
-                  placeholder="https://example.com/logo.png"
-                />
+                <Label>School Logo</Label>
+                <div className="mt-2 flex items-start gap-4">
+                  {/* Preview */}
+                  <div className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden">
+                    {settings?.school_logo_url ? (
+                      <img src={settings.school_logo_url} alt="School logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <ImageIcon className="h-8 w-8 text-gray-300" />
+                    )}
+                  </div>
+                  {/* Upload controls */}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoFileChange}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={logoUploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {logoUploading ? 'Processing...' : 'Upload Image'}
+                    </Button>
+                    {settings?.school_logo_url && (
+                      <button
+                        type="button"
+                        onClick={() => handleChange('school_logo_url', '')}
+                        className="flex items-center text-xs text-red-500 hover:text-red-700 gap-1"
+                      >
+                        <X className="h-3 w-3" /> Remove logo
+                      </button>
+                    )}
+                    <p className="text-xs text-gray-400">PNG, JPG, SVG up to 5 MB. Resized to 256×256 for storage.</p>
+                    <p className="text-xs text-gray-400">Or paste a URL directly:</p>
+                    <Input
+                      value={settings?.school_logo_url?.startsWith('data:') ? '' : (settings?.school_logo_url || '')}
+                      onChange={(e) => handleChange('school_logo_url', e.target.value)}
+                      placeholder="https://example.com/logo.png"
+                      className="text-xs h-8"
+                    />
+                  </div>
+                </div>
               </div>
               <div>
                 <Label htmlFor="current_academic_year">Current Academic Year</Label>

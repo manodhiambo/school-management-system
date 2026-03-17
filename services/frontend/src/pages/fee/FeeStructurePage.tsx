@@ -479,16 +479,31 @@ export function FeeStructurePage() {
               </div>
 
               {/* Student Type */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Applies To (Student Category)</Label>
-                  <Select value={formData.student_type} onChange={e => handleChange('student_type', e.target.value)}>
-                    <option value="all">All Students</option>
-                    <option value="boarder">Boarders Only</option>
-                    <option value="day_scholar">Day Scholars Only</option>
-                  </Select>
-                  <p className="text-xs text-gray-400 mt-1">Bulk generation will only bill matching students.</p>
+              <div>
+                <Label>Student Type</Label>
+                <div className="flex gap-2 mt-1">
+                  {[
+                    { value: 'all', label: 'All Students' },
+                    { value: 'day_scholar', label: 'Day Scholar' },
+                    { value: 'boarder', label: 'Boarder' },
+                  ].map(opt => (
+                    <button key={opt.value} type="button"
+                      onClick={() => handleChange('student_type', opt.value)}
+                      className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                        formData.student_type === opt.value
+                          ? opt.value === 'boarder' ? 'bg-purple-600 text-white border-purple-600'
+                            : opt.value === 'day_scholar' ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-gray-700 text-white border-gray-700'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                      }`}>
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
+              </div>
+
+              {/* Frequency */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Frequency *</Label>
                   <Select value={formData.frequency} onChange={e => handleChange('frequency', e.target.value)}>
@@ -499,32 +514,32 @@ export function FeeStructurePage() {
                     <option value="one_time">One Time</option>
                   </Select>
                 </div>
+                <div>
+                  <Label>Academic Year</Label>
+                  <Input value={formData.academicYear} onChange={e => handleChange('academicYear', e.target.value)} />
+                </div>
               </div>
 
               {/* Transport Fee */}
-              <div className="border rounded-lg p-3 bg-orange-50 border-orange-200 space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={formData.is_transport_fee}
-                    onChange={e => handleChange('is_transport_fee', e.target.checked)} className="rounded" />
-                  <span className="text-sm font-medium flex items-center gap-1">
-                    <Bus className="h-4 w-4 text-orange-500" /> This is a Transport Fee
-                  </span>
-                </label>
-                {formData.is_transport_fee && (
-                  <div>
-                    <Label className="text-xs">Link to Route (optional — leave blank for all routes)</Label>
-                    <Select value={formData.route_id} onChange={e => handleChange('route_id', e.target.value)}>
-                      <option value="">All Transport Students</option>
-                      {routes.map((r: any) => (
-                        <option key={r.id} value={r.id}>{r.route_name} — {r.route_code || ''} (KES {Number(r.term_fee || 0).toLocaleString()}/term)</option>
-                      ))}
-                    </Select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Transport fees are only billed to students who have been assigned to a transport route.
-                      If a route is selected, only students on that specific route are billed.
-                    </p>
-                  </div>
-                )}
+              <div className="flex items-start gap-3 p-3 border rounded-lg">
+                <input type="checkbox" id="is_transport_fee" checked={formData.is_transport_fee}
+                  onChange={e => handleChange('is_transport_fee', e.target.checked)} className="rounded mt-0.5" />
+                <div className="flex-1">
+                  <label htmlFor="is_transport_fee" className="text-sm font-medium cursor-pointer flex items-center gap-1">
+                    <Bus className="h-4 w-4 text-orange-500" /> This is a transport fee
+                  </label>
+                  {formData.is_transport_fee && (
+                    <div className="mt-2">
+                      <Label className="text-xs">Route (optional)</Label>
+                      <Select value={formData.route_id} onChange={e => handleChange('route_id', e.target.value)}>
+                        <option value="">All routes</option>
+                        {routes.map((r: any) => (
+                          <option key={r.id} value={r.id}>{r.route_name}{r.route_code ? ` (${r.route_code})` : ''} — KES {Number(r.term_fee || 0).toLocaleString()}/term</option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -538,19 +553,8 @@ export function FeeStructurePage() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Academic Year</Label>
-                  <Input value={formData.academicYear} onChange={e => handleChange('academicYear', e.target.value)} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
                   <Label>Due Day of Month</Label>
                   <Input type="number" min="1" max="28" value={formData.dueDay} onChange={e => handleChange('dueDay', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Late Fee (KES)</Label>
-                  <Input type="number" value={formData.lateFeeAmount} onChange={e => handleChange('lateFeeAmount', e.target.value)} />
                 </div>
               </div>
 

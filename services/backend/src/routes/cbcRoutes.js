@@ -562,7 +562,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
        FROM (
          -- Issued invoices (current term/year when term is recorded, else all)
          SELECT
-           COALESCE(fi.description, fs.name, 'School Fee') AS fee_name,
+           COALESCE(fs.name, fi.description, 'School Fee') AS fee_name,
            COALESCE(fs.is_transport_fee, FALSE) AS is_transport_fee,
            COALESCE(tr.route_name, '') AS route_name,
            fi.total_amount,

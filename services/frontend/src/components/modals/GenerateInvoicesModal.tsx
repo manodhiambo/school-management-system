@@ -20,11 +20,14 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
   const [students, setStudents] = useState<any[]>([]);
   const [feeStructures, setFeeStructures] = useState<any[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const currentYear = new Date().getFullYear().toString();
   const [formData, setFormData] = useState({
     classId: '',
     feeStructureId: '',
     dueDate: '',
     description: '',
+    term: '',
+    academic_year: currentYear,
   });
 
   useEffect(() => {
@@ -117,7 +120,9 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
         studentIds: selectedStudents,
         feeStructureId: formData.feeStructureId,
         dueDate: formData.dueDate || null,
-        description: formData.description || null
+        description: formData.description || null,
+        term: formData.term || null,
+        academic_year: formData.academic_year || null,
       });
       
       alert(`Successfully generated ${response.data?.created?.length || 0} invoices!`);
@@ -138,6 +143,8 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
       feeStructureId: '',
       dueDate: '',
       description: '',
+      term: '',
+      academic_year: currentYear,
     });
     setSelectedStudents([]);
   };
@@ -188,6 +195,32 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
                   type="date"
                   value={formData.dueDate}
                   onChange={(e) => handleChange('dueDate', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="term">Term</Label>
+                <Select
+                  id="term"
+                  value={formData.term}
+                  onChange={(e) => handleChange('term', e.target.value)}
+                >
+                  <option value="">Select Term</option>
+                  <option value="term1">Term 1</option>
+                  <option value="term2">Term 2</option>
+                  <option value="term3">Term 3</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="academic_year">Academic Year</Label>
+                <Input
+                  id="academic_year"
+                  type="text"
+                  placeholder="e.g. 2025"
+                  value={formData.academic_year}
+                  onChange={(e) => handleChange('academic_year', e.target.value)}
                 />
               </div>
             </div>

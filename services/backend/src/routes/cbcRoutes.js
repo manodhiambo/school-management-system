@@ -548,27 +548,69 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       [rc.tenant_id, termDates[0]?.end_date || new Date()]
     ).catch(() => []);
 
-    // Fee breakdown: all invoices for this student (full fee structure list)
+    // Fee breakdown for this term/year:
+    //   Part 1 — invoices already issued (filtered to current term/year when term column is set)
+    //   Part 2 — fee_structure entries applicable to this student/class that have NO invoice yet
+    //            (ensures school-wide fees like exam fee always appear even if not yet billed)
     const feeBreakdown = await query(
-      `SELECT
-         COALESCE(fi.description, fs.name, 'School Fee') AS fee_name,
-         COALESCE(fs.is_transport_fee, FALSE) AS is_transport_fee,
-         COALESCE(tr.route_name, '') AS route_name,
-         SUM(fi.total_amount) AS total_amount,
-         SUM(COALESCE(fi.paid_amount, 0)) AS paid_amount,
-         SUM(fi.balance_amount) AS balance_amount,
-         MIN(fi.due_date) AS due_date,
-         STRING_AGG(DISTINCT fi.status, ', ') AS statuses
-       FROM fee_invoices fi
-       LEFT JOIN fee_structure fs ON fs.id = fi.fee_structure_id
-       LEFT JOIN transport_routes tr ON tr.id = fs.route_id
-       WHERE fi.student_id = $1
-         AND fi.tenant_id = $2
-       GROUP BY COALESCE(fi.description, fs.name, 'School Fee'),
-                COALESCE(fs.is_transport_fee, FALSE),
-                COALESCE(tr.route_name, '')
+      `SELECT fee_name, is_transport_fee, route_name,
+              SUM(total_amount) AS total_amount,
+              SUM(paid_amount)  AS paid_amount,
+              SUM(balance_amount) AS balance_amount,
+              MIN(due_date) AS due_date,
+              STRING_AGG(DISTINCT statuses, ', ') AS statuses
+       FROM (
+         -- Issued invoices (current term/year when term is recorded, else all)
+         SELECT
+           COALESCE(fi.description, fs.name, 'School Fee') AS fee_name,
+           COALESCE(fs.is_transport_fee, FALSE) AS is_transport_fee,
+           COALESCE(tr.route_name, '') AS route_name,
+           fi.total_amount,
+           COALESCE(fi.paid_amount, 0) AS paid_amount,
+           fi.balance_amount,
+           fi.due_date,
+           fi.status AS statuses
+         FROM fee_invoices fi
+         LEFT JOIN fee_structure fs ON fs.id = fi.fee_structure_id
+         LEFT JOIN transport_routes tr ON tr.id = fs.route_id
+         WHERE fi.student_id = $1
+           AND fi.tenant_id = $2
+           AND fi.status NOT IN ('cancelled')
+           AND (fi.term IS NULL OR fi.term = $3)
+           AND (fi.academic_year IS NULL OR fi.academic_year = $4)
+
+         UNION ALL
+
+         -- Applicable fee structures with NO invoice for this student in this term/year
+         SELECT
+           fs.name AS fee_name,
+           COALESCE(fs.is_transport_fee, FALSE) AS is_transport_fee,
+           COALESCE(tr.route_name, '') AS route_name,
+           fs.amount AS total_amount,
+           0 AS paid_amount,
+           fs.amount AS balance_amount,
+           NULL AS due_date,
+           'not invoiced' AS statuses
+         FROM fee_structure fs
+         LEFT JOIN transport_routes tr ON tr.id = fs.route_id
+         JOIN students stu ON stu.id = $1
+         WHERE fs.tenant_id = $2
+           AND fs.is_active = TRUE
+           AND fs.academic_year = $4
+           AND (fs.class_id IS NULL OR fs.class_id = stu.class_id)
+           AND (fs.student_type = 'all' OR fs.student_type = stu.student_type OR stu.student_type IS NULL)
+           AND NOT EXISTS (
+             SELECT 1 FROM fee_invoices fi2
+             WHERE fi2.fee_structure_id = fs.id
+               AND fi2.student_id = $1
+               AND (fi2.term IS NULL OR fi2.term = $3)
+               AND (fi2.academic_year IS NULL OR fi2.academic_year = $4)
+               AND fi2.status NOT IN ('cancelled')
+           )
+       ) sub
+       GROUP BY fee_name, is_transport_fee, route_name
        ORDER BY is_transport_fee, fee_name`,
-      [rc.student_id, rc.tenant_id]
+      [rc.student_id, rc.tenant_id, rc.term, rc.academic_year]
     );
 
     // If no transport row in invoices, check direct student transport assignment

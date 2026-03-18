@@ -372,7 +372,7 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
     logger.info('Bulk invoice request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
 
-    const { studentIds, student_ids, feeStructureId, fee_structure_id, dueDate, due_date } = req.body;
+    const { studentIds, student_ids, feeStructureId, fee_structure_id, dueDate, due_date, term, academic_year } = req.body;
 
     const actualStudentIds = studentIds || student_ids;
     const actualFeeStructureId = feeStructureId || fee_structure_id;
@@ -406,9 +406,10 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
         await query(
           `INSERT INTO fee_invoices (
             id, invoice_number, student_id, total_amount,
-            net_amount, balance_amount, due_date, status, tenant_id, description, fee_structure_id
-          ) VALUES ($1, $2, $3, $4, $4, $4, $5, 'pending', $6, $7, $8)`,
-          [invoiceId, invoiceNumber, studentId, structure.amount, actualDueDate, tid, structure.name, structure.id]
+            net_amount, balance_amount, due_date, status, tenant_id, description, fee_structure_id,
+            term, academic_year
+          ) VALUES ($1, $2, $3, $4, $4, $4, $5, 'pending', $6, $7, $8, $9, $10)`,
+          [invoiceId, invoiceNumber, studentId, structure.amount, actualDueDate, tid, structure.name, structure.id, term || null, academic_year || null]
         );
 
         created.push({ studentId, invoiceId, invoiceNumber });
@@ -435,6 +436,7 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { class_ids, fee_structure_ids, due_date, term, academic_year, dry_run } = req.body;
+    // term and academic_year are now saved to fee_invoices for proper report-card filtering
 
     if (!fee_structure_ids?.length) {
       return res.status(400).json({ success: false, message: 'Select at least one fee structure' });
@@ -502,9 +504,9 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
             const invoiceId = uuidv4();
             const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
             await query(
-              `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount, due_date, status, tenant_id, description, fee_structure_id)
-               VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8)`,
-              [invoiceId, invoiceNumber, student.id, amount, due_date || null, tid, struct.name, struct.id]
+              `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount, due_date, status, tenant_id, description, fee_structure_id, term, academic_year)
+               VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9,$10)`,
+              [invoiceId, invoiceNumber, student.id, amount, due_date || null, tid, struct.name, struct.id, term || null, academic_year || null]
             );
             summary.created.push({ student_id: student.id, name: `${student.first_name} ${student.last_name}`, fee: struct.name, amount });
           } catch (err) {

@@ -42,8 +42,7 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
         WHERE t.user_id = $${paramIndex} AND t.tenant_id = $1 AND t.class_id IS NOT NULL
         UNION
         SELECT cs.class_id FROM class_subjects cs
-        JOIN teachers t ON cs.teacher_id = t.id
-        WHERE t.user_id = $${paramIndex} AND t.tenant_id = $1
+        WHERE cs.teacher_id = $${paramIndex} AND cs.tenant_id = $1
       )`;
       params.push(req.user.id);
       paramIndex++;
@@ -94,8 +93,7 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
           WHERE t.user_id = $2 AND t.tenant_id = $1 AND t.class_id IS NOT NULL
           UNION
           SELECT cs.class_id FROM class_subjects cs
-          JOIN teachers t ON cs.teacher_id = t.id
-          WHERE t.user_id = $2 AND t.tenant_id = $1
+          WHERE cs.teacher_id = $2 AND cs.tenant_id = $1
         )`
       : '';
 
@@ -112,7 +110,7 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
       ${isTeacher ? `AND class_id IN (
           SELECT t.class_id FROM teachers t WHERE t.user_id = $2 AND t.tenant_id = $1 AND t.class_id IS NOT NULL
           UNION
-          SELECT cs.class_id FROM class_subjects cs JOIN teachers t ON cs.teacher_id = t.id WHERE t.user_id = $2 AND t.tenant_id = $1
+          SELECT cs.class_id FROM class_subjects cs WHERE cs.teacher_id = $2 AND cs.tenant_id = $1
         )` : ''}
     `, statsParams);
 

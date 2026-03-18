@@ -16,6 +16,7 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
   try {
     const { classId, status, search } = req.query;
     const tid = req.user.tenant_id;
+    const isTeacher = req.user.role === 'teacher';
 
     let sql = `
       SELECT
@@ -33,6 +34,20 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
     `;
     const params = [tid];
     let paramIndex = 2;
+
+    // Teachers only see students in classes they teach (homeroom or subject)
+    if (isTeacher) {
+      sql += ` AND s.class_id IN (
+        SELECT t.class_id FROM teachers t
+        WHERE t.user_id = $${paramIndex} AND t.tenant_id = $1 AND t.class_id IS NOT NULL
+        UNION
+        SELECT cs.class_id FROM class_subjects cs
+        JOIN teachers t ON cs.teacher_id = t.id
+        WHERE t.user_id = $${paramIndex} AND t.tenant_id = $1
+      )`;
+      params.push(req.user.id);
+      paramIndex++;
+    }
 
     if (classId) {
       sql += ` AND s.class_id = $${paramIndex}`;
@@ -70,6 +85,21 @@ router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) =>
 router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    const isTeacher = req.user.role === 'teacher';
+
+    // Teacher class subquery — classes the teacher is assigned to
+    const teacherClassFilter = isTeacher
+      ? `AND id IN (
+          SELECT t.class_id FROM teachers t
+          WHERE t.user_id = $2 AND t.tenant_id = $1 AND t.class_id IS NOT NULL
+          UNION
+          SELECT cs.class_id FROM class_subjects cs
+          JOIN teachers t ON cs.teacher_id = t.id
+          WHERE t.user_id = $2 AND t.tenant_id = $1
+        )`
+      : '';
+
+    const statsParams = isTeacher ? [tid, req.user.id] : [tid];
     const stats = await query(`
       SELECT
         COUNT(*) as total_students,
@@ -79,7 +109,12 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
         SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as female_students
       FROM students
       WHERE tenant_id = $1
-    `, [tid]);
+      ${isTeacher ? `AND class_id IN (
+          SELECT t.class_id FROM teachers t WHERE t.user_id = $2 AND t.tenant_id = $1 AND t.class_id IS NOT NULL
+          UNION
+          SELECT cs.class_id FROM class_subjects cs JOIN teachers t ON cs.teacher_id = t.id WHERE t.user_id = $2 AND t.tenant_id = $1
+        )` : ''}
+    `, statsParams);
 
     const byClass = await query(`
       SELECT
@@ -91,9 +126,10 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
       FROM classes c
       LEFT JOIN students s ON s.class_id = c.id AND s.status = 'active' AND s.tenant_id = $1
       WHERE c.tenant_id = $1
+      ${teacherClassFilter}
       GROUP BY c.id, c.name, c.section, c.education_level
       ORDER BY c.name, c.section
-    `, [tid]);
+    `, statsParams);
 
     res.json({
       success: true,

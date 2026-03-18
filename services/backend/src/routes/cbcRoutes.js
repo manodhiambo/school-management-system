@@ -548,23 +548,25 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       [rc.tenant_id, termDates[0]?.end_date || new Date()]
     ).catch(() => []);
 
-    // Fee breakdown: pending/partial/overdue invoices for this student
+    // Fee breakdown: all invoices for this student (full fee structure list)
     const feeBreakdown = await query(
       `SELECT
          COALESCE(fi.description, fs.name, 'School Fee') AS fee_name,
          COALESCE(fs.is_transport_fee, FALSE) AS is_transport_fee,
+         COALESCE(tr.route_name, '') AS route_name,
          SUM(fi.total_amount) AS total_amount,
          SUM(COALESCE(fi.paid_amount, 0)) AS paid_amount,
          SUM(fi.balance_amount) AS balance_amount,
          MIN(fi.due_date) AS due_date,
-         COUNT(*) AS invoice_count,
          STRING_AGG(DISTINCT fi.status, ', ') AS statuses
        FROM fee_invoices fi
        LEFT JOIN fee_structure fs ON fs.id = fi.fee_structure_id
+       LEFT JOIN transport_routes tr ON tr.id = fs.route_id
        WHERE fi.student_id = $1
          AND fi.tenant_id = $2
-         AND fi.status IN ('pending', 'partial', 'overdue')
-       GROUP BY COALESCE(fi.description, fs.name, 'School Fee'), COALESCE(fs.is_transport_fee, FALSE)
+       GROUP BY COALESCE(fi.description, fs.name, 'School Fee'),
+                COALESCE(fs.is_transport_fee, FALSE),
+                COALESCE(tr.route_name, '')
        ORDER BY is_transport_fee, fee_name`,
       [rc.student_id, rc.tenant_id]
     );

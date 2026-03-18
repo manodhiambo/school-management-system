@@ -336,59 +336,101 @@ async function renderReportCardPage(
   y += dH + 5;
 
   // ── 7. FEES + TERM DATES ──────────────────────────────────────────────────
-  if (y + 28 > 272) { doc.addPage(); y = 10; }
+  const feeRows: any[] = detail.fee_breakdown || [];
+  const totalFees = feeRows.reduce((s: number, r: any) => s + Number(r.total_amount || 0), 0);
+  const totalPaid = feeRows.reduce((s: number, r: any) => s + Number(r.paid_amount || 0), 0);
+  const totalBalance = feeRows.reduce((s: number, r: any) => s + Number(r.balance_amount || 0), 0);
+
   const feeW = CW * 0.56;
   const dateW = CW - feeW - 4;
   const feeX = M;
   const dateX = M + feeW + 4;
 
+  const feeSectionHeight = Math.max(28, 7 + feeRows.length * 6 + 14);
+  if (y + feeSectionHeight > 272) { doc.addPage(); y = 10; }
+  const feeSectionStartY = y;
+
   // FEES header
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
   doc.text('FEES', feeX, y + 5);
   doc.text('TERM DATES', dateX, y + 5);
   y += 7;
 
-  // Fee table columns: CURRENT BALANCE | NEXT TERM BALANCE | TOTAL BALANCE
-  const feeRows: any[] = detail.fee_breakdown || [];
-  const totalBalance = feeRows.reduce((s: number, r: any) => s + Number(r.balance_amount || 0), 0);
-  const fColW = feeW / 3;
-  const fCols = [feeX, feeX + fColW, feeX + fColW * 2];
+  // Fee list header row
+  cell(doc, feeX, y, feeW * 0.55, 6, [235, 235, 235]);
+  cell(doc, feeX + feeW * 0.55, y, feeW * 0.22, 6, [235, 235, 235]);
+  cell(doc, feeX + feeW * 0.77, y, feeW * 0.23, 6, [235, 235, 235]);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(0, 0, 0);
+  doc.text('FEE ITEM', feeX + 2, y + 4);
+  doc.text('CHARGED', feeX + feeW * 0.55 + 2, y + 4);
+  doc.text('BALANCE', feeX + feeW * 0.77 + 2, y + 4);
+  y += 6;
 
-  // Fee header cells
-  ['CURRENT BALANCE', 'NEXT TERM BALANCE', 'TOTAL BALANCE'].forEach((h, i) => {
-    cell(doc, fCols[i], y, fColW, 7, [235, 235, 235]);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
-    doc.text(h, fCols[i] + fColW / 2, y + 4.5, { align: 'center' });
+  // Individual fee rows
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+  feeRows.forEach((r: any, i: number) => {
+    const bg: [number, number, number] = i % 2 === 0 ? [250, 250, 250] : [255, 255, 255];
+    cell(doc, feeX, y, feeW * 0.55, 6, bg);
+    cell(doc, feeX + feeW * 0.55, y, feeW * 0.22, 6, bg);
+    cell(doc, feeX + feeW * 0.77, y, feeW * 0.23, 6, bg);
+    doc.setTextColor(0, 0, 0);
+    const label = r.is_transport_fee
+      ? `Transport${r.route_name ? ` (${r.route_name})` : ''}`
+      : r.fee_name;
+    doc.text((label || 'Fee').slice(0, 26), feeX + 2, y + 4.5);
+    doc.text(Number(r.total_amount || 0).toLocaleString('en-KE'), feeX + feeW * 0.55 + 2, y + 4.5);
+    const bal = Number(r.balance_amount || 0);
+    if (bal > 0) doc.setTextColor(200, 40, 40);
+    doc.text(bal.toLocaleString('en-KE'), feeX + feeW * 0.77 + 2, y + 4.5);
+    doc.setTextColor(0, 0, 0);
+    y += 6;
   });
 
-  // Fee value cells
-  const currentBal = totalBalance;
-  [currentBal, 0, totalBalance].forEach((v, i) => {
-    cell(doc, fCols[i], y + 7, fColW, 8);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
-    doc.text(v > 0 ? v.toLocaleString('en-KE') : '0', fCols[i] + fColW / 2, y + 13, { align: 'center' });
-  });
+  if (feeRows.length === 0) {
+    cell(doc, feeX, y, feeW, 6, [250, 250, 250]);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(150, 150, 150);
+    doc.text('No fee invoices found', feeX + 2, y + 4.5);
+    y += 6;
+  }
+
+  // Total row
+  cell(doc, feeX, y, feeW * 0.55, 7, [220, 235, 255]);
+  cell(doc, feeX + feeW * 0.55, y, feeW * 0.22, 7, [220, 235, 255]);
+  cell(doc, feeX + feeW * 0.77, y, feeW * 0.23, 7, [220, 235, 255]);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
+  doc.text('TOTAL', feeX + 2, y + 5);
+  doc.text(totalFees.toLocaleString('en-KE'), feeX + feeW * 0.55 + 2, y + 5);
+  if (totalBalance > 0) doc.setTextColor(200, 40, 40);
+  doc.text(totalBalance.toLocaleString('en-KE'), feeX + feeW * 0.77 + 2, y + 5);
+  doc.setTextColor(0, 0, 0);
+  y += 7;
+
+  // Paid row
+  cell(doc, feeX, y, feeW, 6, [240, 255, 245]);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+  doc.text(`Paid: KES ${totalPaid.toLocaleString('en-KE')}`, feeX + 2, y + 4.5);
+  y += 6;
 
   // M-Pesa note
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(60, 60, 60);
-  doc.text('Dial *657*66# on Safaricom to pay school fees from your M-Pesa', feeX, y + 18.5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(60, 60, 60);
+  doc.text('Dial *657*66# on Safaricom to pay school fees from your M-Pesa', feeX, y + 4);
+  y += 5;
 
-  // Term dates table
+  // Term dates table (positioned to the right, aligned with fee list header)
+  const termY = feeSectionStartY + 7;
   const dColW = dateW / 2;
   ['TERM ENDS', 'NEXT TERM BEGINS'].forEach((h, i) => {
-    cell(doc, dateX + i * dColW, y, dColW, 7, [235, 235, 235]);
+    cell(doc, dateX + i * dColW, termY, dColW, 7, [235, 235, 235]);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
-    doc.text(h, dateX + i * dColW + dColW / 2, y + 4.5, { align: 'center' });
+    doc.text(h, dateX + i * dColW + dColW / 2, termY + 4.5, { align: 'center' });
   });
   const termEndStr = detail.term_end_date || '—';
   const nextTermStr = detail.next_term_start_date || '—';
   [termEndStr, nextTermStr].forEach((v, i) => {
-    cell(doc, dateX + i * dColW, y + 7, dColW, 8);
+    cell(doc, dateX + i * dColW, termY + 7, dColW, 8);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
-    doc.text(v, dateX + i * dColW + dColW / 2, y + 13, { align: 'center' });
+    doc.text(v, dateX + i * dColW + dColW / 2, termY + 13, { align: 'center' });
   });
-
-  y += 22;
 
   // ── 8. FOOTER ─────────────────────────────────────────────────────────────
   const footerY = 287;

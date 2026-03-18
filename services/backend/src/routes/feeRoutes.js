@@ -31,7 +31,7 @@ router.get('/structure', async (req, res) => {
     let paramIndex = 2;
 
     if (classId) {
-      sql += ` AND (fs.class_id = $${paramIndex} OR fs.class_id IS NULL)`;
+      sql += ` AND fs.class_id = $${paramIndex}`;
       params.push(classId); paramIndex++;
     }
     if (frequency) {

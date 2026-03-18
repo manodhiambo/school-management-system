@@ -23,6 +23,7 @@ import { AcademicPage } from './pages/academic/AcademicPage';
 import { AttendancePage } from './pages/attendance/AttendancePage';
 import { FeePage } from './pages/fee/FeePage';
 import { FeeStructurePage } from './pages/fee/FeeStructurePage';
+import { ExtraFeesPage } from './pages/fee/ExtraFeesPage';
 import { TimetablePage } from './pages/timetable/TimetablePage';
 import { CommunicationPage } from './pages/communication/CommunicationPage';
 import { UsersPage } from './pages/users/UsersPage';
@@ -150,6 +151,7 @@ function App() {
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="fee" element={<FeePage />} />
               <Route path="fee-structure" element={<FeeStructurePage />} />
+              <Route path="extra-fees" element={<ExtraFeesPage />} />
               <Route path="timetable" element={<TimetablePage />} />
               <Route path="communication" element={<CommunicationPage />} />
               <Route path="users" element={<UsersPage />} />

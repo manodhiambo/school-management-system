@@ -563,6 +563,23 @@ class ApiService {
     return this.api.post('/fee/invoice/bulk-smart', data);
   }
 
+  // Extra Fees
+  getExtraFees(params?: any) {
+    return this.api.get('/extra-fees', { params });
+  }
+  getExtraFeesForReport(params: { student_id: string; class_id?: string; term?: string; academic_year?: string }) {
+    return this.api.get('/extra-fees/for-report', { params });
+  }
+  createExtraFee(data: any) {
+    return this.api.post('/extra-fees', data);
+  }
+  updateExtraFee(id: string, data: any) {
+    return this.api.put('/extra-fees/' + id, data);
+  }
+  deleteExtraFee(id: string) {
+    return this.api.delete('/extra-fees/' + id);
+  }
+
   // Timetable Delete/Reset (Admin only)
   deleteTimetableEntry(id: string) {
     return this.api.delete("/timetable/" + id);

@@ -99,6 +99,7 @@ const navigationItems: NavItem[] = [
   { name: 'Financial Years',   href: '/app/finance/financial-years',  icon: Calendar,  roles: ['admin', 'finance_officer'], section: 'Finance' },
   { name: 'Fee Management',    href: '/app/fee',                      icon: DollarSign,roles: ['admin'],                    section: 'Finance' },
   { name: 'Fee Structure',     href: '/app/fee-structure',            icon: DollarSign,roles: ['admin'],                    section: 'Finance' },
+  { name: 'Extra Fees',        href: '/app/extra-fees',               icon: DollarSign,roles: ['admin'],                    section: 'Finance' },
   { name: 'My Fees',           href: '/app/my-fees',                  icon: DollarSign,roles: ['student'],                  section: 'Finance' },
 
   // ── Family (parent) ───────────────────────────────────────────────────────

@@ -33,7 +33,8 @@ async function generateStudentReportPDF(
   feeStructures: any[],
   term: string,
   academicYear: string,
-  transportAssignment?: any
+  transportAssignment?: any,
+  extraFees: any[] = []
 ) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
@@ -222,6 +223,11 @@ async function generateStudentReportPDF(
     }
   }
 
+  // Extra / miscellaneous fees
+  for (const ef of extraFees) {
+    feeItems.push({ label: ef.name, amount: Number(ef.amount) || 0 });
+  }
+
   const structureTotal = feeItems.reduce((s: number, f) => s + f.amount, 0);
 
   // Fee structure line items
@@ -329,12 +335,13 @@ export function StudentReportPage() {
     if (!selectedStudent) return;
     setGenerating(true);
     try {
-      const [schoolRes, assessRes, feeRes, feeStructRes, transportRes]: any[] = await Promise.all([
+      const [schoolRes, assessRes, feeRes, feeStructRes, transportRes, extraFeesRes]: any[] = await Promise.all([
         api.getSettings(),
         api.getCbcAssessments({ student_id: selectedStudent.id, term, academic_year: academicYear }),
         api.getStudentFeeAccount(selectedStudent.id).catch(() => null),
         api.getFeeStructures({ classId: selectedStudent.class_id }).catch(() => ({ data: [] })),
         api.getTransportStudents({ student_id: selectedStudent.id }).catch(() => ({ data: [] })),
+        api.getExtraFeesForReport({ student_id: selectedStudent.id, class_id: selectedStudent.class_id, term, academic_year: academicYear }).catch(() => ({ data: [] })),
       ]);
 
       const school = schoolRes?.data || schoolRes || {};
@@ -343,9 +350,10 @@ export function StudentReportPage() {
       const feeStructures = feeStructRes?.data || [];
       const transportList: any[] = transportRes?.data || [];
       const transportAssignment = transportList.length > 0 ? transportList[0] : null;
+      const extraFees: any[] = extraFeesRes?.data || [];
 
       await generateStudentReportPDF(
-        selectedStudent, assessments, feeAccount, school, feeStructures, term, academicYear, transportAssignment
+        selectedStudent, assessments, feeAccount, school, feeStructures, term, academicYear, transportAssignment, extraFees
       );
     } catch (err: any) {
       alert('Failed to generate report: ' + (err.message || 'Unknown error'));

@@ -597,6 +597,22 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       }
     }
 
+    // Extra fees: class-level + student-level
+    const extraFees = await query(
+      `SELECT ef.name AS fee_name, ef.amount AS total_amount, 0 AS paid_amount, ef.amount AS balance_amount,
+              FALSE AS is_transport_fee, '' AS route_name, TRUE AS is_extra_fee
+       FROM extra_fees ef
+       WHERE ef.tenant_id = $1
+         AND ef.is_active = TRUE
+         AND (ef.student_id = $2 OR (ef.class_id = $3 AND ef.student_id IS NULL))
+         AND (ef.term IS NULL OR ef.term = $4)
+         AND (ef.academic_year IS NULL OR ef.academic_year = $5)
+       ORDER BY ef.student_id NULLS LAST, ef.name`,
+      [rc.tenant_id, rc.student_id, rc.class_id, rc.term, rc.academic_year]
+    ).catch(() => []);
+
+    const allFees = [...feeBreakdown, ...extraFees];
+
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
     res.json({ success: true, data: {
       ...rc,
@@ -604,7 +620,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       term_end_date: fmtDate(termDates[0]?.end_date),
       next_term_start_date: fmtDate(nextTermDates[0]?.start_date),
       competencies,
-      fee_breakdown: feeBreakdown,
+      fee_breakdown: allFees,
     } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

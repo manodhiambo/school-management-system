@@ -44,6 +44,7 @@ import transportRoutes from './routes/transportRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import academicsModuleRoutes from './routes/academicsModuleRoutes.js';
 import staffLeaveRoutes from './routes/staffLeaveRoutes.js';
+import extraFeesRoutes from './routes/extraFeesRoutes.js';
 
 dotenv.config();
 
@@ -82,6 +83,7 @@ app.use('/api/v1/classes', classesRoutes);
 app.use('/api/v1/subjects', subjectsRoutes);
 app.use('/api/v1/attendance', attendanceRoutes);
 app.use('/api/v1/fee', feeRoutes);
+app.use('/api/v1/extra-fees', extraFeesRoutes);
 app.use('/api/v1/exams', examsRoutes);
 app.use('/api/v1/timetable', timetableRoutes);
 app.use('/api/v1/communication', communicationRoutes);

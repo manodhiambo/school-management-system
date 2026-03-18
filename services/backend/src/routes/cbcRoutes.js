@@ -571,6 +571,32 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       [rc.student_id, rc.tenant_id]
     );
 
+    // If no transport row in invoices, check direct student transport assignment
+    const hasTransportInvoice = feeBreakdown.some(r => r.is_transport_fee);
+    if (!hasTransportInvoice) {
+      const transportAssignment = await query(
+        `SELECT st.student_id, tr.route_name, tr.term_fee
+         FROM student_transport st
+         JOIN transport_routes tr ON tr.id = st.route_id
+         WHERE st.student_id = $1 AND st.is_active = TRUE LIMIT 1`,
+        [rc.student_id]
+      ).catch(() => []);
+      if (transportAssignment.length > 0) {
+        const ta = transportAssignment[0];
+        const termFee = parseFloat(ta.term_fee) || 0;
+        feeBreakdown.push({
+          fee_name: `Transport — ${ta.route_name}`,
+          is_transport_fee: true,
+          route_name: ta.route_name,
+          total_amount: termFee,
+          paid_amount: 0,
+          balance_amount: termFee,
+          due_date: null,
+          statuses: 'no invoice',
+        });
+      }
+    }
+
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
     res.json({ success: true, data: {
       ...rc,

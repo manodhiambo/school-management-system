@@ -32,7 +32,8 @@ async function generateStudentReportPDF(
   school: any,
   feeStructures: any[],
   term: string,
-  academicYear: string
+  academicYear: string,
+  transportAssignment?: any
 ) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
@@ -190,19 +191,42 @@ async function generateStudentReportPDF(
   const totalPaid = Number(feeAccount?.paid) || 0;
   const balance = Number(feeAccount?.pending) || 0;
 
-  // Separate transport vs non-transport fee structures
-  // A fee applies to this student if student_type matches ('all' or student's type)
-  const applicableStructures = feeStructures.filter((f: any) => {
-    if (f.is_transport_fee) return student.uses_transport === true;
+  // Non-transport fee structures applicable to this student
+  const nonTransportStructures = feeStructures.filter((f: any) => {
+    if (f.is_transport_fee) return false;
     const st = f.student_type || 'all';
     return st === 'all' || st === student.student_type;
   });
 
-  const structureTotal = applicableStructures.reduce((s: number, f: any) => s + (Number(f.amount) || 0), 0);
+  // Build transport fee row from actual route assignment (term_fee), or fee structure fallback
+  type FeeItem = { label: string; amount: number };
+  const feeItems: FeeItem[] = nonTransportStructures.map((f: any) => ({
+    label: f.name,
+    amount: Number(f.amount) || 0,
+  }));
+
+  if (transportAssignment) {
+    const routeFee = Number(transportAssignment.term_fee) || 0;
+    feeItems.push({
+      label: `Transport — ${transportAssignment.route_name || 'Route'}`,
+      amount: routeFee,
+    });
+  } else {
+    // Fallback: any transport fee structure if student uses_transport
+    const tStruct = feeStructures.find((f: any) => f.is_transport_fee && student.uses_transport);
+    if (tStruct) {
+      feeItems.push({
+        label: `Transport — ${tStruct.route_name || tStruct.name}`,
+        amount: Number(tStruct.amount) || 0,
+      });
+    }
+  }
+
+  const structureTotal = feeItems.reduce((s: number, f) => s + f.amount, 0);
 
   // Fee structure line items
   doc.setFontSize(9);
-  applicableStructures.forEach((f: any, idx: number) => {
+  feeItems.forEach((f, idx) => {
     if (y > 270) { doc.addPage(); y = 20; }
     if (idx % 2 === 0) {
       doc.setFillColor(240, 253, 244);
@@ -210,15 +234,12 @@ async function generateStudentReportPDF(
     }
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
-    const label = f.is_transport_fee
-      ? `Transport — ${f.route_name || f.name}`
-      : f.name;
-    doc.text(label, margin + 4, y + 5);
-    doc.text(`KES ${Number(f.amount).toLocaleString()}`, pageW - margin - 4, y + 5, { align: 'right' });
+    doc.text(f.label, margin + 4, y + 5);
+    doc.text(`KES ${f.amount.toLocaleString()}`, pageW - margin - 4, y + 5, { align: 'right' });
     y += 7;
   });
 
-  if (applicableStructures.length === 0) {
+  if (feeItems.length === 0) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(150, 150, 150);
@@ -308,20 +329,23 @@ export function StudentReportPage() {
     if (!selectedStudent) return;
     setGenerating(true);
     try {
-      const [schoolRes, assessRes, feeRes, feeStructRes]: any[] = await Promise.all([
+      const [schoolRes, assessRes, feeRes, feeStructRes, transportRes]: any[] = await Promise.all([
         api.getSettings(),
         api.getCbcAssessments({ student_id: selectedStudent.id, term, academic_year: academicYear }),
         api.getStudentFeeAccount(selectedStudent.id).catch(() => null),
         api.getFeeStructures({ classId: selectedStudent.class_id }).catch(() => ({ data: [] })),
+        api.getTransportStudents({ student_id: selectedStudent.id }).catch(() => ({ data: [] })),
       ]);
 
       const school = schoolRes?.data || schoolRes || {};
       const assessments = assessRes?.data || [];
       const feeAccount = feeRes?.data || feeRes || null;
       const feeStructures = feeStructRes?.data || [];
+      const transportList: any[] = transportRes?.data || [];
+      const transportAssignment = transportList.length > 0 ? transportList[0] : null;
 
       await generateStudentReportPDF(
-        selectedStudent, assessments, feeAccount, school, feeStructures, term, academicYear
+        selectedStudent, assessments, feeAccount, school, feeStructures, term, academicYear, transportAssignment
       );
     } catch (err: any) {
       alert('Failed to generate report: ' + (err.message || 'Unknown error'));

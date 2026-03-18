@@ -123,10 +123,10 @@ router.delete('/routes/:id', authenticate, async (req, res) => {
 // GET /api/v1/transport/students — all student transport assignments
 router.get('/students', authenticate, async (req, res) => {
   try {
-    const { route_id, class_id } = req.query;
+    const { route_id, class_id, student_id } = req.query;
     const tid = req.user.tenant_id;
     let sql = `SELECT st.*, s.first_name||' '||s.last_name as student_name,
-               s.admission_number, c.name as class_name, r.route_name
+               s.admission_number, c.name as class_name, r.route_name, r.term_fee
                FROM student_transport st
                JOIN students s ON s.id = st.student_id
                LEFT JOIN classes c ON c.id = s.class_id
@@ -135,6 +135,7 @@ router.get('/students', authenticate, async (req, res) => {
     const params = [tid];
     if (route_id) { sql += ` AND st.route_id=$${params.length+1}`; params.push(route_id); }
     if (class_id) { sql += ` AND s.class_id=$${params.length+1}`; params.push(class_id); }
+    if (student_id) { sql += ` AND st.student_id=$${params.length+1}`; params.push(student_id); }
     sql += ' ORDER BY s.first_name';
     const rows = await query(sql, params);
     res.json({ success: true, data: rows });

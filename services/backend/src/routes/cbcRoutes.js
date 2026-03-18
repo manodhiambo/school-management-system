@@ -571,7 +571,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
            fi.due_date,
            fi.status AS statuses
          FROM fee_invoices fi
-         LEFT JOIN fee_structure fs ON fs.id = fi.fee_structure_id
+         LEFT JOIN fee_structure fs ON fs.id = fi.fee_structure_id AND fs.tenant_id = $2
          LEFT JOIN transport_routes tr ON tr.id = fs.route_id
          WHERE fi.student_id = $1
            AND fi.tenant_id = $2
@@ -593,7 +593,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
            'not invoiced' AS statuses
          FROM fee_structure fs
          LEFT JOIN transport_routes tr ON tr.id = fs.route_id
-         JOIN students stu ON stu.id = $1
+         JOIN students stu ON stu.id = $1 AND stu.tenant_id = $2
          WHERE fs.tenant_id = $2
            AND fs.is_active = TRUE
            AND fs.academic_year = $4
@@ -603,6 +603,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
              SELECT 1 FROM fee_invoices fi2
              WHERE fi2.fee_structure_id = fs.id
                AND fi2.student_id = $1
+               AND fi2.tenant_id = $2
                AND (fi2.term IS NULL OR fi2.term = $3)
                AND (fi2.academic_year IS NULL OR fi2.academic_year = $4)
                AND fi2.status NOT IN ('cancelled')

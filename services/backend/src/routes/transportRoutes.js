@@ -162,6 +162,32 @@ router.post('/students', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/v1/transport/students/bulk — bulk assign students to a route
+router.post('/students/bulk', authenticate, async (req, res) => {
+  try {
+    const { route_id, student_ids, pickup_stop, dropoff_stop } = req.body;
+    if (!route_id || !Array.isArray(student_ids) || !student_ids.length) {
+      return res.status(400).json({ success: false, message: 'route_id and student_ids[] required' });
+    }
+    const tid = req.user.tenant_id;
+    const inserted = [];
+    for (const student_id of student_ids) {
+      const rows = await query(
+        `INSERT INTO student_transport (student_id, route_id, pickup_stop, dropoff_stop, tenant_id)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (student_id, route_id) DO UPDATE SET pickup_stop=$3, dropoff_stop=$4, is_active=TRUE
+         RETURNING *`,
+        [student_id, route_id, pickup_stop || null, dropoff_stop || null, tid]
+      );
+      inserted.push(rows[0]);
+    }
+    res.status(201).json({ success: true, data: inserted, count: inserted.length });
+  } catch (err) {
+    logger.error('Bulk assign transport error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // DELETE /api/v1/transport/students/:id — unassign student
 router.delete('/students/:id', authenticate, async (req, res) => {
   try {

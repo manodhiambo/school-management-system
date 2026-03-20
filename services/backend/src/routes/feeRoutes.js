@@ -742,7 +742,8 @@ router.get('/student/:studentId', async (req, res) => {
       ORDER BY fp.payment_date DESC
     `, [std.id, tid]);
 
-    // Expected fee structures
+    // Expected fee structures — transport fees only if student is on that route;
+    // extra_fee_id structures excluded (already covered by the extra_fees query below)
     const structures = await query(`
       SELECT fs.*, c.name AS class_name
       FROM fee_structure fs
@@ -751,8 +752,20 @@ router.get('/student/:studentId', async (req, res) => {
         AND (fs.class_id = $2 OR fs.class_id IS NULL)
         AND (fs.student_type = 'all' OR fs.student_type = $3)
         AND fs.academic_year = $4
+        AND fs.extra_fee_id IS NULL
+        AND (
+          fs.is_transport_fee = FALSE
+          OR (
+            fs.is_transport_fee = TRUE
+            AND EXISTS (
+              SELECT 1 FROM student_transport st
+              WHERE st.student_id = $5 AND st.route_id = fs.route_id
+                AND st.is_active = TRUE AND st.tenant_id = $1
+            )
+          )
+        )
       ORDER BY fs.name
-    `, [tid, std.class_id, std.student_type || 'all', year]);
+    `, [tid, std.class_id, std.student_type || 'all', year, std.id]);
 
     // Extra fees
     const extraFees = await query(`
@@ -899,7 +912,8 @@ router.get('/expected/:studentId', async (req, res) => {
     }
     const std = studentRows[0];
 
-    // Fee structures for this class (and school-wide ones with no class)
+    // Fee structures for this class — transport fees only if student is on that route;
+    // extra_fee_id structures excluded (covered by extra_fees query below)
     const structures = await query(
       `SELECT fs.*, c.name AS class_name
        FROM fee_structure fs
@@ -908,8 +922,20 @@ router.get('/expected/:studentId', async (req, res) => {
          AND (fs.class_id = $2 OR fs.class_id IS NULL)
          AND (fs.student_type = 'all' OR fs.student_type = $3)
          AND fs.academic_year = $4
+         AND fs.extra_fee_id IS NULL
+         AND (
+           fs.is_transport_fee = FALSE
+           OR (
+             fs.is_transport_fee = TRUE
+             AND EXISTS (
+               SELECT 1 FROM student_transport st
+               WHERE st.student_id = $5 AND st.route_id = fs.route_id
+                 AND st.is_active = TRUE AND st.tenant_id = $1
+             )
+           )
+         )
        ORDER BY fs.name`,
-      [tid, std.class_id, std.student_type || 'all', year]
+      [tid, std.class_id, std.student_type || 'all', year, std.id]
     );
 
     // Extra fees for this student's class and/or this specific student

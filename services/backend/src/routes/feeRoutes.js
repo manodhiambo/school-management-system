@@ -481,18 +481,21 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
     );
     for (const t of transportRows) transportMap[t.student_id] = t;
 
-    // Load existing invoices for duplicate detection (same student + structure + term + year)
+    // Load existing invoices for duplicate detection — covers fee_structure_id and extra_fee_id
     const existingInvoices = await query(
-      `SELECT student_id, fee_structure_id, term, academic_year
+      `SELECT student_id, fee_structure_id, extra_fee_id, term, academic_year
        FROM fee_invoices
        WHERE tenant_id = $1 AND status NOT IN ('cancelled')`,
       [tid]
     );
-    const existingSet = new Set(
-      existingInvoices.map(r =>
-        `${r.student_id}|${r.fee_structure_id}|${r.term || ''}|${r.academic_year || ''}`
-      )
-    );
+    const existingSet = new Set([
+      ...existingInvoices
+        .filter(r => r.fee_structure_id)
+        .map(r => `${r.student_id}|fs:${r.fee_structure_id}|${r.term||''}|${r.academic_year||''}`),
+      ...existingInvoices
+        .filter(r => r.extra_fee_id)
+        .map(r => `${r.student_id}|ef:${r.extra_fee_id}|${r.term||''}|${r.academic_year||''}`),
+    ]);
 
     const summary = { created: [], skipped: [], errors: [] };
 
@@ -537,7 +540,7 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
         }
 
         // Duplicate check — skip if invoice already exists for this student + structure + term + year
-        const dupKey = `${student.id}|${struct.id}|${term || ''}|${academic_year || ''}`;
+        const dupKey = `${student.id}|fs:${struct.id}|${term || ''}|${academic_year || ''}`;
         if (existingSet.has(dupKey)) {
           summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'already_invoiced' });
           continue;
@@ -1137,19 +1140,27 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
       return res.status(400).json({ success: false, message: 'No applicable fee structures found for this student' });
     }
 
-    // Existing invoice keys for duplicate detection
+    // Existing invoice keys for duplicate detection — covers both fee_structure_id and extra_fee_id
     const existingInvRows = await query(
-      'SELECT fee_structure_id, term, academic_year FROM fee_invoices WHERE student_id=$1 AND tenant_id=$2 AND status!=\'cancelled\'',
+      `SELECT fee_structure_id, extra_fee_id, term, academic_year
+       FROM fee_invoices WHERE student_id=$1 AND tenant_id=$2 AND status!='cancelled'`,
       [std.id, tid]
     );
-    const existingSet = new Set(existingInvRows.map(r => `${r.fee_structure_id}|${r.term||''}|${r.academic_year||''}`));
+    const existingSet = new Set([
+      ...existingInvRows
+        .filter(r => r.fee_structure_id)
+        .map(r => `fs:${r.fee_structure_id}|${r.term||''}|${r.academic_year||''}`),
+      ...existingInvRows
+        .filter(r => r.extra_fee_id)
+        .map(r => `ef:${r.extra_fee_id}|${r.term||''}|${r.academic_year||''}`),
+    ]);
 
     const created = [];
     const skipped = [];
 
     // Generate one invoice per fee structure
     for (const struct of structures) {
-      const dupKey = `${struct.id}|${term||''}|${year}`;
+      const dupKey = `fs:${struct.id}|${term||''}|${year}`;
       if (existingSet.has(dupKey)) { skipped.push(struct.name); continue; }
       const amount = struct.is_transport_fee && studentRoute
         ? (parseFloat(studentRoute.term_fee) || parseFloat(struct.amount))
@@ -1166,17 +1177,17 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
       created.push({ invoice_number: invoiceNumber, description: struct.name, amount });
     }
 
-    // Generate one invoice per extra fee
+    // Generate one invoice per extra fee — store extra_fee_id for future duplicate detection
     for (const ef of extraRows) {
-      const dupKey = `extra:${ef.id}|${term||''}|${year}`;
+      const dupKey = `ef:${ef.id}|${term||''}|${year}`;
       if (existingSet.has(dupKey)) { skipped.push(ef.name); continue; }
       const invoiceId = uuidv4();
       const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth()+1).toString().padStart(2,'0')}${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`;
       await query(
         `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount,
-           due_date, status, tenant_id, description, term, academic_year)
-         VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9)`,
-        [invoiceId, invoiceNumber, std.id, parseFloat(ef.amount), due_date||null, tid, ef.name, term||null, year]
+           due_date, status, tenant_id, description, extra_fee_id, term, academic_year)
+         VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9,$10)`,
+        [invoiceId, invoiceNumber, std.id, parseFloat(ef.amount), due_date||null, tid, ef.name, ef.id, term||null, year]
       );
       existingSet.add(dupKey);
       created.push({ invoice_number: invoiceNumber, description: ef.name, amount: parseFloat(ef.amount) });

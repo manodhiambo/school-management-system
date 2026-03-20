@@ -293,21 +293,14 @@ async function renderReportCardPage(
   const remH = 38;
   const remY = y;
 
-  // Class Teacher / Facilitator box
+  // Class Facilitator box
   doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
   doc.rect(M, remY, remW, remH, 'FD');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
-  doc.text("CLASS TEACHER'S COMMENT", M + 3, remY + 5.5);
-  // Facilitator name shown prominently
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(21, 101, 192);
-  doc.text(detail.class_teacher_name || '—', M + 3, remY + 12);
-  doc.setTextColor(0, 0, 0);
-  if (detail.class_teacher_comment) {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-    const lines = doc.splitTextToSize(String(detail.class_teacher_comment), remW - 6);
-    doc.text(lines.slice(0, 3), M + 3, remY + 18);
-  }
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.text('CLASS FACILITATOR', M + 3, remY + 5.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(21, 101, 192);
+  doc.text(detail.class_teacher_name || '—', M + 3, remY + 14);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
   doc.text('Signature:', M + 3, remY + remH - 5);
   doc.setDrawColor(0, 0, 0);
   doc.line(M + 26, remY + remH - 5, M + remW - 3, remY + remH - 5);
@@ -317,16 +310,10 @@ async function renderReportCardPage(
   doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
   doc.rect(prX, remY, remW, remH, 'FD');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
-  doc.text("HEAD TEACHER'S COMMENT", prX + 3, remY + 5.5);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(21, 101, 192);
-  doc.text(school?.school_name ? `${school.school_name}` : '—', prX + 3, remY + 12);
-  doc.setTextColor(0, 0, 0);
-  if (detail.head_teacher_comment) {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-    const lines2 = doc.splitTextToSize(String(detail.head_teacher_comment), remW - 6);
-    doc.text(lines2.slice(0, 3), prX + 3, remY + 18);
-  }
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.text('HEAD TEACHER / PRINCIPAL', prX + 3, remY + 5.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(21, 101, 192);
+  doc.text(detail.head_teacher_name || '—', prX + 3, remY + 14);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
   doc.text('Signature:', prX + 3, remY + remH - 5);
   doc.setDrawColor(0, 0, 0);
   doc.line(prX + 26, remY + remH - 5, prX + remW - 3, remY + remH - 5);
@@ -905,22 +892,19 @@ export function CbcReportCardPage() {
                   </div>
                 )}
 
-                {/* Facilitator / Class teacher */}
+                {/* Class Facilitator */}
                 {detail.class_teacher_name && (
                   <div className="bg-blue-50 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-blue-500 mb-0.5">Class Teacher / Facilitator</p>
+                    <p className="text-xs font-semibold text-blue-500 mb-0.5">Class Facilitator</p>
                     <p className="text-sm font-bold text-blue-900">{detail.class_teacher_name}</p>
-                    {detail.class_teacher_comment && (
-                      <p className="text-xs text-blue-700 mt-1 italic">{detail.class_teacher_comment}</p>
-                    )}
                   </div>
                 )}
 
-                {/* Head teacher comment */}
-                {detail.head_teacher_comment && (
+                {/* Head Teacher / Principal */}
+                {detail.head_teacher_name && (
                   <div className="bg-purple-50 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-purple-700 mb-1">Head Teacher's Comment</p>
-                    <p className="text-sm text-purple-900">{detail.head_teacher_comment}</p>
+                    <p className="text-xs font-semibold text-purple-700 mb-0.5">Head Teacher / Principal</p>
+                    <p className="text-sm font-bold text-purple-900">{detail.head_teacher_name}</p>
                   </div>
                 )}
 

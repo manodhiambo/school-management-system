@@ -537,6 +537,14 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
     ).catch(() => []);
     const classTeacherName = classTeacherRows[0]?.name || null;
 
+    // Head teacher / principal name (admin user for this tenant)
+    const headTeacherRows = await query(
+      `SELECT UPPER(first_name || ' ' || last_name) AS name
+       FROM users WHERE tenant_id = $1 AND role = 'admin' ORDER BY created_at ASC LIMIT 1`,
+      [rc.tenant_id]
+    ).catch(() => []);
+    const headTeacherName = headTeacherRows[0]?.name || null;
+
     // Term dates from academic_terms
     const termDates = await query(
       `SELECT start_date, end_date FROM academic_terms
@@ -661,6 +669,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
     res.json({ success: true, data: {
       ...rc,
       class_teacher_name: classTeacherName,
+      head_teacher_name: headTeacherName,
       term_end_date: fmtDate(termDates[0]?.end_date),
       next_term_start_date: fmtDate(nextTermDates[0]?.start_date),
       competencies,

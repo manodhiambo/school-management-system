@@ -68,7 +68,7 @@ router.get('/', authenticate, async (req, res) => {
     // Find parent record for logged-in user
     let parentId = null;
     if (req.user.role === 'parent') {
-      const pRows = await query('SELECT id FROM parents WHERE user_id=$1', [req.user.id]);
+      const pRows = await query('SELECT id FROM parents WHERE user_id=$1 AND tenant_id=$2', [req.user.id, tid]);
       if (pRows.length) parentId = pRows[0].id;
     }
 
@@ -103,7 +103,7 @@ router.get('/unread-count', authenticate, async (req, res) => {
     let sql = `SELECT COUNT(*) as count FROM parent_alerts WHERE tenant_id=$1 AND is_read=FALSE`;
     const params = [tid];
     if (req.user.role === 'parent') {
-      const pRows = await query('SELECT id FROM parents WHERE user_id=$1', [req.user.id]);
+      const pRows = await query('SELECT id FROM parents WHERE user_id=$1 AND tenant_id=$2', [req.user.id, tid]);
       if (pRows.length) { sql += ` AND parent_id=$${params.length+1}`; params.push(pRows[0].id); }
     }
     const rows = await query(sql, params);
@@ -131,7 +131,7 @@ router.put('/mark-all-read', authenticate, async (req, res) => {
     let sql = `UPDATE parent_alerts SET is_read=TRUE, read_at=NOW() WHERE tenant_id=$1 AND is_read=FALSE`;
     const params = [tid];
     if (req.user.role === 'parent') {
-      const pRows = await query('SELECT id FROM parents WHERE user_id=$1', [req.user.id]);
+      const pRows = await query('SELECT id FROM parents WHERE user_id=$1 AND tenant_id=$2', [req.user.id, tid]);
       if (pRows.length) { sql += ` AND parent_id=$${params.length+1}`; params.push(pRows[0].id); }
     }
     await query(sql, params);

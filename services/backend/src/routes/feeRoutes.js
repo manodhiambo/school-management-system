@@ -138,7 +138,7 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
       ]
     );
 
-    const newStructure = await query('SELECT * FROM fee_structure WHERE id = $1', [structureId]);
+    const newStructure = await query('SELECT * FROM fee_structure WHERE id = $1 AND tenant_id = $2', [structureId, tid]);
 
     res.status(201).json({
       success: true,
@@ -205,7 +205,7 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
       ]
     );
 
-    const updated = await query('SELECT * FROM fee_structure WHERE id = $1', [req.params.id]);
+    const updated = await query('SELECT * FROM fee_structure WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
 
     res.json({
       success: true,

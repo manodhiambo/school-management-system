@@ -111,10 +111,12 @@ router.post('/strands', authenticate, async (req, res) => {
 router.put('/strands/:id', authenticate, async (req, res) => {
   try {
     const { name, code, education_level, order_index } = req.body;
+    const tid = req.user.tenant_id;
     const rows = await query(
-      `UPDATE cbc_strands SET name=$1, code=$2, education_level=$3, order_index=$4 WHERE id=$5 RETURNING *`,
-      [name, code, education_level, order_index || 0, req.params.id]
+      `UPDATE cbc_strands SET name=$1, code=$2, education_level=$3, order_index=$4 WHERE id=$5 AND tenant_id=$6 RETURNING *`,
+      [name, code, education_level, order_index || 0, req.params.id, tid]
     );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -124,7 +126,7 @@ router.put('/strands/:id', authenticate, async (req, res) => {
 // DELETE /api/v1/cbc/strands/:id
 router.delete('/strands/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM cbc_strands WHERE id=$1', [req.params.id]);
+    await query('DELETE FROM cbc_strands WHERE id=$1 AND tenant_id=$2', [req.params.id, req.user.tenant_id]);
     res.json({ success: true, message: 'Strand deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -139,9 +141,10 @@ router.delete('/strands/:id', authenticate, async (req, res) => {
 router.get('/sub-strands', authenticate, async (req, res) => {
   try {
     const { strand_id } = req.query;
+    const tid = req.user.tenant_id;
     let sql = `SELECT ss.*, s.name as strand_name FROM cbc_sub_strands ss
-               JOIN cbc_strands s ON s.id = ss.strand_id WHERE 1=1`;
-    const params = [];
+               JOIN cbc_strands s ON s.id = ss.strand_id WHERE s.tenant_id = $1`;
+    const params = [tid];
     if (strand_id) { sql += ` AND ss.strand_id = $${params.length + 1}`; params.push(strand_id); }
     sql += ' ORDER BY ss.order_index, ss.name';
     const rows = await query(sql, params);
@@ -155,6 +158,10 @@ router.get('/sub-strands', authenticate, async (req, res) => {
 router.post('/sub-strands', authenticate, async (req, res) => {
   try {
     const { strand_id, name, code, order_index } = req.body;
+    const tid = req.user.tenant_id;
+    // Verify the parent strand belongs to this tenant
+    const strand = await query('SELECT id FROM cbc_strands WHERE id=$1 AND tenant_id=$2', [strand_id, tid]);
+    if (!strand.length) return res.status(403).json({ success: false, message: 'Strand not found' });
     const rows = await query(
       `INSERT INTO cbc_sub_strands (strand_id, name, code, order_index) VALUES ($1,$2,$3,$4) RETURNING *`,
       [strand_id, name, code, order_index || 0]
@@ -169,10 +176,14 @@ router.post('/sub-strands', authenticate, async (req, res) => {
 router.put('/sub-strands/:id', authenticate, async (req, res) => {
   try {
     const { name, code, order_index } = req.body;
+    const tid = req.user.tenant_id;
+    // Sub-strands have no tenant_id; scope by parent strand's tenant_id
     const rows = await query(
-      `UPDATE cbc_sub_strands SET name=$1, code=$2, order_index=$3 WHERE id=$4 RETURNING *`,
-      [name, code, order_index || 0, req.params.id]
+      `UPDATE cbc_sub_strands SET name=$1, code=$2, order_index=$3
+       WHERE id=$4 AND strand_id IN (SELECT id FROM cbc_strands WHERE tenant_id=$5) RETURNING *`,
+      [name, code, order_index || 0, req.params.id, tid]
     );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -182,7 +193,11 @@ router.put('/sub-strands/:id', authenticate, async (req, res) => {
 // DELETE /api/v1/cbc/sub-strands/:id
 router.delete('/sub-strands/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM cbc_sub_strands WHERE id=$1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query(
+      'DELETE FROM cbc_sub_strands WHERE id=$1 AND strand_id IN (SELECT id FROM cbc_strands WHERE tenant_id=$2)',
+      [req.params.id, tid]
+    );
     res.json({ success: true, message: 'Sub-strand deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -276,7 +291,7 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
   }
   // Teachers can only edit their own assessments
   if (req.user.role === 'teacher') {
-    const existing = await query('SELECT teacher_id FROM cbc_assessments WHERE id=$1', [req.params.id]);
+    const existing = await query('SELECT teacher_id FROM cbc_assessments WHERE id=$1 AND tenant_id=$2', [req.params.id, req.user.tenant_id]);
     if (!existing.length || existing[0].teacher_id !== req.user.id) {
       return res.status(403).json({ success: false, message: 'You can only edit your own assessments' });
     }
@@ -299,9 +314,11 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
     const finalComment = teacher_comments || (finalGrade ? autoComment(finalGrade) : null);
     const rows = await query(
       `UPDATE cbc_assessments SET score=$1, max_score=$2, cbc_grade=$3, pre_primary_grade=$4,
-       teacher_comments=$5, exam_period=$6, result_code=$7, grade_points=$8, updated_at=NOW() WHERE id=$9 RETURNING *`,
+       teacher_comments=$5, exam_period=$6, result_code=$7, grade_points=$8, updated_at=NOW()
+       WHERE id=$9 AND tenant_id=$10 RETURNING *`,
       [result_code ? null : (score || null), max_score || null, result_code ? null : grade, result_code ? null : ppGrade,
-       finalComment, exam_period || null, result_code || null, result_code ? null : grade_pts, req.params.id]
+       finalComment, exam_period || null, result_code || null, result_code ? null : grade_pts,
+       req.params.id, req.user.tenant_id]
     );
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -315,13 +332,13 @@ router.delete('/assessments/:id', authenticate, async (req, res) => {
     return res.status(403).json({ success: false, message: 'Access denied' });
   }
   if (req.user.role === 'teacher') {
-    const existing = await query('SELECT teacher_id FROM cbc_assessments WHERE id=$1', [req.params.id]);
+    const existing = await query('SELECT teacher_id FROM cbc_assessments WHERE id=$1 AND tenant_id=$2', [req.params.id, req.user.tenant_id]);
     if (!existing.length || existing[0].teacher_id !== req.user.id) {
       return res.status(403).json({ success: false, message: 'You can only delete your own assessments' });
     }
   }
   try {
-    await query('DELETE FROM cbc_assessments WHERE id=$1', [req.params.id]);
+    await query('DELETE FROM cbc_assessments WHERE id=$1 AND tenant_id=$2', [req.params.id, req.user.tenant_id]);
     res.json({ success: true, message: 'Assessment deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

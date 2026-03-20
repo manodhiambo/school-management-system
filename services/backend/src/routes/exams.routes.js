@@ -98,8 +98,8 @@ router.get('/:id', authenticate, async (req, res) => {
     let questions = [];
     if (exam.mode === 'online') {
       const rawQuestions = await query(
-        'SELECT * FROM exam_questions WHERE exam_id = $1 ORDER BY order_index',
-        [req.params.id]
+        'SELECT eq.* FROM exam_questions eq JOIN exams e ON e.id = eq.exam_id WHERE eq.exam_id = $1 AND e.tenant_id = $2 ORDER BY eq.order_index',
+        [req.params.id, req.user.tenant_id]
       );
       if (req.user.role === 'student') {
         questions = rawQuestions.map(({ correct_answer, ...q }) => q);

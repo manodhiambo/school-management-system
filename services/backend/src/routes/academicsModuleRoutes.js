@@ -131,6 +131,9 @@ router.put('/schemes/:id', requireRole(['admin','teacher']), async (req, res) =>
 router.post('/schemes/:id/weeks', requireRole(['admin','teacher']), async (req, res) => {
   try {
     const { weeks } = req.body; // array of week objects
+    // Verify the scheme belongs to this tenant before modifying its weeks
+    const scheme = await query('SELECT id FROM schemes_of_work WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
+    if (!scheme[0]) return res.status(404).json({ error: 'Scheme not found' });
     await query('DELETE FROM scheme_weeks WHERE scheme_id = $1', [req.params.id]);
     for (const w of weeks) {
       await query(`
@@ -378,13 +381,13 @@ router.post('/sba/:id/records', requireRole(['admin','teacher']), async (req, re
         cbc_grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
       }
       await query(`
-        INSERT INTO sba_student_records (sba_setup_id, student_id, teacher_id, score, cbc_grade, is_absent, teacher_remarks)
-        VALUES ($1,$2,$3,$4,$5,$6,$7)
+        INSERT INTO sba_student_records (sba_setup_id, student_id, teacher_id, score, cbc_grade, is_absent, teacher_remarks, tenant_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
         ON CONFLICT (sba_setup_id, student_id) DO UPDATE SET
           score=EXCLUDED.score, cbc_grade=EXCLUDED.cbc_grade,
           is_absent=EXCLUDED.is_absent, teacher_remarks=EXCLUDED.teacher_remarks,
           submitted_at=NOW()
-      `, [req.params.id, r.student_id, uid(req), score, cbc_grade, r.is_absent || false, r.teacher_remarks]);
+      `, [req.params.id, r.student_id, uid(req), score, cbc_grade, r.is_absent || false, r.teacher_remarks, tid(req)]);
     }
     res.json({ message: `Saved ${records.length} records` });
   } catch (err) {
@@ -514,6 +517,9 @@ router.get('/projects/:id', requireRole(['admin','teacher','student']), async (r
 router.post('/projects/:id/milestones', requireRole(['admin','teacher']), async (req, res) => {
   try {
     const { title, description, due_date, sort_order } = req.body;
+    // Verify project belongs to this tenant
+    const project = await query('SELECT id FROM projects WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]);
+    if (!project[0]) return res.status(404).json({ error: 'Project not found' });
     const result = await query(
       'INSERT INTO project_milestones (project_id, title, description, due_date, sort_order) VALUES ($1,$2,$3,$4,$5) RETURNING *',
       [req.params.id, title, description, due_date, sort_order || 0]
@@ -533,10 +539,10 @@ router.post('/projects/:id/submissions', requireRole(['admin','teacher','student
     const now = new Date();
     const isLate = project[0].due_date && now > new Date(project[0].due_date);
     const result = await query(`
-      INSERT INTO project_submissions (project_id, student_id, project_group_id, title, description, evidence_urls, milestone_id, is_late)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+      INSERT INTO project_submissions (project_id, student_id, project_group_id, title, description, evidence_urls, milestone_id, is_late, tenant_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *
     `, [req.params.id, student_id, project_group_id, title, description,
-        evidence_urls || [], milestone_id, isLate]);
+        evidence_urls || [], milestone_id, isLate, tid(req)]);
     res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -547,14 +553,15 @@ router.post('/projects/:id/submissions', requireRole(['admin','teacher','student
 router.put('/projects/:projectId/submissions/:subId/grade', requireRole(['admin','teacher']), async (req, res) => {
   try {
     const { score, teacher_remarks } = req.body;
-    const project = await query('SELECT max_score FROM projects WHERE id=$1', [req.params.projectId]);
-    const maxScore = parseFloat(project[0]?.max_score || 100);
+    const project = await query('SELECT max_score FROM projects WHERE id=$1 AND tenant_id=$2', [req.params.projectId, tid(req)]);
+    if (!project[0]) return res.status(404).json({ error: 'Project not found' });
+    const maxScore = parseFloat(project[0].max_score || 100);
     const pct = (parseFloat(score) / maxScore) * 100;
     const cbc_grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
     const result = await query(`
       UPDATE project_submissions SET score=$1, cbc_grade=$2, teacher_remarks=$3, graded_at=NOW(), graded_by=$4
-      WHERE id=$5 RETURNING *
-    `, [score, cbc_grade, teacher_remarks, uid(req), req.params.subId]);
+      WHERE id=$5 AND tenant_id=$6 RETURNING *
+    `, [score, cbc_grade, teacher_remarks, uid(req), req.params.subId, tid(req)]);
     res.json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });

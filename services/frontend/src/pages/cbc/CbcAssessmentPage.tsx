@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
-import { Plus, BookOpen, Download, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Plus, BookOpen, Download, Pencil, Trash2, X, Check, Search } from 'lucide-react';
 
 const CBC_GRADES = ['EE', 'ME', 'AE', 'BE'];
 const JSS_GRADES = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2'];
@@ -83,7 +83,9 @@ export function CbcAssessmentPage() {
   const qc = useQueryClient();
   const user = useAuthStore((s: any) => s.user);
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-  const [filters, setFilters] = useState({ class_id: '', subject_id: '', term: 'term1', academic_year: new Date().getFullYear().toString() });
+  const [filters, setFilters] = useState({ class_id: '', subject_id: '', term: 'term1', academic_year: new Date().getFullYear().toString(), student_id: '' });
+  const [studentSearch, setStudentSearch] = useState('');
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<any>({ ...EMPTY_FORM });
 
@@ -104,6 +106,11 @@ export function CbcAssessmentPage() {
     queryKey: ['students', form.class_id || filters.class_id],
     queryFn: () => api.getStudents((form.class_id || filters.class_id) ? { classId: form.class_id || filters.class_id } : undefined),
     enabled: showForm || !!filters.class_id,
+  });
+  // All students for the filter search (not scoped to class)
+  const { data: allStudentsData } = useQuery({
+    queryKey: ['students-all-cbc'],
+    queryFn: () => api.getStudents(),
   });
 
   const createMutation = useMutation({
@@ -135,6 +142,16 @@ export function CbcAssessmentPage() {
   const subjects = (subjectsData as any)?.data || [];
   const assessments = (assessmentsData as any)?.data || [];
   const students = (studentsData as any)?.data || [];
+  const allStudents: any[] = (allStudentsData as any)?.data || [];
+
+  const filteredStudentOptions = allStudents.filter(s => {
+    if (!studentSearch.trim()) return true;
+    const q = studentSearch.toLowerCase();
+    return `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) ||
+      (s.admission_number || '').toLowerCase().includes(q);
+  });
+  const selectedStudent = allStudents.find(s => s.id === filters.student_id);
+  const selectedStudentName = selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : '';
 
   // Compute auto-comment when score/max_score changes
   const handleFormChange = (field: string, value: string) => {
@@ -352,7 +369,7 @@ export function CbcAssessmentPage() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div>
               <Label className="text-xs">Class</Label>
               <select className="w-full border rounded-md px-2 py-1.5 text-sm mt-1"
@@ -383,7 +400,72 @@ export function CbcAssessmentPage() {
               <Input className="text-sm h-8 mt-1" value={filters.academic_year}
                 onChange={e => setFilters({ ...filters, academic_year: e.target.value })} />
             </div>
+            {/* Student search */}
+            <div className="relative">
+              <Label className="text-xs">Student</Label>
+              <div className="relative mt-1">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  className="w-full border rounded-md pl-7 pr-7 py-1.5 text-sm"
+                  placeholder="Search student..."
+                  value={filters.student_id ? selectedStudentName : studentSearch}
+                  onChange={e => {
+                    if (filters.student_id) {
+                      setFilters({ ...filters, student_id: '' });
+                    }
+                    setStudentSearch(e.target.value);
+                    setShowStudentDropdown(true);
+                  }}
+                  onFocus={() => setShowStudentDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowStudentDropdown(false), 150)}
+                />
+                {(filters.student_id || studentSearch) && (
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => {
+                      setFilters({ ...filters, student_id: '' });
+                      setStudentSearch('');
+                      setShowStudentDropdown(false);
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {showStudentDropdown && !filters.student_id && (
+                <div className="absolute z-30 mt-1 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {filteredStudentOptions.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-400">No students found</p>
+                  ) : (
+                    filteredStudentOptions.slice(0, 20).map((s: any) => (
+                      <button
+                        key={s.id}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex flex-col"
+                        onMouseDown={() => {
+                          setFilters({ ...filters, student_id: s.id });
+                          setStudentSearch('');
+                          setShowStudentDropdown(false);
+                        }}
+                      >
+                        <span>{s.first_name} {s.last_name}</span>
+                        <span className="text-xs text-gray-400">{s.admission_number}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+          {filters.student_id && (
+            <p className="mt-2 text-xs text-indigo-600">
+              Filtering by: <strong>{selectedStudentName}</strong>
+              <button className="ml-2 underline text-gray-400 hover:text-gray-600"
+                onClick={() => { setFilters({ ...filters, student_id: '' }); setStudentSearch(''); }}>
+                Clear
+              </button>
+            </p>
+          )}
         </CardContent>
       </Card>
 

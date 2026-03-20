@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { CheckSquare, Square, AlertTriangle, CheckCircle2, Loader2, Eye, Zap } from 'lucide-react';
+import {
+  CheckSquare, Square, AlertTriangle, CheckCircle2,
+  Loader2, Eye, Zap, Search, X,
+} from 'lucide-react';
 import api from '@/services/api';
 
 interface GenerateInvoicesModalProps {
@@ -20,6 +23,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState<any[]>([]);
   const [feeStructures, setFeeStructures] = useState<any[]>([]);
+  const [fsSearch, setFsSearch] = useState('');
   const [selectedStructures, setSelectedStructures] = useState<string[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState('');
@@ -36,6 +40,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
       setResult(null);
       setSelectedStructures([]);
       setSelectedClasses([]);
+      setFsSearch('');
       setDueDate('');
       setTerm('');
       setAcademicYear(currentYear);
@@ -44,9 +49,13 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
 
   const loadData = async () => {
     try {
-      const [clsRes, fsRes]: any[] = await Promise.all([api.getClasses(), api.getFeeStructures()]);
+      // isActive=all → return every structure regardless of active status
+      const [clsRes, fsRes]: any[] = await Promise.all([
+        api.getClasses(),
+        api.getFeeStructures({ isActive: 'all' }),
+      ]);
       setClasses(clsRes.data || []);
-      setFeeStructures((fsRes.data || []).filter((f: any) => f.is_active !== false));
+      setFeeStructures(fsRes.data || []);
     } catch {
       /* ignore */
     }
@@ -57,6 +66,25 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
 
   const toggleClass = (id: string) =>
     setSelectedClasses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  // Filtered list for the search box
+  const visibleStructures = feeStructures.filter(fs => {
+    if (!fsSearch) return true;
+    const q = fsSearch.toLowerCase();
+    return (
+      fs.name?.toLowerCase().includes(q) ||
+      fs.class_name?.toLowerCase().includes(q) ||
+      fs.student_type?.toLowerCase().includes(q)
+    );
+  });
+
+  const selectAllVisible = () =>
+    setSelectedStructures(prev => [...new Set([...prev, ...visibleStructures.map(f => f.id)])]);
+
+  const deselectAllVisible = () => {
+    const visibleIds = new Set(visibleStructures.map(f => f.id));
+    setSelectedStructures(prev => prev.filter(id => !visibleIds.has(id)));
+  };
 
   const handlePreview = async () => {
     if (!selectedStructures.length) return;
@@ -100,12 +128,11 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
     }
   };
 
-  // Group skipped by reason for display
+  // Group skipped by reason
   const skipReasons: Record<string, number> = {};
   for (const s of preview?.skipped || []) {
     skipReasons[s.reason] = (skipReasons[s.reason] || 0) + 1;
   }
-
   const reasonLabel: Record<string, string> = {
     class_mismatch: 'Not in target class',
     student_type_mismatch: 'Student type mismatch (day/boarding)',
@@ -113,8 +140,10 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
     route_mismatch: 'Wrong transport route',
   };
 
-  // Which structures have a class restriction
   const classRestrictedIds = new Set(feeStructures.filter(f => f.class_id).map(f => f.id));
+
+  // Count how many visible structures are selected
+  const visibleSelectedCount = visibleStructures.filter(f => selectedStructures.includes(f.id)).length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,18 +161,70 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
           <div className="space-y-5">
             {/* Fee Structures */}
             <div>
-              <Label className="text-sm font-semibold">Select Fee Structures *</Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-sm font-semibold">
+                  Fee Structures *
+                  {selectedStructures.length > 0 && (
+                    <span className="ml-2 text-blue-600 font-normal">({selectedStructures.length} selected)</span>
+                  )}
+                </Label>
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={selectAllVisible}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Select all{fsSearch ? ' matching' : ''}
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    type="button"
+                    onClick={deselectAllVisible}
+                    className="text-gray-500 hover:underline"
+                  >
+                    Deselect all{fsSearch ? ' matching' : ''}
+                  </button>
+                </div>
+              </div>
+
               <p className="text-xs text-gray-400 mb-2">
-                Each selected structure auto-assigns to affected students based on class, student type, and transport settings.
+                All fee structures are shown — active and inactive. Each auto-assigns to students based on class, student type, and transport settings.
               </p>
-              <div className="border rounded-md max-h-52 overflow-y-auto divide-y">
+
+              {/* Search box */}
+              <div className="relative mb-2">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                <Input
+                  placeholder="Search by name, class or student type..."
+                  value={fsSearch}
+                  onChange={e => setFsSearch(e.target.value)}
+                  className="pl-8 pr-8 text-sm h-9"
+                />
+                {fsSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setFsSearch('')}
+                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="border rounded-md max-h-56 overflow-y-auto divide-y">
                 {feeStructures.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">No active fee structures. Create one first.</p>
+                  <p className="text-sm text-gray-400 text-center py-6">
+                    No fee structures found. Create one first in Fee Structure settings.
+                  </p>
+                ) : visibleStructures.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">No structures match your search.</p>
                 ) : (
-                  feeStructures.map(fs => (
+                  visibleStructures.map(fs => (
                     <div
                       key={fs.id}
-                      className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 select-none"
+                      className={`flex items-center gap-3 p-3 cursor-pointer select-none transition-colors ${
+                        selectedStructures.includes(fs.id) ? 'bg-blue-50' : 'hover:bg-gray-50'
+                      } ${!fs.is_active ? 'opacity-60' : ''}`}
                       onClick={() => toggleStructure(fs.id)}
                     >
                       {selectedStructures.includes(fs.id)
@@ -153,27 +234,41 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
                         <p className="font-medium text-sm truncate">{fs.name}</p>
                         <p className="text-xs text-gray-400">
                           KES {Number(fs.amount).toLocaleString()}
-                          {fs.class_id && <span className="ml-2 text-purple-600">· Class: {fs.class_name || fs.class_id}</span>}
-                          {fs.student_type && fs.student_type !== 'all' && <span className="ml-2 text-blue-500">· {fs.student_type}</span>}
+                          {fs.class_name && <span className="ml-2 text-purple-600">· {fs.class_name}</span>}
+                          {fs.student_type && fs.student_type !== 'all' && (
+                            <span className="ml-2 text-blue-500 capitalize">· {fs.student_type}</span>
+                          )}
                           {fs.is_transport_fee && <span className="ml-2 text-orange-500">· Transport</span>}
+                          {fs.frequency && <span className="ml-2 text-gray-300 capitalize">· {fs.frequency}</span>}
                         </p>
                       </div>
-                      {classRestrictedIds.has(fs.id) && (
-                        <Badge variant="outline" className="text-[10px] shrink-0">Class-specific</Badge>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {classRestrictedIds.has(fs.id) && (
+                          <Badge variant="outline" className="text-[10px]">Class</Badge>
+                        )}
+                        {!fs.is_active && (
+                          <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
               </div>
-              {selectedStructures.length > 0 && (
-                <p className="text-xs text-blue-600 mt-1">{selectedStructures.length} structure(s) selected</p>
-              )}
+
+              {/* Summary line */}
+              <p className="text-xs text-gray-400 mt-1">
+                Showing {visibleStructures.length} of {feeStructures.length} structure(s)
+                {fsSearch && ` matching "${fsSearch}"`}
+                {visibleSelectedCount > 0 && ` · ${visibleSelectedCount} selected in view`}
+              </p>
             </div>
 
-            {/* Optional class filter */}
+            {/* Restrict to classes */}
             <div>
               <Label className="text-sm font-semibold">Restrict to Classes (optional)</Label>
-              <p className="text-xs text-gray-400 mb-2">Leave blank to include all classes. Select to restrict which classes receive invoices.</p>
+              <p className="text-xs text-gray-400 mb-2">
+                Leave blank to include all classes. Select to override which classes receive invoices.
+              </p>
               <div className="flex flex-wrap gap-2">
                 {classes.map(c => (
                   <button
@@ -230,20 +325,16 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                Invoices are auto-assigned based on each fee structure's class and student type settings.
-                You can preview before committing.
+                Invoices auto-assign based on each structure's class and student type. Use <strong>Preview</strong> to verify before generating.
               </span>
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button
-                onClick={handlePreview}
-                disabled={loading || selectedStructures.length === 0}
-              >
+              <Button onClick={handlePreview} disabled={loading || selectedStructures.length === 0}>
                 {loading
                   ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading preview...</>
-                  : <><Eye className="h-4 w-4 mr-2" /> Preview</>}
+                  : <><Eye className="h-4 w-4 mr-2" /> Preview ({selectedStructures.length} selected)</>}
               </Button>
             </DialogFooter>
           </div>
@@ -269,7 +360,6 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
               </div>
             </div>
 
-            {/* Skip reasons summary */}
             {Object.keys(skipReasons).length > 0 && (
               <div className="text-xs text-gray-500 space-y-0.5">
                 <p className="font-medium text-gray-600">Why students were skipped:</p>
@@ -279,7 +369,6 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
               </div>
             )}
 
-            {/* Invoice list preview */}
             {preview.created.length > 0 && (
               <div className="border rounded-md max-h-56 overflow-y-auto divide-y text-sm">
                 {preview.created.map((row: any, i: number) => (
@@ -299,16 +388,13 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
               <div className="text-center py-8 text-gray-400">
                 <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
                 <p>No students match the selected fee structures.</p>
-                <p className="text-xs mt-1">Check that the fee structures have the correct class / student type settings.</p>
+                <p className="text-xs mt-1">Check that the structures have the correct class / student type settings.</p>
               </div>
             )}
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setStep('config')}>Back</Button>
-              <Button
-                onClick={handleGenerate}
-                disabled={loading || preview.created.length === 0}
-              >
+              <Button onClick={handleGenerate} disabled={loading || preview.created.length === 0}>
                 {loading
                   ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
                   : <><Zap className="h-4 w-4 mr-2" /> Generate {preview.created.length} Invoice(s)</>}

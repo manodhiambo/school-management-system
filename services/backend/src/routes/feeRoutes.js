@@ -38,10 +38,12 @@ router.get('/structure', async (req, res) => {
       sql += ` AND fs.frequency = $${paramIndex}`;
       params.push(frequency); paramIndex++;
     }
-    // Default: only show active structures
-    const activeFilter = isActive !== undefined ? isActive === 'true' : true;
-    sql += ` AND fs.is_active = $${paramIndex}`;
-    params.push(activeFilter); paramIndex++;
+    // isActive='all' → no filter; default → only active
+    if (isActive !== 'all') {
+      const activeFilter = isActive !== undefined ? isActive === 'true' : true;
+      sql += ` AND fs.is_active = $${paramIndex}`;
+      params.push(activeFilter); paramIndex++;
+    }
 
     if (student_type) {
       sql += ` AND (fs.student_type = $${paramIndex} OR fs.student_type = 'all')`;

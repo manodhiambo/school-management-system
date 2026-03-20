@@ -1,275 +1,848 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, AlertCircle, FileText, Plus, Users, Bell, Download } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  DollarSign, TrendingUp, AlertCircle, FileText, Plus, Users,
+  Search, Download, Trash2, Eye, RefreshCw, X, CheckCircle
+} from 'lucide-react';
 import { RecordPaymentModal } from '@/components/modals/RecordPaymentModal';
 import { GenerateInvoicesModal } from '@/components/modals/GenerateInvoicesModal';
 import api from '@/services/api';
+import { jsPDF } from 'jspdf';
 
-export function FeePage() {
-  const [stats, setStats] = useState<any>(null);
-  const [invoices, setInvoices] = useState<any[]>([]);
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface StudentSummary {
+  id: string; first_name: string; last_name: string; admission_number: string;
+  class_name: string; student_type: string;
+  total_invoiced: number; total_paid: number; total_balance: number; invoice_count: number;
+}
+interface Invoice {
+  id: string; invoice_number: string; description: string;
+  net_amount: number; paid_amount: number; balance_amount: number;
+  status: string; due_date: string; created_at: string; term: string; academic_year: string;
+}
+interface Payment {
+  id: string; amount: number; payment_method: string;
+  payment_date: string; transaction_id: string; remarks: string;
+}
+interface ExpectedFee {
+  id: string; name: string; amount: number; frequency?: string; description?: string;
+}
+
+// ─── PDF generator ────────────────────────────────────────────────────────────
+function downloadFeeStatement(
+  student: StudentSummary,
+  invoices: Invoice[],
+  payments: Payment[],
+  expected: ExpectedFee[],
+  extraFees: ExpectedFee[],
+  schoolName: string
+) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pw = doc.internal.pageSize.getWidth();
+  let y = 15;
+
+  // Header
+  doc.setFillColor(37, 99, 235);
+  doc.rect(0, 0, pw, 28, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+  doc.text(schoolName, pw / 2, 12, { align: 'center' });
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+  doc.text('FEE STATEMENT', pw / 2, 20, { align: 'center' });
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-KE')}`, pw / 2, 26, { align: 'center' });
+
+  y = 36;
+  doc.setTextColor(30, 30, 30);
+
+  // Student info
+  doc.setFillColor(240, 245, 255);
+  doc.rect(10, y, pw - 20, 22, 'F');
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+  doc.text(`${student.first_name} ${student.last_name}`, 15, y + 8);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.text(`Admission No: ${student.admission_number}`, 15, y + 15);
+  doc.text(`Class: ${student.class_name || '—'}`, 90, y + 15);
+  y += 28;
+
+  const fmt = (n: number) => `KES ${Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+
+  // Summary box
+  doc.setFillColor(255, 248, 230);
+  doc.rect(10, y, pw - 20, 22, 'F');
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+  const cols = [15, pw / 4 + 5, pw / 2 + 5, (3 * pw) / 4 + 5];
+  doc.text('TOTAL EXPECTED', cols[0], y + 7);
+  doc.text('TOTAL INVOICED', cols[1], y + 7);
+  doc.text('TOTAL PAID', cols[2], y + 7);
+  doc.text('BALANCE DUE', cols[3], y + 7);
+  doc.setFont('helvetica', 'normal');
+  const totalExpected = [...expected, ...extraFees].reduce((s, f) => s + Number(f.amount), 0);
+  doc.text(fmt(totalExpected), cols[0], y + 16);
+  doc.text(fmt(student.total_invoiced), cols[1], y + 16);
+  doc.text(fmt(student.total_paid), cols[2], y + 16);
+  doc.setTextColor(student.total_balance > 0 ? 180 : 30, 30, 30);
+  doc.text(fmt(student.total_balance), cols[3], y + 16);
+  doc.setTextColor(30, 30, 30);
+  y += 28;
+
+  // Expected fees table
+  if (expected.length || extraFees.length) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+    doc.text('Expected Fees', 10, y); y += 5;
+    doc.setFillColor(37, 99, 235);
+    doc.rect(10, y, pw - 20, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(8);
+    doc.text('Fee Name', 14, y + 5);
+    doc.text('Frequency', pw / 2, y + 5);
+    doc.text('Amount', pw - 35, y + 5, { align: 'right' });
+    y += 7; doc.setTextColor(30, 30, 30);
+    let rowBg = false;
+    for (const f of [...expected, ...extraFees]) {
+      if (rowBg) { doc.setFillColor(245, 247, 255); doc.rect(10, y, pw - 20, 7, 'F'); }
+      doc.setFont('helvetica', 'normal');
+      doc.text(f.name, 14, y + 5);
+      doc.text(f.frequency || 'extra', pw / 2, y + 5);
+      doc.text(fmt(f.amount), pw - 14, y + 5, { align: 'right' });
+      y += 7; rowBg = !rowBg;
+    }
+    y += 4;
+  }
+
+  // Invoices table
+  if (invoices.length) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+    doc.text('Invoices', 10, y); y += 5;
+    doc.setFillColor(37, 99, 235);
+    doc.rect(10, y, pw - 20, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(8);
+    doc.text('Invoice #', 14, y + 5);
+    doc.text('Description', 55, y + 5);
+    doc.text('Amount', 115, y + 5, { align: 'right' });
+    doc.text('Paid', 140, y + 5, { align: 'right' });
+    doc.text('Balance', 166, y + 5, { align: 'right' });
+    doc.text('Status', pw - 14, y + 5, { align: 'right' });
+    y += 7; doc.setTextColor(30, 30, 30);
+    let rowBg = false;
+    for (const inv of invoices) {
+      if (y > 270) { doc.addPage(); y = 15; }
+      if (rowBg) { doc.setFillColor(245, 247, 255); doc.rect(10, y, pw - 20, 7, 'F'); }
+      doc.setFont('helvetica', 'normal');
+      doc.text(inv.invoice_number, 14, y + 5);
+      doc.text((inv.description || '').substring(0, 30), 55, y + 5);
+      doc.text(fmt(inv.net_amount), 115, y + 5, { align: 'right' });
+      doc.text(fmt(inv.paid_amount || 0), 140, y + 5, { align: 'right' });
+      doc.setTextColor(Number(inv.balance_amount) > 0 ? 180 : 30, 30, 30);
+      doc.text(fmt(inv.balance_amount), 166, y + 5, { align: 'right' });
+      doc.setTextColor(30, 30, 30);
+      doc.text(inv.status, pw - 14, y + 5, { align: 'right' });
+      y += 7; rowBg = !rowBg;
+    }
+    y += 4;
+  }
+
+  // Payments table
+  if (payments.length) {
+    if (y > 240) { doc.addPage(); y = 15; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+    doc.text('Payment History', 10, y); y += 5;
+    doc.setFillColor(37, 99, 235);
+    doc.rect(10, y, pw - 20, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(8);
+    doc.text('Date', 14, y + 5);
+    doc.text('Method', 60, y + 5);
+    doc.text('Reference', 100, y + 5);
+    doc.text('Amount', pw - 14, y + 5, { align: 'right' });
+    y += 7; doc.setTextColor(30, 30, 30);
+    let rowBg = false;
+    for (const p of payments) {
+      if (y > 270) { doc.addPage(); y = 15; }
+      if (rowBg) { doc.setFillColor(245, 247, 255); doc.rect(10, y, pw - 20, 7, 'F'); }
+      doc.setFont('helvetica', 'normal');
+      doc.text(new Date(p.payment_date).toLocaleDateString('en-KE'), 14, y + 5);
+      doc.text((p.payment_method || '').replace('_', ' '), 60, y + 5);
+      doc.text(p.transaction_id || p.remarks || '—', 100, y + 5);
+      doc.setTextColor(0, 120, 60);
+      doc.text(fmt(p.amount), pw - 14, y + 5, { align: 'right' });
+      doc.setTextColor(30, 30, 30);
+      y += 7; rowBg = !rowBg;
+    }
+  }
+
+  // Footer
+  doc.setFontSize(7); doc.setTextColor(130, 130, 130);
+  doc.text('This is a computer-generated statement. No signature required.', pw / 2, 292, { align: 'center' });
+
+  doc.save(`FeeStatement_${student.admission_number}_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+// ─── Status badge helper ───────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: string }) {
+  const cls =
+    status === 'paid' ? 'bg-green-100 text-green-800' :
+    status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
+    status === 'overdue' ? 'bg-red-100 text-red-800' :
+    'bg-gray-100 text-gray-700';
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{status}</span>;
+}
+
+const fmt = (n: number | string) =>
+  `KES ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+
+// ─── Fee Statement Modal ───────────────────────────────────────────────────────
+function FeeStatementModal({
+  student, onClose, onPaymentRecorded
+}: {
+  student: StudentSummary;
+  onClose: () => void;
+  onPaymentRecorded: () => void;
+}) {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [expected, setExpected] = useState<ExpectedFee[]>([]);
+  const [extraFees, setExtraFees] = useState<ExpectedFee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [schoolName, setSchoolName] = useState('School');
+  const [genLoading, setGenLoading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const totalExpected = [...expected, ...extraFees].reduce((s, f) => s + Number(f.amount), 0);
 
-  const loadData = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [statsRes, invoicesRes]: any = await Promise.all([
-        api.getFeeStatistics(),
-        api.getFeeInvoices()
+      const [feeRes, expectedRes, settingsRes]: any[] = await Promise.all([
+        api.getStudentFeeAccount(student.id),
+        api.getExpectedFees(student.id),
+        api.getSettings().catch(() => ({ data: { school_name: 'School' } })),
       ]);
-      
-      console.log('Fee stats response:', statsRes);
-      console.log('Fee invoices response:', invoicesRes);
-      
-      // The API returns {success: true, data: ...}
-      // So statsRes.data contains the actual data
-      setStats(statsRes?.data || {});
-      setInvoices(invoicesRes?.data || []);
-    } catch (error) {
-      console.error('Error loading fee data:', error);
-      setStats({});
-      setInvoices([]);
+      const feeData = feeRes?.data || {};
+      setInvoices(feeData.invoices || []);
+      setPayments(feeData.payments || []);
+      setExpected(expectedRes?.data?.structures || []);
+      setExtraFees(expectedRes?.data?.extra_fees || []);
+      setSchoolName(settingsRes?.data?.school_name || 'School');
     } finally {
       setLoading(false);
     }
-  };
+  }, [student.id]);
 
-  const handleViewDefaulters = async () => {
+  useEffect(() => { load(); }, [load]);
+
+  const handleGenerateInvoice = async () => {
+    setGenLoading(true);
     try {
-      const response: any = await api.getFeeDefaulters();
-      const defaulters = response?.data || [];
-      if (defaulters.length === 0) {
-        alert('No fee defaulters found!');
-      } else {
-        const list = defaulters.map((d: any) => 
-          `${d.first_name} ${d.last_name} - KES ${parseFloat(d.total_due).toLocaleString()}`
-        ).join('\n');
-        alert(`Fee Defaulters:\n\n${list}`);
-      }
-    } catch (error) {
-      console.error('Error loading defaulters:', error);
-      alert('Failed to load defaulters');
+      await api.generateInvoiceForStudent({ student_id: student.id });
+      await load();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to generate invoice');
+    } finally {
+      setGenLoading(false);
     }
   };
 
-  const handleSendReminders = () => {
-    alert('Payment reminders will be sent via SMS/Email');
+  const handleDeleteInvoice = async (invId: string) => {
+    if (!confirm('Delete this invoice and its payments? This cannot be undone.')) return;
+    setDeleting(invId);
+    try {
+      await api.deleteFeeInvoice(invId);
+      await load();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to delete invoice');
+    } finally {
+      setDeleting(null);
+    }
   };
 
-  const handleDownloadReport = () => {
-    alert('Fee report download functionality coming soon!');
+  const updatedStudent = {
+    ...student,
+    total_invoiced: invoices.reduce((s, i) => s + Number(i.net_amount), 0),
+    total_paid: invoices.reduce((s, i) => s + Number(i.paid_amount || 0), 0),
+    total_balance: invoices.reduce((s, i) => s + Number(i.balance_amount), 0),
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  const totalAmount = parseFloat(stats?.total_amount || '0');
-  const totalCollected = parseFloat(stats?.total_collected || '0');
-  const totalPending = parseFloat(stats?.total_pending || '0');
-  const totalInvoices = parseInt(stats?.total_invoices || '0');
-  const paidCount = parseInt(stats?.paid_count || '0');
-  const pendingCount = parseInt(stats?.pending_count || '0');
-  const overdueCount = parseInt(stats?.overdue_count || '0');
-  const collectionPercentage = totalAmount > 0 ? ((totalCollected / totalAmount) * 100).toFixed(1) : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Fee Management</h2>
-          <p className="text-gray-500">Manage fee collection and invoicing</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => setShowInvoiceModal(true)}>
-            <FileText className="mr-2 h-4 w-4" />
-            Generate Invoices
-          </Button>
-          <Button onClick={() => setShowPaymentModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Record Payment
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-sm">
-              <span>Total Amount</span>
-              <DollarSign className="h-4 w-4 text-gray-500" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">KES {totalAmount.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">{totalInvoices} invoice(s)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-sm">
-              <span>Collected</span>
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">KES {totalCollected.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">{paidCount} paid</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-sm">
-              <span>Pending</span>
-              <AlertCircle className="h-4 w-4 text-yellow-500" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">KES {totalPending.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">{pendingCount} pending</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-sm">
-              <span>Collection Rate</span>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{collectionPercentage}%</div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-              <div 
-                className="bg-primary h-2 rounded-full" 
-                style={{ width: `${Math.min(Number(collectionPercentage), 100)}%` }}
-              ></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleViewDefaulters}>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-red-100 rounded-full">
-                <Users className="h-6 w-6 text-red-600" />
+    <>
+      <Dialog open onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between pr-6">
+              <span>
+                Fee Statement — {student.first_name} {student.last_name}
+                <span className="ml-2 text-sm font-normal text-gray-500">{student.admission_number}</span>
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() =>
+                  downloadFeeStatement(updatedStudent, invoices, payments, expected, extraFees, schoolName)
+                }>
+                  <Download className="h-3.5 w-3.5 mr-1" /> Download PDF
+                </Button>
+                <Button size="sm" onClick={handleGenerateInvoice} disabled={genLoading}>
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  {genLoading ? 'Generating...' : 'Generate Invoice'}
+                </Button>
               </div>
-              <div>
-                <p className="text-sm text-gray-500">View Defaulters</p>
-                <p className="text-lg font-bold">{overdueCount} overdue</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </DialogTitle>
+          </DialogHeader>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleSendReminders}>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-blue-100 rounded-full">
-                <Bell className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Send Reminders</p>
-                <p className="text-lg font-bold">SMS & Email</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleDownloadReport}>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-green-100 rounded-full">
-                <Download className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Download Report</p>
-                <p className="text-lg font-bold">Fee Statement</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Invoices */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Invoices</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {invoices.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No invoices found</p>
-              <p className="text-sm text-gray-400">Generate invoices to get started</p>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left p-3 font-medium">Invoice #</th>
-                    <th className="text-left p-3 font-medium">Student</th>
-                    <th className="text-right p-3 font-medium">Amount</th>
-                    <th className="text-right p-3 font-medium">Paid</th>
-                    <th className="text-right p-3 font-medium">Balance</th>
-                    <th className="text-center p-3 font-medium">Status</th>
+            <div className="space-y-5 pt-1">
+
+              {/* Summary row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Expected', val: totalExpected, color: 'text-blue-700', bg: 'bg-blue-50' },
+                  { label: 'Invoiced', val: updatedStudent.total_invoiced, color: 'text-gray-800', bg: 'bg-gray-50' },
+                  { label: 'Paid', val: updatedStudent.total_paid, color: 'text-green-700', bg: 'bg-green-50' },
+                  { label: 'Balance Due', val: updatedStudent.total_balance, color: updatedStudent.total_balance > 0 ? 'text-red-700' : 'text-green-700', bg: updatedStudent.total_balance > 0 ? 'bg-red-50' : 'bg-green-50' },
+                ].map(({ label, val, color, bg }) => (
+                  <div key={label} className={`${bg} rounded-lg p-3`}>
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className={`text-lg font-bold ${color}`}>{fmt(val)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Expected Fees */}
+              <div>
+                <h3 className="font-semibold text-sm text-gray-700 mb-2">Expected Fees (from fee structures)</h3>
+                {expected.length === 0 && extraFees.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">No fee structures assigned to this student's class.</p>
+                ) : (
+                  <table className="w-full text-sm border rounded overflow-hidden">
+                    <thead className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="text-left px-3 py-2">Fee Name</th>
+                        <th className="text-left px-3 py-2">Type</th>
+                        <th className="text-right px-3 py-2">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {expected.map(f => (
+                        <tr key={f.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2">{f.name}</td>
+                          <td className="px-3 py-2 text-gray-500 capitalize">{f.frequency || 'standard'}</td>
+                          <td className="px-3 py-2 text-right font-medium">{fmt(f.amount)}</td>
+                        </tr>
+                      ))}
+                      {extraFees.map(f => (
+                        <tr key={f.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2">{f.name} <span className="text-xs text-purple-600">(extra)</span></td>
+                          <td className="px-3 py-2 text-gray-500">extra</td>
+                          <td className="px-3 py-2 text-right font-medium">{fmt(f.amount)}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-gray-100 font-semibold">
+                        <td className="px-3 py-2" colSpan={2}>Total Expected</td>
+                        <td className="px-3 py-2 text-right">{fmt(totalExpected)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Invoices */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm text-gray-700">Invoices</h3>
+                </div>
+                {invoices.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">No invoices generated yet.</p>
+                ) : (
+                  <table className="w-full text-sm border rounded overflow-hidden">
+                    <thead className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="text-left px-3 py-2">Invoice #</th>
+                        <th className="text-left px-3 py-2">Description</th>
+                        <th className="text-right px-3 py-2">Amount</th>
+                        <th className="text-right px-3 py-2">Paid</th>
+                        <th className="text-right px-3 py-2">Balance</th>
+                        <th className="text-center px-3 py-2">Status</th>
+                        <th className="px-2 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {invoices.map(inv => (
+                        <tr key={inv.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 font-mono text-xs">{inv.invoice_number}</td>
+                          <td className="px-3 py-2 text-gray-600 text-xs max-w-[160px] truncate">{inv.description || '—'}</td>
+                          <td className="px-3 py-2 text-right">{fmt(inv.net_amount)}</td>
+                          <td className="px-3 py-2 text-right text-green-700">{fmt(inv.paid_amount || 0)}</td>
+                          <td className="px-3 py-2 text-right text-red-700">{fmt(inv.balance_amount)}</td>
+                          <td className="px-3 py-2 text-center"><StatusBadge status={inv.status} /></td>
+                          <td className="px-2 py-2">
+                            <div className="flex gap-1 justify-end">
+                              <button
+                                className="text-blue-500 hover:text-blue-700 p-1"
+                                title="Record payment"
+                                onClick={() => { setSelectedInvoice(inv); setShowPayModal(true); }}
+                              >
+                                <DollarSign className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                className="text-red-400 hover:text-red-600 p-1"
+                                title="Delete invoice"
+                                onClick={() => handleDeleteInvoice(inv.id)}
+                                disabled={deleting === inv.id}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Payment History */}
+              <div>
+                <h3 className="font-semibold text-sm text-gray-700 mb-2">Payment History</h3>
+                {payments.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">No payments recorded yet.</p>
+                ) : (
+                  <table className="w-full text-sm border rounded overflow-hidden">
+                    <thead className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="text-left px-3 py-2">Date</th>
+                        <th className="text-left px-3 py-2">Method</th>
+                        <th className="text-left px-3 py-2">Reference</th>
+                        <th className="text-left px-3 py-2">Remarks</th>
+                        <th className="text-right px-3 py-2">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {payments.map(p => (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-xs">{new Date(p.payment_date).toLocaleDateString('en-KE')}</td>
+                          <td className="px-3 py-2 capitalize">{(p.payment_method || '').replace('_', ' ')}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{p.transaction_id || '—'}</td>
+                          <td className="px-3 py-2 text-xs text-gray-500">{p.remarks || '—'}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-green-700">{fmt(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Record payment within the statement */}
+      {showPayModal && (
+        <RecordPaymentModal
+          open={showPayModal}
+          onOpenChange={(v) => { setShowPayModal(v); if (!v) setSelectedInvoice(null); }}
+          onSuccess={() => { load(); onPaymentRecorded(); }}
+          preselectedStudentId={student.id}
+          preselectedInvoiceId={selectedInvoice?.id}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+export function FeePage() {
+  const [stats, setStats] = useState<any>(null);
+  const [students, setStudents] = useState<StudentSummary[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterClass, setFilterClass] = useState('');
+  const [activeTab, setActiveTab] = useState<'students' | 'invoices' | 'payments'>('students');
+  const [selectedStudent, setSelectedStudent] = useState<StudentSummary | null>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [invLoading, setInvLoading] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [searchInv, setSearchInv] = useState('');
+  const [deletingInv, setDeletingInv] = useState<string | null>(null);
+
+  const loadSummary = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [statsRes, studRes, classRes]: any[] = await Promise.all([
+        api.getFeeStatistics(),
+        api.getStudentsSummary({ search, classId: filterClass }),
+        api.getClasses(),
+      ]);
+      setStats(statsRes?.data || {});
+      setStudents(studRes?.data || []);
+      setClasses(classRes?.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, filterClass]);
+
+  const loadInvoices = useCallback(async () => {
+    setInvLoading(true);
+    try {
+      const res: any = await api.getFeeInvoices();
+      setInvoices(res?.data || []);
+    } finally {
+      setInvLoading(false);
+    }
+  }, []);
+
+  const loadPayments = useCallback(async () => {
+    setInvLoading(true);
+    try {
+      const res: any = await api.getFeePayments();
+      setPayments(res?.data || []);
+    } finally {
+      setInvLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSummary(); }, [loadSummary]);
+  useEffect(() => {
+    if (activeTab === 'invoices') loadInvoices();
+    if (activeTab === 'payments') loadPayments();
+  }, [activeTab, loadInvoices, loadPayments]);
+
+  const handleDeleteInvoice = async (id: string) => {
+    if (!confirm('Delete this invoice and its payments?')) return;
+    setDeletingInv(id);
+    try {
+      await api.deleteFeeInvoice(id);
+      loadInvoices();
+      loadSummary();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to delete');
+    } finally {
+      setDeletingInv(null);
+    }
+  };
+
+  const totalAmount    = parseFloat(stats?.total_amount    || '0');
+  const totalCollected = parseFloat(stats?.total_collected || '0');
+  const totalPending   = parseFloat(stats?.total_pending   || '0');
+  const collectionPct  = totalAmount > 0 ? ((totalCollected / totalAmount) * 100).toFixed(1) : '0';
+
+  const filteredInvoices = invoices.filter(inv => {
+    if (!searchInv) return true;
+    const q = searchInv.toLowerCase();
+    return (
+      inv.invoice_number?.toLowerCase().includes(q) ||
+      inv.first_name?.toLowerCase().includes(q) ||
+      inv.last_name?.toLowerCase().includes(q) ||
+      inv.admission_number?.toLowerCase().includes(q)
+    );
+  });
+
+  const TABS = [
+    { id: 'students', label: 'Students & Expected Fees' },
+    { id: 'invoices', label: 'Invoices' },
+    { id: 'payments', label: 'Payment History' },
+  ] as const;
+
+  return (
+    <div className="space-y-5">
+      {/* Top bar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Fee Management</h2>
+          <p className="text-sm text-gray-500">Manage expected fees, invoices and payments</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowInvoiceModal(true)}>
+            <FileText className="h-4 w-4 mr-1" /> Generate Bulk Invoices
+          </Button>
+          <Button onClick={() => setShowPaymentModal(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Record Payment
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Invoiced', val: totalAmount, icon: DollarSign, color: 'text-gray-800', sub: `${stats?.total_invoices || 0} invoices` },
+          { label: 'Collected', val: totalCollected, icon: TrendingUp, color: 'text-green-700', sub: `${stats?.paid_count || 0} paid` },
+          { label: 'Outstanding', val: totalPending, icon: AlertCircle, color: 'text-yellow-700', sub: `${stats?.pending_count || 0} pending` },
+          { label: 'Collection Rate', val: null, icon: CheckCircle, color: 'text-primary', sub: `${collectionPct}%`, pct: Number(collectionPct) },
+        ].map(({ label, val, icon: Icon, color, sub, pct }) => (
+          <Card key={label}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-4 px-4">
+              <CardTitle className="text-xs font-medium text-gray-500">{label}</CardTitle>
+              <Icon className={`h-4 w-4 ${color}`} />
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              {val !== null ? (
+                <div className={`text-xl font-bold ${color}`}>{fmt(val)}</div>
+              ) : (
+                <>
+                  <div className={`text-xl font-bold ${color}`}>{sub}</div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                    <div className="bg-primary h-1.5 rounded-full" style={{ width: `${Math.min(pct!, 100)}%` }} />
+                  </div>
+                </>
+              )}
+              {val !== null && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b flex gap-0">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === t.id
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab: Students & Expected Fees ── */}
+      {activeTab === 'students' && (
+        <div className="space-y-4">
+          {/* Search + class filter */}
+          <div className="flex gap-3 flex-wrap items-center">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by name or admission no..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={filterClass}
+              onChange={e => setFilterClass(e.target.value)}
+            >
+              <option value="">All Classes</option>
+              {classes.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <Button variant="outline" size="sm" onClick={loadSummary}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+            </Button>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                </div>
+              ) : students.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p>No students found.</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="text-left px-4 py-3 font-medium">Student</th>
+                      <th className="text-left px-4 py-3 font-medium">Class</th>
+                      <th className="text-right px-4 py-3 font-medium">Invoiced</th>
+                      <th className="text-right px-4 py-3 font-medium">Paid</th>
+                      <th className="text-right px-4 py-3 font-medium">Balance</th>
+                      <th className="text-center px-4 py-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {students.map(s => (
+                      <tr key={s.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium">{s.first_name} {s.last_name}</p>
+                          <p className="text-xs text-gray-400">{s.admission_number}</p>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{s.class_name || '—'}</td>
+                        <td className="px-4 py-3 text-right">{fmt(s.total_invoiced)}</td>
+                        <td className="px-4 py-3 text-right text-green-700 font-medium">{fmt(s.total_paid)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={Number(s.total_balance) > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
+                            {fmt(s.total_balance)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedStudent(s)}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" /> Statement
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Tab: Invoices ── */}
+      {activeTab === 'invoices' && (
+        <div className="space-y-3">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search invoice or student..."
+              value={searchInv}
+              onChange={e => setSearchInv(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {invLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary" />
+                </div>
+              ) : filteredInvoices.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p>No invoices found.</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="text-left px-4 py-3 font-medium">Invoice #</th>
+                      <th className="text-left px-4 py-3 font-medium">Student</th>
+                      <th className="text-left px-4 py-3 font-medium">Class</th>
+                      <th className="text-right px-4 py-3 font-medium">Amount</th>
+                      <th className="text-right px-4 py-3 font-medium">Paid</th>
+                      <th className="text-right px-4 py-3 font-medium">Balance</th>
+                      <th className="text-center px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredInvoices.map(inv => (
+                      <tr key={inv.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-mono text-xs">{inv.invoice_number}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-medium">{inv.first_name} {inv.last_name}</p>
+                          <p className="text-xs text-gray-400">{inv.admission_number}</p>
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 text-xs">{inv.class_name || '—'}</td>
+                        <td className="px-4 py-3 text-right">{fmt(inv.net_amount)}</td>
+                        <td className="px-4 py-3 text-right text-green-700">{fmt(inv.paid_amount || 0)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={Number(inv.balance_amount) > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
+                            {fmt(inv.balance_amount)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <StatusBadge status={inv.status} />
+                        </td>
+                        <td className="px-4 py-2">
+                          <button
+                            className="text-red-400 hover:text-red-600 p-1"
+                            title="Delete invoice"
+                            disabled={deletingInv === inv.id}
+                            onClick={() => handleDeleteInvoice(inv.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Tab: Payment History ── */}
+      {activeTab === 'payments' && (
+        <Card>
+          <CardContent className="p-0">
+            {invLoading ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary" />
+              </div>
+            ) : payments.length === 0 ? (
+              <div className="text-center py-10 text-gray-400">
+                <DollarSign className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                <p>No payments recorded yet.</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b">
+                    <th className="text-left px-4 py-3 font-medium">Date</th>
+                    <th className="text-left px-4 py-3 font-medium">Student</th>
+                    <th className="text-left px-4 py-3 font-medium">Invoice</th>
+                    <th className="text-left px-4 py-3 font-medium">Method</th>
+                    <th className="text-left px-4 py-3 font-medium">Reference</th>
+                    <th className="text-right px-4 py-3 font-medium">Amount</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {invoices.slice(0, 10).map((invoice) => (
-                    <tr key={invoice.id} className="border-b hover:bg-gray-50">
-                      <td className="p-3 font-mono text-sm">{invoice.invoice_number}</td>
-                      <td className="p-3">
-                        {invoice.first_name} {invoice.last_name}
-                        <span className="text-xs text-gray-500 block">{invoice.admission_number}</span>
+                <tbody className="divide-y">
+                  {payments.map((p: any) => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-xs">{new Date(p.payment_date).toLocaleDateString('en-KE')}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium">{p.first_name} {p.last_name}</p>
                       </td>
-                      <td className="p-3 text-right">KES {parseFloat(invoice.net_amount || 0).toLocaleString()}</td>
-                      <td className="p-3 text-right text-green-600">KES {parseFloat(invoice.paid_amount || 0).toLocaleString()}</td>
-                      <td className="p-3 text-right text-red-600">KES {parseFloat(invoice.balance_amount || 0).toLocaleString()}</td>
-                      <td className="p-3 text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                          invoice.status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
-                          invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {invoice.status}
-                        </span>
-                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.invoice_number || '—'}</td>
+                      <td className="px-4 py-3 capitalize">{(p.payment_method || '').replace('_', ' ')}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{p.transaction_id || '—'}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-green-700">{fmt(p.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Fee Statement modal */}
+      {selectedStudent && (
+        <FeeStatementModal
+          student={selectedStudent}
+          onClose={() => setSelectedStudent(null)}
+          onPaymentRecorded={loadSummary}
+        />
+      )}
 
       <RecordPaymentModal
         open={showPaymentModal}
         onOpenChange={setShowPaymentModal}
-        onSuccess={loadData}
+        onSuccess={loadSummary}
       />
       <GenerateInvoicesModal
         open={showInvoiceModal}
         onOpenChange={setShowInvoiceModal}
-        onSuccess={loadData}
+        onSuccess={() => { loadSummary(); if (activeTab === 'invoices') loadInvoices(); }}
       />
     </div>
   );

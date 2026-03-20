@@ -605,13 +605,14 @@ router.post('/payment', async (req, res) => {
     }
 
     const paymentId = uuidv4();
+    const receiptNumber = 'RCP-' + Date.now().toString(36).toUpperCase();
 
     if (!actualInvoiceId && actualStudentId) {
       // Student-only payment (no invoice) — general credit on account
       await query(
-        `INSERT INTO fee_payments (id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date, tenant_id)
-         VALUES ($1, $2, $3, $4, $5, $6, 'success', COALESCE($7::timestamptz, NOW()), $8)`,
-        [paymentId, actualStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, tid]
+        `INSERT INTO fee_payments (id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date, receipt_number, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, 'success', COALESCE($7::timestamptz, NOW()), $8, $9)`,
+        [paymentId, actualStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, receiptNumber, tid]
       );
       return res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
     }
@@ -628,9 +629,9 @@ router.post('/payment', async (req, res) => {
     const invStudentId = actualStudentId || invCheck[0].student_id;
 
     await query(
-      `INSERT INTO fee_payments (id, invoice_id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'success', COALESCE($8::timestamptz, NOW()), $9)`,
-      [paymentId, actualInvoiceId, invStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, tid]
+      `INSERT INTO fee_payments (id, invoice_id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date, receipt_number, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'success', COALESCE($8::timestamptz, NOW()), $9, $10)`,
+      [paymentId, actualInvoiceId, invStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, receiptNumber, tid]
     );
 
     await query(
@@ -701,61 +702,316 @@ router.get('/defaulters', async (req, res) => {
   }
 });
 
-// Get student fee account
+// Get student fee account — full ledger with expected fees
 router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const studentId = req.params.studentId;
+    const { academic_year, term } = req.query;
+    const year = academic_year || new Date().getFullYear().toString();
 
-    const student = await query(
-      'SELECT id FROM students WHERE (id = $1 OR user_id = $1) AND tenant_id = $2',
-      [studentId, tid]
+    // Resolve student
+    const studentRows = await query(
+      `SELECT s.*, c.name AS class_name, c.education_level
+       FROM students s
+       LEFT JOIN classes c ON c.id = s.class_id
+       WHERE (s.id = $1 OR s.user_id = $1) AND s.tenant_id = $2`,
+      [req.params.studentId, tid]
     );
+    if (!studentRows.length) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+    const std = studentRows[0];
 
-    const actualStudentId = student.length > 0 ? student[0].id : studentId;
+    // Full invoice list with all fields
+    const invoices = await query(`
+      SELECT fi.*, fs.name AS structure_name
+      FROM fee_invoices fi
+      LEFT JOIN fee_structure fs ON fi.fee_structure_id = fs.id
+      WHERE fi.student_id = $1 AND fi.tenant_id = $2
+      ORDER BY fi.created_at DESC
+    `, [std.id, tid]);
 
-    const invoices = await query(
-      'SELECT * FROM fee_invoices WHERE student_id = $1 AND tenant_id = $2 ORDER BY created_at DESC',
-      [actualStudentId, tid]
-    );
-
+    // Full payment list with method/reference
     const payments = await query(`
-      SELECT fp.* FROM fee_payments fp
+      SELECT fp.*, fi.invoice_number
+      FROM fee_payments fp
       LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
       WHERE (fi.student_id = $1 OR fp.student_id = $1) AND fp.tenant_id = $2
       ORDER BY fp.payment_date DESC
-    `, [actualStudentId, tid]);
+    `, [std.id, tid]);
 
-    const summary = await query(`
-      SELECT
-        COALESCE(SUM(total_amount), 0)::numeric as total_amount,
-        COALESCE(SUM(total_amount - balance_amount), 0)::numeric as total_paid,
-        COALESCE(SUM(balance_amount), 0)::numeric as total_balance
-      FROM fee_invoices WHERE student_id = $1 AND tenant_id = $2
-    `, [actualStudentId, tid]);
+    // Expected fee structures
+    const structures = await query(`
+      SELECT fs.*, c.name AS class_name
+      FROM fee_structure fs
+      LEFT JOIN classes c ON c.id = fs.class_id
+      WHERE fs.tenant_id = $1 AND fs.is_active = true
+        AND (fs.class_id = $2 OR fs.class_id IS NULL)
+        AND (fs.student_type = 'all' OR fs.student_type = $3)
+        AND fs.academic_year = $4
+      ORDER BY fs.name
+    `, [tid, std.class_id, std.student_type || 'all', year]);
+
+    // Extra fees
+    const extraFees = await query(`
+      SELECT ef.*, c.name AS class_name
+      FROM extra_fees ef
+      LEFT JOIN classes c ON c.id = ef.class_id
+      WHERE ef.tenant_id = $1 AND ef.is_active = true
+        AND (ef.student_id = $2 OR (ef.class_id = $3 AND ef.student_id IS NULL) OR (ef.class_id IS NULL AND ef.student_id IS NULL))
+        AND (ef.term IS NULL OR ef.term = $4)
+        AND (ef.academic_year IS NULL OR ef.academic_year = $5)
+      ORDER BY ef.name
+    `, [tid, std.id, std.class_id, term || null, term ? year : null]);
+
+    const totalExpected = structures.reduce((s, r) => s + parseFloat(r.amount || 0), 0)
+                        + extraFees.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+    const totalInvoiced = invoices.reduce((s, r) => s + parseFloat(r.net_amount || 0), 0);
+    const totalPaid     = invoices.reduce((s, r) => s + parseFloat(r.paid_amount || 0), 0);
+    const totalBalance  = invoices.reduce((s, r) => s + parseFloat(r.balance_amount || 0), 0);
 
     res.json({
       success: true,
       data: {
-        total_fees: summary[0]?.total_amount || 0,
-        paid: summary[0]?.total_paid || 0,
-        pending: summary[0]?.total_balance || 0,
-        invoices: invoices.map(inv => ({
-          id: inv.id,
-          invoice_number: inv.invoice_number,
-          amount: inv.total_amount,
-          paid: parseFloat(inv.total_amount) - parseFloat(inv.balance_amount),
-          balance: inv.balance_amount,
-          due_date: inv.due_date,
-          status: inv.status,
-          description: inv.description || `Invoice ${inv.invoice_number}`
-        })),
-        payments
+        student: std,
+        invoices,   // raw — all fields intact (net_amount, paid_amount, balance_amount, description, term, status…)
+        payments,
+        structures,
+        extra_fees: extraFees,
+        summary: { total_expected: totalExpected, total_invoiced: totalInvoiced, total_paid: totalPaid, total_balance: totalBalance }
       }
     });
   } catch (error) {
     logger.error('Get student fee account error:', error);
     res.status(500).json({ success: false, message: 'Error fetching fee account' });
+  }
+});
+
+// Get a single payment receipt — used for print/share after recording
+router.get('/receipt/:paymentId', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const rows = await query(`
+      SELECT fp.*,
+             fi.invoice_number, fi.description AS invoice_description,
+             fi.net_amount AS invoice_amount, fi.balance_amount AS invoice_balance,
+             fi.term, fi.academic_year,
+             s.first_name, s.last_name, s.admission_number,
+             c.name AS class_name
+      FROM fee_payments fp
+      LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
+      LEFT JOIN students s ON COALESCE(fp.student_id, fi.student_id) = s.id
+      LEFT JOIN classes c ON s.class_id = c.id
+      WHERE fp.id = $1 AND fp.tenant_id = $2
+    `, [req.params.paymentId, tid]);
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Receipt not found' });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    logger.error('Get receipt error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching receipt' });
+  }
+});
+
+// ============== DELETE INVOICE ==============
+
+router.delete('/invoice/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const inv = await query(
+      'SELECT id FROM fee_invoices WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, tid]
+    );
+    if (!inv.length) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+    // Remove linked payments first then the invoice
+    await query('DELETE FROM fee_payments WHERE invoice_id = $1', [req.params.id]);
+    await query('DELETE FROM fee_invoices WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
+    res.json({ success: true, message: 'Invoice deleted' });
+  } catch (error) {
+    logger.error('Delete invoice error:', error);
+    res.status(500).json({ success: false, message: 'Error deleting invoice' });
+  }
+});
+
+// ============== EXPECTED FEES FOR A STUDENT ==============
+// Returns the fee structures that apply to the student's class + any student-level extra fees
+
+router.get('/expected/:studentId', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { academic_year, term } = req.query;
+    const year = academic_year || new Date().getFullYear().toString();
+
+    // Resolve student
+    const studentRows = await query(
+      `SELECT s.*, c.name AS class_name, c.education_level
+       FROM students s
+       LEFT JOIN classes c ON c.id = s.class_id
+       WHERE (s.id = $1 OR s.user_id = $1) AND s.tenant_id = $2`,
+      [req.params.studentId, tid]
+    );
+    if (!studentRows.length) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+    const std = studentRows[0];
+
+    // Fee structures for this class (and school-wide ones with no class)
+    const structures = await query(
+      `SELECT fs.*, c.name AS class_name
+       FROM fee_structure fs
+       LEFT JOIN classes c ON c.id = fs.class_id
+       WHERE fs.tenant_id = $1 AND fs.is_active = true
+         AND (fs.class_id = $2 OR fs.class_id IS NULL)
+         AND (fs.student_type = 'all' OR fs.student_type = $3)
+         AND fs.academic_year = $4
+       ORDER BY fs.name`,
+      [tid, std.class_id, std.student_type || 'all', year]
+    );
+
+    // Extra fees for this student's class and/or this specific student
+    const extraRows = await query(
+      `SELECT ef.*, c.name AS class_name
+       FROM extra_fees ef
+       LEFT JOIN classes c ON c.id = ef.class_id
+       WHERE ef.tenant_id = $1 AND ef.is_active = true
+         AND (
+           ef.student_id = $2
+           OR (ef.class_id = $3 AND ef.student_id IS NULL)
+           OR (ef.class_id IS NULL AND ef.student_id IS NULL)
+         )
+         AND (ef.term IS NULL OR ef.term = $4)
+         AND (ef.academic_year IS NULL OR ef.academic_year = $5)
+       ORDER BY ef.name`,
+      [tid, std.id, std.class_id, term || null, term ? year : null]
+    );
+
+    const totalExpected =
+      structures.reduce((s, r) => s + parseFloat(r.amount || 0), 0) +
+      extraRows.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+
+    res.json({
+      success: true,
+      data: { student: std, structures, extra_fees: extraRows, total_expected: totalExpected }
+    });
+  } catch (error) {
+    logger.error('Get expected fees error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching expected fees' });
+  }
+});
+
+// ============== STUDENTS FEE SUMMARY ==============
+// All students with their invoiced / paid / balance totals — for the fee management table
+
+router.get('/students-summary', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { search, classId } = req.query;
+
+    let sql = `
+      SELECT s.id, s.first_name, s.last_name, s.admission_number,
+             s.class_id, s.student_type,
+             c.name AS class_name, c.education_level,
+             COALESCE(SUM(fi.net_amount),     0)::numeric AS total_invoiced,
+             COALESCE(SUM(fi.paid_amount),    0)::numeric AS total_paid,
+             COALESCE(SUM(fi.balance_amount), 0)::numeric AS total_balance,
+             COUNT(fi.id)::int                            AS invoice_count
+      FROM students s
+      LEFT JOIN classes c ON c.id = s.class_id
+      LEFT JOIN fee_invoices fi
+             ON fi.student_id = s.id AND fi.tenant_id = $1
+             AND fi.status NOT IN ('cancelled')
+      WHERE s.tenant_id = $1 AND s.status = 'active'
+    `;
+    const params = [tid];
+    let pi = 2;
+
+    if (search) {
+      sql += ` AND (s.first_name ILIKE $${pi} OR s.last_name ILIKE $${pi} OR s.admission_number ILIKE $${pi})`;
+      params.push(`%${search}%`); pi++;
+    }
+    if (classId) {
+      sql += ` AND s.class_id = $${pi++}`;
+      params.push(classId);
+    }
+
+    sql += ` GROUP BY s.id, s.first_name, s.last_name, s.admission_number,
+                      s.class_id, s.student_type, c.name, c.education_level
+             ORDER BY c.name, s.first_name`;
+
+    const students = await query(sql, params);
+    res.json({ success: true, data: students });
+  } catch (error) {
+    logger.error('Get students summary error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching students summary' });
+  }
+});
+
+// ============== GENERATE INVOICE FOR STUDENT FROM FEE STRUCTURES ==============
+
+router.post('/invoice/generate-for-student', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { student_id, academic_year, term, due_date } = req.body;
+    if (!student_id) return res.status(400).json({ success: false, message: 'student_id required' });
+
+    const year = academic_year || new Date().getFullYear().toString();
+
+    // Get student
+    const stdRows = await query(
+      'SELECT * FROM students WHERE id = $1 AND tenant_id = $2',
+      [student_id, tid]
+    );
+    if (!stdRows.length) return res.status(404).json({ success: false, message: 'Student not found' });
+    const std = stdRows[0];
+
+    // Get applicable fee structures
+    const structures = await query(
+      `SELECT * FROM fee_structure
+       WHERE tenant_id = $1 AND is_active = true
+         AND (class_id = $2 OR class_id IS NULL)
+         AND (student_type = 'all' OR student_type = $3)
+         AND academic_year = $4`,
+      [tid, std.class_id, std.student_type || 'all', year]
+    );
+    // Get extra fees
+    const extraRows = await query(
+      `SELECT * FROM extra_fees
+       WHERE tenant_id = $1 AND is_active = true
+         AND (student_id = $2 OR (class_id = $3 AND student_id IS NULL) OR (class_id IS NULL AND student_id IS NULL))
+         AND (term IS NULL OR term = $4)
+         AND (academic_year IS NULL OR academic_year = $5)`,
+      [tid, std.id, std.class_id, term || null, term ? year : null]
+    );
+
+    if (!structures.length && !extraRows.length) {
+      return res.status(400).json({ success: false, message: 'No active fee structures found for this student' });
+    }
+
+    const totalAmount = structures.reduce((s, r) => s + parseFloat(r.amount), 0) +
+                        extraRows.reduce((s, r) => s + parseFloat(r.amount), 0);
+
+    const invoiceId = uuidv4();
+    const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    const description = structures.map(s => s.name).concat(extraRows.map(e => e.name)).join(', ');
+
+    await query(
+      `INSERT INTO fee_invoices
+         (id, invoice_number, student_id, total_amount, net_amount, balance_amount,
+          due_date, status, tenant_id, description, term, academic_year)
+       VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9)`,
+      [invoiceId, invoiceNumber, student_id, totalAmount,
+       due_date || null, tid, description, term || null, year]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Invoice generated from fee structures',
+      data: { id: invoiceId, invoice_number: invoiceNumber, amount: totalAmount, description }
+    });
+  } catch (error) {
+    logger.error('Generate invoice for student error:', error);
+    res.status(500).json({ success: false, message: 'Error generating invoice' });
   }
 });
 

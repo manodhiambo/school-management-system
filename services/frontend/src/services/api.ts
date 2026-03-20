@@ -143,6 +143,10 @@ class ApiService {
     return this.api.get('/fee/student/' + studentId);
   }
 
+  getFeeReceipt(paymentId: string) {
+    return this.api.get('/fee/receipt/' + paymentId);
+  }
+
   // Teachers
   getTeachers(params?: any) {
     return this.api.get('/teachers', { params });
@@ -331,6 +335,22 @@ class ApiService {
 
   getFeeStatistics(params?: any) {
     return this.api.get('/fee/statistics', { params });
+  }
+
+  deleteFeeInvoice(id: string) {
+    return this.api.delete('/fee/invoice/' + id);
+  }
+
+  getExpectedFees(studentId: string, params?: any) {
+    return this.api.get('/fee/expected/' + studentId, { params });
+  }
+
+  getStudentsSummary(params?: any) {
+    return this.api.get('/fee/students-summary', { params });
+  }
+
+  generateInvoiceForStudent(data: any) {
+    return this.api.post('/fee/invoice/generate-for-student', data);
   }
 
   // M-Pesa Payments

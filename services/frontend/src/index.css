@@ -57,3 +57,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  body > *:not(.print-receipt) { display: none !important; }
+  .print-receipt { display: block !important; }
+}

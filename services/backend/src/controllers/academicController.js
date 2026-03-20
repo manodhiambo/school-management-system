@@ -43,7 +43,7 @@ class AcademicController {
   getClasses = asyncHandler(async (req, res) => {
     const filters = {
       academicYear: req.query.academicYear,
-      isActive: req.query.isActive === 'true',
+      isActive: req.query.isActive !== undefined ? req.query.isActive === 'true' : undefined,
       classTeacherId: req.query.classTeacherId
     };
     const classes = await academicService.getClasses(filters, req.tenantId);

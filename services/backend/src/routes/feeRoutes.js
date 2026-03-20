@@ -445,10 +445,13 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Select at least one fee structure' });
     }
 
-    // Load fee structures
+    // Load fee structures — only for this tenant
     const placeholders = fee_structure_ids.map((_, i) => `$${i + 2}`).join(',');
     const structures = await query(
-      `SELECT * FROM fee_structure WHERE id IN (${placeholders}) AND tenant_id = $1`,
+      `SELECT fs.*, ef.student_id AS extra_fee_student_id, ef.class_id AS extra_fee_class_id
+       FROM fee_structure fs
+       LEFT JOIN extra_fees ef ON ef.id = fs.extra_fee_id AND ef.tenant_id = $1
+       WHERE fs.id IN (${placeholders}) AND fs.tenant_id = $1`,
       [tid, ...fee_structure_ids]
     );
 
@@ -499,6 +502,18 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
         if (struct.class_id && student.class_id !== struct.class_id) {
           summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'class_mismatch' });
           continue;
+        }
+        // Extra-fee-linked: if the original extra fee is student-scoped, only that student gets it
+        if (struct.extra_fee_id) {
+          if (struct.extra_fee_student_id && struct.extra_fee_student_id !== student.id) {
+            summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'student_mismatch' });
+            continue;
+          }
+          // extra_fee_class_id already handled by struct.class_id above, but guard anyway
+          if (!struct.extra_fee_student_id && struct.extra_fee_class_id && student.class_id !== struct.extra_fee_class_id) {
+            summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'class_mismatch' });
+            continue;
+          }
         }
         // Filter by student_type
         if (struct.student_type !== 'all' && student.student_type !== struct.student_type) {

@@ -135,6 +135,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
   }
   const reasonLabel: Record<string, string> = {
     class_mismatch: 'Not in target class',
+    student_mismatch: 'Fee is for a specific student only',
     student_type_mismatch: 'Student type mismatch (day/boarding)',
     no_transport: 'Not assigned to any transport route',
     route_mismatch: 'Wrong transport route',

@@ -114,8 +114,8 @@ async function generateStudentReportPDF(
       ? [margin, margin + 48, margin + 80, margin + 100, margin + 116, margin + 128, margin + 148]
       : [margin, margin + 52, margin + 88, margin + 110, margin + 124, margin + 140];
     const colHeads = hasJSS
-      ? ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Pts', 'Comment']
-      : ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Comment'];
+      ? ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Pts', 'Facilitator']
+      : ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Facilitator'];
     doc.setFillColor(219, 234, 254);
     doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
     doc.setFont('helvetica', 'bold');
@@ -132,7 +132,7 @@ async function generateStudentReportPDF(
       }
       const grade = a.cbc_grade || a.pre_primary_grade || '';
       const score = a.result_code ? a.result_code : (a.score != null ? `${a.score}/${a.max_score}` : '—');
-      const comment = a.teacher_comments || (grade ? AUTO_COMMENTS[grade] : '—') || '—';
+      const facilitator = (a.teacher_name || '—');
       const period = a.exam_period ? a.exam_period.replace('_', '-') : a.assessment_type || '';
 
       doc.text((a.subject_name || '—').slice(0, 24), colX[0], y + 5);
@@ -161,9 +161,9 @@ async function generateStudentReportPDF(
         doc.setFontSize(8);
         doc.text(pts, colX[4], y + 5);
         doc.setFont('helvetica', 'normal');
-        doc.text(comment.slice(0, 22), colX[5], y + 5);
+        doc.text(facilitator.slice(0, 22), colX[5], y + 5);
       } else {
-        doc.text(comment.slice(0, 24), colX[4], y + 5);
+        doc.text(facilitator.slice(0, 24), colX[4], y + 5);
       }
       y += 7;
     });

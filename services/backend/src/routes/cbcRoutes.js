@@ -522,11 +522,16 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
     const rc = rows[0];
     const competencies = await query(
       `SELECT cs.*, sub.name as subject_name,
-              UPPER(u.first_name || ' ' || u.last_name) AS teacher_name
+              UPPER(t.first_name || ' ' || t.last_name) AS teacher_name,
+              CASE cs.overall_cbc_grade
+                WHEN 'EE' THEN 4 WHEN 'ME' THEN 3 WHEN 'AE' THEN 2 WHEN 'BE' THEN 1
+                WHEN 'WD' THEN 4 WHEN 'D'  THEN 2 WHEN 'B'  THEN 1
+                ELSE NULL
+              END AS grade_points
        FROM student_competency_summary cs
        JOIN subjects sub ON sub.id = cs.subject_id
        LEFT JOIN class_subjects csj ON csj.class_id = $4 AND csj.subject_id = cs.subject_id
-       LEFT JOIN users u ON u.id = csj.teacher_id
+       LEFT JOIN teachers t ON t.user_id = csj.teacher_id
        WHERE cs.student_id = $1 AND cs.term = $2 AND cs.academic_year = $3`,
       [rc.student_id, rc.term, rc.academic_year, rc.class_id]
     );

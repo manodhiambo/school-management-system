@@ -220,26 +220,30 @@ async function renderReportCardPage(
   doc.text('LEARNING AREAS PERFORMANCE', W / 2, y + 5.5, { align: 'center' });
   y += 9; doc.setTextColor(0, 0, 0);
 
-  // Column config: LEARNING AREAS | MARKS | DEV. | GRADE | FACILITATOR
+  // Column config: LEARNING AREA | TYPE/PERIOD | SCORE | GRADE | POINTS | FACILITATOR
   const COL = {
-    subject:     { x: M,       w: 58 },
-    marks:       { x: M + 58,  w: 16 },
-    dev:         { x: M + 74,  w: 14 },
-    grade:       { x: M + 88,  w: 16 },
-    facilitator: { x: M + 104, w: CW - 104 },
+    subject:     { x: M,        w: 55 },
+    period:      { x: M + 55,   w: 28 },
+    score:       { x: M + 83,   w: 22 },
+    grade:       { x: M + 105,  w: 16 },
+    points:      { x: M + 121,  w: 16 },
+    facilitator: { x: M + 137,  w: CW - 137 },
   };
+
+  const termPeriod = term === 'term1' ? 'END TERM 1' : term === 'term2' ? 'END TERM 2' : 'END TERM 3';
 
   // Column header row
   doc.setFillColor(189, 214, 238);
   doc.rect(M, y, CW, 8, 'F');
   doc.setDrawColor(160, 160, 160);
   doc.rect(M, y, CW, 8, 'D');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
   [
-    { k: 'subject',     t: 'LEARNING AREAS' },
-    { k: 'marks',       t: 'MARKS' },
-    { k: 'dev',         t: 'DEV.' },
+    { k: 'subject',     t: 'LEARNING AREA' },
+    { k: 'period',      t: 'TYPE/PERIOD' },
+    { k: 'score',       t: 'SCORE' },
     { k: 'grade',       t: 'GRADE' },
+    { k: 'points',      t: 'PTS' },
     { k: 'facilitator', t: 'FACILITATOR' },
   ].forEach(({ k, t }) => {
     const c = COL[k as keyof typeof COL];
@@ -267,10 +271,22 @@ async function renderReportCardPage(
       doc.line(col.x, y, col.x, y + rowH);
     });
 
+    const scoreStr = c.total_score != null && c.max_score != null
+      ? `${Number(c.total_score).toFixed(0)}/${Number(c.max_score).toFixed(0)}`
+      : pct;
+    const pts = c.grade_points != null ? String(c.grade_points) : (
+      grade === 'EE' || grade === 'WD' ? '4' :
+      grade === 'ME' ? '3' :
+      grade === 'AE' || grade === 'D' ? '2' :
+      grade === 'BE' || grade === 'B' ? '1' : '—'
+    );
+
     doc.setTextColor(0, 0, 0);
-    doc.text((c.subject_name || '').slice(0, 28), COL.subject.x + 2, y + 5.5);
-    doc.text(pct, COL.marks.x + 2, y + 5.5);
-    doc.text('—', COL.dev.x + 2, y + 5.5); // DEV not yet computed
+    doc.text((c.subject_name || '').slice(0, 26), COL.subject.x + 2, y + 5.5);
+    doc.setFontSize(6.5);
+    doc.text(termPeriod, COL.period.x + 2, y + 5.5);
+    doc.setFontSize(8);
+    doc.text(scoreStr, COL.score.x + 2, y + 5.5);
 
     // Grade badge
     if (grade) {
@@ -284,7 +300,10 @@ async function renderReportCardPage(
       doc.text('—', COL.grade.x + 2, y + 5.5);
     }
 
-    doc.text((c.teacher_name || '—').slice(0, 30), COL.facilitator.x + 2, y + 5.5);
+    doc.text(pts, COL.points.x + 2, y + 5.5);
+    doc.setFontSize(7.5);
+    doc.text((c.teacher_name || '—').slice(0, 28), COL.facilitator.x + 2, y + 5.5);
+    doc.setFontSize(8);
     y += rowH;
   });
   y += 4;

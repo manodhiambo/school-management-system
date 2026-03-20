@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { X, CheckCircle, XCircle, Clock } from 'lucide-react';
 import api from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 
 interface MarkAttendanceModalProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface MarkAttendanceModalProps {
 }
 
 export function MarkAttendanceModal({ open, onOpenChange, onSuccess }: MarkAttendanceModalProps) {
+  const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
@@ -35,8 +37,15 @@ export function MarkAttendanceModal({ open, onOpenChange, onSuccess }: MarkAtten
 
   const loadClasses = async () => {
     try {
-      const response: any = await api.getClasses();
-      setClasses(response.data || []);
+      let response: any;
+      if (user?.role === 'teacher') {
+        // Teachers only see their assigned classes
+        response = await api.getTeacherClasses(user.id);
+        setClasses(response?.data || []);
+      } else {
+        response = await api.getClasses();
+        setClasses(response?.data || []);
+      }
     } catch (error) {
       console.error('Error loading classes:', error);
     }

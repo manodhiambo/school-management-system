@@ -12,6 +12,7 @@ export function GradeBookPage() {
   const { user } = useAuthStore();
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [allAssignments, setAllAssignments] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<any>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [students, setStudents] = useState<any[]>([]);
@@ -33,26 +34,63 @@ export function GradeBookPage() {
 
   useEffect(() => {
     if (user?.id) {
-      loadClasses();
-      loadSubjects();
+      loadClassesAndAssignments();
     }
   }, [user?.id]);
 
   useEffect(() => {
     if (selectedClass) {
+      // Class teachers (is_class_teacher flag) can grade any subject in the class
+      if (selectedClass.is_class_teacher) {
+        loadAllClassSubjects(selectedClass.id);
+      } else {
+        // Subject teachers only see their assigned subjects for this class
+        const classSubjects = allAssignments
+          .filter((a: any) => a.class_id === selectedClass.id)
+          .map((a: any) => ({ id: a.subject_id, name: a.subject_name, code: a.subject_code }));
+        setSubjects(classSubjects);
+      }
+      setSelectedSubject('');
       loadStudents(selectedClass.id);
       loadGradebookEntries();
     }
-  }, [selectedClass, selectedSubject]);
+  }, [selectedClass, allAssignments]);
 
-  const loadClasses = async () => {
+  const loadAllClassSubjects = async (classId: string) => {
+    try {
+      const response: any = await api.getClassSubjects(classId);
+      const data = response?.data || [];
+      setSubjects(Array.isArray(data) ? data.map((cs: any) => ({
+        id: cs.subject_id,
+        name: cs.subject_name,
+        code: cs.code,
+      })) : []);
+    } catch (error) {
+      console.error('Error loading class subjects:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedClass) {
+      loadGradebookEntries();
+    }
+  }, [selectedSubject]);
+
+  const loadClassesAndAssignments = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response: any = await api.getTeacherClasses(user?.id || '');
-      const classesData = response?.data || response?.classes || response || [];
+      const [classesRes, assignmentsRes]: any[] = await Promise.all([
+        api.getTeacherClasses(user?.id || ''),
+        api.getTeacherSubjectAssignments(user?.id || ''),
+      ]);
+      const classesData = classesRes?.data || classesRes?.classes || classesRes || [];
       const arr = Array.isArray(classesData) ? classesData : [];
       setClasses(arr);
+
+      const assignmentsData = assignmentsRes?.data || [];
+      setAllAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
+
       if (arr.length > 0) {
         setSelectedClass(arr[0]);
       }
@@ -61,17 +99,6 @@ export function GradeBookPage() {
       setError(error?.message || 'Failed to load classes');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadSubjects = async () => {
-    try {
-      const response: any = await api.getSubjects();
-      const data = response?.data || response?.subjects || response || [];
-      const arr = Array.isArray(data) ? data : [];
-      setSubjects(arr);
-    } catch (error) {
-      console.error('Error loading subjects:', error);
     }
   };
 

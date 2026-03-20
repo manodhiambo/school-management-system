@@ -171,8 +171,9 @@ class TeacherService {
   }
 
   async getTeacherClasses(id, tenantId) {
+    // Resolve both teacher.id and user_id — class_subjects references users.id
     const teacherResult = await query(
-      'SELECT id FROM teachers WHERE (id = $1 OR user_id = $1) AND tenant_id = $2',
+      'SELECT id, user_id FROM teachers WHERE (id = $1 OR user_id = $1) AND tenant_id = $2',
       [id, tenantId]
     );
 
@@ -181,18 +182,35 @@ class TeacherService {
     }
 
     const teacherId = teacherResult[0].id;
+    const userId = teacherResult[0].user_id;
 
+    // Return classes where teacher is assigned as subject teacher (class_subjects.teacher_id = user_id)
+    // OR where teacher is the class teacher (teachers.class_id = class.id)
     const classes = await query(`
       SELECT DISTINCT c.*,
-        (SELECT COUNT(*)::int FROM students s WHERE s.class_id = c.id AND s.tenant_id = $2) as student_count
+        (SELECT COUNT(*)::int FROM students s WHERE s.class_id = c.id AND s.tenant_id = $3) as student_count,
+        (EXISTS (
+          SELECT 1 FROM teachers t2
+          WHERE t2.id = $1 AND t2.class_id = c.id AND t2.tenant_id = $3
+        )) as is_class_teacher
       FROM classes c
-      JOIN timetable tt ON tt.class_id = c.id
-      WHERE tt.teacher_id = $1
-        AND tt.is_active = true
+      WHERE c.tenant_id = $3
         AND c.is_active = true
-        AND c.tenant_id = $2
+        AND (
+          -- Subject teacher: assigned via class_subjects
+          EXISTS (
+            SELECT 1 FROM class_subjects cs
+            WHERE cs.class_id = c.id AND cs.teacher_id = $2 AND cs.tenant_id = $3
+          )
+          OR
+          -- Class teacher: assigned via teachers.class_id
+          EXISTS (
+            SELECT 1 FROM teachers t3
+            WHERE t3.id = $1 AND t3.class_id = c.id AND t3.tenant_id = $3
+          )
+        )
       ORDER BY c.name, c.section
-    `, [teacherId, tenantId]);
+    `, [teacherId, userId, tenantId]);
 
     return classes;
   }

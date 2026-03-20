@@ -254,12 +254,14 @@ router.get(
 // ── Teaching Assignments (class + subject pairs) ─────────────────────────────
 
 // Helper: resolve teacher's user_id (class_subjects.teacher_id references users.id)
+// Accepts either teachers.id or users.id (user_id) as input
 async function resolveTeacherUserId(teacherId, tenantId) {
   const rows = await query(
-    'SELECT user_id FROM teachers WHERE id = $1 AND tenant_id = $2',
+    'SELECT user_id FROM teachers WHERE (id = $1 OR user_id = $1) AND tenant_id = $2',
     [teacherId, tenantId]
   );
-  return rows[0]?.user_id || null;
+  // If found, return the user_id; otherwise treat input as already a user_id
+  return rows[0]?.user_id || teacherId;
 }
 
 // Helper: fetch assignment list for a given user_id

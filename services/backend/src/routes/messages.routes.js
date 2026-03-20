@@ -8,13 +8,14 @@ const router = express.Router();
 // Get messages
 router.get('/', authenticate, async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const messages = await query(`
-      SELECT * FROM messages 
-      WHERE recipient_id = ? OR sender_id = ?
+      SELECT * FROM messages
+      WHERE tenant_id = $1 AND (recipient_id = $2 OR sender_id = $2)
       ORDER BY created_at DESC
       LIMIT 50
-    `, [req.user.id, req.user.id]);
-    
+    `, [tid, req.user.id]);
+
     res.json({
       success: true,
       data: messages
@@ -29,14 +30,15 @@ router.get('/', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     const { recipient_id, subject, content } = req.body;
-    
+    const tid = req.user.tenant_id;
+
     const messageId = uuidv4();
-    
+
     await query(
-      'INSERT INTO messages (id, sender_id, recipient_id, subject, content) VALUES (?, ?, ?, ?, ?)',
-      [messageId, req.user.id, recipient_id, subject, content]
+      'INSERT INTO messages (id, sender_id, recipient_id, subject, content, tenant_id) VALUES ($1, $2, $3, $4, $5, $6)',
+      [messageId, req.user.id, recipient_id, subject, content, tid]
     );
-    
+
     res.status(201).json({
       success: true,
       message: 'Message sent successfully',

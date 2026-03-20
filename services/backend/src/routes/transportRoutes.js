@@ -26,17 +26,18 @@ router.get('/routes', authenticate, async (req, res) => {
 // GET /api/v1/transport/routes/:id
 router.get('/routes/:id', authenticate, async (req, res) => {
   try {
-    const rows = await query('SELECT * FROM transport_routes WHERE id=$1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    const rows = await query('SELECT * FROM transport_routes WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
     if (!rows.length) return res.status(404).json({ success: false, message: 'Route not found' });
     // Get students on this route
     const students = await query(
       `SELECT st.*, s.first_name||' '||s.last_name as student_name,
        s.admission_number, c.name as class_name
        FROM student_transport st
-       JOIN students s ON s.id = st.student_id
+       JOIN students s ON s.id = st.student_id AND s.tenant_id=$2
        LEFT JOIN classes c ON c.id = s.class_id
-       WHERE st.route_id=$1 AND st.is_active=TRUE ORDER BY s.first_name`,
-      [req.params.id]
+       WHERE st.route_id=$1 AND st.is_active=TRUE AND st.tenant_id=$2 ORDER BY s.first_name`,
+      [req.params.id, tid]
     );
     res.json({ success: true, data: { ...rows[0], students } });
   } catch (err) {
@@ -83,6 +84,7 @@ router.put('/routes/:id', authenticate, async (req, res) => {
       morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee, is_active,
       fare_per_km, distance_km
     } = req.body;
+    const tid = req.user.tenant_id;
     const rows = await query(
       `UPDATE transport_routes SET
        route_name=COALESCE($1,route_name), route_code=COALESCE($2,route_code),
@@ -96,13 +98,13 @@ router.put('/routes/:id', authenticate, async (req, res) => {
        term_fee=COALESCE($15,term_fee), is_active=COALESCE($16,is_active),
        fare_per_km=COALESCE($17,fare_per_km), distance_km=COALESCE($18,distance_km),
        updated_at=NOW()
-       WHERE id=$19 RETURNING *`,
+       WHERE id=$19 AND tenant_id=$20 RETURNING *`,
       [route_name, route_code, description, vehicle_registration, vehicle_capacity,
        driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
        morning_pickup_time, afternoon_dropoff_time,
        stops ? JSON.stringify(stops) : null,
        monthly_fee, term_fee, is_active,
-       fare_per_km, distance_km, req.params.id]
+       fare_per_km, distance_km, req.params.id, tid]
     );
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -113,7 +115,8 @@ router.put('/routes/:id', authenticate, async (req, res) => {
 // DELETE /api/v1/transport/routes/:id
 router.delete('/routes/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM transport_routes WHERE id=$1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query('DELETE FROM transport_routes WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
     res.json({ success: true, message: 'Route deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -192,7 +195,8 @@ router.post('/students/bulk', authenticate, async (req, res) => {
 // DELETE /api/v1/transport/students/:id — unassign student
 router.delete('/students/:id', authenticate, async (req, res) => {
   try {
-    await query('UPDATE student_transport SET is_active=FALSE WHERE id=$1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query('UPDATE student_transport SET is_active=FALSE WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
     res.json({ success: true, message: 'Student removed from route' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

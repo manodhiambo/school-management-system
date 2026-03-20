@@ -55,91 +55,125 @@ async function renderReportCardPage(
   doc.setTextColor(0, 0, 0);
 
   // ── 1. SCHOOL HEADER ───────────────────────────────────────────────────────
-  // Logo
+  const logoSize = 26;
+  const photoSize = 26;
+  const headerH = 32;
+
+  // School logo — LEFT corner
   if (school?.school_logo_url) {
     try {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       await new Promise<void>((resolve) => {
-        img.onload = () => { try { doc.addImage(img, 'PNG', M, 4, 24, 24); } catch { /* skip */ } resolve(); };
+        img.onload = () => { try { doc.addImage(img, 'PNG', M, 3, logoSize, logoSize); } catch { /* skip */ } resolve(); };
         img.onerror = () => resolve();
         img.src = school.school_logo_url;
       });
     } catch { /* skip */ }
+  } else {
+    // Logo placeholder box
+    doc.setFillColor(230, 230, 230); doc.setDrawColor(180, 180, 180);
+    doc.rect(M, 3, logoSize, logoSize, 'FD');
+    doc.setFontSize(5); doc.setTextColor(160, 160, 160);
+    doc.text('LOGO', M + logoSize / 2, 3 + logoSize / 2, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
   }
 
-  // School name
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-  doc.text((school?.school_name || 'SCHOOL NAME').toUpperCase(), W / 2, 10, { align: 'center' });
-
-  // Address / Tel / Email
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  // School info — centered between logo and student photo
+  const hTextX = M + logoSize + 2;
+  const hTextW = W - M - logoSize - 2 - photoSize - 2 - M;
+  const hCenterX = hTextX + hTextW / 2;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.setTextColor(0, 0, 0);
+  doc.text((school?.school_name || 'SCHOOL NAME').toUpperCase(), hCenterX, 10, { align: 'center' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
   const addrParts = [school?.address, school?.city, school?.state].filter(Boolean).join(', ');
-  if (addrParts) doc.text(`Address: ${addrParts}`, W / 2, 16, { align: 'center' });
-  if (school?.phone) doc.text(`Tel: ${school.phone}`, W / 2, 21, { align: 'center' });
-  if (school?.email) doc.text(`Email: ${school.email}`, W / 2, 26, { align: 'center' });
+  let hy = 16;
+  if (addrParts) { doc.text(addrParts, hCenterX, hy, { align: 'center' }); hy += 5; }
+  if (school?.phone) { doc.text(`Tel: ${school.phone}`, hCenterX, hy, { align: 'center' }); hy += 5; }
+  if (school?.email) { doc.text(school.email, hCenterX, hy, { align: 'center' }); hy += 5; }
+  if (school?.motto) {
+    doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(7);
+    doc.text(school.motto, hCenterX, hy, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+  }
 
-  // Blue title banner
+  // Student photo — RIGHT corner
+  const photoX = W - M - photoSize;
+  const studentPhotoUrl = detail.photo_url || detail.profile_picture || detail.student_photo_url || null;
+  if (studentPhotoUrl) {
+    try {
+      const sImg = new Image();
+      sImg.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve) => {
+        sImg.onload = () => { try { doc.addImage(sImg, 'JPEG', photoX, 3, photoSize, photoSize); } catch { /* skip */ } resolve(); };
+        sImg.onerror = () => resolve();
+        sImg.src = studentPhotoUrl;
+      });
+    } catch { /* skip */ }
+  } else {
+    doc.setFillColor(220, 220, 220); doc.setDrawColor(160, 160, 160);
+    doc.rect(photoX, 3, photoSize, photoSize, 'FD');
+    doc.setFontSize(5.5); doc.setTextColor(130, 130, 130);
+    doc.text('PHOTO', photoX + photoSize / 2, 3 + photoSize / 2, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+  }
+
+  // "LEARNER ASSESSMENT REPORT CARD" title banner
   const termRoman = term === 'term1' ? 'I' : term === 'term2' ? 'II' : 'III';
   const termLabel = `END TERM ${termRoman}`;
   doc.setFillColor(21, 101, 192);
-  doc.rect(M, 29, CW, 10, 'F');
-  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.rect(M, headerH + 2, CW, 7, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.text('LEARNER ASSESSMENT REPORT CARD', W / 2, headerH + 7, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
+
+  // Thin blue sub-banner with term/class info
+  doc.setFillColor(189, 214, 238);
+  doc.rect(M, headerH + 10, CW, 6, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(21, 101, 192);
   doc.text(
-    `ACADEMIC REPORT FORM – ${(detail.class_name || '').toUpperCase()} – ${termLabel} – (${academicYear} TERM ${termRoman})`,
-    W / 2, 35.5, { align: 'center' }
+    `${(detail.class_name || '').toUpperCase()} – ${termLabel} – ${academicYear}`,
+    W / 2, headerH + 14.5, { align: 'center' }
   );
   doc.setTextColor(0, 0, 0);
-  y = 42;
+  y = headerH + 18;
 
-  // ── 2. STUDENT INFO + PERFORMANCE SNAPSHOT ────────────────────────────────
-  // Photo placeholder
-  doc.setFillColor(220, 220, 220); doc.setDrawColor(160, 160, 160);
-  doc.rect(M, y, 28, 36, 'FD');
-  doc.setTextColor(140, 140, 140); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-  doc.text('PHOTO', M + 14, y + 19, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
-
-  // Student details (right of photo)
-  const sd = M + 32;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-  doc.text((detail.student_name || '').toUpperCase(), sd, y + 8);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-  doc.text(`ADMNO:${detail.admission_number || ''}`, sd, y + 15);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-  doc.setTextColor(22, 163, 74);
-  doc.text(`GRADE:${detail.class_name || ''}`, sd, y + 22);
-  doc.setTextColor(0, 0, 0);
-
-  // Performance snapshot (right side, small box)
+  // ── 2. STUDENT INFO ROW ───────────────────────────────────────────────────
+  // Full-width student details (no photo here — photo is in header)
   const comps: any[] = detail.competencies || [];
   const totalPts = comps.reduce((s: number, c: any) => s + (GRADE_POINTS[c.overall_cbc_grade || c.pre_primary_grade || ''] || 0), 0);
   const maxPts = comps.length * 4;
   const meanPts = comps.length ? totalPts / comps.length : 0;
   const perfLevel = meanPts >= 3.5 ? 'Exceeding Expectations' : meanPts >= 2.5 ? 'Meeting Expectations' : meanPts >= 1.5 ? 'Approaching Expectations' : 'Below Expectations';
 
-  const snapX = M + CW - 62;
-  doc.setFillColor(248, 248, 248); doc.setDrawColor(200, 200, 200);
-  doc.rect(snapX, y, 62, 36, 'FD');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(80, 80, 80);
-  doc.text('Learning Area Performance', snapX + 31, y + 5, { align: 'center' });
-  // Mini bar chart for each subject
-  const barMaxW = 40;
-  const barH = 3;
-  const barStartX = snapX + 4;
-  const barY0 = y + 9;
-  comps.slice(0, 8).forEach((c: any, i: number) => {
-    const pct = Number(c.percentage) || 0;
-    const barW = (pct / 100) * barMaxW;
-    const grade = c.overall_cbc_grade || c.pre_primary_grade || '';
-    const [r, g, b] = GRADE_HEX[grade] || [150, 150, 150];
-    doc.setFillColor(r, g, b);
-    doc.rect(barStartX, barY0 + i * 3.5, barW, barH, 'F');
-    doc.setFontSize(5); doc.setTextColor(80, 80, 80);
-    doc.text(`${Math.round(pct)}%`, barStartX + barMaxW + 1, barY0 + i * 3.5 + 2.5);
+  // Name / Adm / Grade / Stream / Term / Year info grid
+  const infoRowH = 7;
+  const infoCol = [M, M + 20, M + 80, M + 110, M + 140, M + 160];
+  const infoW   = [20, 60,     30,     30,      20,      CW - 150];
+  const row1Labels = ['NAME', detail.student_name || '', 'GRADE', detail.class_name || '', 'ADMNO', detail.admission_number || ''];
+  const row2Labels = ['STREAM', detail.class_name || '', 'TERM', termLabel, 'YEAR', academicYear];
+
+  [row1Labels, row2Labels].forEach((rowData, ri) => {
+    const ry = y + ri * infoRowH;
+    doc.setFillColor(ri === 0 ? 240 : 248, ri === 0 ? 240 : 248, ri === 0 ? 240 : 248);
+    doc.rect(M, ry, CW, infoRowH, 'F');
+    doc.setDrawColor(200, 200, 200); doc.rect(M, ry, CW, infoRowH, 'D');
+    rowData.forEach((txt, ci) => {
+      if (ci > 0 && infoCol[ci]) {
+        doc.setDrawColor(200, 200, 200);
+        doc.line(infoCol[ci], ry, infoCol[ci], ry + infoRowH);
+      }
+      const isBold = ci % 2 === 0;
+      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+      doc.setFontSize(isBold ? 6.5 : 8);
+      doc.setTextColor(isBold ? 80 : 0, isBold ? 80 : 0, isBold ? 80 : 0);
+      const cx = infoCol[ci] + (infoW[ci] || 30) / 2;
+      doc.text(String(txt).slice(0, 20), cx, ry + 4.8, { align: 'center' });
+    });
   });
   doc.setTextColor(0, 0, 0);
-  y += 39;
+  y += 2 * infoRowH + 3;
 
   // ── 3. STATS BAR ─────────────────────────────────────────────────────────
   const statW = CW / 4;
@@ -180,7 +214,7 @@ async function renderReportCardPage(
   doc.text('LEARNING AREAS PERFORMANCE', W / 2, y + 5.5, { align: 'center' });
   y += 9; doc.setTextColor(0, 0, 0);
 
-  // Column config: LEARNING AREAS | MARKS | DEV. | GRADE | PERFORMANCE LEVEL | TEACHER
+  // Column config: LEARNING AREAS | MARKS | DEV. | GRADE | PERFORMANCE LEVEL | FACILITATOR
   const COL = {
     subject: { x: M,        w: 58 },
     marks:   { x: M + 58,   w: 16 },
@@ -202,7 +236,7 @@ async function renderReportCardPage(
     { k: 'dev',     t: 'DEV.' },
     { k: 'grade',   t: 'GRADE' },
     { k: 'perf',    t: 'PERFORMANCE LEVEL' },
-    { k: 'teacher', t: 'TEACHER' },
+    { k: 'teacher', t: 'FACILITATOR' },
   ].forEach(({ k, t }) => {
     const c = COL[k as keyof typeof COL];
     doc.text(t, c.x + 2, y + 5.5);
@@ -259,33 +293,40 @@ async function renderReportCardPage(
   const remH = 38;
   const remY = y;
 
-  // Class Teacher box
+  // Class Teacher / Facilitator box
   doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
   doc.rect(M, remY, remW, remH, 'FD');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-  doc.text(`Class Teacher Remarks: ${detail.class_teacher_name || ''}`, M + 3, remY + 6);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
+  doc.text("CLASS TEACHER'S COMMENT", M + 3, remY + 5.5);
+  // Facilitator name shown prominently
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(21, 101, 192);
+  doc.text(detail.class_teacher_name || '—', M + 3, remY + 12);
+  doc.setTextColor(0, 0, 0);
   if (detail.class_teacher_comment) {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
     const lines = doc.splitTextToSize(String(detail.class_teacher_comment), remW - 6);
-    doc.text(lines.slice(0, 4), M + 3, remY + 12);
+    doc.text(lines.slice(0, 3), M + 3, remY + 18);
   }
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
   doc.text('Signature:', M + 3, remY + remH - 5);
   doc.setDrawColor(0, 0, 0);
   doc.line(M + 26, remY + remH - 5, M + remW - 3, remY + remH - 5);
 
-  // Principal box
+  // Head Teacher / Principal box
   const prX = M + remW + 4;
   doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
   doc.rect(prX, remY, remW, remH, 'FD');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-  doc.text(`Principal Remarks: ${school?.school_name ? '' : ''}`, prX + 3, remY + 6);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
+  doc.text("HEAD TEACHER'S COMMENT", prX + 3, remY + 5.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(21, 101, 192);
+  doc.text(school?.school_name ? `${school.school_name}` : '—', prX + 3, remY + 12);
+  doc.setTextColor(0, 0, 0);
   if (detail.head_teacher_comment) {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
     const lines2 = doc.splitTextToSize(String(detail.head_teacher_comment), remW - 6);
-    doc.text(lines2.slice(0, 4), prX + 3, remY + 12);
+    doc.text(lines2.slice(0, 3), prX + 3, remY + 18);
   }
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
   doc.text('Signature:', prX + 3, remY + remH - 5);
   doc.setDrawColor(0, 0, 0);
   doc.line(prX + 26, remY + remH - 5, prX + remW - 3, remY + remH - 5);
@@ -484,6 +525,7 @@ export function CbcReportCardPage() {
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [showShare, setShowShare] = useState(false);
   const [shareResult, setShareResult] = useState<any>(null);
+  const [shareContact, setShareContact] = useState({ name: '', phone: '', email: '' });
   const [downloading, setDownloading] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
@@ -514,7 +556,7 @@ export function CbcReportCardPage() {
   });
 
   const shareMutation = useMutation({
-    mutationFn: (channels: string[]) => api.shareReportCard(detail?.id, channels),
+    mutationFn: (channels: string[]) => api.shareReportCard(detail?.id, channels, shareContact),
     onSuccess: (res: any) => setShareResult(res?.data?.results || res?.results || {}),
   });
 
@@ -784,7 +826,15 @@ export function CbcReportCardPage() {
                       </Button>
                     )}
                     {detail.status === 'published' || detail.status === 'acknowledged' ? (
-                      <Button size="sm" variant="outline" onClick={() => { setShowShare(true); setShareResult(null); }}
+                      <Button size="sm" variant="outline" onClick={() => {
+                          setShareContact({
+                            name: detail?.guardian_name || '',
+                            phone: detail?.guardian_phone || '',
+                            email: detail?.guardian_email || '',
+                          });
+                          setShareResult(null);
+                          setShowShare(true);
+                        }}
                         className="flex items-center gap-1 border-green-300 text-green-700 hover:bg-green-50">
                         <Share2 className="h-4 w-4" />
                         Share with Parent
@@ -814,29 +864,55 @@ export function CbcReportCardPage() {
                 {detail.competencies?.length > 0 && (
                   <div>
                     <h3 className="font-semibold text-sm text-gray-700 mb-2">Learning Areas</h3>
-                    <div className="space-y-2">
-                      {detail.competencies.map((c: any) => (
-                        <div key={c.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                          <span className="text-sm font-medium">{c.subject_name}</span>
-                          <div className="flex items-center gap-2">
-                            {c.percentage && <span className="text-xs text-gray-500">{c.percentage}%</span>}
-                            {(c.overall_cbc_grade || c.pre_primary_grade) && (
-                              <Badge className={GRADE_COLORS[c.overall_cbc_grade || c.pre_primary_grade] || 'bg-gray-100'}>
-                                {c.overall_cbc_grade || c.pre_primary_grade}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-blue-50 text-blue-800">
+                            <th className="text-left px-3 py-1.5 font-semibold">Learning Area</th>
+                            <th className="text-center px-2 py-1.5 font-semibold">Marks</th>
+                            <th className="text-center px-2 py-1.5 font-semibold">Grade</th>
+                            <th className="text-left px-2 py-1.5 font-semibold hidden sm:table-cell">Performance</th>
+                            <th className="text-left px-2 py-1.5 font-semibold">Facilitator</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detail.competencies.map((c: any, i: number) => (
+                            <tr key={c.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-3 py-1.5 text-gray-800 font-medium">{c.subject_name}</td>
+                              <td className="px-2 py-1.5 text-center text-gray-600">
+                                {c.percentage ? `${Math.round(Number(c.percentage))}%` : '—'}
+                              </td>
+                              <td className="px-2 py-1.5 text-center">
+                                {(c.overall_cbc_grade || c.pre_primary_grade) ? (
+                                  <Badge className={`text-xs ${GRADE_COLORS[c.overall_cbc_grade || c.pre_primary_grade] || 'bg-gray-100'}`}>
+                                    {c.overall_cbc_grade || c.pre_primary_grade}
+                                  </Badge>
+                                ) : '—'}
+                              </td>
+                              <td className="px-2 py-1.5 text-gray-600 hidden sm:table-cell">
+                                {c.overall_cbc_grade || c.pre_primary_grade
+                                  ? (GRADE_LABEL_FULL[c.overall_cbc_grade || c.pre_primary_grade] || '—')
+                                  : '—'}
+                              </td>
+                              <td className="px-2 py-1.5 text-gray-700 font-medium">
+                                {c.teacher_name || '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}
 
-                {/* Teacher comment */}
-                {detail.class_teacher_comment && (
+                {/* Facilitator / Class teacher */}
+                {detail.class_teacher_name && (
                   <div className="bg-blue-50 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-blue-700 mb-1">Class Teacher's Comment</p>
-                    <p className="text-sm text-blue-900">{detail.class_teacher_comment}</p>
+                    <p className="text-xs font-semibold text-blue-500 mb-0.5">Class Teacher / Facilitator</p>
+                    <p className="text-sm font-bold text-blue-900">{detail.class_teacher_name}</p>
+                    {detail.class_teacher_comment && (
+                      <p className="text-xs text-blue-700 mt-1 italic">{detail.class_teacher_comment}</p>
+                    )}
                   </div>
                 )}
 
@@ -845,6 +921,60 @@ export function CbcReportCardPage() {
                   <div className="bg-purple-50 rounded-lg p-3">
                     <p className="text-xs font-semibold text-purple-700 mb-1">Head Teacher's Comment</p>
                     <p className="text-sm text-purple-900">{detail.head_teacher_comment}</p>
+                  </div>
+                )}
+
+                {/* Fee Breakdown — includes standard fees, extra fees and transport */}
+                {detail.fee_breakdown && detail.fee_breakdown.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-sm text-gray-700 mb-2">Fee Account</h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-100 text-gray-600">
+                            <th className="text-left px-3 py-1.5 font-semibold">Fee Item</th>
+                            <th className="text-right px-3 py-1.5 font-semibold">Charged</th>
+                            <th className="text-right px-3 py-1.5 font-semibold">Paid</th>
+                            <th className="text-right px-3 py-1.5 font-semibold">Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detail.fee_breakdown.map((f: any, i: number) => (
+                            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-3 py-1.5 text-gray-800">
+                                {f.is_transport_fee
+                                  ? `Transport${f.route_name ? ` (${f.route_name})` : ''}`
+                                  : f.fee_name}
+                                {f.is_extra_fee && <span className="ml-1 text-purple-500 font-medium">(Extra)</span>}
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-gray-700">
+                                {Number(f.total_amount || 0).toLocaleString('en-KE')}
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-green-700">
+                                {Number(f.paid_amount || 0).toLocaleString('en-KE')}
+                              </td>
+                              <td className={`px-3 py-1.5 text-right font-medium ${Number(f.balance_amount) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {Number(f.balance_amount || 0).toLocaleString('en-KE')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-blue-50 font-semibold border-t">
+                            <td className="px-3 py-1.5 text-gray-800">TOTAL</td>
+                            <td className="px-3 py-1.5 text-right text-gray-800">
+                              {detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.total_amount || 0), 0).toLocaleString('en-KE')}
+                            </td>
+                            <td className="px-3 py-1.5 text-right text-green-700">
+                              {detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.paid_amount || 0), 0).toLocaleString('en-KE')}
+                            </td>
+                            <td className={`px-3 py-1.5 text-right ${detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.balance_amount || 0), 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.balance_amount || 0), 0).toLocaleString('en-KE')}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
                   </div>
                 )}
 
@@ -894,44 +1024,73 @@ export function CbcReportCardPage() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               {/* Student info */}
               <div className="bg-indigo-50 rounded-xl p-3">
                 <p className="font-semibold text-indigo-900">{detail.student_name}</p>
                 <p className="text-sm text-indigo-600">{detail.class_name} · {detail.term?.replace('term', 'Term ')} {detail.academic_year}</p>
               </div>
 
-              {/* Parent contact info (read-only) */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Registered Parent / Guardian Contact</p>
-                {detail.guardian_name && (
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span>{detail.guardian_name}
-                      {detail.guardian_relationship ? ` (${detail.guardian_relationship})` : ''}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  {detail.guardian_phone ? (
-                    <span className="text-gray-700 font-mono">{detail.guardian_phone}</span>
-                  ) : (
-                    <span className="text-red-500 italic">No phone number registered</span>
+              {/* Editable contact fields */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Recipient Contact</p>
+                  {(detail.guardian_name || detail.guardian_phone || detail.guardian_email) && (
+                    <button
+                      className="text-xs text-indigo-500 hover:text-indigo-700 underline"
+                      onClick={() => setShareContact({
+                        name: detail.guardian_name || '',
+                        phone: detail.guardian_phone || '',
+                        email: detail.guardian_email || '',
+                      })}
+                    >
+                      Reset to registered contact
+                    </button>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <AtSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  {detail.guardian_email ? (
-                    <span className="text-gray-700">{detail.guardian_email}</span>
-                  ) : (
-                    <span className="text-red-500 italic">No email address registered</span>
-                  )}
+
+                <div>
+                  <Label className="text-xs text-gray-600">
+                    <Users className="h-3 w-3 inline mr-1" />Name
+                  </Label>
+                  <Input
+                    value={shareContact.name}
+                    onChange={e => setShareContact(c => ({ ...c, name: e.target.value }))}
+                    placeholder="Parent / Guardian name"
+                    className="mt-1"
+                  />
                 </div>
-                {!detail.guardian_phone && !detail.guardian_email && (
-                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+
+                <div>
+                  <Label className="text-xs text-gray-600">
+                    <Phone className="h-3 w-3 inline mr-1" />Phone (WhatsApp)
+                  </Label>
+                  <Input
+                    value={shareContact.phone}
+                    onChange={e => setShareContact(c => ({ ...c, phone: e.target.value }))}
+                    placeholder="e.g. 0712 345 678"
+                    className="mt-1 font-mono"
+                    type="tel"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-600">
+                    <AtSign className="h-3 w-3 inline mr-1" />Email address
+                  </Label>
+                  <Input
+                    value={shareContact.email}
+                    onChange={e => setShareContact(c => ({ ...c, email: e.target.value }))}
+                    placeholder="parent@email.com"
+                    className="mt-1"
+                    type="email"
+                  />
+                </div>
+
+                {!shareContact.phone && !shareContact.email && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700">No parent contact details found. Ask the school office to link a parent/guardian to this student.</p>
+                    <p className="text-xs text-amber-700">Enter a phone number (for WhatsApp) or email address to send the report card.</p>
                   </div>
                 )}
               </div>
@@ -943,11 +1102,11 @@ export function CbcReportCardPage() {
                     <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${shareResult.email?.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                       <Mail className="h-4 w-4 flex-shrink-0" />
                       {shareResult.email?.success
-                        ? 'Email sent successfully to parent.'
+                        ? `Email sent successfully to ${shareContact.email || 'recipient'}.`
                         : `Email failed: ${shareResult.email?.error}`}
                     </div>
                   )}
-                  {shareResult.whatsapp !== undefined && shareResult.whatsapp?.success && (
+                  {shareResult.whatsapp?.success && (
                     <a
                       href={shareResult.whatsapp.waUrl}
                       target="_blank"
@@ -955,7 +1114,7 @@ export function CbcReportCardPage() {
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
                     >
                       <MessageCircle className="h-4 w-4 flex-shrink-0" />
-                      Open WhatsApp to send message →
+                      Tap to open WhatsApp and send →
                     </a>
                   )}
                   {shareResult.whatsapp !== undefined && !shareResult.whatsapp?.success && (
@@ -969,44 +1128,55 @@ export function CbcReportCardPage() {
 
               {/* Action buttons */}
               <div className="flex flex-col gap-2 pt-2 border-t">
-                {/* Email */}
+                {/* Download PDF first */}
                 <button
-                  onClick={() => shareMutation.mutate(['email'])}
-                  disabled={shareMutation.isPending || !detail.guardian_email}
-                  className="flex items-center justify-center gap-2 w-full rounded-xl py-3 px-4 font-semibold text-sm
-                    bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  onClick={() => handleDownload('selected')}
+                  disabled={downloading}
+                  className="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 px-4 font-medium text-sm
+                    border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
-                  <Mail className="h-4 w-4" />
-                  {shareMutation.isPending ? 'Sending…' : `Send Email to ${detail.guardian_email || 'parent'}`}
+                  {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {downloading ? 'Generating PDF…' : 'Download PDF'}
                 </button>
 
                 {/* WhatsApp */}
                 <button
-                  onClick={() => shareMutation.mutate(['whatsapp'])}
-                  disabled={shareMutation.isPending || !detail.guardian_phone}
+                  onClick={() => { setShareResult(null); shareMutation.mutate(['whatsapp']); }}
+                  disabled={shareMutation.isPending || !shareContact.phone}
                   className="flex items-center justify-center gap-2 w-full rounded-xl py-3 px-4 font-semibold text-sm
                     bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <MessageCircle className="h-4 w-4" />
-                  {shareMutation.isPending ? 'Preparing…' : `Send via WhatsApp to ${detail.guardian_phone || 'parent'}`}
+                  {shareMutation.isPending ? 'Preparing…' : `Send via WhatsApp${shareContact.phone ? ` → ${shareContact.phone}` : ''}`}
+                </button>
+
+                {/* Email */}
+                <button
+                  onClick={() => { setShareResult(null); shareMutation.mutate(['email']); }}
+                  disabled={shareMutation.isPending || !shareContact.email}
+                  className="flex items-center justify-center gap-2 w-full rounded-xl py-3 px-4 font-semibold text-sm
+                    bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Mail className="h-4 w-4" />
+                  {shareMutation.isPending ? 'Sending…' : `Send Email${shareContact.email ? ` → ${shareContact.email}` : ''}`}
                 </button>
 
                 {/* Both */}
-                {detail.guardian_email && detail.guardian_phone && (
+                {shareContact.email && shareContact.phone && (
                   <button
-                    onClick={() => shareMutation.mutate(['email', 'whatsapp'])}
+                    onClick={() => { setShareResult(null); shareMutation.mutate(['email', 'whatsapp']); }}
                     disabled={shareMutation.isPending}
                     className="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 px-4 font-medium text-sm
                       border border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Share2 className="h-4 w-4" />
-                    Send via Both (Email + WhatsApp)
+                    Send via Both (WhatsApp + Email)
                   </button>
                 )}
               </div>
 
               <p className="text-xs text-gray-400 text-center">
-                Messages are sent only to the registered contact details shown above.
+                You can type any contact details above — not limited to registered parents.
               </p>
             </div>
           </div>

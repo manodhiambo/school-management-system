@@ -503,6 +503,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       `SELECT rc.*,
        s.first_name||' '||s.last_name AS student_name,
        s.admission_number, s.date_of_birth, s.nemis_number,
+       s.photo_url, s.profile_picture,
        c.name AS class_name, c.education_level,
        p.first_name||' '||p.last_name AS guardian_name,
        p.relationship AS guardian_relationship,
@@ -513,7 +514,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
        JOIN classes c ON c.id = rc.class_id
        LEFT JOIN parents p ON p.id = s.parent_id
        LEFT JOIN users pu ON pu.id = p.user_id
-       WHERE rc.id = $1`, [req.params.id]
+       WHERE rc.id = $1 AND rc.tenant_id = $2`, [req.params.id, req.user.tenant_id]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     const rc = rows[0];
@@ -620,9 +621,9 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       const transportAssignment = await query(
         `SELECT st.student_id, tr.route_name, tr.term_fee
          FROM student_transport st
-         JOIN transport_routes tr ON tr.id = st.route_id
-         WHERE st.student_id = $1 AND st.is_active = TRUE LIMIT 1`,
-        [rc.student_id]
+         JOIN transport_routes tr ON tr.id = st.route_id AND tr.tenant_id = $2
+         WHERE st.student_id = $1 AND st.tenant_id = $2 AND st.is_active = TRUE LIMIT 1`,
+        [rc.student_id, rc.tenant_id]
       ).catch(() => []);
       if (transportAssignment.length > 0) {
         const ta = transportAssignment[0];
@@ -673,7 +674,9 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
 // POST /api/v1/cbc/report-cards/:id/share — send report card to parent via email and/or WhatsApp
 router.post('/report-cards/:id/share', authenticate, async (req, res) => {
   try {
-    const { channels = ['email'] } = req.body; // channels: ['email', 'whatsapp']
+    // channels: ['email', 'whatsapp']
+    // override_email / override_phone / override_name let the sender specify a custom recipient
+    const { channels = ['email'], override_email, override_phone, override_name } = req.body;
     const tid = req.user.tenant_id;
 
     // Load report card with parent contacts + school name
@@ -702,6 +705,11 @@ router.post('/report-cards/:id/share', authenticate, async (req, res) => {
     if (!rows.length) return res.status(404).json({ success: false, message: 'Report card not found' });
 
     const rc = rows[0];
+    // Use override contacts if provided, fall back to registered parent contacts
+    const toName  = (override_name  || '').trim() || rc.guardian_name  || 'Parent/Guardian';
+    const toEmail = (override_email || '').trim() || rc.guardian_email || null;
+    const toPhone = (override_phone || '').trim() || rc.guardian_phone || null;
+
     const termLabel = (rc.term || '').replace('term', 'Term ');
     const gradeLabel = rc.overall_grade
       ? `${rc.overall_grade} (${
@@ -715,35 +723,37 @@ router.post('/report-cards/:id/share', authenticate, async (req, res) => {
     const results = {};
 
     // ── Email ────────────────────────────────────────────────────────────────
-    if (channels.includes('email') && rc.guardian_email) {
-      const emailResult = await sendEmail(rc.guardian_email, 'reportCard', {
-        guardianName: rc.guardian_name || 'Parent/Guardian',
-        studentName: rc.student_name,
-        className: rc.class_name,
-        term: termLabel,
-        academicYear: rc.academic_year,
-        overallGrade: gradeLabel,
-        daysPresent: rc.days_present ?? 'N/A',
-        daysAbsent: rc.days_absent ?? 'N/A',
-        teacherComment: rc.class_teacher_comment || '',
-        schoolName: rc.school_name || 'the school',
-        loginUrl: process.env.FRONTEND_URL || 'https://skulmanager.org/login',
-      });
-      results.email = emailResult;
-    } else if (channels.includes('email')) {
-      results.email = { success: false, error: 'No email address registered for this parent' };
+    if (channels.includes('email')) {
+      if (toEmail) {
+        const emailResult = await sendEmail(toEmail, 'reportCard', {
+          guardianName: toName,
+          studentName: rc.student_name,
+          className: rc.class_name,
+          term: termLabel,
+          academicYear: rc.academic_year,
+          overallGrade: gradeLabel,
+          daysPresent: rc.days_present ?? 'N/A',
+          daysAbsent: rc.days_absent ?? 'N/A',
+          teacherComment: rc.class_teacher_comment || '',
+          schoolName: rc.school_name || 'the school',
+          loginUrl: process.env.FRONTEND_URL || 'https://skulmanager.org/login',
+        });
+        results.email = emailResult;
+      } else {
+        results.email = { success: false, error: 'No email address provided' };
+      }
     }
 
-    // ── WhatsApp (return data for client-side wa.me link) ────────────────────
+    // ── WhatsApp (return wa.me link for client to open) ───────────────────────
     if (channels.includes('whatsapp')) {
-      if (rc.guardian_phone) {
+      if (toPhone) {
         // Normalise phone to international format (Kenya +254)
-        let phone = rc.guardian_phone.replace(/\D/g, '');
+        let phone = toPhone.replace(/\D/g, '');
         if (phone.startsWith('0')) phone = '254' + phone.slice(1);
-        else if (!phone.startsWith('254')) phone = '254' + phone;
+        else if (!phone.startsWith('254') && phone.length <= 9) phone = '254' + phone;
 
         const message =
-          `Dear ${rc.guardian_name || 'Parent/Guardian'},\n\n` +
+          `Dear ${toName},\n\n` +
           `${rc.student_name}'s CBC Report Card for ${termLabel} ${rc.academic_year} is ready.\n\n` +
           `📚 Class: ${rc.class_name}\n` +
           `🏅 Overall Grade: ${gradeLabel}\n` +
@@ -759,7 +769,7 @@ router.post('/report-cards/:id/share', authenticate, async (req, res) => {
           waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
         };
       } else {
-        results.whatsapp = { success: false, error: 'No phone number registered for this parent' };
+        results.whatsapp = { success: false, error: 'No phone number provided' };
       }
     }
 

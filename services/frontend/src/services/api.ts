@@ -1024,7 +1024,14 @@ class ApiService {
   createCbcReportCard(data: any) { return this.api.post('/cbc/report-cards', data); }
   generateCbcReportCards(data: any) { return this.api.post('/cbc/report-cards/generate', data); }
   publishCbcReportCard(id: string) { return this.api.put('/cbc/report-cards/' + id + '/publish'); }
-  shareReportCard(id: string, channels: string[]) { return this.api.post('/cbc/report-cards/' + id + '/share', { channels }); }
+  shareReportCard(id: string, channels: string[], contact?: { name: string; phone: string; email: string }) {
+    return this.api.post('/cbc/report-cards/' + id + '/share', {
+      channels,
+      override_email: contact?.email || undefined,
+      override_phone: contact?.phone || undefined,
+      override_name:  contact?.name  || undefined,
+    });
+  }
   acknowledgeCbcReportCard(id: string, data: any) { return this.api.put('/cbc/report-cards/' + id + '/acknowledge', data); }
 
   // Portfolios

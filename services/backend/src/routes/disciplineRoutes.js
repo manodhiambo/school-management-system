@@ -59,13 +59,14 @@ router.get('/stats', authenticate, async (req, res) => {
 // GET /api/v1/discipline/:id
 router.get('/:id', authenticate, async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const rows = await query(
       `SELECT di.*, s.first_name||' '||s.last_name as student_name,
        s.admission_number, c.name as class_name
        FROM discipline_incidents di
        JOIN students s ON s.id = di.student_id
        LEFT JOIN classes c ON c.id = di.class_id
-       WHERE di.id=$1`, [req.params.id]
+       WHERE di.id=$1 AND di.tenant_id=$2`, [req.params.id, tid]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: rows[0] });
@@ -123,6 +124,7 @@ router.put('/:id', authenticate, async (req, res) => {
       action_taken, action_details, suspension_days, suspension_start,
       suspension_end, follow_up_notes, is_resolved, parent_response
     } = req.body;
+    const tid = req.user.tenant_id;
     const rows = await query(
       `UPDATE discipline_incidents SET
        action_taken=COALESCE($1,action_taken), action_details=COALESCE($2,action_details),
@@ -131,9 +133,9 @@ router.put('/:id', authenticate, async (req, res) => {
        is_resolved=COALESCE($7,is_resolved),
        resolved_at=CASE WHEN $7=TRUE THEN NOW() ELSE resolved_at END,
        parent_response=COALESCE($8,parent_response), updated_at=NOW()
-       WHERE id=$9 RETURNING *`,
+       WHERE id=$9 AND tenant_id=$10 RETURNING *`,
       [action_taken, action_details, suspension_days, suspension_start,
-       suspension_end, follow_up_notes, is_resolved, parent_response, req.params.id]
+       suspension_end, follow_up_notes, is_resolved, parent_response, req.params.id, tid]
     );
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -144,7 +146,8 @@ router.put('/:id', authenticate, async (req, res) => {
 // DELETE /api/v1/discipline/:id
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM discipline_incidents WHERE id=$1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query('DELETE FROM discipline_incidents WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
     res.json({ success: true, message: 'Incident deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

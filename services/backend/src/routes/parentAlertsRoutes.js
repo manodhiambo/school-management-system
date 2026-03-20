@@ -116,7 +116,8 @@ router.get('/unread-count', authenticate, async (req, res) => {
 // PUT /:id/read — mark single alert as read
 router.put('/:id/read', authenticate, async (req, res) => {
   try {
-    await query('UPDATE parent_alerts SET is_read=TRUE, read_at=NOW() WHERE id=$1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query('UPDATE parent_alerts SET is_read=TRUE, read_at=NOW() WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -181,12 +182,13 @@ router.post('/broadcast', authenticate, async (req, res) => {
 // GET /student/:studentId — all alerts for a student (admin/teacher view)
 router.get('/student/:studentId', authenticate, async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const rows = await query(
       `SELECT pa.*, p.first_name||' '||p.last_name as parent_name
        FROM parent_alerts pa
-       JOIN parents p ON p.id = pa.parent_id
-       WHERE pa.student_id=$1 ORDER BY pa.created_at DESC LIMIT 100`,
-      [req.params.studentId]
+       JOIN parents p ON p.id = pa.parent_id AND p.tenant_id=$2
+       WHERE pa.student_id=$1 AND pa.tenant_id=$2 ORDER BY pa.created_at DESC LIMIT 100`,
+      [req.params.studentId, tid]
     );
     res.json({ success: true, data: rows });
   } catch (err) {

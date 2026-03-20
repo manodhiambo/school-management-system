@@ -260,7 +260,7 @@ router.get('/invoice', async (req, res) => {
       FROM fee_invoices fi
       JOIN students s ON fi.student_id = s.id
       LEFT JOIN classes c ON s.class_id = c.id
-      WHERE s.tenant_id = $1
+      WHERE fi.tenant_id = $1
     `;
     const params = [tid];
     let paramIndex = 2;
@@ -543,7 +543,7 @@ router.get('/payment', async (req, res) => {
       FROM fee_payments fp
       LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
       LEFT JOIN students s ON COALESCE(fp.student_id, fi.student_id) = s.id
-      WHERE s.tenant_id = $1
+      WHERE fp.tenant_id = $1
     `;
     const params = [tid];
     let paramIndex = 2;
@@ -622,8 +622,8 @@ router.post('/payment', async (req, res) => {
              ELSE 'partial'
            END,
            updated_at = NOW()
-       WHERE id = $2`,
-      [amount, actualInvoiceId]
+       WHERE id = $2 AND tenant_id = $3`,
+      [amount, actualInvoiceId, tid]
     );
 
     res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });

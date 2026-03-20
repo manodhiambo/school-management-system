@@ -80,8 +80,9 @@ router.post('/records', authenticate, async (req, res) => {
 // GET /api/v1/health/profile/:studentId
 router.get('/profile/:studentId', authenticate, async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const rows = await query(
-      'SELECT * FROM student_medical_profile WHERE student_id=$1', [req.params.studentId]
+      'SELECT * FROM student_medical_profile WHERE student_id=$1 AND tenant_id=$2', [req.params.studentId, tid]
     );
     res.json({ success: true, data: rows[0] || null });
   } catch (err) {
@@ -124,7 +125,8 @@ router.post('/profile', authenticate, async (req, res) => {
 // DELETE /api/v1/health/records/:id
 router.delete('/records/:id', authenticate, async (req, res) => {
   try {
-    await query('DELETE FROM student_health_records WHERE id=$1', [req.params.id]);
+    const tid = req.user.tenant_id;
+    await query('DELETE FROM student_health_records WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
     res.json({ success: true, message: 'Health record deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

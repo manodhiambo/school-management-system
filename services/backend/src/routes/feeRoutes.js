@@ -545,7 +545,7 @@ router.get('/payment', async (req, res) => {
     const tid = req.user.tenant_id;
 
     let sql = `
-      SELECT fp.*, fi.invoice_number, s.first_name, s.last_name
+      SELECT fp.*, fi.invoice_number, s.first_name, s.last_name, s.admission_number
       FROM fee_payments fp
       LEFT JOIN fee_invoices fi ON fp.invoice_id = fi.id
       LEFT JOIN students s ON COALESCE(fp.student_id, fi.student_id) = s.id
@@ -831,6 +831,47 @@ router.delete('/invoice/:id', requireRole(['admin']), async (req, res) => {
   } catch (error) {
     logger.error('Delete invoice error:', error);
     res.status(500).json({ success: false, message: 'Error deleting invoice' });
+  }
+});
+
+// ============== DELETE PAYMENT ==============
+// Reverses the payment amount on the linked invoice then removes the record
+
+router.delete('/payment/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+
+    const payments = await query(
+      'SELECT * FROM fee_payments WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, tid]
+    );
+    if (!payments.length) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+    const payment = payments[0];
+
+    // If linked to an invoice, reverse the paid amount and recalculate balance
+    if (payment.invoice_id) {
+      await query(
+        `UPDATE fee_invoices
+         SET paid_amount = GREATEST(0, COALESCE(paid_amount, 0) - $1),
+             balance_amount = LEAST(net_amount, COALESCE(balance_amount, net_amount) + $1),
+             status = CASE
+               WHEN (COALESCE(paid_amount, 0) - $1) <= 0 THEN 'pending'
+               WHEN (COALESCE(paid_amount, 0) - $1) < net_amount THEN 'partial'
+               ELSE status
+             END,
+             updated_at = NOW()
+         WHERE id = $2 AND tenant_id = $3`,
+        [payment.amount, payment.invoice_id, tid]
+      );
+    }
+
+    await query('DELETE FROM fee_payments WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
+    res.json({ success: true, message: 'Payment deleted and invoice balance reversed' });
+  } catch (error) {
+    logger.error('Delete payment error:', error);
+    res.status(500).json({ success: false, message: 'Error deleting payment' });
   }
 });
 

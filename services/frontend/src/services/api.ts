@@ -357,6 +357,10 @@ class ApiService {
     return this.api.delete('/fee/invoice/' + id);
   }
 
+  deleteFeePayment(id: string) {
+    return this.api.delete('/fee/payment/' + id);
+  }
+
   getExpectedFees(studentId: string, params?: any) {
     return this.api.get('/fee/expected/' + studentId, { params });
   }

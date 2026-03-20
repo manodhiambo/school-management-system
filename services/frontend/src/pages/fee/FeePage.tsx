@@ -28,6 +28,7 @@ interface Invoice {
 interface Payment {
   id: string; amount: number; payment_method: string;
   payment_date: string; transaction_id: string; remarks: string;
+  invoice_id?: string; receipt_number?: string;
 }
 interface ExpectedFee {
   id: string; name: string; amount: number; frequency?: string; description?: string;
@@ -209,6 +210,7 @@ function FeeStatementModal({
   const [schoolName, setSchoolName] = useState('School');
   const [genLoading, setGenLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deletingPmt, setDeletingPmt] = useState<string | null>(null);
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
@@ -257,6 +259,19 @@ function FeeStatementModal({
       alert(e?.response?.data?.message || 'Failed to delete invoice');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleDeletePayment = async (pmtId: string) => {
+    if (!confirm('Delete this payment? The invoice balance will be reversed.')) return;
+    setDeletingPmt(pmtId);
+    try {
+      await api.deleteFeePayment(pmtId);
+      await load();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to delete payment');
+    } finally {
+      setDeletingPmt(null);
     }
   };
 
@@ -420,6 +435,7 @@ function FeeStatementModal({
                         <th className="text-left px-3 py-2">Reference</th>
                         <th className="text-left px-3 py-2">Remarks</th>
                         <th className="text-right px-3 py-2">Amount</th>
+                        <th className="px-2 py-2" />
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -427,9 +443,19 @@ function FeeStatementModal({
                         <tr key={p.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2 text-xs">{new Date(p.payment_date).toLocaleDateString('en-KE')}</td>
                           <td className="px-3 py-2 capitalize">{(p.payment_method || '').replace('_', ' ')}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{p.transaction_id || '—'}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{p.transaction_id || p.receipt_number || '—'}</td>
                           <td className="px-3 py-2 text-xs text-gray-500">{p.remarks || '—'}</td>
                           <td className="px-3 py-2 text-right font-semibold text-green-700">{fmt(p.amount)}</td>
+                          <td className="px-2 py-2 text-right">
+                            <button
+                              className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
+                              title="Delete payment"
+                              disabled={deletingPmt === p.id}
+                              onClick={() => handleDeletePayment(p.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -472,6 +498,7 @@ export function FeePage() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [searchInv, setSearchInv] = useState('');
   const [deletingInv, setDeletingInv] = useState<string | null>(null);
+  const [deletingPay, setDeletingPay] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -518,7 +545,7 @@ export function FeePage() {
   }, [activeTab, loadInvoices, loadPayments]);
 
   const handleDeleteInvoice = async (id: string) => {
-    if (!confirm('Delete this invoice and its payments?')) return;
+    if (!confirm('Delete this invoice and all its payments? This cannot be undone.')) return;
     setDeletingInv(id);
     try {
       await api.deleteFeeInvoice(id);
@@ -528,6 +555,20 @@ export function FeePage() {
       alert(e?.response?.data?.message || 'Failed to delete');
     } finally {
       setDeletingInv(null);
+    }
+  };
+
+  const handleDeletePayment = async (id: string) => {
+    if (!confirm('Delete this payment? The invoice balance will be reversed.')) return;
+    setDeletingPay(id);
+    try {
+      await api.deleteFeePayment(id);
+      loadPayments();
+      loadSummary();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to delete payment');
+    } finally {
+      setDeletingPay(null);
     }
   };
 
@@ -803,6 +844,7 @@ export function FeePage() {
                     <th className="text-left px-4 py-3 font-medium">Method</th>
                     <th className="text-left px-4 py-3 font-medium">Reference</th>
                     <th className="text-right px-4 py-3 font-medium">Amount</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -811,11 +853,22 @@ export function FeePage() {
                       <td className="px-4 py-3 text-xs">{new Date(p.payment_date).toLocaleDateString('en-KE')}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium">{p.first_name} {p.last_name}</p>
+                        {p.admission_number && <p className="text-xs text-gray-400">{p.admission_number}</p>}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.invoice_number || '—'}</td>
                       <td className="px-4 py-3 capitalize">{(p.payment_method || '').replace('_', ' ')}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{p.transaction_id || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{p.transaction_id || p.receipt_number || '—'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-green-700">{fmt(p.amount)}</td>
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
+                          title="Delete payment (reverses invoice balance)"
+                          disabled={deletingPay === p.id}
+                          onClick={() => handleDeletePayment(p.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -199,11 +199,13 @@ router.get('/assessments', authenticate, async (req, res) => {
     const { student_id, class_id, subject_id, term, academic_year } = req.query;
     const tid = req.user.tenant_id;
     let sql = `SELECT a.*, s.first_name||' '||s.last_name as student_name,
-               sub.name as subject_name, st.name as strand_name
+               sub.name as subject_name, st.name as strand_name,
+               UPPER(u.first_name || ' ' || u.last_name) AS teacher_name
                FROM cbc_assessments a
                JOIN students s ON s.id = a.student_id
                JOIN subjects sub ON sub.id = a.subject_id
                LEFT JOIN cbc_strands st ON st.id = a.strand_id
+               LEFT JOIN users u ON u.id = a.teacher_id
                WHERE a.tenant_id = $1`;
     const params = [tid];
     if (student_id) { sql += ` AND a.student_id = $${params.length+1}`; params.push(student_id); }
@@ -503,7 +505,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       `SELECT rc.*,
        s.first_name||' '||s.last_name AS student_name,
        s.admission_number, s.date_of_birth, s.nemis_number,
-       s.photo_url, s.profile_picture,
+       s.profile_photo_url,
        c.name AS class_name, c.education_level,
        p.first_name||' '||p.last_name AS guardian_name,
        p.relationship AS guardian_relationship,

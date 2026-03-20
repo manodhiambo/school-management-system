@@ -100,13 +100,19 @@ async function renderReportCardPage(
 
   // Student photo — RIGHT corner
   const photoX = W - M - photoSize;
-  const studentPhotoUrl = detail.photo_url || detail.profile_picture || detail.student_photo_url || null;
+  const studentPhotoUrl = detail.profile_photo_url || null;
   if (studentPhotoUrl) {
     try {
       const sImg = new Image();
       sImg.crossOrigin = 'anonymous';
       await new Promise<void>((resolve) => {
-        sImg.onload = () => { try { doc.addImage(sImg, 'JPEG', photoX, 3, photoSize, photoSize); } catch { /* skip */ } resolve(); };
+        sImg.onload = () => {
+          try {
+            const fmt = studentPhotoUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(sImg, fmt, photoX, 3, photoSize, photoSize);
+          } catch { /* skip */ }
+          resolve();
+        };
         sImg.onerror = () => resolve();
         sImg.src = studentPhotoUrl;
       });
@@ -797,12 +803,29 @@ export function CbcReportCardPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle>{detail.student_name}</CardTitle>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {detail.class_name} · {detail.term?.replace('term', 'Term ')} · {detail.academic_year}
-                    </p>
-                    <p className="text-xs text-gray-400">Admission: {detail.admission_number}</p>
+                  <div className="flex items-start gap-4">
+                    {/* Student passport photo */}
+                    <div className="flex-shrink-0">
+                      {detail.profile_photo_url ? (
+                        <img
+                          src={detail.profile_photo_url}
+                          alt={detail.student_name}
+                          className="w-20 h-20 rounded-lg object-cover border-2 border-gray-200 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-lg bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center">
+                          <span className="text-2xl text-gray-300">📷</span>
+                          <span className="text-xs text-gray-400 mt-1">No Photo</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <CardTitle>{detail.student_name}</CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {detail.class_name} · {detail.term?.replace('term', 'Term ')} · {detail.academic_year}
+                      </p>
+                      <p className="text-xs text-gray-400">Admission: {detail.admission_number}</p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {statusBadge(detail.status)}

@@ -177,7 +177,7 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       dateOfBirth, date_of_birth, gender, bloodGroup, blood_group,
       classId, class_id, parentId, parent_id, admissionDate, admission_date,
       address, city, state, pincode, phonePrimary, phone_primary, phone,
-      student_type, studentType, uses_transport
+      student_type, studentType, uses_transport, profile_photo_url
     } = req.body;
 
     const actualFirstName = firstName || first_name;
@@ -237,14 +237,14 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       `INSERT INTO students (
         id, user_id, admission_number, first_name, last_name, date_of_birth,
         gender, blood_group, class_id, parent_id, admission_date,
-        address, city, state, pincode, phone, student_type, uses_transport, tenant_id, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'active')`,
+        address, city, state, pincode, phone, student_type, uses_transport, tenant_id, status, profile_photo_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'active', $20)`,
       [
         studentId, userId, admissionNumber, actualFirstName, actualLastName,
         actualDateOfBirth, actualGender, actualBloodGroup,
         actualClassId, actualParentId, actualAdmissionDate,
         address || null, city || null, state || null, pincode || null, actualPhone,
-        actualStudentType, actualUsesTransport, tid
+        actualStudentType, actualUsesTransport, tid, profile_photo_url || null
       ]
     );
 
@@ -274,7 +274,7 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
       firstName, first_name, lastName, last_name, dateOfBirth, date_of_birth,
       gender, bloodGroup, blood_group, classId, class_id, parentId, parent_id,
       address, city, state, pincode, phone, status, admission_number, student_type,
-      uses_transport
+      uses_transport, profile_photo_url
     } = req.body;
 
     // Convert empty strings to null for UUID fields
@@ -282,6 +282,7 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
     const actualParentId = (parentId || parent_id) || null;
     const actualDob = (dateOfBirth || date_of_birth) || null;
 
+    const updatePhotoUrl = 'profile_photo_url' in req.body;
     await query(
       `UPDATE students SET
         first_name = COALESCE($1, first_name),
@@ -300,6 +301,7 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
         admission_number = COALESCE(NULLIF($14, ''), admission_number),
         student_type = COALESCE(NULLIF($15, ''), student_type),
         uses_transport = COALESCE($16, uses_transport),
+        profile_photo_url = CASE WHEN $19 THEN $20 ELSE profile_photo_url END,
         updated_at = NOW()
        WHERE id = $17 AND tenant_id = $18`,
       [
@@ -309,7 +311,8 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
         actualParentId, address || null, city || null, state || null, pincode || null,
         phone || null, status, admission_number || null, student_type || null,
         uses_transport !== undefined ? (uses_transport === true || uses_transport === 'true') : null,
-        req.params.id, tid
+        req.params.id, tid,
+        updatePhotoUrl, profile_photo_url || null
       ]
     );
 

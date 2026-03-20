@@ -1,11 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X, Bus } from 'lucide-react';
+import { X, Bus, Camera } from 'lucide-react';
 import api from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';
+
+function resizeImageToBase64(file: File, maxSize = 300): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = reject;
+      img.src = e.target!.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 interface AddStudentModalProps {
   open: boolean;
@@ -17,6 +38,8 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState<any[]>([]);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: 'student123',
@@ -32,6 +55,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
     city: '',
     state: '',
     pincode: '',
+    profile_photo_url: '',
   });
 
   useEffect(() => {
@@ -50,6 +74,18 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const base64 = await resizeImageToBase64(file, 300);
+      setPhotoPreview(base64);
+      setFormData(prev => ({ ...prev, profile_photo_url: base64 }));
+    } catch {
+      toast({ title: 'Error', description: 'Failed to process photo', variant: 'destructive' });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -61,6 +97,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
       });
       onSuccess();
       onOpenChange(false);
+      setPhotoPreview('');
       setFormData({
         email: '',
         password: 'student123',
@@ -76,6 +113,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
         city: '',
         state: '',
         pincode: '',
+        profile_photo_url: '',
       });
     } catch (error: any) {
       toast({
@@ -103,6 +141,45 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
+            {/* Passport Photo */}
+            <div className="border-b pb-4">
+              <h3 className="font-semibold mb-3">Passport Photo</h3>
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer overflow-hidden bg-gray-50 hover:border-blue-400 transition-colors"
+                  onClick={() => photoInputRef.current?.click()}
+                >
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center">
+                      <Camera className="h-7 w-7 text-gray-300 mx-auto" />
+                      <span className="text-xs text-gray-400 mt-1 block">Upload Photo</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => photoInputRef.current?.click()}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    {photoPreview ? 'Change Photo' : 'Choose Photo'}
+                  </Button>
+                  {photoPreview && (
+                    <Button type="button" variant="ghost" size="sm" className="ml-2 text-red-500" onClick={() => { setPhotoPreview(''); setFormData(p => ({ ...p, profile_photo_url: '' })); }}>
+                      Remove
+                    </Button>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">JPG or PNG, max 5MB. Will be resized to passport size.</p>
+                </div>
+              </div>
+            </div>
+
             {/* Personal Information */}
             <div className="border-b pb-4">
               <h3 className="font-semibold mb-3">Personal Information</h3>

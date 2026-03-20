@@ -52,7 +52,7 @@ const EMPTY_FORM = {
 };
 
 function downloadCSV(assessments: any[]) {
-  const headers = ['Student', 'Subject', 'Strand', 'Type', 'Exam Period', 'Term', 'Year', 'Score', 'Max Score', 'CBC Grade', 'Grade Points', 'Result Code', 'Date', 'Comments'];
+  const headers = ['Student', 'Subject', 'Strand', 'Type', 'Exam Period', 'Term', 'Year', 'Score', 'Max Score', 'CBC Grade', 'Grade Points', 'Result Code', 'Date', 'Facilitator'];
   const rows = assessments.map((a: any) => [
     a.student_name,
     a.subject_name,
@@ -67,7 +67,7 @@ function downloadCSV(assessments: any[]) {
     a.grade_points ?? '',
     a.result_code || '',
     a.assessment_date ? new Date(a.assessment_date).toLocaleDateString() : '',
-    (a.teacher_comments || '').replace(/,/g, ';'),
+    a.teacher_name || '',
   ]);
   const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -335,12 +335,6 @@ export function CbcAssessmentPage() {
                 <Label>Assessment Date</Label>
                 <Input type="date" value={form.assessment_date || ''} onChange={e => handleFormChange('assessment_date', e.target.value)} />
               </div>
-              <div className="md:col-span-3">
-                <Label>Teacher Comments {form.teacher_comments && !form.teacher_comments_manual && <span className="text-xs text-indigo-500 ml-1">(auto-generated)</span>}</Label>
-                <textarea className="w-full border rounded-md px-3 py-2 text-sm mt-1 min-h-[80px]"
-                  value={form.teacher_comments || ''} onChange={e => handleFormChange('teacher_comments', e.target.value)}
-                  placeholder="Observations, feedback..." />
-              </div>
               <div className="md:col-span-3 flex gap-3">
                 <Button type="submit" disabled={createMutation.isPending}>
                   {createMutation.isPending ? 'Saving...' : 'Save Assessment'}
@@ -432,7 +426,7 @@ export function CbcAssessmentPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Grade</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Pts</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Comments</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Facilitator</th>
                     {(isAdmin || user?.role === 'teacher') && <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>}
                   </tr>
                 </thead>
@@ -498,13 +492,8 @@ export function CbcAssessmentPage() {
                       <td className="px-4 py-3 text-gray-500">
                         {a.assessment_date ? new Date(a.assessment_date).toLocaleDateString() : '—'}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[160px]">
-                        {editId === a.id ? (
-                          <input type="text" className="w-full border rounded px-1 py-0.5 text-xs"
-                            value={editForm.teacher_comments} onChange={e => setEditForm({ ...editForm, teacher_comments: e.target.value })} />
-                        ) : (
-                          <span className="truncate block">{a.teacher_comments || '—'}</span>
-                        )}
+                      <td className="px-4 py-3 text-gray-700 font-medium">
+                        {a.teacher_name || '—'}
                       </td>
                       {(isAdmin || user?.role === 'teacher') && (
                         <td className="px-4 py-3">

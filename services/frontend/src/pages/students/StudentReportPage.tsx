@@ -72,8 +72,14 @@ async function generateStudentReportPDF(
   // ── School Header ───────────────────────────────────────────────────────────
   const headerH = 40;
   const imgSize = 28;
-  doc.setFillColor(37, 99, 235);
+  // White header background
+  doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, pageW, headerH, 'F');
+  // Bottom border line
+  doc.setDrawColor(37, 99, 235);
+  doc.setLineWidth(0.8);
+  doc.line(0, headerH, pageW, headerH);
+  doc.setLineWidth(0.2);
 
   // School logo — LEFT
   if (school.school_logo_url) {
@@ -93,10 +99,9 @@ async function generateStudentReportPDF(
       });
     } catch { /* skip */ }
   } else {
-    doc.setFillColor(255, 255, 255, 0.2);
-    doc.setDrawColor(255, 255, 255);
+    doc.setDrawColor(180, 180, 180);
     doc.rect(margin, (headerH - imgSize) / 2, imgSize, imgSize, 'D');
-    doc.setFontSize(5); doc.setTextColor(255, 255, 255);
+    doc.setFontSize(5); doc.setTextColor(150, 150, 150);
     doc.text('LOGO', margin + imgSize / 2, headerH / 2, { align: 'center' });
   }
 
@@ -120,30 +125,33 @@ async function generateStudentReportPDF(
       });
     } catch { /* skip */ }
   } else {
-    doc.setDrawColor(255, 255, 255);
+    doc.setDrawColor(180, 180, 180);
     doc.rect(photoX, (headerH - imgSize) / 2, imgSize, imgSize, 'D');
-    doc.setFontSize(5); doc.setTextColor(255, 255, 255);
+    doc.setFontSize(5); doc.setTextColor(150, 150, 150);
     doc.text('PHOTO', photoX + imgSize / 2, headerH / 2, { align: 'center' });
   }
 
   // School info — centered between logo and photo
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(37, 99, 235);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text(school.school_name || 'School Management System', pageW / 2, 11, { align: 'center' });
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(60, 60, 60);
   const addrLine = [school.address, school.city, school.state].filter(Boolean).join(', ');
   if (addrLine) doc.text(addrLine, pageW / 2, 18, { align: 'center' });
   const contactLine = [school.phone, school.email].filter(Boolean).join('  |  ');
   if (contactLine) doc.text(contactLine, pageW / 2, 24, { align: 'center' });
   if (school.motto) {
     doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
     doc.text(school.motto, pageW / 2, 30, { align: 'center' });
     doc.setFont('helvetica', 'normal');
   }
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(37, 99, 235);
   const termLabel = term.replace('term', 'Term ');
   doc.text(`STUDENT REPORT FORM — ${termLabel} ${academicYear}`, pageW / 2, 37, { align: 'center' });
   y = headerH + 8;

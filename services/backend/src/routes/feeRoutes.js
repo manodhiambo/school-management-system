@@ -1078,49 +1078,108 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
     if (!stdRows.length) return res.status(404).json({ success: false, message: 'Student not found' });
     const std = stdRows[0];
 
-    // Get applicable fee structures
-    const structures = await query(
-      `SELECT * FROM fee_structure
-       WHERE tenant_id = $1 AND is_active = true
-         AND (class_id = $2 OR class_id IS NULL)
-         AND (student_type = 'all' OR student_type = $3)
-         AND academic_year = $4`,
-      [tid, std.class_id, std.student_type || 'all', year]
+    // Student's transport assignment (for transport fee filtering)
+    const transportRows = await query(
+      `SELECT st.route_id, r.term_fee FROM student_transport st
+       JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $1
+       WHERE st.student_id = $2 AND st.is_active = TRUE AND st.tenant_id = $1`,
+      [tid, std.id]
     );
-    // Get extra fees
+    const studentRoute = transportRows[0] || null;
+
+    // Fee structures — same filtering logic as /expected/:studentId:
+    // - transport fees only if student has active route assignment for that route
+    // - extra_fee_id structures excluded (covered by extra_fees query)
+    const structures = await query(
+      `SELECT fs.*, ef.student_id AS extra_fee_student_id
+       FROM fee_structure fs
+       LEFT JOIN extra_fees ef ON ef.id = fs.extra_fee_id AND ef.tenant_id = $1
+       WHERE fs.tenant_id = $1 AND fs.is_active = true
+         AND (fs.class_id = $2 OR fs.class_id IS NULL)
+         AND (fs.student_type = 'all' OR fs.student_type = $3)
+         AND fs.academic_year = $4
+         AND fs.extra_fee_id IS NULL
+         AND (
+           fs.is_transport_fee = FALSE
+           OR (
+             fs.is_transport_fee = TRUE
+             AND EXISTS (
+               SELECT 1 FROM student_transport st
+               WHERE st.student_id = $5 AND st.route_id = fs.route_id
+                 AND st.is_active = TRUE AND st.tenant_id = $1
+             )
+           )
+         )`,
+      [tid, std.class_id, std.student_type || 'all', year, std.id]
+    );
+
+    // Extra fees applicable to this student (class-level + student-level)
     const extraRows = await query(
       `SELECT * FROM extra_fees
        WHERE tenant_id = $1 AND is_active = true
-         AND (student_id = $2 OR (class_id = $3 AND student_id IS NULL) OR (class_id IS NULL AND student_id IS NULL))
+         AND (
+           student_id = $2
+           OR (class_id = $3 AND student_id IS NULL)
+         )
          AND (term IS NULL OR term = $4)
          AND (academic_year IS NULL OR academic_year = $5)`,
       [tid, std.id, std.class_id, term || null, term ? year : null]
     );
 
     if (!structures.length && !extraRows.length) {
-      return res.status(400).json({ success: false, message: 'No active fee structures found for this student' });
+      return res.status(400).json({ success: false, message: 'No applicable fee structures found for this student' });
     }
 
-    const totalAmount = structures.reduce((s, r) => s + parseFloat(r.amount), 0) +
-                        extraRows.reduce((s, r) => s + parseFloat(r.amount), 0);
-
-    const invoiceId = uuidv4();
-    const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-    const description = structures.map(s => s.name).concat(extraRows.map(e => e.name)).join(', ');
-
-    await query(
-      `INSERT INTO fee_invoices
-         (id, invoice_number, student_id, total_amount, net_amount, balance_amount,
-          due_date, status, tenant_id, description, term, academic_year)
-       VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9)`,
-      [invoiceId, invoiceNumber, student_id, totalAmount,
-       due_date || null, tid, description, term || null, year]
+    // Existing invoice keys for duplicate detection
+    const existingInvRows = await query(
+      'SELECT fee_structure_id, term, academic_year FROM fee_invoices WHERE student_id=$1 AND tenant_id=$2 AND status!=\'cancelled\'',
+      [std.id, tid]
     );
+    const existingSet = new Set(existingInvRows.map(r => `${r.fee_structure_id}|${r.term||''}|${r.academic_year||''}`));
 
+    const created = [];
+    const skipped = [];
+
+    // Generate one invoice per fee structure
+    for (const struct of structures) {
+      const dupKey = `${struct.id}|${term||''}|${year}`;
+      if (existingSet.has(dupKey)) { skipped.push(struct.name); continue; }
+      const amount = struct.is_transport_fee && studentRoute
+        ? (parseFloat(studentRoute.term_fee) || parseFloat(struct.amount))
+        : parseFloat(struct.amount);
+      const invoiceId = uuidv4();
+      const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth()+1).toString().padStart(2,'0')}${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`;
+      await query(
+        `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount,
+           due_date, status, tenant_id, description, fee_structure_id, term, academic_year)
+         VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9,$10)`,
+        [invoiceId, invoiceNumber, std.id, amount, due_date||null, tid, struct.name, struct.id, term||null, year]
+      );
+      existingSet.add(dupKey);
+      created.push({ invoice_number: invoiceNumber, description: struct.name, amount });
+    }
+
+    // Generate one invoice per extra fee
+    for (const ef of extraRows) {
+      const dupKey = `extra:${ef.id}|${term||''}|${year}`;
+      if (existingSet.has(dupKey)) { skipped.push(ef.name); continue; }
+      const invoiceId = uuidv4();
+      const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth()+1).toString().padStart(2,'0')}${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`;
+      await query(
+        `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount,
+           due_date, status, tenant_id, description, term, academic_year)
+         VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9)`,
+        [invoiceId, invoiceNumber, std.id, parseFloat(ef.amount), due_date||null, tid, ef.name, term||null, year]
+      );
+      existingSet.add(dupKey);
+      created.push({ invoice_number: invoiceNumber, description: ef.name, amount: parseFloat(ef.amount) });
+    }
+
+    const totalAmount = created.reduce((s, r) => s + r.amount, 0);
     res.status(201).json({
       success: true,
-      message: 'Invoice generated from fee structures',
-      data: { id: invoiceId, invoice_number: invoiceNumber, amount: totalAmount, description }
+      message: `${created.length} invoice(s) generated${skipped.length ? `, ${skipped.length} skipped (already invoiced)` : ''}`,
+      data: { created, skipped, total_amount: totalAmount }
     });
   } catch (error) {
     logger.error('Generate invoice for student error:', error);

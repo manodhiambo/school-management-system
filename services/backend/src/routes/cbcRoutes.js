@@ -200,12 +200,12 @@ router.get('/assessments', authenticate, async (req, res) => {
     const tid = req.user.tenant_id;
     let sql = `SELECT a.*, s.first_name||' '||s.last_name as student_name,
                sub.name as subject_name, st.name as strand_name,
-               UPPER(u.first_name || ' ' || u.last_name) AS teacher_name
+               UPPER(t.first_name || ' ' || t.last_name) AS teacher_name
                FROM cbc_assessments a
                JOIN students s ON s.id = a.student_id
                JOIN subjects sub ON sub.id = a.subject_id
                LEFT JOIN cbc_strands st ON st.id = a.strand_id
-               LEFT JOIN users u ON u.id = a.teacher_id
+               LEFT JOIN teachers t ON t.user_id = a.teacher_id
                WHERE a.tenant_id = $1`;
     const params = [tid];
     if (student_id) { sql += ` AND a.student_id = $${params.length+1}`; params.push(student_id); }
@@ -539,10 +539,13 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
     ).catch(() => []);
     const classTeacherName = classTeacherRows[0]?.name || null;
 
-    // Head teacher / principal name (admin user for this tenant)
+    // Head teacher / principal name (teacher linked to an admin user for this tenant)
     const headTeacherRows = await query(
-      `SELECT UPPER(first_name || ' ' || last_name) AS name
-       FROM users WHERE tenant_id = $1 AND role = 'admin' ORDER BY created_at ASC LIMIT 1`,
+      `SELECT UPPER(t.first_name || ' ' || t.last_name) AS name
+       FROM teachers t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.tenant_id = $1 AND u.role = 'admin'
+       ORDER BY t.created_at ASC LIMIT 1`,
       [rc.tenant_id]
     ).catch(() => []);
     const headTeacherName = headTeacherRows[0]?.name || null;

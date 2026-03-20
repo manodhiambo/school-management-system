@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, PlusCircle, Users, User, Loader2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, PlusCircle, Users, User, Loader2, Search, Link2 } from 'lucide-react';
 import api from '@/services/api';
 
 const EMPTY_FORM = {
@@ -216,7 +216,14 @@ export function ExtraFeesPage() {
                 {filtered.map(fee => (
                   <tr key={fee.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">
-                      {fee.name}
+                      <div className="flex items-center gap-2">
+                        {fee.name}
+                        {fee.fee_structure_id && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5">
+                            <Link2 className="h-3 w-3" /> Fee Structure
+                          </span>
+                        )}
+                      </div>
                       {fee.description && <p className="text-xs text-gray-400 mt-0.5">{fee.description}</p>}
                     </td>
                     <td className="px-4 py-3">{Number(fee.amount).toLocaleString('en-KE')}</td>

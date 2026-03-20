@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, DollarSign, Bus, Users, Loader2, Eye, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, Bus, Users, Loader2, Eye, CheckCircle2, XCircle, Link2 } from 'lucide-react';
 import api from '@/services/api';
 
 const STUDENT_TYPE_LABEL: Record<string, string> = {
@@ -275,16 +275,25 @@ export function FeeStructurePage() {
                                 <Bus className="h-3 w-3 mr-1" />Transport
                               </Badge>
                             )}
+                            {s.extra_fee_id && (
+                              <Badge className="bg-indigo-100 text-indigo-700">
+                                <Link2 className="h-3 w-3 mr-1" />Extra Fee
+                              </Badge>
+                            )}
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex justify-center gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleEdit(s)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => handleDelete(s.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {(s.is_transport_fee || s.extra_fee_id) ? (
+                              <p className="text-xs text-gray-400 text-center italic">Auto-managed</p>
+                            ) : (
+                              <div className="flex justify-center gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleEdit(s)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => handleDelete(s.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}

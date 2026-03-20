@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
-import { Bus, Plus, Edit, Trash2, Search, Users, X, CheckSquare, Square } from 'lucide-react';
+import { Bus, Plus, Edit, Trash2, Search, Users, X, CheckSquare, Square, Link2 } from 'lucide-react';
 
 export function TransportPage() {
   const qc = useQueryClient();
@@ -267,6 +267,11 @@ export function TransportPage() {
                           <div>
                             <p className="font-medium text-sm">{r.route_name}</p>
                             <p className="text-xs text-gray-500">{r.vehicle_registration || 'No vehicle'}</p>
+                            {Number(r.term_fee) > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-xs text-green-700 mt-0.5">
+                                <Link2 className="h-3 w-3" /> KES {Number(r.term_fee).toLocaleString()}
+                              </span>
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-semibold text-indigo-600">{r.student_count || 0}</p>
@@ -340,7 +345,12 @@ export function TransportPage() {
                       <p><span className="font-medium">Morning:</span> {routeDetail.morning_pickup_time}</p>
                     )}
                     {Number(routeDetail.term_fee) > 0 && (
-                      <p><span className="font-medium">Term Fee:</span> KES {Number(routeDetail.term_fee).toLocaleString()}</p>
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">Term Fee:</span> KES {Number(routeDetail.term_fee).toLocaleString()}
+                        <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5">
+                          <Link2 className="h-3 w-3" /> Fee Structure
+                        </span>
+                      </p>
                     )}
                     {Number(routeDetail.distance_km) > 0 && (
                       <p><span className="font-medium">Distance:</span> {routeDetail.distance_km} km</p>

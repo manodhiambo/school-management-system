@@ -1,7 +1,33 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+
+// Helper: sync fee_structure for a transport route
+async function syncTransportFeeStructure(route, tid) {
+  const { id, route_name, term_fee, is_active } = route;
+  const existing = await query(
+    'SELECT id FROM fee_structure WHERE route_id=$1 AND tenant_id=$2 AND is_transport_fee=TRUE',
+    [id, tid]
+  );
+  const active = is_active !== false;
+  if (existing.length) {
+    await query(
+      `UPDATE fee_structure SET name=$1, amount=$2, is_active=$3, updated_at=NOW()
+       WHERE id=$4 AND tenant_id=$5`,
+      [`${route_name} - Transport Fee`, Number(term_fee) || 0, active, existing[0].id, tid]
+    );
+  } else if (Number(term_fee) > 0) {
+    await query(
+      `INSERT INTO fee_structure (id, name, amount, frequency, is_transport_fee, route_id,
+        tenant_id, is_mandatory, student_type, academic_year, due_day)
+       VALUES ($1,$2,$3,'one_time',TRUE,$4,$5,FALSE,'all',$6,15)`,
+      [uuidv4(), `${route_name} - Transport Fee`, Number(term_fee), id, tid,
+       new Date().getFullYear().toString()]
+    );
+  }
+}
 
 const router = express.Router();
 
@@ -68,6 +94,7 @@ router.post('/routes', authenticate, async (req, res) => {
        JSON.stringify(stops || []), monthly_fee || 0, term_fee || 0,
        fare_per_km || 0, distance_km || 0, tid]
     );
+    await syncTransportFeeStructure(rows[0], tid);
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     logger.error('Create transport route error:', err);
@@ -106,6 +133,7 @@ router.put('/routes/:id', authenticate, async (req, res) => {
        monthly_fee, term_fee, is_active,
        fare_per_km, distance_km, req.params.id, tid]
     );
+    if (rows.length) await syncTransportFeeStructure(rows[0], tid);
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -116,6 +144,11 @@ router.put('/routes/:id', authenticate, async (req, res) => {
 router.delete('/routes/:id', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    // Remove linked fee_structure first (route_id FK would block delete otherwise)
+    await query(
+      'DELETE FROM fee_structure WHERE route_id=$1 AND tenant_id=$2 AND is_transport_fee=TRUE',
+      [req.params.id, tid]
+    );
     await query('DELETE FROM transport_routes WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
     res.json({ success: true, message: 'Route deleted' });
   } catch (err) {

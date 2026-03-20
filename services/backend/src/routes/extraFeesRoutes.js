@@ -3,6 +3,7 @@ import { authenticate } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 router.use(authenticate);
@@ -19,10 +20,12 @@ router.get('/', async (req, res) => {
       SELECT ef.*,
              c.name AS class_name,
              s.first_name || ' ' || s.last_name AS student_name,
-             s.admission_number
+             s.admission_number,
+             fs.id AS fee_structure_id
       FROM extra_fees ef
       LEFT JOIN classes c ON c.id = ef.class_id
       LEFT JOIN students s ON s.id = ef.student_id
+      LEFT JOIN fee_structure fs ON fs.extra_fee_id = ef.id AND fs.tenant_id = ef.tenant_id
       WHERE ef.tenant_id = $1
     `;
     const params = [tid];
@@ -86,7 +89,19 @@ router.post('/', requireRole(['admin']), async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [tid, name, Number(amount), class_id || null, student_id || null, term || null, academic_year || null, description || null]
     );
-    res.status(201).json({ success: true, data: rows[0] });
+    const ef = rows[0];
+
+    // Auto-create linked fee_structure so it appears in fee management
+    const fsDescription = description ? `Extra Fee: ${description}` : `Extra Fee: ${name}`;
+    await query(
+      `INSERT INTO fee_structure (id, name, amount, frequency, class_id, extra_fee_id,
+        tenant_id, is_mandatory, student_type, academic_year, due_day, description)
+       VALUES ($1,$2,$3,'one_time',$4,$5,$6,FALSE,'all',$7,15,$8)`,
+      [uuidv4(), name, Number(amount), class_id || null, ef.id, tid,
+       academic_year || new Date().getFullYear().toString(), fsDescription]
+    );
+
+    res.status(201).json({ success: true, data: ef });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -119,7 +134,32 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
        req.params.id, tid]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
-    res.json({ success: true, data: rows[0] });
+    const ef = rows[0];
+
+    // Sync linked fee_structure
+    const existing = await query(
+      'SELECT id FROM fee_structure WHERE extra_fee_id=$1 AND tenant_id=$2',
+      [req.params.id, tid]
+    );
+    if (existing.length) {
+      await query(
+        `UPDATE fee_structure SET name=COALESCE($1,name), amount=COALESCE($2,amount),
+         class_id=$3, is_active=COALESCE($4,is_active), updated_at=NOW()
+         WHERE extra_fee_id=$5 AND tenant_id=$6`,
+        [ef.name, ef.amount, ef.class_id, ef.is_active, req.params.id, tid]
+      );
+    } else {
+      // Create if missing (e.g. pre-existing extra fees)
+      await query(
+        `INSERT INTO fee_structure (id, name, amount, frequency, class_id, extra_fee_id,
+          tenant_id, is_mandatory, student_type, academic_year, due_day)
+         VALUES ($1,$2,$3,'one_time',$4,$5,$6,FALSE,'all',$7,15)`,
+        [uuidv4(), ef.name, ef.amount, ef.class_id, req.params.id, tid,
+         ef.academic_year || new Date().getFullYear().toString()]
+      );
+    }
+
+    res.json({ success: true, data: ef });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

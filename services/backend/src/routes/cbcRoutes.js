@@ -534,8 +534,12 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       `SELECT cs.*, sub.name as subject_name,
               UPPER(t.first_name || ' ' || t.last_name) AS teacher_name,
               CASE cs.overall_cbc_grade
-                WHEN 'EE' THEN 4 WHEN 'ME' THEN 3 WHEN 'AE' THEN 2 WHEN 'BE' THEN 1
-                WHEN 'WD' THEN 4 WHEN 'D'  THEN 2 WHEN 'B'  THEN 1
+                WHEN 'EE'  THEN 4 WHEN 'ME'  THEN 3 WHEN 'AE'  THEN 2 WHEN 'BE'  THEN 1
+                WHEN 'WD'  THEN 4 WHEN 'D'   THEN 2 WHEN 'B'   THEN 1
+                WHEN 'EE1' THEN 8 WHEN 'EE2' THEN 7
+                WHEN 'ME1' THEN 6 WHEN 'ME2' THEN 5
+                WHEN 'AE1' THEN 4 WHEN 'AE2' THEN 3
+                WHEN 'BE1' THEN 2 WHEN 'BE2' THEN 1
                 ELSE NULL
               END AS grade_points
        FROM student_competency_summary cs
@@ -545,6 +549,52 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
        WHERE cs.student_id = $1 AND cs.term = $2 AND cs.academic_year = $3`,
       [rc.student_id, rc.term, rc.academic_year, rc.class_id]
     );
+
+    // If student_competency_summary is empty, fall back to cbc_assessments
+    // (same data source used by Student Report page — ensures both pages show the same grades)
+    let finalCompetencies = competencies;
+    if (competencies.length === 0) {
+      const gradePointMap = {
+        EE:4, ME:3, AE:2, BE:1, WD:4, D:2, B:1,
+        EE1:8, EE2:7, ME1:6, ME2:5, AE1:4, AE2:3, BE1:2, BE2:1,
+      };
+      const fallback = await query(
+        `SELECT
+           a.subject_id,
+           sub.name AS subject_name,
+           UPPER(t.first_name || ' ' || t.last_name) AS teacher_name,
+           SUM(COALESCE(a.score, 0))::numeric        AS total_score,
+           SUM(COALESCE(a.max_score, 0))::numeric     AS max_score,
+           CASE WHEN SUM(COALESCE(a.max_score, 0)) > 0
+             THEN ROUND(
+               SUM(COALESCE(a.score, 0))::numeric /
+               SUM(COALESCE(a.max_score, 0))::numeric * 100, 2)
+             ELSE NULL END                            AS percentage,
+           (SELECT a2.cbc_grade FROM cbc_assessments a2
+            WHERE a2.student_id = $1 AND a2.subject_id = a.subject_id
+              AND a2.term = $2 AND a2.academic_year = $3 AND a2.tenant_id = $5
+              AND a2.cbc_grade IS NOT NULL
+            ORDER BY a2.assessment_date DESC LIMIT 1) AS overall_cbc_grade,
+           (SELECT a2.pre_primary_grade FROM cbc_assessments a2
+            WHERE a2.student_id = $1 AND a2.subject_id = a.subject_id
+              AND a2.term = $2 AND a2.academic_year = $3 AND a2.tenant_id = $5
+              AND a2.pre_primary_grade IS NOT NULL
+            ORDER BY a2.assessment_date DESC LIMIT 1) AS pre_primary_grade
+         FROM cbc_assessments a
+         JOIN subjects sub ON sub.id = a.subject_id
+         LEFT JOIN class_subjects csj ON csj.class_id = $4 AND csj.subject_id = a.subject_id
+         LEFT JOIN teachers t ON t.user_id = csj.teacher_id
+         WHERE a.student_id = $1 AND a.term = $2 AND a.academic_year = $3 AND a.tenant_id = $5
+         GROUP BY a.subject_id, sub.name, t.first_name, t.last_name
+         ORDER BY sub.name`,
+        [rc.student_id, rc.term, rc.academic_year, rc.class_id, rc.tenant_id]
+      ).catch(() => []);
+
+      finalCompetencies = fallback.map(r => ({
+        ...r,
+        grade_points: gradePointMap[r.overall_cbc_grade || r.pre_primary_grade || ''] ?? null,
+      }));
+    }
 
     // Class teacher name (teacher marked as class teacher for this class)
     const classTeacherRows = await query(
@@ -695,7 +745,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       head_teacher_name: headTeacherName,
       term_end_date: termEndDate,
       next_term_start_date: nextTermStartDate,
-      competencies,
+      competencies: finalCompetencies,
       fee_breakdown: allFees,
     } });
   } catch (err) {

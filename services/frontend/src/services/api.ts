@@ -292,6 +292,18 @@ class ApiService {
     return this.api.get('/attendance/statistics/' + studentId);
   }
 
+  getMonthlyAttendanceReport(month: string, classId?: string) {
+    return this.api.get('/attendance/report/monthly', { params: { month, classId } });
+  }
+
+  getAbsentPreview(date: string, classId?: string) {
+    return this.api.get('/attendance/absent-preview', { params: { date, classId } });
+  }
+
+  notifyAbsentStudents(data: { date: string; classId?: string }) {
+    return this.api.post('/attendance/notify-absent', data);
+  }
+
   // Fee Management
   getFeeStructures(params?: any) {
     return this.api.get('/fee/structure', { params });

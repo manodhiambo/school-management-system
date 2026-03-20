@@ -169,9 +169,12 @@ class FinanceController {
         SELECT
           ir.*,
           coa.account_name,
-          coa.account_code
+          coa.account_code,
+          s.first_name || ' ' || s.last_name AS student_name,
+          s.admission_number
         FROM income_records ir
         LEFT JOIN chart_of_accounts coa ON ir.account_id = coa.id
+        LEFT JOIN students s ON ir.student_id = s.id
         WHERE ir.tenant_id = $1
       `;
       const params = [tenantId];
@@ -216,10 +219,13 @@ class FinanceController {
         description,
         reference_number,
         payment_method,
+        student_id,
+        payer_name,
       } = req.body;
 
       // Parse integer FK — empty string or missing → null
       const accountId = account_id ? parseInt(account_id) || null : null;
+      const studentId = student_id || null;
 
       // Generate income number
       const incomeNumber = await generateNumber('INC-', 'income_records', 'income_number', tenantId);
@@ -231,16 +237,19 @@ class FinanceController {
 
       const result = await pool.query(`
         INSERT INTO income_records (
-          tenant_id, income_number, income_date, income_category, account_id, amount, vat_rate, vat_amount, total_amount,
+          tenant_id, income_number, income_date, income_category, account_id,
+          student_id, payer_name, amount, vat_rate, vat_amount, total_amount,
           description, payment_reference, payment_method,
           status, created_by, created_at, updated_at
-        ) VALUES ($1, $2, $3, 'Other Income', $4, $5, $6, $7, $8, $9, $10, $11, 'completed', $12, NOW(), NOW())
+        ) VALUES ($1, $2, $3, 'Other Income', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'completed', $14, NOW(), NOW())
         RETURNING *
       `, [
         tenantId,
         incomeNumber,
         transaction_date,
         accountId,
+        studentId,
+        payer_name || null,
         amount,
         vatRate,
         finalVatAmount,

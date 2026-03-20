@@ -894,36 +894,40 @@ export function CbcReportCardPage() {
                         <thead>
                           <tr className="bg-blue-50 text-blue-800">
                             <th className="text-left px-3 py-1.5 font-semibold">Learning Area</th>
-                            <th className="text-center px-2 py-1.5 font-semibold">Marks</th>
+                            <th className="text-center px-2 py-1.5 font-semibold hidden sm:table-cell">Type/Period</th>
+                            <th className="text-center px-2 py-1.5 font-semibold">Score</th>
                             <th className="text-center px-2 py-1.5 font-semibold">Grade</th>
-                            <th className="text-left px-2 py-1.5 font-semibold hidden sm:table-cell">Performance</th>
+                            <th className="text-center px-2 py-1.5 font-semibold">Pts</th>
                             <th className="text-left px-2 py-1.5 font-semibold">Facilitator</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {detail.competencies.map((c: any, i: number) => (
-                            <tr key={c.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-3 py-1.5 text-gray-800 font-medium">{c.subject_name}</td>
-                              <td className="px-2 py-1.5 text-center text-gray-600">
-                                {c.percentage ? `${Math.round(Number(c.percentage))}%` : '—'}
-                              </td>
-                              <td className="px-2 py-1.5 text-center">
-                                {(c.overall_cbc_grade || c.pre_primary_grade) ? (
-                                  <Badge className={`text-xs ${GRADE_COLORS[c.overall_cbc_grade || c.pre_primary_grade] || 'bg-gray-100'}`}>
-                                    {c.overall_cbc_grade || c.pre_primary_grade}
-                                  </Badge>
-                                ) : '—'}
-                              </td>
-                              <td className="px-2 py-1.5 text-gray-600 hidden sm:table-cell">
-                                {c.overall_cbc_grade || c.pre_primary_grade
-                                  ? (GRADE_LABEL_FULL[c.overall_cbc_grade || c.pre_primary_grade] || '—')
-                                  : '—'}
-                              </td>
-                              <td className="px-2 py-1.5 text-gray-700 font-medium">
-                                {c.teacher_name || '—'}
-                              </td>
-                            </tr>
-                          ))}
+                          {detail.competencies.map((c: any, i: number) => {
+                            const grade = c.overall_cbc_grade || c.pre_primary_grade || '';
+                            const scoreStr = c.total_score != null && c.max_score != null
+                              ? `${Math.round(Number(c.total_score))}/${Math.round(Number(c.max_score))}`
+                              : c.percentage ? `${Math.round(Number(c.percentage))}%` : '—';
+                            const pts = c.grade_points != null ? c.grade_points :
+                              grade === 'EE' || grade === 'WD' ? 4 :
+                              grade === 'ME' ? 3 :
+                              grade === 'AE' || grade === 'D' ? 2 :
+                              grade === 'BE' || grade === 'B' ? 1 : '—';
+                            const period = detail.term === 'term1' ? 'End Term 1' : detail.term === 'term2' ? 'End Term 2' : 'End Term 3';
+                            return (
+                              <tr key={c.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="px-3 py-1.5 text-gray-800 font-medium">{c.subject_name}</td>
+                                <td className="px-2 py-1.5 text-center text-gray-500 hidden sm:table-cell">{period}</td>
+                                <td className="px-2 py-1.5 text-center text-gray-600">{scoreStr}</td>
+                                <td className="px-2 py-1.5 text-center">
+                                  {grade ? (
+                                    <Badge className={`text-xs ${GRADE_COLORS[grade] || 'bg-gray-100'}`}>{grade}</Badge>
+                                  ) : '—'}
+                                </td>
+                                <td className="px-2 py-1.5 text-center font-semibold text-indigo-700">{pts}</td>
+                                <td className="px-2 py-1.5 text-gray-700 font-medium">{c.teacher_name || '—'}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

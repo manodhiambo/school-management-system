@@ -445,15 +445,18 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Select at least one fee structure' });
     }
 
-    // Load fee structures — only for this tenant
+    // Load fee structures — only active ones for this tenant
+    // Inactive structures are shown in the modal for reference but must not generate invoices
     const placeholders = fee_structure_ids.map((_, i) => `$${i + 2}`).join(',');
-    const structures = await query(
+    const allSelectedStructures = await query(
       `SELECT fs.*, ef.student_id AS extra_fee_student_id, ef.class_id AS extra_fee_class_id
        FROM fee_structure fs
        LEFT JOIN extra_fees ef ON ef.id = fs.extra_fee_id AND ef.tenant_id = $1
        WHERE fs.id IN (${placeholders}) AND fs.tenant_id = $1`,
       [tid, ...fee_structure_ids]
     );
+    const inactiveSkipped = allSelectedStructures.filter(s => !s.is_active).map(s => s.name);
+    const structures = allSelectedStructures.filter(s => s.is_active);
 
     // Load students (filter by class_ids if given)
     let studentSql = `SELECT s.id, s.first_name, s.last_name, s.admission_number,
@@ -570,11 +573,15 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
       }
     }
 
+    if (inactiveSkipped.length) {
+      summary.skipped.push(...inactiveSkipped.map(name => ({ fee: name, reason: 'inactive_structure' })));
+    }
     res.json({
       success: true,
       dry_run: !!dry_run,
       message: dry_run ? `Preview: ${summary.created.length} invoices would be created` : `${summary.created.length} invoices created, ${summary.errors.length} errors`,
-      data: summary
+      data: summary,
+      inactive_skipped: inactiveSkipped,
     });
   } catch (error) {
     logger.error('Smart bulk invoice error:', error);

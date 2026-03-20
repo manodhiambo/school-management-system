@@ -78,8 +78,11 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
     );
   });
 
+  // Select All only picks ACTIVE structures — inactive ones must not generate invoices
   const selectAllVisible = () =>
-    setSelectedStructures(prev => [...new Set([...prev, ...visibleStructures.map(f => f.id)])]);
+    setSelectedStructures(prev => [
+      ...new Set([...prev, ...visibleStructures.filter(f => f.is_active).map(f => f.id)]),
+    ]);
 
   const deselectAllVisible = () => {
     const visibleIds = new Set(visibleStructures.map(f => f.id));
@@ -140,7 +143,12 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
     no_transport: 'Not assigned to any transport route',
     route_mismatch: 'Wrong transport route',
     already_invoiced: 'Invoice already exists for this term/year',
+    inactive_structure: 'Fee structure is inactive (skipped automatically)',
   };
+
+  const selectedInactiveCount = selectedStructures.filter(id =>
+    feeStructures.find(f => f.id === id && !f.is_active)
+  ).length;
 
   const classRestrictedIds = new Set(feeStructures.filter(f => f.class_id).map(f => f.id));
 
@@ -324,10 +332,20 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
               </div>
             </div>
 
+            {selectedInactiveCount > 0 && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-md p-3 text-xs text-red-800">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>{selectedInactiveCount} inactive structure{selectedInactiveCount > 1 ? 's' : ''} selected.</strong>{' '}
+                  Inactive structures will be skipped automatically — they will not generate invoices.
+                  Deselect them to avoid confusion.
+                </span>
+              </div>
+            )}
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                Invoices auto-assign based on each structure's class and student type. Use <strong>Preview</strong> to verify before generating.
+                Invoices auto-assign based on each structure's class and student type. <strong>Select All</strong> only picks active structures. Use <strong>Preview</strong> to verify before generating.
               </span>
             </div>
 

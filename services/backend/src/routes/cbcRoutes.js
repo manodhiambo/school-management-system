@@ -458,7 +458,7 @@ router.get('/report-cards', authenticate, async (req, res) => {
 // POST /api/v1/cbc/report-cards/generate — bulk-create draft report cards for all students in a class
 router.post('/report-cards/generate', authenticate, async (req, res) => {
   try {
-    const { class_id, term, academic_year } = req.body;
+    const { class_id, term, academic_year, closing_date, opening_date } = req.body;
     if (!class_id || !term || !academic_year) {
       return res.status(400).json({ success: false, message: 'class_id, term and academic_year are required' });
     }
@@ -481,12 +481,22 @@ router.post('/report-cards/generate', authenticate, async (req, res) => {
         `SELECT id FROM cbc_report_cards WHERE student_id=$1 AND class_id=$2 AND term=$3 AND academic_year=$4 AND tenant_id=$5`,
         [s.id, class_id, term, academic_year, tid]
       );
-      if (existing.length) continue;
+      if (existing.length) {
+        // Update closing/opening dates if provided
+        if (closing_date || opening_date) {
+          await query(
+            `UPDATE cbc_report_cards SET closing_date=COALESCE($1, closing_date), opening_date=COALESCE($2, opening_date), updated_at=NOW()
+             WHERE student_id=$3 AND class_id=$4 AND term=$5 AND academic_year=$6 AND tenant_id=$7`,
+            [closing_date || null, opening_date || null, s.id, class_id, term, academic_year, tid]
+          );
+        }
+        continue;
+      }
 
       await query(
-        `INSERT INTO cbc_report_cards (id, tenant_id, student_id, class_id, term, academic_year, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'draft',NOW(),NOW())`,
-        [uuidv4(), tid, s.id, class_id, term, academic_year]
+        `INSERT INTO cbc_report_cards (id, tenant_id, student_id, class_id, term, academic_year, closing_date, opening_date, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',NOW(),NOW())`,
+        [uuidv4(), tid, s.id, class_id, term, academic_year, closing_date || null, opening_date || null]
       );
       created++;
     }
@@ -676,12 +686,15 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
     const allFees = [...feeBreakdown, ...extraFees];
 
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
+    // Prefer explicitly stored dates; fall back to academic_terms lookup
+    const termEndDate = rc.closing_date ? fmtDate(rc.closing_date) : fmtDate(termDates[0]?.end_date);
+    const nextTermStartDate = rc.opening_date ? fmtDate(rc.opening_date) : fmtDate(nextTermDates[0]?.start_date);
     res.json({ success: true, data: {
       ...rc,
       class_teacher_name: classTeacherName,
       head_teacher_name: headTeacherName,
-      term_end_date: fmtDate(termDates[0]?.end_date),
-      next_term_start_date: fmtDate(nextTermDates[0]?.start_date),
+      term_end_date: termEndDate,
+      next_term_start_date: nextTermStartDate,
       competencies,
       fee_breakdown: allFees,
     } });
@@ -812,7 +825,8 @@ router.post('/report-cards', authenticate, async (req, res) => {
       student_id, class_id, term, academic_year,
       overall_grade, days_present, days_absent, days_late,
       learning_areas, values_citizenship, co_curricular,
-      class_teacher_comment, head_teacher_comment
+      class_teacher_comment, head_teacher_comment,
+      closing_date, opening_date
     } = req.body;
     const tid = req.user.tenant_id;
     const rows = await query(
@@ -820,20 +834,22 @@ router.post('/report-cards', authenticate, async (req, res) => {
        (student_id, class_id, term, academic_year, overall_grade,
         days_present, days_absent, days_late, learning_areas,
         values_citizenship, co_curricular, class_teacher_comment,
-        head_teacher_comment, class_teacher_id, tenant_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        head_teacher_comment, class_teacher_id, tenant_id, closing_date, opening_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (student_id, term, academic_year)
        DO UPDATE SET overall_grade=$5, days_present=$6, days_absent=$7,
        days_late=$8, learning_areas=$9, values_citizenship=$10,
        co_curricular=$11, class_teacher_comment=$12, head_teacher_comment=$13,
-       class_teacher_id=$14, updated_at=NOW()
+       class_teacher_id=$14, closing_date=COALESCE($16, cbc_report_cards.closing_date),
+       opening_date=COALESCE($17, cbc_report_cards.opening_date), updated_at=NOW()
        RETURNING *`,
       [student_id, class_id, term, academic_year, overall_grade,
        days_present || 0, days_absent || 0, days_late || 0,
        JSON.stringify(learning_areas || {}),
        JSON.stringify(values_citizenship || {}),
        JSON.stringify(co_curricular || {}),
-       class_teacher_comment, head_teacher_comment, req.user.id, tid]
+       class_teacher_comment, head_teacher_comment, req.user.id, tid,
+       closing_date || null, opening_date || null]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {

@@ -3,9 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { X, CheckSquare, Square } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { CheckSquare, Square, AlertTriangle, CheckCircle2, Loader2, Eye, Zap } from 'lucide-react';
 import api from '@/services/api';
 
 interface GenerateInvoicesModalProps {
@@ -14,302 +13,328 @@ interface GenerateInvoicesModalProps {
   onSuccess: () => void;
 }
 
+const currentYear = new Date().getFullYear().toString();
+
 export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: GenerateInvoicesModalProps) {
+  const [step, setStep] = useState<'config' | 'preview' | 'done'>('config');
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
   const [feeStructures, setFeeStructures] = useState<any[]>([]);
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-  const currentYear = new Date().getFullYear().toString();
-  const [formData, setFormData] = useState({
-    classId: '',
-    feeStructureId: '',
-    dueDate: '',
-    description: '',
-    term: '',
-    academic_year: currentYear,
-  });
+  const [selectedStructures, setSelectedStructures] = useState<string[]>([]);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [dueDate, setDueDate] = useState('');
+  const [term, setTerm] = useState('');
+  const [academicYear, setAcademicYear] = useState(currentYear);
+  const [preview, setPreview] = useState<{ created: any[]; skipped: any[]; errors: any[] } | null>(null);
+  const [result, setResult] = useState<{ created: any[]; errors: any[] } | null>(null);
 
   useEffect(() => {
     if (open) {
       loadData();
+      setStep('config');
+      setPreview(null);
+      setResult(null);
+      setSelectedStructures([]);
+      setSelectedClasses([]);
+      setDueDate('');
+      setTerm('');
+      setAcademicYear(currentYear);
     }
   }, [open]);
 
-  useEffect(() => {
-    if (formData.classId) {
-      loadStudents(formData.classId);
-    } else {
-      loadAllStudents();
-    }
-  }, [formData.classId]);
-
   const loadData = async () => {
     try {
-      const [classesRes, feeStructuresRes]: any = await Promise.all([
-        api.getClasses(),
-        api.getFeeStructures()
-      ]);
-      setClasses(classesRes.data || []);
-      setFeeStructures(feeStructuresRes.data || []);
-      loadAllStudents();
-    } catch (error) {
-      console.error('Error loading data:', error);
+      const [clsRes, fsRes]: any[] = await Promise.all([api.getClasses(), api.getFeeStructures()]);
+      setClasses(clsRes.data || []);
+      setFeeStructures((fsRes.data || []).filter((f: any) => f.is_active !== false));
+    } catch {
+      /* ignore */
     }
   };
 
-  const loadAllStudents = async () => {
-    try {
-      const response: any = await api.getStudents();
-      setStudents(response.data || []);
-      // Select all by default
-      setSelectedStudents((response.data || []).map((s: any) => s.id));
-    } catch (error) {
-      console.error('Error loading students:', error);
-    }
-  };
+  const toggleStructure = (id: string) =>
+    setSelectedStructures(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const loadStudents = async (classId: string) => {
-    try {
-      const response: any = await api.getStudents({ classId });
-      setStudents(response.data || []);
-      // Select all students from the class by default
-      setSelectedStudents((response.data || []).map((s: any) => s.id));
-    } catch (error) {
-      console.error('Error loading students:', error);
-    }
-  };
+  const toggleClass = (id: string) =>
+    setSelectedClasses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const toggleStudent = (studentId: string) => {
-    setSelectedStudents(prev => 
-      prev.includes(studentId) 
-        ? prev.filter(id => id !== studentId)
-        : [...prev, studentId]
-    );
-  };
-
-  const selectAllStudents = () => {
-    setSelectedStudents(students.map(s => s.id));
-  };
-
-  const deselectAllStudents = () => {
-    setSelectedStudents([]);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (selectedStudents.length === 0) {
-      alert('Please select at least one student');
-      return;
-    }
-    
-    if (!formData.feeStructureId) {
-      alert('Please select a fee structure');
-      return;
-    }
-    
+  const handlePreview = async () => {
+    if (!selectedStructures.length) return;
     setLoading(true);
-
     try {
-      const response: any = await api.generateBulkInvoices({
-        studentIds: selectedStudents,
-        feeStructureId: formData.feeStructureId,
-        dueDate: formData.dueDate || null,
-        description: formData.description || null,
-        term: formData.term || null,
-        academic_year: formData.academic_year || null,
+      const res: any = await api.generateSmartBulkInvoices({
+        fee_structure_ids: selectedStructures,
+        class_ids: selectedClasses.length ? selectedClasses : undefined,
+        due_date: dueDate || undefined,
+        term: term || undefined,
+        academic_year: academicYear || undefined,
+        dry_run: true,
       });
-      
-      alert(`Successfully generated ${response.data?.created?.length || 0} invoices!`);
-      onSuccess();
-      onOpenChange(false);
-      resetForm();
-    } catch (error: any) {
-      console.error('Generate invoices error:', error);
-      alert(error.message || 'Failed to generate invoices');
+      setPreview(res.data || { created: [], skipped: [], errors: [] });
+      setStep('preview');
+    } catch (e: any) {
+      alert(e?.response?.data?.message || e.message || 'Preview failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      classId: '',
-      feeStructureId: '',
-      dueDate: '',
-      description: '',
-      term: '',
-      academic_year: currentYear,
-    });
-    setSelectedStudents([]);
+  const handleGenerate = async () => {
+    setLoading(true);
+    try {
+      const res: any = await api.generateSmartBulkInvoices({
+        fee_structure_ids: selectedStructures,
+        class_ids: selectedClasses.length ? selectedClasses : undefined,
+        due_date: dueDate || undefined,
+        term: term || undefined,
+        academic_year: academicYear || undefined,
+        dry_run: false,
+      });
+      setResult(res.data || { created: [], errors: [] });
+      setStep('done');
+      onSuccess();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || e.message || 'Generation failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const selectedFeeStructure = feeStructures.find(f => f.id === formData.feeStructureId);
+  // Group skipped by reason for display
+  const skipReasons: Record<string, number> = {};
+  for (const s of preview?.skipped || []) {
+    skipReasons[s.reason] = (skipReasons[s.reason] || 0) + 1;
+  }
+
+  const reasonLabel: Record<string, string> = {
+    class_mismatch: 'Not in target class',
+    student_type_mismatch: 'Student type mismatch (day/boarding)',
+    no_transport: 'No transport subscription',
+    route_mismatch: 'Wrong transport route',
+  };
+
+  // Which structures have a class restriction
+  const classRestrictedIds = new Set(feeStructures.filter(f => f.class_id).map(f => f.id));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Fee Invoices</DialogTitle>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <DialogTitle>
+            {step === 'config' && 'Generate Fee Invoices'}
+            {step === 'preview' && 'Preview — Confirm Generation'}
+            {step === 'done' && 'Invoices Generated'}
+          </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="feeStructureId">Fee Structure *</Label>
-                <Select
-                  id="feeStructureId"
-                  value={formData.feeStructureId}
-                  onChange={(e) => handleChange('feeStructureId', e.target.value)}
-                  required
-                >
-                  <option value="">Select Fee Structure</option>
-                  {feeStructures.map((fs) => (
-                    <option key={fs.id} value={fs.id}>
-                      {fs.name} - KES {parseFloat(fs.amount).toLocaleString()}
-                    </option>
-                  ))}
-                </Select>
-                {feeStructures.length === 0 && (
-                  <p className="text-xs text-red-500 mt-1">
-                    No fee structures found. Please create one first in Fee Structure page.
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input
-                  id="dueDate"
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => handleChange('dueDate', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="term">Term</Label>
-                <Select
-                  id="term"
-                  value={formData.term}
-                  onChange={(e) => handleChange('term', e.target.value)}
-                >
-                  <option value="">Select Term</option>
-                  <option value="term1">Term 1</option>
-                  <option value="term2">Term 2</option>
-                  <option value="term3">Term 3</option>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="academic_year">Academic Year</Label>
-                <Input
-                  id="academic_year"
-                  type="text"
-                  placeholder="e.g. 2025"
-                  value={formData.academic_year}
-                  onChange={(e) => handleChange('academic_year', e.target.value)}
-                />
-              </div>
-            </div>
-
-            {selectedFeeStructure && (
-              <div className="p-3 bg-blue-50 rounded-lg text-sm">
-                <p><strong>Selected Fee:</strong> {selectedFeeStructure.name}</p>
-                <p><strong>Amount:</strong> KES {parseFloat(selectedFeeStructure.amount).toLocaleString()}</p>
-                <p><strong>Frequency:</strong> {selectedFeeStructure.frequency}</p>
-              </div>
-            )}
-
+        {/* ── STEP 1: Config ── */}
+        {step === 'config' && (
+          <div className="space-y-5">
+            {/* Fee Structures */}
             <div>
-              <Label htmlFor="classId">Filter by Class</Label>
-              <Select
-                id="classId"
-                value={formData.classId}
-                onChange={(e) => handleChange('classId', e.target.value)}
-              >
-                <option value="">All Classes</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.name} {cls.section || ''}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => handleChange('description', e.target.value)}
-                placeholder="Additional invoice description..."
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <Label>Select Students ({selectedStudents.length}/{students.length})</Label>
-                <div className="space-x-2">
-                  <Button type="button" size="sm" variant="outline" onClick={selectAllStudents}>
-                    Select All
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={deselectAllStudents}>
-                    Deselect All
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="border rounded max-h-48 overflow-y-auto">
-                {students.length === 0 ? (
-                  <p className="text-center text-gray-500 py-4">No students found</p>
+              <Label className="text-sm font-semibold">Select Fee Structures *</Label>
+              <p className="text-xs text-gray-400 mb-2">
+                Each selected structure auto-assigns to affected students based on class, student type, and transport settings.
+              </p>
+              <div className="border rounded-md max-h-52 overflow-y-auto divide-y">
+                {feeStructures.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">No active fee structures. Create one first.</p>
                 ) : (
-                  students.map((student) => (
-                    <div 
-                      key={student.id}
-                      className="flex items-center p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                      onClick={() => toggleStudent(student.id)}
+                  feeStructures.map(fs => (
+                    <div
+                      key={fs.id}
+                      className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 select-none"
+                      onClick={() => toggleStructure(fs.id)}
                     >
-                      {selectedStudents.includes(student.id) ? (
-                        <CheckSquare className="h-5 w-5 text-primary mr-2" />
-                      ) : (
-                        <Square className="h-5 w-5 text-gray-400 mr-2" />
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium">{student.first_name} {student.last_name}</p>
-                        <p className="text-xs text-gray-500">
-                          {student.admission_number} • {student.class_name || 'No Class'}
+                      {selectedStructures.includes(fs.id)
+                        ? <CheckSquare className="h-5 w-5 text-blue-600 shrink-0" />
+                        : <Square className="h-5 w-5 text-gray-300 shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{fs.name}</p>
+                        <p className="text-xs text-gray-400">
+                          KES {Number(fs.amount).toLocaleString()}
+                          {fs.class_id && <span className="ml-2 text-purple-600">· Class: {fs.class_name || fs.class_id}</span>}
+                          {fs.student_type && fs.student_type !== 'all' && <span className="ml-2 text-blue-500">· {fs.student_type}</span>}
+                          {fs.is_transport_fee && <span className="ml-2 text-orange-500">· Transport</span>}
                         </p>
                       </div>
+                      {classRestrictedIds.has(fs.id) && (
+                        <Badge variant="outline" className="text-[10px] shrink-0">Class-specific</Badge>
+                      )}
                     </div>
                   ))
                 )}
               </div>
+              {selectedStructures.length > 0 && (
+                <p className="text-xs text-blue-600 mt-1">{selectedStructures.length} structure(s) selected</p>
+              )}
             </div>
-          </div>
 
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading || selectedStudents.length === 0 || !formData.feeStructureId}>
-              {loading ? 'Generating...' : `Generate ${selectedStudents.length} Invoice(s)`}
-            </Button>
-          </DialogFooter>
-        </form>
+            {/* Optional class filter */}
+            <div>
+              <Label className="text-sm font-semibold">Restrict to Classes (optional)</Label>
+              <p className="text-xs text-gray-400 mb-2">Leave blank to include all classes. Select to restrict which classes receive invoices.</p>
+              <div className="flex flex-wrap gap-2">
+                {classes.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleClass(c.id)}
+                    className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                      selectedClasses.includes(c.id)
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Term / Year / Due Date */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-sm">Term</Label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+                  value={term}
+                  onChange={e => setTerm(e.target.value)}
+                >
+                  <option value="">All Terms</option>
+                  <option value="term1">Term 1</option>
+                  <option value="term2">Term 2</option>
+                  <option value="term3">Term 3</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-sm">Academic Year</Label>
+                <Input
+                  value={academicYear}
+                  onChange={e => setAcademicYear(e.target.value)}
+                  placeholder="e.g. 2025"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-sm">Due Date</Label>
+                <Input
+                  type="date"
+                  value={dueDate}
+                  onChange={e => setDueDate(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Invoices are auto-assigned based on each fee structure's class and student type settings.
+                You can preview before committing.
+              </span>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button
+                onClick={handlePreview}
+                disabled={loading || selectedStructures.length === 0}
+              >
+                {loading
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading preview...</>
+                  : <><Eye className="h-4 w-4 mr-2" /> Preview</>}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {/* ── STEP 2: Preview ── */}
+        {step === 'preview' && preview && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="border rounded-lg p-3 bg-green-50">
+                <p className="text-2xl font-bold text-green-700">{preview.created.length}</p>
+                <p className="text-xs text-gray-500">Invoices to create</p>
+              </div>
+              <div className="border rounded-lg p-3 bg-gray-50">
+                <p className="text-2xl font-bold text-gray-500">{preview.skipped.length}</p>
+                <p className="text-xs text-gray-500">Skipped (not affected)</p>
+              </div>
+              <div className="border rounded-lg p-3 bg-blue-50">
+                <p className="text-2xl font-bold text-blue-700">
+                  KES {preview.created.reduce((s: number, r: any) => s + Number(r.amount || 0), 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500">Total value</p>
+              </div>
+            </div>
+
+            {/* Skip reasons summary */}
+            {Object.keys(skipReasons).length > 0 && (
+              <div className="text-xs text-gray-500 space-y-0.5">
+                <p className="font-medium text-gray-600">Why students were skipped:</p>
+                {Object.entries(skipReasons).map(([reason, count]) => (
+                  <p key={reason}>· {count} student(s) — {reasonLabel[reason] || reason}</p>
+                ))}
+              </div>
+            )}
+
+            {/* Invoice list preview */}
+            {preview.created.length > 0 && (
+              <div className="border rounded-md max-h-56 overflow-y-auto divide-y text-sm">
+                {preview.created.map((row: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2">
+                    <div>
+                      <span className="font-medium">{row.name}</span>
+                      {row.class_name && <span className="text-gray-400 text-xs ml-2">· {row.class_name}</span>}
+                      <p className="text-xs text-gray-400">{row.fee}</p>
+                    </div>
+                    <span className="font-semibold text-gray-700">KES {Number(row.amount).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {preview.created.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                <p>No students match the selected fee structures.</p>
+                <p className="text-xs mt-1">Check that the fee structures have the correct class / student type settings.</p>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStep('config')}>Back</Button>
+              <Button
+                onClick={handleGenerate}
+                disabled={loading || preview.created.length === 0}
+              >
+                {loading
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
+                  : <><Zap className="h-4 w-4 mr-2" /> Generate {preview.created.length} Invoice(s)</>}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {/* ── STEP 3: Done ── */}
+        {step === 'done' && result && (
+          <div className="space-y-4">
+            <div className="text-center py-6">
+              <CheckCircle2 className="h-14 w-14 text-green-500 mx-auto mb-3" />
+              <h3 className="text-xl font-bold text-gray-800">{result.created.length} Invoices Created</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Invoices have been assigned to the relevant students and are ready for payment.
+              </p>
+              {result.errors.length > 0 && (
+                <p className="text-xs text-red-500 mt-2">{result.errors.length} error(s) occurred — check logs.</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => onOpenChange(false)}>Done</Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

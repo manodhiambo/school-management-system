@@ -515,20 +515,6 @@ async function generateStudentReportPDF(
     y += 17;
   }
 
-  // ── Signatures ──────────────────────────────────────────────────────────────
-  if (y > 262) { doc.addPage(); y = 20; }
-  y += 4;
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setDrawColor(180);
-  const sigY = y + 12;
-  doc.line(margin, sigY, margin + 50, sigY);
-  doc.line(pageW / 2 - 10, sigY, pageW / 2 + 40, sigY);
-  doc.line(pageW - margin - 50, sigY, pageW - margin, sigY);
-  doc.text('Class Teacher', margin, sigY + 5);
-  doc.text('Head Teacher', pageW / 2 - 10, sigY + 5);
-  doc.text("Parent's Signature", pageW - margin - 50, sigY + 5);
-
   // ── Footer ──────────────────────────────────────────────────────────────────
   doc.setFontSize(7);
   doc.setTextColor(150);
@@ -693,7 +679,7 @@ export function StudentReportPage() {
             <p>• Student details and CBC assessment grades with auto-comments</p>
             <p>• Fees section: amount billed, paid, outstanding balance</p>
             <p>• Transport charges and next term expected fees</p>
-            <p>• Signature lines for Class Teacher, Head Teacher, and Parent</p>
+            <p>• Term closing and next term opening dates (if set)</p>
           </div>
 
           <Button className="w-full" onClick={handleGenerate} disabled={!selectedStudent || generating}>

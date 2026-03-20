@@ -27,11 +27,15 @@ const AUTO_COMMENTS: Record<string, string> = {
 
 // Facilitator comment based on average points per subject (JSS scale: 1–8)
 function getFacilitatorComment(avgPoints: number): { comment: string; color: [number, number, number] } {
-  if (avgPoints >= 7)   return { comment: 'Outstanding performance! Keep up the excellent work.', color: [22, 163, 74] };
-  if (avgPoints >= 5.5) return { comment: 'Good performance. Continue working hard to achieve more.', color: [37, 99, 235] };
-  if (avgPoints >= 4)   return { comment: 'Fair performance. More effort is needed to improve.', color: [202, 138, 4] };
-  if (avgPoints >= 2.5) return { comment: 'Below average. Put in more effort to catch up with the class.', color: [220, 38, 38] };
-  return { comment: 'Very poor performance. Urgent improvement required — please see the class teacher.', color: [185, 28, 28] };
+  const rounded = Math.round(avgPoints);
+  if (rounded >= 8) return { comment: 'Outstanding! You are a star performer. Keep it up!',               color: [22, 163, 74]  };
+  if (rounded === 7) return { comment: 'Excellent work! Your hard work is really showing.',                color: [34, 197, 94]  };
+  if (rounded === 6) return { comment: 'Good job! You are doing great, keep putting in the effort.',       color: [37, 99, 235]  };
+  if (rounded === 5) return { comment: 'Well done! You have mastered this. Stay focused.',                 color: [59, 130, 246] };
+  if (rounded === 4) return { comment: 'Nice effort! You are so close, just a little more practice.',      color: [202, 138, 4]  };
+  if (rounded === 3) return { comment: 'Nice effort! I believe you can do even better next time.',         color: [217, 119, 6]  };
+  if (rounded === 2) return { comment: "Don't give up! Keep trying until you get there.",                  color: [220, 38, 38]  };
+  return                    { comment: 'You can do it! Keep trying until you get it.',                     color: [185, 28, 28]  };
 }
 
 // Facilitator comment based on grade distribution (non-JSS)

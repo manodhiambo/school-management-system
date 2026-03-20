@@ -1024,6 +1024,9 @@ class ApiService {
   createCbcReportCard(data: any) { return this.api.post('/cbc/report-cards', data); }
   generateCbcReportCards(data: any) { return this.api.post('/cbc/report-cards/generate', data); }
   publishCbcReportCard(id: string) { return this.api.put('/cbc/report-cards/' + id + '/publish'); }
+  bulkPublishCbcReportCards(data: { ids?: string[]; class_id?: string; term?: string; academic_year?: string }) {
+    return this.api.put('/cbc/report-cards/bulk-publish', data);
+  }
   shareReportCard(id: string, channels: string[], contact?: { name: string; phone: string; email: string }) {
     return this.api.post('/cbc/report-cards/' + id + '/share', {
       channels,

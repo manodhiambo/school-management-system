@@ -550,6 +550,15 @@ export function CbcReportCardPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cbc-report-cards'] }),
   });
 
+  const bulkPublishMutation = useMutation({
+    mutationFn: () => api.bulkPublishCbcReportCards({
+      class_id: filters.class_id,
+      term: filters.term,
+      academic_year: filters.academic_year,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cbc-report-cards'] }),
+  });
+
   const generateMutation = useMutation({
     mutationFn: () => api.generateCbcReportCards({
       class_id: filters.class_id,
@@ -570,6 +579,8 @@ export function CbcReportCardPage() {
   const cards = (cardsData as any)?.data || [];
   const detail = (cardDetail as any)?.data;
   const cardsWithId = cards.filter((c: any) => c.id);
+  const draftCards = cardsWithId.filter((c: any) => c.status === 'draft');
+  const publishedCards = cardsWithId.filter((c: any) => c.status === 'published' || c.status === 'acknowledged');
   const selectedClass = classes.find((c: any) => c.id === filters.class_id);
 
   // ── Download handler ────────────────────────────────────────────────────────
@@ -648,14 +659,15 @@ export function CbcReportCardPage() {
                   </span>
                 </button>
                 <button
-                  className="w-full text-left px-4 py-3 text-sm hover:bg-green-50 flex items-start gap-3"
-                  onClick={() => handleDownload('published')}
+                  className={`w-full text-left px-4 py-3 text-sm flex items-start gap-3 ${publishedCards.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-50'}`}
+                  onClick={() => publishedCards.length > 0 && handleDownload('published')}
                 >
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${publishedCards.length > 0 ? 'text-green-500' : 'text-gray-300'}`} />
                   <span>
                     <span className="font-medium block">Published / Acknowledged Only</span>
                     <span className="text-xs text-gray-500">
-                      {cardsWithId.filter((c: any) => c.status === 'published' || c.status === 'acknowledged').length} cards
+                      {publishedCards.length} card{publishedCards.length !== 1 ? 's' : ''}
+                      {publishedCards.length === 0 ? ' — use Publish All Drafts first' : ''}
                     </span>
                   </span>
                 </button>
@@ -771,18 +783,53 @@ export function CbcReportCardPage() {
         {/* Cards list */}
         <div className="lg:col-span-1">
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-4 w-4 text-gray-400" />
                   Learners ({cards.length})
                 </CardTitle>
-                {cards.length > 0 && (
-                  <span className="text-xs text-gray-400">
-                    {cards.filter((c: any) => c.id).length} with card
-                  </span>
+                {cardsWithId.length > 0 && (
+                  <span className="text-xs text-gray-400">{cardsWithId.length} with card</span>
                 )}
               </div>
+
+              {/* Status summary + Bulk Publish */}
+              {cardsWithId.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {/* Status counts */}
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="flex items-center gap-1 text-green-700">
+                      <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                      {publishedCards.length} published
+                    </span>
+                    <span className="flex items-center gap-1 text-gray-500">
+                      <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />
+                      {draftCards.length} draft
+                    </span>
+                  </div>
+
+                  {/* Publish All Drafts button */}
+                  {draftCards.length > 0 && (
+                    <Button
+                      size="sm"
+                      className="w-full bg-green-600 hover:bg-green-700 text-white text-xs h-8"
+                      onClick={() => bulkPublishMutation.mutate()}
+                      disabled={bulkPublishMutation.isPending}
+                    >
+                      <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                      {bulkPublishMutation.isPending
+                        ? 'Publishing…'
+                        : `Publish All Drafts (${draftCards.length})`}
+                    </Button>
+                  )}
+                  {bulkPublishMutation.isSuccess && (
+                    <p className="text-xs text-green-600 text-center">
+                      {(bulkPublishMutation.data as any)?.data?.published ?? 0} card(s) published successfully.
+                    </p>
+                  )}
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               {!filters.class_id ? (

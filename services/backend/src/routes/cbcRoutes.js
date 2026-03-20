@@ -925,13 +925,49 @@ router.post('/report-cards', authenticate, async (req, res) => {
   }
 });
 
+// PUT /api/v1/cbc/report-cards/bulk-publish — publish multiple cards at once
+// Must come before /:id routes so Express doesn't treat "bulk-publish" as an :id
+router.put('/report-cards/bulk-publish', authenticate, async (req, res) => {
+  try {
+    const { ids, class_id, term, academic_year } = req.body;
+    const tid = req.user.tenant_id;
+    let rows;
+
+    if (Array.isArray(ids) && ids.length > 0) {
+      // Publish a specific list of IDs
+      const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
+      rows = await query(
+        `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
+         WHERE id IN (${placeholders}) AND tenant_id=$1 AND status='draft' RETURNING id`,
+        [tid, ...ids]
+      );
+    } else if (class_id && term && academic_year) {
+      // Publish all drafts for a class/term/year
+      rows = await query(
+        `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
+         WHERE class_id=$2 AND term=$3 AND academic_year=$4 AND tenant_id=$1 AND status='draft' RETURNING id`,
+        [tid, class_id, term, academic_year]
+      );
+    } else {
+      return res.status(400).json({ success: false, message: 'Provide ids[] or class_id + term + academic_year' });
+    }
+
+    res.json({ success: true, published: rows.length });
+  } catch (err) {
+    logger.error('Bulk publish error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // PUT /api/v1/cbc/report-cards/:id/publish
 router.put('/report-cards/:id/publish', authenticate, async (req, res) => {
   try {
     const rows = await query(
       `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
-       WHERE id=$1 RETURNING *`, [req.params.id]
+       WHERE id=$1 AND tenant_id=$2 RETURNING *`,
+      [req.params.id, req.user.tenant_id]
     );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

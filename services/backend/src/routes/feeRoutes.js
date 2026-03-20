@@ -298,10 +298,11 @@ router.get('/invoice/:id', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const invoices = await query(
-      `SELECT fi.*, s.first_name, s.last_name, s.admission_number
+      `SELECT fi.*, s.first_name, s.last_name, s.admission_number, c.name as class_name
        FROM fee_invoices fi
        JOIN students s ON fi.student_id = s.id
-       WHERE fi.id = $1 AND s.tenant_id = $2`,
+       LEFT JOIN classes c ON s.class_id = c.id
+       WHERE fi.id = $1 AND fi.tenant_id = $2`,
       [req.params.id, tid]
     );
 
@@ -476,6 +477,11 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
 
     for (const struct of structures) {
       for (const student of allStudents) {
+        // If fee structure is tied to a specific class, only students in that class get it
+        if (struct.class_id && student.class_id !== struct.class_id) {
+          summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'class_mismatch' });
+          continue;
+        }
         // Filter by student_type
         if (struct.student_type !== 'all' && student.student_type !== struct.student_type) {
           summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'student_type_mismatch' });
@@ -579,38 +585,52 @@ router.post('/payment', async (req, res) => {
     const {
       invoice_id, invoiceId, student_id, studentId,
       amount, payment_method, paymentMethod,
-      transaction_id, transactionId, remarks
+      transaction_id, transactionId, remarks, payment_date, paymentDate
     } = req.body;
 
     const actualInvoiceId = invoice_id || invoiceId;
     const actualStudentId = student_id || studentId;
-    const actualPaymentMethod = payment_method || paymentMethod || 'cash';
+    // Normalize payment method — 'bank_transfer' maps to DB-accepted value if needed
+    const rawMethod = payment_method || paymentMethod || 'cash';
+    const actualPaymentMethod = rawMethod;  // DB now accepts bank_transfer via migration 038
     const actualTransactionId = transaction_id || transactionId;
+    const actualPaymentDate = payment_date || paymentDate || null;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ success: false, message: 'Valid amount is required' });
     }
 
-    const paymentId = uuidv4();
-
-    if (!actualInvoiceId && actualStudentId) {
-      await query(
-        `INSERT INTO fee_payments (id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date, tenant_id)
-         VALUES ($1, $2, $3, $4, $5, $6, 'success', NOW(), $7)`,
-        [paymentId, actualStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, tid]
-      );
-
-      return res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
-    }
-
-    if (!actualInvoiceId) {
+    if (!actualInvoiceId && !actualStudentId) {
       return res.status(400).json({ success: false, message: 'Invoice ID or Student ID is required' });
     }
 
+    const paymentId = uuidv4();
+
+    if (!actualInvoiceId && actualStudentId) {
+      // Student-only payment (no invoice) — general credit on account
+      await query(
+        `INSERT INTO fee_payments (id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, 'success', COALESCE($7::timestamptz, NOW()), $8)`,
+        [paymentId, actualStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, tid]
+      );
+      return res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
+    }
+
+    // Verify invoice belongs to this tenant before recording
+    const invCheck = await query(
+      'SELECT id, student_id FROM fee_invoices WHERE id = $1 AND tenant_id = $2',
+      [actualInvoiceId, tid]
+    );
+    if (invCheck.length === 0) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    const invStudentId = actualStudentId || invCheck[0].student_id;
+
     await query(
-      `INSERT INTO fee_payments (id, invoice_id, amount, payment_method, transaction_id, remarks, status, payment_date, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, 'success', NOW(), $7)`,
-      [paymentId, actualInvoiceId, amount, actualPaymentMethod, actualTransactionId, remarks, tid]
+      `INSERT INTO fee_payments (id, invoice_id, student_id, amount, payment_method, transaction_id, remarks, status, payment_date, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'success', COALESCE($8::timestamptz, NOW()), $9)`,
+      [paymentId, actualInvoiceId, invStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, tid]
     );
 
     await query(
@@ -668,7 +688,7 @@ router.get('/defaulters', async (req, res) => {
         COALESCE(SUM(fi.balance_amount), 0)::numeric as total_due,
         COUNT(fi.id)::int as pending_invoices
       FROM students s
-      JOIN fee_invoices fi ON s.id = fi.student_id
+      JOIN fee_invoices fi ON s.id = fi.student_id AND fi.tenant_id = $1
       LEFT JOIN classes c ON s.class_id = c.id
       WHERE s.tenant_id = $1 AND fi.balance_amount > 0
       GROUP BY s.id, s.first_name, s.last_name, s.admission_number, c.name

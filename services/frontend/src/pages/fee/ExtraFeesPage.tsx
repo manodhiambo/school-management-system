@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, PlusCircle, Users, User, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, PlusCircle, Users, User, Loader2, Search } from 'lucide-react';
 import api from '@/services/api';
 
 const EMPTY_FORM = {
@@ -29,6 +29,8 @@ export function ExtraFeesPage() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [filterClass, setFilterClass] = useState('');
+  const [filterStudent, setFilterStudent] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
 
   useEffect(() => {
     loadData();
@@ -55,11 +57,13 @@ export function ExtraFeesPage() {
   const openCreate = () => {
     setEditing(null);
     setForm({ ...EMPTY_FORM });
+    setStudentSearch('');
     setShowModal(true);
   };
 
   const openEdit = (fee: any) => {
     setEditing(fee);
+    setStudentSearch('');
     setForm({
       name: fee.name || '',
       amount: String(fee.amount || ''),
@@ -111,9 +115,21 @@ export function ExtraFeesPage() {
     loadData();
   };
 
-  const filtered = filterClass
-    ? fees.filter(f => f.class_id === filterClass || (!f.class_id && !f.student_id))
-    : fees;
+  const filtered = fees.filter(f => {
+    if (filterClass && f.class_id !== filterClass && !(!f.class_id && !f.student_id)) return false;
+    if (filterStudent && f.student_id !== filterStudent) return false;
+    return true;
+  });
+
+  const filteredStudents = students.filter(s => {
+    if (!studentSearch) return true;
+    const q = studentSearch.toLowerCase();
+    return (
+      s.first_name?.toLowerCase().includes(q) ||
+      s.last_name?.toLowerCase().includes(q) ||
+      s.admission_number?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -130,18 +146,45 @@ export function ExtraFeesPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3">
-        <Label className="text-sm font-medium">Filter by class:</Label>
-        <select
-          className="border rounded-md px-3 py-1.5 text-sm"
-          value={filterClass}
-          onChange={e => setFilterClass(e.target.value)}
-        >
-          <option value="">All Classes</option>
-          {classes.map((c: any) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium whitespace-nowrap">Filter by class:</Label>
+          <select
+            className="border rounded-md px-3 py-1.5 text-sm"
+            value={filterClass}
+            onChange={e => { setFilterClass(e.target.value); setFilterStudent(''); }}
+          >
+            <option value="">All Classes</option>
+            {classes.map((c: any) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium whitespace-nowrap">Filter by student:</Label>
+          <select
+            className="border rounded-md px-3 py-1.5 text-sm"
+            value={filterStudent}
+            onChange={e => setFilterStudent(e.target.value)}
+          >
+            <option value="">All Students</option>
+            {students
+              .filter(s => !filterClass || s.class_id === filterClass)
+              .map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.first_name} {s.last_name} ({s.admission_number})
+                </option>
+              ))}
+          </select>
+        </div>
+        {(filterClass || filterStudent) && (
+          <button
+            className="text-xs text-blue-600 underline"
+            onClick={() => { setFilterClass(''); setFilterStudent(''); }}
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -254,7 +297,7 @@ export function ExtraFeesPage() {
                 <select
                   className="w-full border rounded-md px-3 py-2 text-sm mt-1"
                   value={form.scope}
-                  onChange={e => setForm(f => ({ ...f, scope: e.target.value as 'class' | 'student', class_id: '', student_id: '' }))}
+                  onChange={e => { setStudentSearch(''); setForm(f => ({ ...f, scope: e.target.value as 'class' | 'student', class_id: '', student_id: '' })); }}
                 >
                   <option value="class">By Class</option>
                   <option value="student">Individual Student</option>
@@ -278,18 +321,32 @@ export function ExtraFeesPage() {
               ) : (
                 <div className="col-span-2">
                   <Label>Student</Label>
+                  <div className="relative mt-1 mb-1">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by name or admission no..."
+                      value={studentSearch}
+                      onChange={e => setStudentSearch(e.target.value)}
+                      className="w-full border rounded-md pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    />
+                  </div>
                   <select
-                    className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    size={5}
                     value={form.student_id}
                     onChange={e => setForm(f => ({ ...f, student_id: e.target.value }))}
                   >
                     <option value="">— Select Student —</option>
-                    {students.map((s: any) => (
+                    {filteredStudents.map((s: any) => (
                       <option key={s.id} value={s.id}>
                         {s.first_name} {s.last_name} ({s.admission_number}) — {s.class_name || 'No class'}
                       </option>
                     ))}
                   </select>
+                  {studentSearch && filteredStudents.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1">No students match your search.</p>
+                  )}
                 </div>
               )}
 

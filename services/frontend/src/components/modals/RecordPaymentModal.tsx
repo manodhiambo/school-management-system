@@ -87,6 +87,7 @@ export function RecordPaymentModal({ open, onOpenChange, onSuccess }: RecordPaym
         amount: Number(formData.amount),
         payment_method: formData.payment_method,
         transaction_id: formData.transaction_id || null,
+        payment_date: formData.payment_date || null,
         remarks: formData.remarks || null,
       });
       alert('Payment recorded successfully!');

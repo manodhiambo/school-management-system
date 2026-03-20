@@ -220,14 +220,13 @@ async function renderReportCardPage(
   doc.text('LEARNING AREAS PERFORMANCE', W / 2, y + 5.5, { align: 'center' });
   y += 9; doc.setTextColor(0, 0, 0);
 
-  // Column config: LEARNING AREAS | MARKS | DEV. | GRADE | PERFORMANCE LEVEL | FACILITATOR
+  // Column config: LEARNING AREAS | MARKS | DEV. | GRADE | FACILITATOR
   const COL = {
-    subject: { x: M,        w: 58 },
-    marks:   { x: M + 58,   w: 16 },
-    dev:     { x: M + 74,   w: 14 },
-    grade:   { x: M + 88,   w: 16 },
-    perf:    { x: M + 104,  w: 46 },
-    teacher: { x: M + 150,  w: CW - 150 },
+    subject:     { x: M,       w: 58 },
+    marks:       { x: M + 58,  w: 16 },
+    dev:         { x: M + 74,  w: 14 },
+    grade:       { x: M + 88,  w: 16 },
+    facilitator: { x: M + 104, w: CW - 104 },
   };
 
   // Column header row
@@ -237,16 +236,14 @@ async function renderReportCardPage(
   doc.rect(M, y, CW, 8, 'D');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
   [
-    { k: 'subject', t: 'LEARNING AREAS' },
-    { k: 'marks',   t: 'MARKS' },
-    { k: 'dev',     t: 'DEV.' },
-    { k: 'grade',   t: 'GRADE' },
-    { k: 'perf',    t: 'PERFORMANCE LEVEL' },
-    { k: 'teacher', t: 'FACILITATOR' },
+    { k: 'subject',     t: 'LEARNING AREAS' },
+    { k: 'marks',       t: 'MARKS' },
+    { k: 'dev',         t: 'DEV.' },
+    { k: 'grade',       t: 'GRADE' },
+    { k: 'facilitator', t: 'FACILITATOR' },
   ].forEach(({ k, t }) => {
     const c = COL[k as keyof typeof COL];
     doc.text(t, c.x + 2, y + 5.5);
-    // vertical divider
     doc.setDrawColor(160, 160, 160);
     doc.line(c.x, y, c.x, y + 8);
   });
@@ -287,8 +284,7 @@ async function renderReportCardPage(
       doc.text('—', COL.grade.x + 2, y + 5.5);
     }
 
-    doc.text((GRADE_LABEL_FULL[grade] || '—').slice(0, 22), COL.perf.x + 2, y + 5.5);
-    doc.text((c.teacher_name || '').slice(0, 20), COL.teacher.x + 2, y + 5.5);
+    doc.text((c.teacher_name || '—').slice(0, 30), COL.facilitator.x + 2, y + 5.5);
     y += rowH;
   });
   y += 4;

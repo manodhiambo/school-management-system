@@ -78,7 +78,9 @@ async function generateStudentReportPDF(
   term: string,
   academicYear: string,
   transportAssignment?: any,
-  extraFees: any[] = []
+  extraFees: any[] = [],
+  closingDate?: string,
+  openingDate?: string
 ) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
@@ -175,30 +177,30 @@ async function generateStudentReportPDF(
   // ── Student Details ─────────────────────────────────────────────────────────
   doc.setTextColor(0, 0, 0);
   doc.setFillColor(243, 244, 246);
-  doc.roundedRect(margin, y, pageW - 2 * margin, 24, 2, 2, 'F');
+  doc.roundedRect(margin, y, pageW - 2 * margin, 18, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('STUDENT INFORMATION', margin + 4, y + 7);
+  doc.setFontSize(9);
+  doc.text('STUDENT INFORMATION', margin + 4, y + 5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   const leftCol = margin + 4;
   const rightCol = pageW / 2 + 4;
-  doc.text(`Name: ${student.first_name} ${student.last_name}`, leftCol, y + 14);
-  doc.text(`Adm No: ${student.admission_number || '—'}`, rightCol, y + 14);
-  doc.text(`Class: ${student.class_name || '—'}`, leftCol, y + 20);
-  doc.text(`Category: ${student.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}`, rightCol, y + 20);
-  y += 30;
+  doc.text(`Name: ${student.first_name} ${student.last_name}`, leftCol, y + 10);
+  doc.text(`Adm No: ${student.admission_number || '—'}`, rightCol, y + 10);
+  doc.text(`Class: ${student.class_name || '—'}`, leftCol, y + 16);
+  doc.text(`Category: ${student.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}`, rightCol, y + 16);
+  y += 22;
 
   // ── Assessments Table ────────────────────────────────────────────────────────
   if (assessments.length > 0) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFillColor(37, 99, 235);
-    doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+    doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.text('CBC ASSESSMENT RESULTS', margin + 4, y + 5.5);
-    y += 10;
+    doc.text('CBC ASSESSMENT RESULTS', margin + 4, y + 4.5);
+    y += 9;
     doc.setTextColor(0, 0, 0);
 
     // Table header
@@ -213,66 +215,67 @@ async function generateStudentReportPDF(
       ? ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Pts', 'Facilitator']
       : ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Facilitator'];
     doc.setFillColor(219, 234, 254);
-    doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+    doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    colHeads.forEach((h, i) => doc.text(h, colX[i], y + 5));
-    y += 8;
+    doc.setFontSize(7.5);
+    colHeads.forEach((h, i) => doc.text(h, colX[i], y + 4));
+    y += 7;
 
     doc.setFont('helvetica', 'normal');
     assessments.forEach((a: any, idx: number) => {
-      if (y > 240) { doc.addPage(); y = 20; }
+      if (y > 255) { doc.addPage(); y = 20; }
       if (idx % 2 === 0) {
         doc.setFillColor(249, 250, 251);
-        doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+        doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
       }
       const grade = a.cbc_grade || a.pre_primary_grade || '';
       const score = a.result_code ? a.result_code : (a.score != null ? `${a.score}/${a.max_score}` : '—');
       const facilitator = (a.teacher_name || '—');
       const period = a.exam_period ? a.exam_period.replace('_', '-') : a.assessment_type || '';
 
-      doc.text((a.subject_name || '—').slice(0, 24), colX[0], y + 5);
-      doc.text(period.slice(0, 18), colX[1], y + 5);
-      doc.text(score, colX[2], y + 5);
+      doc.setFontSize(8);
+      doc.text((a.subject_name || '—').slice(0, 24), colX[0], y + 4);
+      doc.text(period.slice(0, 18), colX[1], y + 4);
+      doc.text(score, colX[2], y + 4);
 
       // Grade badge
       if (grade) {
         const [r, g, b] = GRADE_COLORS_HEX[grade] || [100, 100, 100];
         doc.setFillColor(r, g, b);
         doc.setTextColor(255, 255, 255);
-        doc.roundedRect(colX[3], y + 0.5, hasJSS ? 14 : 12, 6, 1, 1, 'F');
+        doc.roundedRect(colX[3], y + 0.5, hasJSS ? 14 : 12, 5, 1, 1, 'F');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
-        doc.text(grade, colX[3] + 1.5, y + 5);
+        doc.text(grade, colX[3] + 1.5, y + 4);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(0, 0, 0);
       } else {
-        doc.text('—', colX[3], y + 5);
+        doc.text('—', colX[3], y + 4);
       }
 
       if (hasJSS) {
         const pts = a.grade_points != null ? String(a.grade_points) : '—';
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.text(pts, colX[4], y + 5);
+        doc.text(pts, colX[4], y + 4);
         doc.setFont('helvetica', 'normal');
-        doc.text(facilitator.slice(0, 22), colX[5], y + 5);
+        doc.text(facilitator.slice(0, 22), colX[5], y + 4);
       } else if (hasPrimary) {
         const pts = GRADE_POINTS_PRIMARY[a.cbc_grade] != null ? String(GRADE_POINTS_PRIMARY[a.cbc_grade]) : '—';
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.text(pts, colX[4], y + 5);
+        doc.text(pts, colX[4], y + 4);
         doc.setFont('helvetica', 'normal');
-        doc.text(facilitator.slice(0, 22), colX[5], y + 5);
+        doc.text(facilitator.slice(0, 22), colX[5], y + 4);
       } else {
-        doc.text(facilitator.slice(0, 24), colX[4], y + 5);
+        doc.text(facilitator.slice(0, 24), colX[4], y + 4);
       }
-      y += 7;
+      y += 6;
     });
 
     // ── Total Points & Facilitator Comment ────────────────────────────────────
-    if (y > 250) { doc.addPage(); y = 20; }
+    if (y > 260) { doc.addPage(); y = 20; }
     y += 2;
 
     if (hasJSS) {
@@ -284,36 +287,35 @@ async function generateStudentReportPDF(
 
       // Total Points row
       doc.setFillColor(219, 234, 254);
-      doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setTextColor(0, 0, 0);
-      doc.text('TOTAL POINTS', margin + 4, y + 5.5);
-      doc.text(`${totalPts} / ${maxPts}`, pageW - margin - 4, y + 5.5, { align: 'right' });
-      y += 9;
+      doc.text('TOTAL POINTS', margin + 4, y + 4.5);
+      doc.text(`${totalPts} / ${maxPts}`, pageW - margin - 4, y + 4.5, { align: 'right' });
+      y += 8;
 
       // Average Points row
       doc.setFillColor(239, 246, 255);
-      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.text('Average Points per Subject', margin + 4, y + 5);
+      doc.setFontSize(8);
+      doc.text('Average Points per Subject', margin + 4, y + 4);
       doc.setFont('helvetica', 'bold');
-      doc.text(avgPts.toFixed(1), pageW - margin - 4, y + 5, { align: 'right' });
-      y += 8;
+      doc.text(avgPts.toFixed(1), pageW - margin - 4, y + 4, { align: 'right' });
+      y += 7;
 
       // Facilitator Comment row (two lines: label + comment)
       doc.setFillColor(color[0], color[1], color[2]);
-      doc.rect(margin, y, pageW - 2 * margin, 14, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 12, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${avgPts.toFixed(1)} pts/subject)`, margin + 4, y + 5);
+      doc.setFontSize(7.5);
+      doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${avgPts.toFixed(1)} pts/subject)`, margin + 4, y + 4.5);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.text(comment, margin + 4, y + 11);
+      doc.text(comment, margin + 4, y + 9.5);
       doc.setTextColor(0, 0, 0);
-      y += 17;
+      y += 14;
     } else if (hasPrimary) {
       // Primary (Grade 1–6): EE=4, ME=3, AE=2, BE=1
       const validPts = assessments.filter((a: any) => GRADE_POINTS_PRIMARY[a.cbc_grade] != null);
@@ -324,36 +326,36 @@ async function generateStudentReportPDF(
 
       // Total Points row
       doc.setFillColor(219, 234, 254);
-      doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setTextColor(0, 0, 0);
-      doc.text('TOTAL POINTS', margin + 4, y + 5.5);
-      doc.text(`${totalPts} / ${maxPts}`, pageW - margin - 4, y + 5.5, { align: 'right' });
-      y += 9;
+      doc.text('TOTAL POINTS', margin + 4, y + 4.5);
+      doc.text(`${totalPts} / ${maxPts}`, pageW - margin - 4, y + 4.5, { align: 'right' });
+      y += 8;
 
       // Average Points row
       doc.setFillColor(239, 246, 255);
-      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
       doc.setTextColor(0, 0, 0);
-      doc.text('Average Points per Subject', margin + 4, y + 5);
+      doc.text('Average Points per Subject', margin + 4, y + 4);
       doc.setFont('helvetica', 'bold');
-      doc.text(avgPts.toFixed(1), pageW - margin - 4, y + 5, { align: 'right' });
-      y += 8;
+      doc.text(avgPts.toFixed(1), pageW - margin - 4, y + 4, { align: 'right' });
+      y += 7;
 
       // Facilitator Comment row (two lines)
       doc.setFillColor(color[0], color[1], color[2]);
-      doc.rect(margin, y, pageW - 2 * margin, 14, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 12, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${avgPts.toFixed(1)} pts/subject)`, margin + 4, y + 5);
+      doc.setFontSize(7.5);
+      doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${avgPts.toFixed(1)} pts/subject)`, margin + 4, y + 4.5);
       doc.setFont('helvetica', 'normal');
-      doc.text(comment, margin + 4, y + 11);
+      doc.text(comment, margin + 4, y + 9.5);
       doc.setTextColor(0, 0, 0);
-      y += 17;
+      y += 14;
     } else {
       // Pre-primary (WD / D / B): grade distribution comment only
       const grades = assessments.map((a: any) => a.pre_primary_grade || '');
@@ -363,15 +365,15 @@ async function generateStudentReportPDF(
       const bC  = grades.filter((g: string) => g === 'B').length;
 
       doc.setFillColor(color[0], color[1], color[2]);
-      doc.rect(margin, y, pageW - 2 * margin, 14, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 12, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.text(`FACILITATOR'S COMMENT:  (WD:${wdC}  D:${dC}  B:${bC})`, margin + 4, y + 5);
+      doc.setFontSize(7.5);
+      doc.text(`FACILITATOR'S COMMENT:  (WD:${wdC}  D:${dC}  B:${bC})`, margin + 4, y + 4.5);
       doc.setFont('helvetica', 'normal');
-      doc.text(comment, margin + 4, y + 11);
+      doc.text(comment, margin + 4, y + 9.5);
       doc.setTextColor(0, 0, 0);
-      y += 17;
+      y += 14;
     }
 
     y += 2;
@@ -384,15 +386,15 @@ async function generateStudentReportPDF(
   }
 
   // ── Fees Section ─────────────────────────────────────────────────────────────
-  if (y > 220) { doc.addPage(); y = 20; }
+  if (y > 240) { doc.addPage(); y = 20; }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFillColor(16, 185, 129);
-  doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+  doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.text('FEES ACCOUNT', margin + 4, y + 5.5);
-  y += 10;
+  doc.text('FEES ACCOUNT', margin + 4, y + 4.5);
+  y += 9;
   doc.setTextColor(0, 0, 0);
 
   // Build fees breakdown from feeStructures (per-item list) + actuals from feeAccount
@@ -438,26 +440,26 @@ async function generateStudentReportPDF(
   const structureTotal = feeItems.reduce((s: number, f) => s + f.amount, 0);
 
   // Fee structure line items
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   feeItems.forEach((f, idx) => {
-    if (y > 270) { doc.addPage(); y = 20; }
+    if (y > 278) { doc.addPage(); y = 20; }
     if (idx % 2 === 0) {
       doc.setFillColor(240, 253, 244);
-      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
     }
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
-    doc.text(f.label, margin + 4, y + 5);
-    doc.text(`KES ${f.amount.toLocaleString()}`, pageW - margin - 4, y + 5, { align: 'right' });
-    y += 7;
+    doc.text(f.label, margin + 4, y + 4);
+    doc.text(`KES ${f.amount.toLocaleString()}`, pageW - margin - 4, y + 4, { align: 'right' });
+    y += 6;
   });
 
   if (feeItems.length === 0) {
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(150, 150, 150);
-    doc.text('No fee structure configured for this class/student.', margin + 4, y + 5);
-    y += 7;
+    doc.text('No fee structure configured for this class/student.', margin + 4, y + 4);
+    y += 6;
   }
 
   // Divider + Total row
@@ -465,13 +467,13 @@ async function generateStudentReportPDF(
   doc.line(margin, y + 1, pageW - margin, y + 1);
   y += 3;
   doc.setFillColor(220, 240, 255);
-  doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+  doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(0, 0, 0);
-  doc.text('TOTAL FEES', margin + 4, y + 5);
-  doc.text(`KES ${structureTotal.toLocaleString()}`, pageW - margin - 4, y + 5, { align: 'right' });
-  y += 7;
+  doc.text('TOTAL FEES', margin + 4, y + 4);
+  doc.text(`KES ${structureTotal.toLocaleString()}`, pageW - margin - 4, y + 4, { align: 'right' });
+  y += 6;
 
   // Paid & Balance summary
   const summaryRows: [string, string, boolean][] = [
@@ -481,21 +483,41 @@ async function generateStudentReportPDF(
   summaryRows.forEach(([label, val, isRed], idx) => {
     if (idx % 2 === 0) {
       doc.setFillColor(240, 253, 244);
-      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
     }
     doc.setFont('helvetica', 'bold');
-    doc.text(label, margin + 4, y + 5);
+    doc.text(label, margin + 4, y + 4);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(isRed ? 220 : 0, isRed ? 38 : 0, isRed ? 38 : 0);
-    doc.text(val, pageW - margin - 4, y + 5, { align: 'right' });
+    doc.text(val, pageW - margin - 4, y + 4, { align: 'right' });
     doc.setTextColor(0, 0, 0);
-    y += 7;
+    y += 6;
   });
-  y += 4;
+  y += 3;
+
+  // ── Term Dates ──────────────────────────────────────────────────────────────
+  if (closingDate || openingDate) {
+    const tdW = (pageW - 2 * margin - 4) / 2;
+    [
+      { label: 'TERM CLOSES', value: closingDate || '—' },
+      { label: 'NEXT TERM OPENS', value: openingDate || '—' },
+    ].forEach(({ label, value }, i) => {
+      const tx = margin + i * (tdW + 4);
+      doc.setFillColor(235, 235, 235);
+      doc.rect(tx, y, tdW, 6, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(80, 80, 80);
+      doc.text(label, tx + tdW / 2, y + 4, { align: 'center' });
+      doc.setFillColor(255, 255, 255);
+      doc.rect(tx, y + 6, tdW, 8);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
+      doc.text(value, tx + tdW / 2, y + 12, { align: 'center' });
+    });
+    y += 17;
+  }
 
   // ── Signatures ──────────────────────────────────────────────────────────────
-  if (y > 250) { doc.addPage(); y = 20; }
-  y += 6;
+  if (y > 262) { doc.addPage(); y = 20; }
+  y += 4;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setDrawColor(180);
@@ -528,6 +550,8 @@ export function StudentReportPage() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [term, setTerm] = useState('term1');
   const [academicYear, setAcademicYear] = useState(String(new Date().getFullYear()));
+  const [closingDate, setClosingDate] = useState('');
+  const [openingDate, setOpeningDate] = useState('');
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
@@ -560,7 +584,8 @@ export function StudentReportPage() {
       const extraFees: any[] = extraFeesRes?.data || [];
 
       await generateStudentReportPDF(
-        selectedStudent, assessments, feeAccount, school, feeStructures, term, academicYear, transportAssignment, extraFees
+        selectedStudent, assessments, feeAccount, school, feeStructures, term, academicYear, transportAssignment, extraFees,
+        closingDate || undefined, openingDate || undefined
       );
     } catch (err: any) {
       alert('Failed to generate report: ' + (err.message || 'Unknown error'));
@@ -644,6 +669,20 @@ export function StudentReportPage() {
             <div>
               <Label>Academic Year *</Label>
               <Input value={academicYear} onChange={e => setAcademicYear(e.target.value)} placeholder="2025" className="mt-1" />
+            </div>
+          </div>
+
+          {/* Term closing / opening dates */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Term Closing Date</Label>
+              <Input type="date" className="mt-1" value={closingDate} onChange={e => setClosingDate(e.target.value)} />
+              <p className="text-xs text-gray-400 mt-0.5">Printed on report card</p>
+            </div>
+            <div>
+              <Label>Next Term Opening Date</Label>
+              <Input type="date" className="mt-1" value={openingDate} onChange={e => setOpeningDate(e.target.value)} />
+              <p className="text-xs text-gray-400 mt-0.5">Printed on report card</p>
             </div>
           </div>
 

@@ -17,6 +17,9 @@ const GRADE_COLORS_HEX: Record<string, [number, number, number]> = {
 const GRADE_POINTS: Record<string, number> = {
   EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
 };
+const GRADE_POINTS_PRIMARY: Record<string, number> = {
+  EE: 4, ME: 3, AE: 2, BE: 1,
+};
 const AUTO_COMMENTS: Record<string, string> = {
   EE: 'EXCELLENT', EE1: 'EXCELLENT', EE2: 'EXCELLENT',
   ME: 'GOOD',      ME1: 'GOOD',      ME2: 'GOOD',
@@ -38,7 +41,16 @@ function getFacilitatorComment(avgPoints: number): { comment: string; color: [nu
   return                    { comment: 'You can do it! Keep trying until you get it.',                     color: [185, 28, 28]  };
 }
 
-// Facilitator comment based on grade distribution (non-JSS)
+// Facilitator comment based on average points per subject (Primary scale: 1–4)
+function getFacilitatorCommentPrimary(avgPoints: number): { comment: string; color: [number, number, number] } {
+  const rounded = Math.round(avgPoints);
+  if (rounded >= 4) return { comment: 'Outstanding! You are a star performer. Keep it up!',         color: [22, 163, 74]  };
+  if (rounded === 3) return { comment: 'Good job! You are doing great, keep putting in the effort.', color: [37, 99, 235]  };
+  if (rounded === 2) return { comment: "Nice effort! I believe you can do even better next time.",   color: [202, 138, 4]  };
+  return                    { comment: 'You can do it! Keep trying until you get it.',               color: [220, 38, 38]  };
+}
+
+// Facilitator comment based on grade distribution (pre-primary)
 function getFacilitatorCommentFromGrades(grades: string[]): { comment: string; color: [number, number, number] } {
   const total = grades.length;
   if (total === 0) return { comment: 'No assessment data available for this term.', color: [150, 150, 150] };
@@ -190,12 +202,14 @@ async function generateStudentReportPDF(
     doc.setTextColor(0, 0, 0);
 
     // Table header
-    // Detect if any assessments are JSS (have grade_points)
+    // Detect level: JSS (has grade_points), Primary (cbc_grade = EE/ME/AE/BE), Pre-primary (WD/D/B)
     const hasJSS = assessments.some((a: any) => a.grade_points != null);
-    const colX = hasJSS
+    const hasPrimary = !hasJSS && assessments.some((a: any) => GRADE_POINTS_PRIMARY[a.cbc_grade] != null);
+    // JSS and Primary both get a Pts column; pre-primary does not
+    const colX = (hasJSS || hasPrimary)
       ? [margin, margin + 48, margin + 80, margin + 100, margin + 116, margin + 128, margin + 148]
       : [margin, margin + 52, margin + 88, margin + 110, margin + 124, margin + 140];
-    const colHeads = hasJSS
+    const colHeads = (hasJSS || hasPrimary)
       ? ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Pts', 'Facilitator']
       : ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Facilitator'];
     doc.setFillColor(219, 234, 254);
@@ -239,6 +253,13 @@ async function generateStudentReportPDF(
 
       if (hasJSS) {
         const pts = a.grade_points != null ? String(a.grade_points) : '—';
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(pts, colX[4], y + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.text(facilitator.slice(0, 22), colX[5], y + 5);
+      } else if (hasPrimary) {
+        const pts = GRADE_POINTS_PRIMARY[a.cbc_grade] != null ? String(GRADE_POINTS_PRIMARY[a.cbc_grade]) : '—';
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.text(pts, colX[4], y + 5);
@@ -293,23 +314,60 @@ async function generateStudentReportPDF(
       doc.text(comment, margin + 4, y + 11);
       doc.setTextColor(0, 0, 0);
       y += 17;
-    } else {
-      // Non-JSS: grade distribution comment
-      const grades = assessments.map((a: any) => a.cbc_grade || a.pre_primary_grade || '');
-      const { comment, color } = getFacilitatorCommentFromGrades(grades);
+    } else if (hasPrimary) {
+      // Primary (Grade 1–6): EE=4, ME=3, AE=2, BE=1
+      const validPts = assessments.filter((a: any) => GRADE_POINTS_PRIMARY[a.cbc_grade] != null);
+      const totalPts = validPts.reduce((s: number, a: any) => s + GRADE_POINTS_PRIMARY[a.cbc_grade], 0);
+      const avgPts = validPts.length > 0 ? totalPts / validPts.length : 0;
+      const maxPts = validPts.length * 4;
+      const { comment, color } = getFacilitatorCommentPrimary(avgPts);
 
-      const eeC = grades.filter((g: string) => g.startsWith('EE') || g === 'WD').length;
-      const meC = grades.filter((g: string) => g.startsWith('ME') || g === 'D').length;
-      const aeC = grades.filter((g: string) => g.startsWith('AE')).length;
-      const beC = grades.filter((g: string) => g.startsWith('BE') || g === 'B').length;
+      // Total Points row
+      doc.setFillColor(219, 234, 254);
+      doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      doc.text('TOTAL POINTS', margin + 4, y + 5.5);
+      doc.text(`${totalPts} / ${maxPts}`, pageW - margin - 4, y + 5.5, { align: 'right' });
+      y += 9;
 
-      // Facilitator Comment row (two lines: label + comment)
+      // Average Points row
+      doc.setFillColor(239, 246, 255);
+      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Average Points per Subject', margin + 4, y + 5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(avgPts.toFixed(1), pageW - margin - 4, y + 5, { align: 'right' });
+      y += 8;
+
+      // Facilitator Comment row (two lines)
       doc.setFillColor(color[0], color[1], color[2]);
       doc.rect(margin, y, pageW - 2 * margin, 14, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
-      doc.text(`FACILITATOR'S COMMENT:  (EE:${eeC}  ME:${meC}  AE:${aeC}  BE:${beC})`, margin + 4, y + 5);
+      doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${avgPts.toFixed(1)} pts/subject)`, margin + 4, y + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(comment, margin + 4, y + 11);
+      doc.setTextColor(0, 0, 0);
+      y += 17;
+    } else {
+      // Pre-primary (WD / D / B): grade distribution comment only
+      const grades = assessments.map((a: any) => a.pre_primary_grade || '');
+      const { comment, color } = getFacilitatorCommentFromGrades(grades);
+      const wdC = grades.filter((g: string) => g === 'WD').length;
+      const dC  = grades.filter((g: string) => g === 'D').length;
+      const bC  = grades.filter((g: string) => g === 'B').length;
+
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(margin, y, pageW - 2 * margin, 14, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text(`FACILITATOR'S COMMENT:  (WD:${wdC}  D:${dC}  B:${bC})`, margin + 4, y + 5);
       doc.setFont('helvetica', 'normal');
       doc.text(comment, margin + 4, y + 11);
       doc.setTextColor(0, 0, 0);

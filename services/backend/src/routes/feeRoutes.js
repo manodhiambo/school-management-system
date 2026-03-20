@@ -797,9 +797,10 @@ router.get('/student/:studentId', async (req, res) => {
     `, [std.id, tid]);
 
     // Expected fee structures — transport fees only if student is on that route;
-    // extra_fee_id structures excluded (already covered by the extra_fees query below)
+    // extra_fee_id structures excluded (already covered by the extra_fees query below).
+    // DISTINCT ON (fs.name) prevents double-rows when both class-specific and global structures match.
     const structures = await query(`
-      SELECT fs.*, c.name AS class_name
+      SELECT DISTINCT ON (fs.name) fs.*, c.name AS class_name
       FROM fee_structure fs
       LEFT JOIN classes c ON c.id = fs.class_id
       WHERE fs.tenant_id = $1 AND fs.is_active = true
@@ -818,7 +819,7 @@ router.get('/student/:studentId', async (req, res) => {
             )
           )
         )
-      ORDER BY fs.name
+      ORDER BY fs.name, fs.class_id NULLS LAST
     `, [tid, std.class_id, std.student_type || 'all', year, std.id]);
 
     // Extra fees
@@ -967,9 +968,11 @@ router.get('/expected/:studentId', async (req, res) => {
     const std = studentRows[0];
 
     // Fee structures for this class — transport fees only if student is on that route;
-    // extra_fee_id structures excluded (covered by extra_fees query below)
+    // extra_fee_id structures excluded (covered by extra_fees query below).
+    // DISTINCT ON (fs.name) prevents duplicate rows when both a class-specific and a
+    // global (class_id IS NULL) structure have the same name — class-specific wins.
     const structures = await query(
-      `SELECT fs.*, c.name AS class_name
+      `SELECT DISTINCT ON (fs.name) fs.*, c.name AS class_name
        FROM fee_structure fs
        LEFT JOIN classes c ON c.id = fs.class_id
        WHERE fs.tenant_id = $1 AND fs.is_active = true
@@ -988,7 +991,7 @@ router.get('/expected/:studentId', async (req, res) => {
              )
            )
          )
-       ORDER BY fs.name`,
+       ORDER BY fs.name, fs.class_id NULLS LAST`,
       [tid, std.class_id, std.student_type || 'all', year, std.id]
     );
 
@@ -1097,18 +1100,20 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
     );
     const studentRoute = transportRows[0] || null;
 
-    // Fee structures — same filtering logic as /expected/:studentId:
-    // - transport fees only if student has active route assignment for that route
-    // - extra_fee_id structures excluded (covered by extra_fees query)
+    // Combined query: regular fee structures + extra-fee-linked structures.
+    // Extra-fee structures (extra_fee_id IS NOT NULL) are included here so that invoice
+    // generation uses fee_structure_id for ALL invoices — consistent with bulk-smart.
+    // Student-scoped extra fees are guarded by ef.student_id check.
+    // DISTINCT ON (fs.name) prevents double-billing when both class-specific and
+    // global structures have the same name — class-specific wins.
     const structures = await query(
-      `SELECT fs.*, ef.student_id AS extra_fee_student_id
+      `SELECT DISTINCT ON (fs.name) fs.*, ef.student_id AS extra_fee_student_id, ef.id AS linked_extra_fee_id
        FROM fee_structure fs
        LEFT JOIN extra_fees ef ON ef.id = fs.extra_fee_id AND ef.tenant_id = $1
        WHERE fs.tenant_id = $1 AND fs.is_active = true
          AND (fs.class_id = $2 OR fs.class_id IS NULL)
          AND (fs.student_type = 'all' OR fs.student_type = $3)
          AND fs.academic_year = $4
-         AND fs.extra_fee_id IS NULL
          AND (
            fs.is_transport_fee = FALSE
            OR (
@@ -1119,31 +1124,28 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
                  AND st.is_active = TRUE AND st.tenant_id = $1
              )
            )
-         )`,
+         )
+         AND (
+           fs.extra_fee_id IS NULL
+           OR (
+             fs.extra_fee_id IS NOT NULL
+             AND (ef.student_id IS NULL OR ef.student_id = $5)
+           )
+         )
+       ORDER BY fs.name, fs.class_id NULLS LAST, fs.extra_fee_id NULLS FIRST`,
       [tid, std.class_id, std.student_type || 'all', year, std.id]
     );
 
-    // Extra fees applicable to this student (class-level + student-level)
-    const extraRows = await query(
-      `SELECT * FROM extra_fees
-       WHERE tenant_id = $1 AND is_active = true
-         AND (
-           student_id = $2
-           OR (class_id = $3 AND student_id IS NULL)
-         )
-         AND (term IS NULL OR term = $4)
-         AND (academic_year IS NULL OR academic_year = $5)`,
-      [tid, std.id, std.class_id, term || null, term ? year : null]
-    );
-
-    if (!structures.length && !extraRows.length) {
+    if (!structures.length) {
       return res.status(400).json({ success: false, message: 'No applicable fee structures found for this student' });
     }
 
-    // Existing invoice keys for duplicate detection — covers both fee_structure_id and extra_fee_id
+    // Existing invoice keys — use both fee_structure_id and extra_fee_id so old invoices
+    // (created before this unification) are also detected as duplicates.
     const existingInvRows = await query(
-      `SELECT fee_structure_id, extra_fee_id, term, academic_year
-       FROM fee_invoices WHERE student_id=$1 AND tenant_id=$2 AND status!='cancelled'`,
+      `SELECT fi.fee_structure_id, fi.extra_fee_id, fi.term, fi.academic_year
+       FROM fee_invoices fi
+       WHERE fi.student_id=$1 AND fi.tenant_id=$2 AND fi.status!='cancelled'`,
       [std.id, tid]
     );
     const existingSet = new Set([
@@ -1158,10 +1160,15 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
     const created = [];
     const skipped = [];
 
-    // Generate one invoice per fee structure
+    // Generate one invoice per fee structure (includes extra-fee-linked structures)
     for (const struct of structures) {
       const dupKey = `fs:${struct.id}|${term||''}|${year}`;
-      if (existingSet.has(dupKey)) { skipped.push(struct.name); continue; }
+      // Also check old-style ef: key for backward compat with invoices created before unification
+      const altDupKey = struct.linked_extra_fee_id
+        ? `ef:${struct.linked_extra_fee_id}|${term||''}|${year}` : null;
+      if (existingSet.has(dupKey) || (altDupKey && existingSet.has(altDupKey))) {
+        skipped.push(struct.name); continue;
+      }
       const amount = struct.is_transport_fee && studentRoute
         ? (parseFloat(studentRoute.term_fee) || parseFloat(struct.amount))
         : parseFloat(struct.amount);
@@ -1174,23 +1181,8 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
         [invoiceId, invoiceNumber, std.id, amount, due_date||null, tid, struct.name, struct.id, term||null, year]
       );
       existingSet.add(dupKey);
+      if (altDupKey) existingSet.add(altDupKey);
       created.push({ invoice_number: invoiceNumber, description: struct.name, amount });
-    }
-
-    // Generate one invoice per extra fee — store extra_fee_id for future duplicate detection
-    for (const ef of extraRows) {
-      const dupKey = `ef:${ef.id}|${term||''}|${year}`;
-      if (existingSet.has(dupKey)) { skipped.push(ef.name); continue; }
-      const invoiceId = uuidv4();
-      const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth()+1).toString().padStart(2,'0')}${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`;
-      await query(
-        `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, balance_amount,
-           due_date, status, tenant_id, description, extra_fee_id, term, academic_year)
-         VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9,$10)`,
-        [invoiceId, invoiceNumber, std.id, parseFloat(ef.amount), due_date||null, tid, ef.name, ef.id, term||null, year]
-      );
-      existingSet.add(dupKey);
-      created.push({ invoice_number: invoiceNumber, description: ef.name, amount: parseFloat(ef.amount) });
     }
 
     const totalAmount = created.reduce((s, r) => s + r.amount, 0);

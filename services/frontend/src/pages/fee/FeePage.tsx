@@ -775,6 +775,7 @@ export function FeePage() {
                       <th className="text-left px-4 py-3 font-medium">Invoice #</th>
                       <th className="text-left px-4 py-3 font-medium">Student</th>
                       <th className="text-left px-4 py-3 font-medium">Class</th>
+                      <th className="text-left px-4 py-3 font-medium">Description</th>
                       <th className="text-right px-4 py-3 font-medium">Amount</th>
                       <th className="text-right px-4 py-3 font-medium">Paid</th>
                       <th className="text-right px-4 py-3 font-medium">Balance</th>
@@ -791,6 +792,7 @@ export function FeePage() {
                           <p className="text-xs text-gray-400">{inv.admission_number}</p>
                         </td>
                         <td className="px-4 py-3 text-gray-500 text-xs">{inv.class_name || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-600 max-w-[160px] truncate">{inv.description || '—'}</td>
                         <td className="px-4 py-3 text-right">{fmt(inv.net_amount)}</td>
                         <td className="px-4 py-3 text-right text-green-700">{fmt(inv.paid_amount || 0)}</td>
                         <td className="px-4 py-3 text-right">

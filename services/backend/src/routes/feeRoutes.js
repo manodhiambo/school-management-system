@@ -464,20 +464,36 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
     }
     const allStudents = await query(studentSql, studentParams);
 
-    // Load transport assignments
+    // Load transport assignments — keyed by student_id (tenant-scoped)
     const transportMap = {};
     const transportRows = await query(
       `SELECT st.student_id, st.route_id, r.term_fee, r.monthly_fee, r.route_name
        FROM student_transport st
-       JOIN transport_routes r ON r.id = st.route_id
+       JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $1
        WHERE st.tenant_id = $1 AND st.is_active = TRUE`,
       [tid]
     );
     for (const t of transportRows) transportMap[t.student_id] = t;
 
+    // Load existing invoices for duplicate detection (same student + structure + term + year)
+    const existingInvoices = await query(
+      `SELECT student_id, fee_structure_id, term, academic_year
+       FROM fee_invoices
+       WHERE tenant_id = $1 AND status NOT IN ('cancelled')`,
+      [tid]
+    );
+    const existingSet = new Set(
+      existingInvoices.map(r =>
+        `${r.student_id}|${r.fee_structure_id}|${r.term || ''}|${r.academic_year || ''}`
+      )
+    );
+
     const summary = { created: [], skipped: [], errors: [] };
 
     for (const struct of structures) {
+      // Extra-fee-linked structures: only assign to students matching the specific extra fee scope
+      // (extra_fee student_id scope is handled by class_id on the structure; if student_id-scoped,
+      // the extra fee has no class_id and applies to all — use extra_fee_id guard)
       for (const student of allStudents) {
         // If fee structure is tied to a specific class, only students in that class get it
         if (struct.class_id && student.class_id !== struct.class_id) {
@@ -489,18 +505,27 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
           summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'student_type_mismatch' });
           continue;
         }
-        // Transport fee: only for students who use school transport
-        if (struct.is_transport_fee && !student.uses_transport) {
-          summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'no_transport' });
-          continue;
+        // Transport fee: check actual route assignment (not the stale uses_transport flag)
+        if (struct.is_transport_fee) {
+          if (!transportMap[student.id]) {
+            summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'no_transport' });
+            continue;
+          }
+          // Route-specific: only for students on that exact route
+          if (struct.route_id && transportMap[student.id].route_id !== struct.route_id) {
+            summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'route_mismatch' });
+            continue;
+          }
         }
-        // Route-specific transport: only for students on that route
-        if (struct.is_transport_fee && struct.route_id && transportMap[student.id]?.route_id !== struct.route_id) {
-          summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'route_mismatch' });
+
+        // Duplicate check — skip if invoice already exists for this student + structure + term + year
+        const dupKey = `${student.id}|${struct.id}|${term || ''}|${academic_year || ''}`;
+        if (existingSet.has(dupKey)) {
+          summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'already_invoiced' });
           continue;
         }
 
-        // Determine amount — use route fee if transport fee and route has term_fee
+        // Determine amount — use route's term_fee for transport fees
         let amount = parseFloat(struct.amount);
         if (struct.is_transport_fee && transportMap[student.id]) {
           const tf = parseFloat(transportMap[student.id].term_fee);
@@ -516,11 +541,15 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
                VALUES ($1,$2,$3,$4,$4,$4,$5,'pending',$6,$7,$8,$9,$10)`,
               [invoiceId, invoiceNumber, student.id, amount, due_date || null, tid, struct.name, struct.id, term || null, academic_year || null]
             );
+            // Add to existing set so subsequent structures in the same run don't re-duplicate
+            existingSet.add(dupKey);
             summary.created.push({ student_id: student.id, name: `${student.first_name} ${student.last_name}`, fee: struct.name, amount });
           } catch (err) {
             summary.errors.push({ student_id: student.id, fee: struct.name, error: err.message });
           }
         } else {
+          // For dry_run, also track duplicates that would happen within this run
+          existingSet.add(dupKey);
           summary.created.push({ student_id: student.id, name: `${student.first_name} ${student.last_name}`, class_name: student.class_name, fee: struct.name, amount, student_type: student.student_type });
         }
       }

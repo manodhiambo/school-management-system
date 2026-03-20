@@ -136,8 +136,9 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
   const reasonLabel: Record<string, string> = {
     class_mismatch: 'Not in target class',
     student_type_mismatch: 'Student type mismatch (day/boarding)',
-    no_transport: 'No transport subscription',
+    no_transport: 'Not assigned to any transport route',
     route_mismatch: 'Wrong transport route',
+    already_invoiced: 'Invoice already exists for this term/year',
   };
 
   const classRestrictedIds = new Set(feeStructures.filter(f => f.class_id).map(f => f.id));

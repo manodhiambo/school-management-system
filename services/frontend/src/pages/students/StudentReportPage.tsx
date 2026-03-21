@@ -401,9 +401,12 @@ async function generateStudentReportPDF(
   const totalPaid = Number(feeAccount?.paid) || 0;
   const balance = Number(feeAccount?.pending) || 0;
 
-  // Non-transport fee structures applicable to this student
+  // Non-transport fee structures applicable to this student.
+  // Exclude auto-created fee_structure entries linked to extra_fees (extra_fee_id != null)
+  // — those are shown separately via the extraFees list below.
   const nonTransportStructures = feeStructures.filter((f: any) => {
     if (f.is_transport_fee) return false;
+    if (f.extra_fee_id) return false; // auto-linked extra fee — shown via extraFees
     const st = f.student_type || 'all';
     return st === 'all' || st === student.student_type;
   });
@@ -432,9 +435,12 @@ async function generateStudentReportPDF(
     }
   }
 
-  // Extra / miscellaneous fees
+  // Extra / miscellaneous fees — skip any whose name already appears in feeItems (dedup)
+  const existingLabels = new Set(feeItems.map((f) => f.label.toLowerCase().trim()));
   for (const ef of extraFees) {
-    feeItems.push({ label: ef.name, amount: Number(ef.amount) || 0 });
+    if (!existingLabels.has((ef.name || '').toLowerCase().trim())) {
+      feeItems.push({ label: ef.name, amount: Number(ef.amount) || 0 });
+    }
   }
 
   const structureTotal = feeItems.reduce((s: number, f) => s + f.amount, 0);

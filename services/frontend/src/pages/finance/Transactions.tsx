@@ -393,7 +393,7 @@ export default function Transactions() {
       </div>
 
       {/* Transactions Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -449,21 +449,21 @@ export default function Transactions() {
                         {record.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex items-center space-x-2">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleViewDetails(record)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50"
                           title="View Details"
                         >
-                          <Eye className="h-5 w-5" />
+                          <Eye className="h-3.5 w-3.5" /> View
                         </button>
                         <button
                           onClick={() => handleDeleteIncome(record.id)}
-                          className="text-red-500 hover:text-red-700"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
                           title="Delete"
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
                         </button>
                       </div>
                     </td>
@@ -531,17 +531,17 @@ export default function Transactions() {
                       )}
                       <button
                         onClick={() => handleViewDetails(record)}
-                        className="text-gray-600 hover:text-gray-800"
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50"
                         title="View Details"
                       >
-                        <Eye className="h-5 w-5" />
+                        <Eye className="h-3.5 w-3.5" /> View
                       </button>
                       <button
                         onClick={() => handleDeleteExpense(record.id)}
-                        className="text-red-500 hover:text-red-700"
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
                         title="Delete"
                       >
-                        <Trash2 className="h-5 w-5" />
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
                       </button>
                     </div>
                   </td>

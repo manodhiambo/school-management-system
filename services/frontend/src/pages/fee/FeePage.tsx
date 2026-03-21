@@ -82,12 +82,17 @@ function downloadFeeStatement(
   doc.text('TOTAL PAID', cols[2], y + 7);
   doc.text('BALANCE DUE', cols[3], y + 7);
   doc.setFont('helvetica', 'normal');
-  const totalExpected = [...expected, ...extraFees].reduce((s, f) => s + Number(f.amount), 0);
+  // Compute totals from live invoice data (excludes cancelled) so summary is always accurate
+  const nonCancelledInvoices = invoices.filter(i => i.status !== 'cancelled');
+  const totalExpected   = [...expected, ...extraFees].reduce((s, f) => s + Number(f.amount), 0);
+  const totalInvoiced   = nonCancelledInvoices.reduce((s, i) => s + Number(i.net_amount || 0), 0);
+  const totalPaid       = nonCancelledInvoices.reduce((s, i) => s + Number(i.paid_amount || 0), 0);
+  const totalBalance    = nonCancelledInvoices.reduce((s, i) => s + Number(i.balance_amount || 0), 0);
   doc.text(fmt(totalExpected), cols[0], y + 16);
-  doc.text(fmt(student.total_invoiced), cols[1], y + 16);
-  doc.text(fmt(student.total_paid), cols[2], y + 16);
-  doc.setTextColor(student.total_balance > 0 ? 180 : 30, 30, 30);
-  doc.text(fmt(student.total_balance), cols[3], y + 16);
+  doc.text(fmt(totalInvoiced), cols[1], y + 16);
+  doc.text(fmt(totalPaid), cols[2], y + 16);
+  doc.setTextColor(totalBalance > 0 ? 180 : 30, 30, 30);
+  doc.text(fmt(totalBalance), cols[3], y + 16);
   doc.setTextColor(30, 30, 30);
   y += 28;
 
@@ -114,8 +119,9 @@ function downloadFeeStatement(
     y += 4;
   }
 
-  // Invoices table
-  if (invoices.length) {
+  // Invoices table — only print active invoices, never show cancelled/deleted ones
+  const activeInvoices = invoices.filter(i => i.status !== 'cancelled');
+  if (activeInvoices.length) {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
     doc.text('Invoices', 10, y); y += 5;
     doc.setFillColor(37, 99, 235);
@@ -129,7 +135,7 @@ function downloadFeeStatement(
     doc.text('Status', pw - 14, y + 5, { align: 'right' });
     y += 7; doc.setTextColor(30, 30, 30);
     let rowBg = false;
-    for (const inv of invoices) {
+    for (const inv of activeInvoices) {
       if (y > 270) { doc.addPage(); y = 15; }
       if (rowBg) { doc.setFillColor(245, 247, 255); doc.rect(10, y, pw - 20, 7, 'F'); }
       doc.setFont('helvetica', 'normal');

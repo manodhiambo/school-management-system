@@ -778,12 +778,13 @@ router.get('/student/:studentId', async (req, res) => {
     }
     const std = studentRows[0];
 
-    // Full invoice list with all fields
+    // Full invoice list — exclude cancelled invoices so they never appear in statements or PDFs
     const invoices = await query(`
       SELECT fi.*, fs.name AS structure_name
       FROM fee_invoices fi
       LEFT JOIN fee_structure fs ON fi.fee_structure_id = fs.id
       WHERE fi.student_id = $1 AND fi.tenant_id = $2
+        AND fi.status NOT IN ('cancelled')
       ORDER BY fi.created_at DESC
     `, [std.id, tid]);
 

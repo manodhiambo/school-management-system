@@ -1262,10 +1262,18 @@ class FinanceController {
     try {
       const tenantId = req.tenantId;
       const { id } = req.params;
-      const result = await pool.query(
-        `DELETE FROM income_records WHERE id = $1 AND tenant_id = $2 RETURNING id`,
-        [id, tenantId]
-      );
+      let result;
+      if (tenantId) {
+        result = await pool.query(
+          `DELETE FROM income_records WHERE id = $1 AND tenant_id = $2 RETURNING id`,
+          [id, tenantId]
+        );
+      } else {
+        result = await pool.query(
+          `DELETE FROM income_records WHERE id = $1 RETURNING id`,
+          [id]
+        );
+      }
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Income record not found' });
       }
@@ -1280,10 +1288,18 @@ class FinanceController {
     try {
       const tenantId = req.tenantId;
       const { id } = req.params;
-      const result = await pool.query(
-        `DELETE FROM expense_records WHERE id = $1 AND tenant_id = $2 RETURNING id`,
-        [id, tenantId]
-      );
+      let result;
+      if (tenantId) {
+        result = await pool.query(
+          `DELETE FROM expense_records WHERE id = $1 AND tenant_id = $2 RETURNING id`,
+          [id, tenantId]
+        );
+      } else {
+        result = await pool.query(
+          `DELETE FROM expense_records WHERE id = $1 RETURNING id`,
+          [id]
+        );
+      }
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Expense record not found' });
       }

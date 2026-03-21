@@ -17,6 +17,8 @@ export default function Transactions() {
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'income' | 'expense' } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
@@ -223,25 +225,30 @@ export default function Transactions() {
     }
   };
 
-  const handleDeleteIncome = async (id: string) => {
-    if (!confirm('Delete this income record permanently? This cannot be undone.')) return;
-    try {
-      await financeService.deleteIncome(id);
-      loadTransactions();
-    } catch (error) {
-      console.error('Failed to delete income:', error);
-      alert('Failed to delete income record');
-    }
+  const handleDeleteIncome = (id: string) => {
+    setDeleteConfirm({ id: String(id), type: 'income' });
   };
 
-  const handleDeleteExpense = async (id: string) => {
-    if (!confirm('Delete this expense record permanently? This cannot be undone.')) return;
+  const handleDeleteExpense = (id: string) => {
+    setDeleteConfirm({ id: String(id), type: 'expense' });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
     try {
-      await financeService.deleteExpense(id);
+      if (deleteConfirm.type === 'income') {
+        await financeService.deleteIncome(deleteConfirm.id);
+      } else {
+        await financeService.deleteExpense(deleteConfirm.id);
+      }
+      setDeleteConfirm(null);
       loadTransactions();
-    } catch (error) {
-      console.error('Failed to delete expense:', error);
-      alert('Failed to delete expense record');
+    } catch (error: any) {
+      console.error('Failed to delete record:', error);
+      alert(error?.message || error?.error || 'Failed to delete record. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -815,6 +822,32 @@ export default function Transactions() {
         </div>
 
       )}
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete {deleteConfirm.type === 'income' ? 'Income' : 'Expense'} Record</h3>
+            <p className="text-gray-600 text-sm mb-5">This will permanently delete the record and cannot be undone. Are you sure?</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* View Details Modal */}
       {showDetailsModal && selectedRecord && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

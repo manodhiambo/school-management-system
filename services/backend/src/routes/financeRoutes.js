@@ -9,7 +9,7 @@ const router = express.Router();
 router.use(authenticate);
 router.use(tenantContext);
 router.use(requireActiveTenant);
-router.use(authorize(['admin', 'finance_officer']));
+router.use(authorize(['admin', 'finance_officer', 'superadmin']));
 
 // Dashboard
 router.get('/dashboard', financeController.getDashboard);

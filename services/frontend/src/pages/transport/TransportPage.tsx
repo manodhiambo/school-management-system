@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
-import { Bus, Plus, Edit, Trash2, Search, Users, X, CheckSquare, Square, Link2 } from 'lucide-react';
+import { Bus, Plus, Edit, Trash2, Search, Users, X, CheckSquare, Square, Link2, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export function TransportPage() {
   const qc = useQueryClient();
@@ -94,6 +96,75 @@ export function TransportPage() {
   const routeDetail = (routeDetailData as any)?.data;
   const allStudents = (studentsData as any)?.data || [];
 
+  async function downloadTransportPDF(routeFilter?: string) {
+    try {
+      const res: any = await (api as any).getTransportStudentsReport(routeFilter ? { route_id: routeFilter } : undefined);
+      const students: any[] = res?.data || [];
+
+      const doc = new jsPDF({ orientation: 'landscape' });
+      const today = new Date().toLocaleDateString('en-KE', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // Title
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Student Transport Report', 14, 16);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${today}`, 14, 23);
+      if (routeFilter && routeDetail) {
+        doc.text(`Route: ${routeDetail.route_name}`, 14, 29);
+      }
+
+      // Summary row
+      const totalStudents = students.length;
+      const paid = students.filter(s => s.payment_status === 'paid').length;
+      const unpaid = totalStudents - paid;
+      const totalAmount = students.reduce((sum: number, s: any) => sum + parseFloat(s.term_fee || 0), 0);
+      const totalPaid = students.reduce((sum: number, s: any) => sum + parseFloat(s.paid_amount || 0), 0);
+      const totalBalance = students.reduce((sum: number, s: any) => sum + parseFloat(s.balance_amount || 0), 0);
+
+      const startY = routeFilter ? 35 : 30;
+      doc.setFontSize(9);
+      doc.text(`Total Students: ${totalStudents}   |   Paid: ${paid}   |   Unpaid/Partial: ${unpaid}   |   Total Fees: KES ${totalAmount.toLocaleString()}   |   Collected: KES ${totalPaid.toLocaleString()}   |   Balance: KES ${totalBalance.toLocaleString()}`, 14, startY);
+
+      // Table
+      autoTable(doc, {
+        startY: startY + 5,
+        head: [['#', 'Student Name', 'Adm No', 'Class', 'Route', 'Pickup Stop', 'Term Fee (KES)', 'Paid (KES)', 'Balance (KES)', 'Status']],
+        body: students.map((s: any, i: number) => [
+          i + 1,
+          s.student_name || '-',
+          s.admission_number || '-',
+          s.class_name || '-',
+          s.route_name || '-',
+          s.pickup_stop || '-',
+          parseFloat(s.term_fee || 0).toLocaleString(),
+          parseFloat(s.paid_amount || 0).toLocaleString(),
+          parseFloat(s.balance_amount || 0).toLocaleString(),
+          s.payment_status === 'paid' ? 'PAID' : s.payment_status === 'partial' ? 'PARTIAL' : s.payment_status === 'no_invoice' ? 'NO INVOICE' : 'UNPAID',
+        ]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [59, 130, 246] as [number, number, number], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
+        columnStyles: { 9: { fontStyle: 'bold' } },
+        didParseCell: (data: any) => {
+          if (data.column.index === 9 && data.section === 'body') {
+            const val = data.cell.raw;
+            if (val === 'PAID') data.cell.styles.textColor = [22, 163, 74];
+            else if (val === 'PARTIAL') data.cell.styles.textColor = [234, 179, 8];
+            else data.cell.styles.textColor = [220, 38, 38];
+          }
+        },
+      });
+
+      const filename = `transport-students-${routeFilter ? routeDetail?.route_name?.replace(/\s+/g, '-') : 'all'}-${Date.now()}.pdf`;
+      doc.save(filename);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  }
+
   // Students already on this route
   const assignedStudentIds = useMemo(
     () => new Set((routeDetail?.students || []).map((s: any) => s.student_id)),
@@ -144,9 +215,14 @@ export function TransportPage() {
           <h1 className="text-2xl font-bold text-gray-900">Transport Management</h1>
           <p className="text-sm text-gray-500 mt-1">Manage school bus routes and student assignments</p>
         </div>
-        <Button onClick={() => setShowRouteForm(!showRouteForm)}>
-          <Plus className="h-4 w-4 mr-2" /> Add Route
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => downloadTransportPDF()}>
+            <Download className="h-4 w-4 mr-2" /> Download PDF (All)
+          </Button>
+          <Button onClick={() => setShowRouteForm(!showRouteForm)}>
+            <Plus className="h-4 w-4 mr-2" /> Add Route
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -328,6 +404,9 @@ export function TransportPage() {
                         }
                       }}>
                         <Trash2 className="h-4 w-4 mr-1" /> Delete
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => downloadTransportPDF(selectedRoute.id)}>
+                        <Download className="h-4 w-4 mr-1" /> PDF
                       </Button>
                       <Button size="sm" onClick={openAssignPanel}>
                         <Users className="h-4 w-4 mr-1" /> Add Students

@@ -1157,6 +1157,7 @@ class ApiService {
   updateTransportRoute(id: string, data: any) { return this.api.put('/transport/routes/' + id, data); }
   deleteTransportRoute(id: string) { return this.api.delete('/transport/routes/' + id); }
   getTransportStudents(params?: any) { return this.api.get('/transport/students', { params }); }
+  getTransportStudentsReport(params?: any) { return this.api.get('/transport/students/report', { params }); }
   assignStudentTransport(data: any) { return this.api.post('/transport/students', data); }
   bulkAssignStudentTransport(data: any) { return this.api.post('/transport/students/bulk', data); }
   removeStudentTransport(id: string) { return this.api.delete('/transport/students/' + id); }

@@ -156,6 +156,52 @@ router.delete('/routes/:id', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/v1/transport/students/report — full transport student list with payment status (PDF export)
+router.get('/students/report', authenticate, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { route_id } = req.query;
+    let sql = `
+      SELECT
+        st.id,
+        s.first_name || ' ' || s.last_name AS student_name,
+        s.admission_number,
+        c.name AS class_name,
+        r.route_name,
+        r.route_code,
+        r.term_fee,
+        r.monthly_fee,
+        st.pickup_stop,
+        st.dropoff_stop,
+        COALESCE(fi.status, 'no_invoice') AS payment_status,
+        COALESCE(fi.paid_amount::numeric, 0) AS paid_amount,
+        COALESCE(fi.balance_amount::numeric, r.term_fee) AS balance_amount
+      FROM student_transport st
+      JOIN students s ON s.id = st.student_id AND s.tenant_id = $1
+      LEFT JOIN classes c ON c.id = s.class_id
+      JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $1
+      LEFT JOIN LATERAL (
+        SELECT fi.status, fi.paid_amount, fi.balance_amount
+        FROM fee_invoices fi
+        JOIN fee_structure fs ON fs.id = fi.fee_structure_id
+        WHERE fi.student_id = st.student_id
+          AND fs.route_id = r.id
+          AND fs.is_transport_fee = TRUE
+          AND fi.tenant_id = $1
+        ORDER BY fi.created_at DESC LIMIT 1
+      ) fi ON TRUE
+      WHERE st.tenant_id = $1 AND st.is_active = TRUE`;
+    const params = [tid];
+    if (route_id) { sql += ` AND st.route_id = $2`; params.push(route_id); }
+    sql += ' ORDER BY r.route_name, s.first_name';
+    const rows = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('Transport report error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/v1/transport/students — all student transport assignments
 router.get('/students', authenticate, async (req, res) => {
   try {

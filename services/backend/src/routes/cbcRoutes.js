@@ -693,10 +693,32 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
          JOIN students stu ON stu.id = $1 AND stu.tenant_id = $2
          WHERE fs.tenant_id = $2
            AND fs.is_active = TRUE
-           AND fs.academic_year = $4
+           AND (fs.academic_year IS NULL OR fs.academic_year = $4)
            AND fs.extra_fee_id IS NULL
            AND (fs.class_id IS NULL OR fs.class_id = stu.class_id)
-           AND (fs.student_type = 'all' OR fs.student_type = stu.student_type OR stu.student_type IS NULL)
+           -- Student type: all, exact match, null student_type, or hostel-assigned boarder
+           AND (
+             fs.student_type = 'all'
+             OR fs.student_type = stu.student_type
+             OR stu.student_type IS NULL
+             OR (fs.student_type = 'boarder' AND EXISTS (
+               SELECT 1 FROM student_hostel sh
+               WHERE sh.student_id = stu.id
+                 AND sh.is_active = TRUE
+                 AND (sh.term IS NULL OR sh.term = $3)
+                 AND (sh.academic_year IS NULL OR sh.academic_year = $4)
+             ))
+           )
+           -- Transport fees only for students with an active route assignment
+           AND (
+             COALESCE(fs.is_transport_fee, FALSE) = FALSE
+             OR EXISTS (
+               SELECT 1 FROM student_transport st
+               WHERE st.student_id = $1
+                 AND (fs.route_id IS NULL OR st.route_id = fs.route_id)
+                 AND st.is_active = TRUE
+             )
+           )
            AND NOT EXISTS (
              SELECT 1 FROM fee_invoices fi2
              WHERE fi2.fee_structure_id = fs.id
@@ -769,11 +791,25 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
              AND (fi_ef2.term IS NULL OR fi_ef2.term = $4)
              AND (fi_ef2.academic_year IS NULL OR fi_ef2.academic_year = $5)
          )
+         -- Not already covered by a fee_structure invoice with the same name (prevents duplicates)
+         AND NOT EXISTS (
+           SELECT 1 FROM fee_invoices fi_ef3
+           JOIN fee_structure fs_ef3 ON fs_ef3.id = fi_ef3.fee_structure_id AND fs_ef3.tenant_id = $1
+           WHERE fi_ef3.student_id = $2 AND fi_ef3.tenant_id = $1
+             AND fi_ef3.status NOT IN ('cancelled')
+             AND (fi_ef3.term IS NULL OR fi_ef3.term = $4)
+             AND (fi_ef3.academic_year IS NULL OR fi_ef3.academic_year = $5)
+             AND LOWER(TRIM(fs_ef3.name)) = LOWER(TRIM(ef.name))
+         )
        ORDER BY ef.student_id NULLS LAST, ef.name`,
       [rc.tenant_id, rc.student_id, rc.class_id, rc.term, rc.academic_year]
     ).catch(() => []);
 
-    const allFees = [...feeBreakdown, ...extraFees];
+    // Final deduplication: remove extra_fee entries whose name already appears in feeBreakdown
+    const feeBreakdownNames = new Set(feeBreakdown.map(f => (f.fee_name || '').toLowerCase().trim()));
+    const dedupedExtraFees = extraFees.filter(ef => !feeBreakdownNames.has((ef.fee_name || '').toLowerCase().trim()));
+
+    const allFees = [...feeBreakdown, ...dedupedExtraFees];
 
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
     // Prefer explicitly stored dates; fall back to academic_terms lookup
@@ -1223,7 +1259,7 @@ router.get('/broadsheet', authenticate, async (req, res) => {
     let gradeParams = [tid, class_id, year];
     let gradeSql = `
       SELECT cs.student_id, sub.name AS subject_name, sub.id AS subject_id,
-             cs.overall_grade, cs.pre_primary_grade
+             cs.overall_cbc_grade AS overall_grade, cs.pre_primary_grade
       FROM student_competency_summary cs
       JOIN subjects sub ON sub.id = cs.subject_id
       WHERE cs.tenant_id = $1 AND cs.class_id = $2 AND cs.academic_year = $3`;

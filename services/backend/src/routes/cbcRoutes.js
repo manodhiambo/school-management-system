@@ -1247,12 +1247,12 @@ router.get('/broadsheet', authenticate, async (req, res) => {
     }
 
     // Build subject list (unique, ordered)
-    const subjectMap: Record<string, string> = {};
+    const subjectMap = {};
     for (const r of gradeRows) subjectMap[r.subject_id] = r.subject_name;
     const subjects = Object.entries(subjectMap).map(([id, name]) => ({ id, name }));
 
     // Map studentId → { subjectId → grade }
-    const gradeMap: Record<string, Record<string, string>> = {};
+    const gradeMap = {};
     for (const r of gradeRows) {
       if (!gradeMap[r.student_id]) gradeMap[r.student_id] = {};
       const isPrePrimary = ['playgroup', 'pp1', 'pp2', 'pre_primary'].includes(educationLevel);
@@ -1262,11 +1262,11 @@ router.get('/broadsheet', authenticate, async (req, res) => {
     }
 
     // Grade → numeric for ranking
-    const gradeScore = (g: string) => ({ EE: 4, ME: 3, AE: 2, BE: 1, WD: 4, D: 2, B: 1 }[g] || 0);
+    const gradeScore = (g) => ({ EE: 4, ME: 3, AE: 2, BE: 1, WD: 4, D: 2, B: 1 }[g] || 0);
 
     // Build student rows
     const resultStudents = students.map(s => {
-      const grades: Record<string, string> = {};
+      const grades = {};
       let totalScore = 0; let gradeCount = 0;
       for (const sub of subjects) {
         const g = gradeMap[s.id]?.[sub.id] || '';
@@ -1289,11 +1289,11 @@ router.get('/broadsheet', authenticate, async (req, res) => {
 
     // Rank by total_score descending
     resultStudents.sort((a, b) => b.total_score - a.total_score);
-    resultStudents.forEach((s, i) => { (s as any).rank = i + 1; });
+    resultStudents.forEach((s, i) => { s.rank = i + 1; });
 
     res.json({ success: true, data: { subjects, students: resultStudents, education_level: educationLevel } });
   } catch (err) {
-    res.status(500).json({ success: false, message: (err as Error).message });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

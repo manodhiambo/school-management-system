@@ -15,8 +15,8 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
     label: 'Teacher Manual',
     color: 'text-indigo-700',
     bg: 'from-indigo-600 to-purple-600',
-    chapters: 13,
-    description: 'Attendance, grade book, CBC SBA, lesson plans, schemes of work, assignments and projects.',
+    chapters: 14,
+    description: 'Attendance, grade book, CBC SBA, lesson plans, schemes of work, assignments, projects and leave requests.',
   },
   student: {
     label: 'Student Manual',
@@ -42,11 +42,11 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
 };
 
 const HIGHLIGHTS: Record<string, string[]> = {
-  admin: ['Manage students & staff', 'CBC academic oversight', 'Finance & fee management', 'Reports & system settings'],
+  admin: ['Manage students & staff', 'CBC analytics & broadsheet', 'Finance & fee management', 'Reports & system settings'],
   teacher: ['Mark class attendance', 'Enter CBC grades (SBA)', 'Create lesson plans & schemes', 'Manage assignments & projects'],
   student: ['View grades & results', 'Submit assignments', 'Check fee balance', 'Library & timetable'],
   parent: ['Track children\'s progress', 'View fee statements', 'Receive school alerts', 'Message teachers'],
-  finance_officer: ['Record fee payments', 'Generate financial reports', 'Budget management', 'Vendor & purchase orders'],
+  finance_officer: ['Record fee payments', 'Student payments & defaulters report', 'Budget management', 'Vendor & purchase orders'],
 };
 
 export function UserManualCard() {

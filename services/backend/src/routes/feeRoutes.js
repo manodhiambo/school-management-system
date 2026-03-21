@@ -1198,4 +1198,181 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
   }
 });
 
+// ============================================================
+// FINANCIAL REPORT ENDPOINTS
+// ============================================================
+
+// Filtered fee summary (academic_year + optional term + optional class_id)
+router.get('/report/summary', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { academic_year, term, class_id } = req.query;
+    const year = academic_year || new Date().getFullYear().toString();
+
+    let sql = `
+      SELECT
+        COALESCE(SUM(fi.net_amount),     0)::numeric AS total_invoiced,
+        COALESCE(SUM(fi.paid_amount),    0)::numeric AS total_collected,
+        COALESCE(SUM(fi.balance_amount), 0)::numeric AS total_outstanding,
+        COUNT(fi.id)::int                            AS total_invoices,
+        COUNT(DISTINCT fi.student_id)::int           AS students_invoiced,
+        COUNT(CASE WHEN fi.status = 'paid'    THEN 1 END)::int AS paid_count,
+        COUNT(CASE WHEN fi.status = 'pending' THEN 1 END)::int AS pending_count,
+        COUNT(CASE WHEN fi.status = 'partial' THEN 1 END)::int AS partial_count,
+        COUNT(CASE WHEN fi.status = 'overdue' THEN 1 END)::int AS overdue_count
+      FROM fee_invoices fi
+      JOIN students s ON s.id = fi.student_id AND s.tenant_id = $1
+      WHERE fi.tenant_id = $1 AND fi.status NOT IN ('cancelled')
+        AND fi.academic_year = $2`;
+    const params = [tid, year];
+    let pi = 3;
+
+    if (term)     { sql += ` AND fi.term = $${pi}`;      params.push(term);     pi++; }
+    if (class_id) { sql += ` AND s.class_id = $${pi}`;  params.push(class_id); pi++; }
+
+    const rows = await query(sql, params);
+    res.json({ success: true, data: rows[0] || {} });
+  } catch (error) {
+    logger.error('Report summary error:', error);
+    res.status(500).json({ success: false, message: 'Error generating report summary' });
+  }
+});
+
+// Fee collection breakdown by class
+router.get('/report/collection-by-class', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { academic_year, term } = req.query;
+    const year = academic_year || new Date().getFullYear().toString();
+
+    let sql = `
+      SELECT
+        c.id          AS class_id,
+        c.name        AS class_name,
+        c.education_level,
+        COUNT(DISTINCT s.id)::int                    AS total_students,
+        COUNT(fi.id)::int                            AS invoice_count,
+        COALESCE(SUM(fi.net_amount),     0)::numeric AS invoiced,
+        COALESCE(SUM(fi.paid_amount),    0)::numeric AS collected,
+        COALESCE(SUM(fi.balance_amount), 0)::numeric AS outstanding,
+        COUNT(CASE WHEN fi.status = 'paid' THEN 1 END)::int AS paid_count
+      FROM classes c
+      LEFT JOIN students s ON s.class_id = c.id AND s.tenant_id = $1 AND s.status = 'active'
+      LEFT JOIN fee_invoices fi
+             ON fi.student_id = s.id AND fi.tenant_id = $1
+            AND fi.status NOT IN ('cancelled')
+            AND fi.academic_year = $2`;
+    const params = [tid, year];
+    let pi = 3;
+
+    if (term) { sql += ` AND fi.term = $${pi}`; params.push(term); pi++; }
+
+    sql += `
+      WHERE c.tenant_id = $1
+      GROUP BY c.id, c.name, c.education_level
+      ORDER BY c.name`;
+
+    const rows = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Collection by class report error:', error);
+    res.status(500).json({ success: false, message: 'Error generating class collection report' });
+  }
+});
+
+// Payment method breakdown
+router.get('/report/payment-methods', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { date_from, date_to } = req.query;
+
+    let sql = `
+      SELECT
+        COALESCE(fp.payment_method, 'cash') AS payment_method,
+        COUNT(*)::int                        AS count,
+        COALESCE(SUM(fp.amount), 0)::numeric AS total
+      FROM fee_payments fp
+      WHERE fp.tenant_id = $1 AND fp.status = 'success'`;
+    const params = [tid];
+    let pi = 2;
+
+    if (date_from) { sql += ` AND fp.payment_date >= $${pi}`; params.push(date_from); pi++; }
+    if (date_to)   { sql += ` AND fp.payment_date <= $${pi}`; params.push(date_to);   pi++; }
+
+    sql += ` GROUP BY fp.payment_method ORDER BY total DESC`;
+
+    const rows = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Payment methods report error:', error);
+    res.status(500).json({ success: false, message: 'Error generating payment methods report' });
+  }
+});
+
+// Monthly collection trend (last N months)
+router.get('/report/monthly-trend', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const months = Math.min(parseInt(req.query.months || '12'), 36);
+
+    const rows = await query(`
+      SELECT
+        TO_CHAR(fp.payment_date, 'YYYY-MM')  AS month,
+        TO_CHAR(fp.payment_date, 'Mon YYYY') AS month_label,
+        COALESCE(SUM(fp.amount), 0)::numeric AS collected,
+        COUNT(*)::int                         AS transactions
+      FROM fee_payments fp
+      WHERE fp.tenant_id = $1
+        AND fp.status = 'success'
+        AND fp.payment_date >= (CURRENT_DATE - ($2 || ' months')::INTERVAL)
+      GROUP BY TO_CHAR(fp.payment_date, 'YYYY-MM'), TO_CHAR(fp.payment_date, 'Mon YYYY')
+      ORDER BY month
+    `, [tid, months]);
+
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Monthly trend report error:', error);
+    res.status(500).json({ success: false, message: 'Error generating monthly trend report' });
+  }
+});
+
+// Detailed defaulters list with class info (more fields than /defaulters)
+router.get('/report/defaulters', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { class_id, academic_year, term } = req.query;
+    const year = academic_year || new Date().getFullYear().toString();
+
+    let sql = `
+      SELECT s.id, s.first_name, s.last_name, s.admission_number,
+             c.name AS class_name, s.student_type,
+             COALESCE(SUM(fi.net_amount),     0)::numeric AS total_invoiced,
+             COALESCE(SUM(fi.paid_amount),    0)::numeric AS total_paid,
+             COALESCE(SUM(fi.balance_amount), 0)::numeric AS total_due,
+             COUNT(fi.id)::int AS invoice_count,
+             MIN(fi.due_date)  AS earliest_due
+      FROM students s
+      JOIN fee_invoices fi ON fi.student_id = s.id AND fi.tenant_id = $1
+        AND fi.balance_amount > 0 AND fi.status NOT IN ('paid','cancelled')
+        AND fi.academic_year = $2
+      LEFT JOIN classes c ON c.id = s.class_id
+      WHERE s.tenant_id = $1 AND s.status = 'active'`;
+    const params = [tid, year];
+    let pi = 3;
+
+    if (term)     { sql += ` AND fi.term = $${pi}`;    params.push(term);     pi++; }
+    if (class_id) { sql += ` AND s.class_id = $${pi}`; params.push(class_id); pi++; }
+
+    sql += `
+      GROUP BY s.id, s.first_name, s.last_name, s.admission_number, c.name, s.student_type
+      ORDER BY total_due DESC`;
+
+    const rows = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Report defaulters error:', error);
+    res.status(500).json({ success: false, message: 'Error generating defaulters report' });
+  }
+});
+
 export default router;

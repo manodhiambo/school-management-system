@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import {
 import api from '@/services/api';
 import { getCBCGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbcGrades';
 
-type Tab = 'overview' | 'class' | 'student' | 'subject';
+type Tab = 'overview' | 'class' | 'student' | 'subject' | 'broadsheet';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 
@@ -35,6 +36,12 @@ export function CbcAnalyticsPage() {
   // Subject view
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [subjectAnalytics, setSubjectAnalytics] = useState<any>(null);
+
+  // Broadsheet
+  const [bsClassId, setBsClassId] = useState('');
+  const [bsTerm, setBsTerm] = useState('');
+  const [bsYear, setBsYear] = useState(new Date().getFullYear().toString());
+  const [broadsheet, setBroadsheet] = useState<any>(null);
 
   useEffect(() => {
     loadBaseData();
@@ -91,6 +98,92 @@ export function CbcAnalyticsPage() {
     setLoading(false);
   };
 
+  const loadBroadsheet = async () => {
+    if (!bsClassId) return;
+    setLoading(true);
+    try {
+      const params: any = { class_id: bsClassId };
+      if (bsTerm) params.term = bsTerm;
+      if (bsYear) params.academic_year = bsYear;
+      const res: any = await (api as any).getCbcBroadsheet(params);
+      setBroadsheet(res?.data || res);
+    } catch { /* silent */ }
+    setLoading(false);
+  };
+
+  const GRADE_COLORS: Record<string, string> = {
+    EE: 'bg-green-100 text-green-800', ME: 'bg-blue-100 text-blue-800',
+    AE: 'bg-yellow-100 text-yellow-800', BE: 'bg-red-100 text-red-800',
+    WD: 'bg-green-100 text-green-800', D: 'bg-blue-100 text-blue-800',
+    B: 'bg-red-100 text-red-800',
+  };
+
+  const downloadBroadsheetCSV = () => {
+    if (!broadsheet) return;
+    const headers = ['Rank', 'Student', 'Adm #', ...broadsheet.subjects.map((s: any) => s.name), 'Overall', 'Score'];
+    const rows = broadsheet.students.map((st: any) => [
+      st.rank,
+      `${st.name}`,
+      st.admission_number,
+      ...broadsheet.subjects.map((s: any) => st.grades?.[s.id] || '—'),
+      st.overall,
+      st.total_score,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map((v: any) => JSON.stringify(v ?? '')).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'broadsheet.csv'; a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const exportBroadsheetPDF = () => {
+    if (!broadsheet) return;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+    const pw = doc.internal.pageSize.getWidth();
+    let y = 10;
+    const className = classes.find((c: any) => c.id === bsClassId)?.name || 'Class';
+
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pw, 22, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+    doc.text('CBC PERFORMANCE BROADSHEET', pw / 2, 10, { align: 'center' });
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.text(`${className}${bsTerm ? ' · ' + bsTerm.toUpperCase() : ''}${bsYear ? ' · ' + bsYear : ''} · Generated: ${new Date().toLocaleDateString('en-KE')}`, pw / 2, 18, { align: 'center' });
+    doc.setTextColor(30, 30, 30);
+    y = 28;
+
+    const subjects = broadsheet.subjects.slice(0, 10); // cap columns for landscape A4
+    const colW = Math.min(18, (pw - 90) / Math.max(subjects.length, 1));
+    const startX = 10;
+
+    // Header row
+    doc.setFillColor(37, 99, 235); doc.rect(startX, y, pw - 20, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+    doc.text('#', startX + 2, y + 5);
+    doc.text('Student', startX + 10, y + 5);
+    doc.text('Adm #', startX + 46, y + 5);
+    subjects.forEach((s: any, i: number) => {
+      doc.text((s.name || '').substring(0, 8), startX + 64 + i * colW, y + 5);
+    });
+    doc.text('Overall', pw - 28, y + 5); doc.text('Score', pw - 12, y + 5, { align: 'right' });
+    y += 7; doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
+    let rowBg = false;
+    for (const st of broadsheet.students) {
+      if (y > 190) { doc.addPage(); y = 10; }
+      if (rowBg) { doc.setFillColor(245, 247, 255); doc.rect(startX, y, pw - 20, 6, 'F'); }
+      doc.text(String(st.rank), startX + 2, y + 4);
+      doc.text((st.name || '').substring(0, 22), startX + 10, y + 4);
+      doc.text(st.admission_number || '', startX + 46, y + 4);
+      subjects.forEach((s: any, i: number) => {
+        const g = st.grades?.[s.id] || '';
+        doc.text(g, startX + 64 + i * colW, y + 4);
+      });
+      doc.text(st.overall || '—', pw - 28, y + 4);
+      doc.text(String(st.total_score ?? '—'), pw - 12, y + 4, { align: 'right' });
+      y += 6; rowBg = !rowBg;
+    }
+    doc.save(`broadsheet-${className.replace(/\s+/g, '-')}.pdf`);
+  };
+
   const filteredStudents = students.filter(s =>
     studentSearch === '' ||
     `${s.first_name} ${s.last_name} ${s.admission_number}`.toLowerCase().includes(studentSearch.toLowerCase())
@@ -101,6 +194,7 @@ export function CbcAnalyticsPage() {
     { key: 'class', label: 'Class View' },
     { key: 'student', label: 'Student View' },
     { key: 'subject', label: 'Subject View' },
+    { key: 'broadsheet', label: 'Broadsheet' },
   ];
 
   return (
@@ -484,6 +578,156 @@ export function CbcAnalyticsPage() {
                 )}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 5: Broadsheet */}
+      {activeTab === 'broadsheet' && (
+        <div className="space-y-6">
+          {/* Controls */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Class</label>
+                  <select value={bsClassId} onChange={e => setBsClassId(e.target.value)} className="mt-1 w-full border rounded-md px-3 py-2 text-sm">
+                    <option value="">-- Select class --</option>
+                    {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name} {c.section && `(${c.section})`}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Term</label>
+                  <select value={bsTerm} onChange={e => setBsTerm(e.target.value)} className="mt-1 w-full border rounded-md px-3 py-2 text-sm">
+                    <option value="">All Terms</option>
+                    <option value="term1">Term 1</option>
+                    <option value="term2">Term 2</option>
+                    <option value="term3">Term 3</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Academic Year</label>
+                  <input type="text" value={bsYear} onChange={e => setBsYear(e.target.value)} placeholder="e.g. 2025" className="mt-1 w-full border rounded-md px-3 py-2 text-sm" />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={loadBroadsheet} disabled={!bsClassId || loading} className="w-full">
+                    {loading ? 'Loading...' : 'Generate'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {broadsheet && !loading && (
+            <>
+              {/* Export buttons */}
+              <div className="flex gap-2 justify-end">
+                <button onClick={downloadBroadsheetCSV} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                  ↓ CSV
+                </button>
+                <button onClick={exportBroadsheetPDF} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
+                  ↓ PDF
+                </button>
+              </div>
+
+              {/* Broadsheet table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    Broadsheet — {classes.find((c: any) => c.id === bsClassId)?.name || ''}
+                    {bsTerm && ` · ${bsTerm.toUpperCase()}`}
+                    {bsYear && ` · ${bsYear}`}
+                    <span className="text-sm font-normal text-gray-500 ml-2">
+                      ({broadsheet.students?.length || 0} students · {broadsheet.subjects?.length || 0} subjects)
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {broadsheet.students?.length === 0 ? (
+                    <p className="text-center text-gray-400 py-8">No assessment data found for this class/term.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-blue-600 text-white">
+                            <th className="px-3 py-2 text-left sticky left-0 bg-blue-600 z-10">#</th>
+                            <th className="px-3 py-2 text-left sticky left-6 bg-blue-600 z-10 min-w-[140px]">Student</th>
+                            <th className="px-3 py-2 text-left min-w-[80px]">Adm #</th>
+                            {broadsheet.subjects.map((s: any) => (
+                              <th key={s.id} className="px-2 py-2 text-center min-w-[60px] whitespace-nowrap">
+                                {s.name.length > 10 ? s.name.substring(0, 10) + '…' : s.name}
+                              </th>
+                            ))}
+                            <th className="px-3 py-2 text-center bg-blue-700">Overall</th>
+                            <th className="px-3 py-2 text-center bg-blue-800">Rank</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {broadsheet.students.map((st: any, idx: number) => (
+                            <tr key={st.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-3 py-2 text-gray-400 sticky left-0 bg-inherit z-10">{idx + 1}</td>
+                              <td className="px-3 py-2 font-medium sticky left-6 bg-inherit z-10">
+                                {st.name}
+                              </td>
+                              <td className="px-3 py-2 text-gray-500">{st.admission_number}</td>
+                              {broadsheet.subjects.map((s: any) => {
+                                const grade = st.grades?.[s.id];
+                                return (
+                                  <td key={s.id} className="px-2 py-2 text-center">
+                                    {grade ? (
+                                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${GRADE_COLORS[grade] || 'bg-gray-100 text-gray-600'}`}>
+                                        {grade}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-300">—</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="px-3 py-2 text-center">
+                                {st.overall ? (
+                                  <span className={`inline-block px-2 py-0.5 rounded font-bold text-xs ${GRADE_COLORS[st.overall] || 'bg-gray-100 text-gray-600'}`}>
+                                    {st.overall}
+                                  </span>
+                                ) : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-3 py-2 text-center font-bold text-blue-700">
+                                #{st.rank}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Grade legend */}
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {broadsheet.education_level === 'pre_primary' ? (
+                      <>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-100 text-green-800 font-semibold">WD</span> Well Developed</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">D</span> Developing</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-semibold">B</span> Beginning</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-100 text-green-800 font-semibold">EE</span> Exceeding Expectations</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">ME</span> Meeting Expectations</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 font-semibold">AE</span> Approaching Expectations</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-semibold">BE</span> Below Expectations</span>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {!broadsheet && !loading && bsClassId && (
+            <p className="text-center text-gray-400 py-12">Click "Generate" to load the broadsheet.</p>
+          )}
+          {!bsClassId && (
+            <p className="text-center text-gray-400 py-12">Select a class to view the broadsheet.</p>
           )}
         </div>
       )}

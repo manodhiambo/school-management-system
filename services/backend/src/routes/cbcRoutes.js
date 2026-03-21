@@ -677,7 +677,8 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
 
          UNION ALL
 
-         -- Applicable fee structures with NO invoice for this student in this term/year
+         -- Applicable fee structures with NO invoice for this student in this term/year.
+         -- Excludes auto-managed extra-fee structures (shown via extra_fees section below).
          SELECT
            fs.name AS fee_name,
            COALESCE(fs.is_transport_fee, FALSE) AS is_transport_fee,
@@ -693,6 +694,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
          WHERE fs.tenant_id = $2
            AND fs.is_active = TRUE
            AND fs.academic_year = $4
+           AND fs.extra_fee_id IS NULL
            AND (fs.class_id IS NULL OR fs.class_id = stu.class_id)
            AND (fs.student_type = 'all' OR fs.student_type = stu.student_type OR stu.student_type IS NULL)
            AND NOT EXISTS (
@@ -736,7 +738,9 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       }
     }
 
-    // Extra fees: class-level + student-level
+    // Extra fees: class-level + student-level.
+    // Excludes any extra fees that are already covered by an invoice (via the auto-created
+    // fee_structure link or the legacy extra_fee_id column) to prevent double-counting.
     const extraFees = await query(
       `SELECT ef.name AS fee_name, ef.amount AS total_amount, 0 AS paid_amount, ef.amount AS balance_amount,
               FALSE AS is_transport_fee, '' AS route_name, TRUE AS is_extra_fee
@@ -746,6 +750,25 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
          AND (ef.student_id = $2 OR (ef.class_id = $3 AND ef.student_id IS NULL))
          AND (ef.term IS NULL OR ef.term = $4)
          AND (ef.academic_year IS NULL OR ef.academic_year = $5)
+         -- Not already invoiced via auto-created fee_structure link
+         AND NOT EXISTS (
+           SELECT 1 FROM fee_invoices fi_ef
+           JOIN fee_structure fs_ef ON fs_ef.id = fi_ef.fee_structure_id AND fs_ef.tenant_id = $1
+           WHERE fi_ef.student_id = $2 AND fi_ef.tenant_id = $1
+             AND fi_ef.status NOT IN ('cancelled')
+             AND (fi_ef.term IS NULL OR fi_ef.term = $4)
+             AND (fi_ef.academic_year IS NULL OR fi_ef.academic_year = $5)
+             AND fs_ef.extra_fee_id = ef.id
+         )
+         -- Not already invoiced via legacy extra_fee_id column
+         AND NOT EXISTS (
+           SELECT 1 FROM fee_invoices fi_ef2
+           WHERE fi_ef2.student_id = $2 AND fi_ef2.tenant_id = $1
+             AND fi_ef2.extra_fee_id = ef.id
+             AND fi_ef2.status NOT IN ('cancelled')
+             AND (fi_ef2.term IS NULL OR fi_ef2.term = $4)
+             AND (fi_ef2.academic_year IS NULL OR fi_ef2.academic_year = $5)
+         )
        ORDER BY ef.student_id NULLS LAST, ef.name`,
       [rc.tenant_id, rc.student_id, rc.class_id, rc.term, rc.academic_year]
     ).catch(() => []);
@@ -1164,6 +1187,113 @@ router.get('/class-summary/:classId', authenticate, async (req, res) => {
   } catch (err) {
     logger.error('Class summary error:', err);
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── BROADSHEET ─────────────────────────────────────────────────────────────
+// GET /api/v1/cbc/broadsheet?class_id=&term=&academic_year=
+// Returns a class-wide performance grid: students (rows) × subjects (columns)
+router.get('/broadsheet', authenticate, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { class_id, term, academic_year } = req.query;
+    if (!class_id) return res.status(400).json({ success: false, message: 'class_id required' });
+    const year = academic_year || new Date().getFullYear().toString();
+
+    // All active students in this class
+    const students = await query(
+      `SELECT s.id, s.first_name, s.last_name, s.admission_number, s.student_type
+       FROM students s
+       WHERE s.class_id = $1 AND s.tenant_id = $2 AND s.status = 'active'
+       ORDER BY s.first_name, s.last_name`,
+      [class_id, tid]
+    );
+    if (!students.length) return res.json({ success: true, data: { subjects: [], students: [] } });
+
+    const studentIds = students.map(s => s.id);
+
+    // Get the education level for this class (to pick the right grade scale)
+    const classRow = await query(
+      'SELECT education_level FROM classes WHERE id=$1 AND tenant_id=$2 LIMIT 1',
+      [class_id, tid]
+    );
+    const educationLevel = classRow[0]?.education_level || '';
+
+    // Grades from student_competency_summary (preferred) ─────────────────────
+    let gradeParams = [tid, class_id, year];
+    let gradeSql = `
+      SELECT cs.student_id, sub.name AS subject_name, sub.id AS subject_id,
+             cs.overall_grade, cs.pre_primary_grade
+      FROM student_competency_summary cs
+      JOIN subjects sub ON sub.id = cs.subject_id
+      WHERE cs.tenant_id = $1 AND cs.class_id = $2 AND cs.academic_year = $3`;
+    if (term) { gradeSql += ` AND cs.term = $${gradeParams.length + 1}`; gradeParams.push(term); }
+    gradeSql += ' ORDER BY sub.name';
+    let gradeRows = await query(gradeSql, gradeParams);
+
+    // Fall back to cbc_assessments if competency summary is empty ─────────────
+    if (!gradeRows.length) {
+      let aParams = [tid, class_id, year];
+      let aSql = `
+        SELECT DISTINCT ON (a.student_id, sub.name)
+               a.student_id, sub.name AS subject_name, sub.id AS subject_id,
+               a.cbc_grade AS overall_grade, a.pre_primary_grade
+        FROM cbc_assessments a
+        JOIN subjects sub ON sub.id = a.subject_id
+        WHERE a.tenant_id = $1 AND a.class_id = $2 AND a.academic_year = $3`;
+      if (term) { aSql += ` AND a.term = $${aParams.length + 1}`; aParams.push(term); }
+      aSql += ' ORDER BY a.student_id, sub.name, a.assessment_date DESC';
+      gradeRows = await query(aSql, aParams);
+    }
+
+    // Build subject list (unique, ordered)
+    const subjectMap: Record<string, string> = {};
+    for (const r of gradeRows) subjectMap[r.subject_id] = r.subject_name;
+    const subjects = Object.entries(subjectMap).map(([id, name]) => ({ id, name }));
+
+    // Map studentId → { subjectId → grade }
+    const gradeMap: Record<string, Record<string, string>> = {};
+    for (const r of gradeRows) {
+      if (!gradeMap[r.student_id]) gradeMap[r.student_id] = {};
+      const isPrePrimary = ['playgroup', 'pp1', 'pp2', 'pre_primary'].includes(educationLevel);
+      gradeMap[r.student_id][r.subject_id] = isPrePrimary
+        ? (r.pre_primary_grade || r.overall_grade || '')
+        : (r.overall_grade || '');
+    }
+
+    // Grade → numeric for ranking
+    const gradeScore = (g: string) => ({ EE: 4, ME: 3, AE: 2, BE: 1, WD: 4, D: 2, B: 1 }[g] || 0);
+
+    // Build student rows
+    const resultStudents = students.map(s => {
+      const grades: Record<string, string> = {};
+      let totalScore = 0; let gradeCount = 0;
+      for (const sub of subjects) {
+        const g = gradeMap[s.id]?.[sub.id] || '';
+        grades[sub.id] = g;
+        if (g) { totalScore += gradeScore(g); gradeCount++; }
+      }
+      const avg = gradeCount > 0 ? totalScore / gradeCount : 0;
+      const overall = avg >= 3.5 ? 'EE' : avg >= 2.5 ? 'ME' : avg >= 1.5 ? 'AE' : gradeCount > 0 ? 'BE' : '';
+      return {
+        id: s.id,
+        name: `${s.first_name} ${s.last_name}`,
+        admission_number: s.admission_number,
+        student_type: s.student_type,
+        grades,
+        overall,
+        total_score: parseFloat(avg.toFixed(2)),
+        subjects_assessed: gradeCount,
+      };
+    });
+
+    // Rank by total_score descending
+    resultStudents.sort((a, b) => b.total_score - a.total_score);
+    resultStudents.forEach((s, i) => { (s as any).rank = i + 1; });
+
+    res.json({ success: true, data: { subjects, students: resultStudents, education_level: educationLevel } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: (err as Error).message });
   }
 });
 

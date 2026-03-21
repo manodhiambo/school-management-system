@@ -373,6 +373,23 @@ class ApiService {
     return this.api.post('/fee/invoice/generate-for-student', data);
   }
 
+  // Financial Reports
+  getFeeReportSummary(params?: any) {
+    return this.api.get('/fee/report/summary', { params });
+  }
+  getFeeReportByClass(params?: any) {
+    return this.api.get('/fee/report/collection-by-class', { params });
+  }
+  getFeeReportPaymentMethods(params?: any) {
+    return this.api.get('/fee/report/payment-methods', { params });
+  }
+  getFeeReportMonthlyTrend(params?: any) {
+    return this.api.get('/fee/report/monthly-trend', { params });
+  }
+  getFeeReportDefaulters(params?: any) {
+    return this.api.get('/fee/report/defaulters', { params });
+  }
+
   // M-Pesa Payments
   initiateMpesaPayment(invoiceId: string, phoneNumber: string, amount: number) {
     return this.api.post('/fee/mpesa/pay', { invoiceId, phoneNumber, amount });
@@ -1090,6 +1107,9 @@ class ApiService {
 
   // CBC Class Summary
   getCbcClassSummary(classId: string, params?: any) { return this.api.get('/cbc/class-summary/' + classId, { params }); }
+
+  // CBC Broadsheet
+  getCbcBroadsheet(params?: any) { return this.api.get('/cbc/broadsheet', { params }); }
 
   // ======================
   // PARENT ALERTS

@@ -754,12 +754,20 @@ class ApiService {
     return this.api.post('/finance/income', data);
   }
 
+  deleteIncome(id: string) {
+    return this.api.delete('/finance/income/' + id);
+  }
+
   getExpenseRecords(params?: any) {
     return this.api.get('/finance/expenses', { params });
   }
 
   createExpense(data: any) {
     return this.api.post('/finance/expenses', data);
+  }
+
+  deleteExpense(id: string) {
+    return this.api.delete('/finance/expenses/' + id);
   }
 
   approveExpense(id: string) {
@@ -780,6 +788,10 @@ class ApiService {
 
   createVendor(data: any) {
     return this.api.post('/finance/vendors', data);
+  }
+
+  deleteVendor(id: string) {
+    return this.api.delete('/finance/vendors/' + id);
   }
 
   getBankAccounts() {
@@ -978,6 +990,10 @@ class ApiService {
 
   getBankTransactions(accountId?: string) {
     return this.api.get('/finance/bank-transactions', { params: { accountId } });
+  }
+
+  deleteBankTransaction(id: string) {
+    return this.api.delete('/finance/bank-transactions/' + id);
   }
 
   // ======================

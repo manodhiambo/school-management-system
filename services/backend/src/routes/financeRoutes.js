@@ -25,11 +25,13 @@ router.post('/financial-years', financeController.createFinancialYear);
 // Income
 router.get('/income', financeController.getIncomeRecords);
 router.post('/income', financeController.createIncome);
+router.delete('/income/:id', financeController.deleteIncome);
 
 // Expenses - specific routes MUST come before general routes
 router.put('/expenses/:id/approve', financeController.approveExpense);
 router.put('/expenses/:id/reject', financeController.rejectExpense);
 router.put('/expenses/:id/pay', financeController.payExpense);
+router.delete('/expenses/:id', financeController.deleteExpense);
 router.get('/expenses', financeController.getExpenseRecords);
 router.post('/expenses', financeController.createExpense);
 
@@ -37,6 +39,7 @@ console.log("Finance routes loaded with approve/reject/pay endpoints");
 // Vendors
 router.get('/vendors', financeController.getVendors);
 router.post('/vendors', financeController.createVendor);
+router.delete('/vendors/:id', financeController.deleteVendor);
 
 // Bank Accounts
 router.get('/bank-accounts', financeController.getBankAccounts);
@@ -75,5 +78,6 @@ router.put('/bank-accounts/:id', financeController.updateBankAccount);
 router.delete('/bank-accounts/:id', financeController.deleteBankAccount);
 router.post('/bank-transactions', financeController.createBankTransaction);
 router.get('/bank-transactions', financeController.getBankTransactions);
+router.delete('/bank-transactions/:id', financeController.deleteBankTransaction);
 
 export default router;

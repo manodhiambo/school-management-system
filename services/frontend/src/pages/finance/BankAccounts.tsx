@@ -184,6 +184,32 @@ export default function BankAccounts() {
     setShowTransactionModal(true);
   };
 
+  const handleViewTransactions = async (account: BankAccount) => {
+    setSelectedAccount(account);
+    setShowTransactionsView(true);
+    try {
+      const data = await financeService.getBankTransactions(account.id);
+      setTransactions(data);
+    } catch (error) {
+      console.error('Failed to load transactions:', error);
+      alert('Failed to load transactions');
+    }
+  };
+
+  const handleDeleteBankTransaction = async (id: string) => {
+    if (!confirm('Delete this bank transaction permanently? This cannot be undone.')) return;
+    try {
+      await financeService.deleteBankTransaction(id);
+      if (selectedAccount) {
+        const data = await financeService.getBankTransactions(selectedAccount.id);
+        setTransactions(data);
+      }
+    } catch (error) {
+      console.error('Failed to delete transaction:', error);
+      alert('Failed to delete transaction');
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
@@ -340,6 +366,12 @@ export default function BankAccounts() {
                     {formatCurrency(parseFloat(account.current_balance.toString()))}
                   </div>
                 </div>
+                <button
+                  onClick={() => handleViewTransactions(account)}
+                  className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded"
+                >
+                  <Eye className="h-3.5 w-3.5" /> View Transactions
+                </button>
               </div>
             </div>
           ))
@@ -355,6 +387,70 @@ export default function BankAccounts() {
           </div>
         )}
       </div>
+
+      {/* Transactions View Panel */}
+      {showTransactionsView && selectedAccount && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-b">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Transactions — {selectedAccount.account_name}
+            </h2>
+            <button onClick={() => setShowTransactionsView(false)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-gray-400">No transactions found</td>
+                  </tr>
+                ) : (
+                  transactions.map((tx: any) => (
+                    <tr key={tx.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap">{new Date(tx.transaction_date).toLocaleDateString('en-KE')}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          tx.transaction_type === 'deposit' ? 'bg-green-100 text-green-800' :
+                          tx.transaction_type === 'withdrawal' ? 'bg-red-100 text-red-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {tx.transaction_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{tx.description || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{tx.reference_number || '—'}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(parseFloat(tx.amount))}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleDeleteBankTransaction(tx.id)}
+                          className="text-red-500 hover:text-red-700"
+                          title="Delete transaction"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Account Modal */}
       {showAccountModal && (

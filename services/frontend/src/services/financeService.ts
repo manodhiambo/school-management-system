@@ -182,6 +182,10 @@ class FinanceService {
     return api.createIncome(data);
   }
 
+  deleteIncome(id: string) {
+    return api.deleteIncome(id);
+  }
+
   // Expenses
   async getExpenseRecords(params?: any): Promise<ExpenseRecord[]> {
     return unwrap<ExpenseRecord>(api.getExpenseRecords(params));
@@ -189,6 +193,10 @@ class FinanceService {
 
   createExpense(data: Partial<ExpenseRecord>) {
     return api.createExpense(data);
+  }
+
+  deleteExpense(id: string) {
+    return api.deleteExpense(id);
   }
 
   approveExpense(id: string) {
@@ -210,6 +218,10 @@ class FinanceService {
 
   createVendor(data: Partial<Vendor>) {
     return api.createVendor(data);
+  }
+
+  deleteVendor(id: string) {
+    return api.deleteVendor(id);
   }
 
   // Bank Accounts
@@ -348,6 +360,10 @@ class FinanceService {
 
   async getBankTransactions(accountId?: string): Promise<any[]> {
     return unwrap<any>(api.getBankTransactions(accountId));
+  }
+
+  deleteBankTransaction(id: string) {
+    return api.deleteBankTransaction(id);
   }
 
 }

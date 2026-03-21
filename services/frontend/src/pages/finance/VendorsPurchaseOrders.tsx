@@ -146,6 +146,17 @@ const VendorsPurchaseOrders: React.FC = () => {
     }
   };
 
+  const handleDeleteVendor = async (id: string, name: string) => {
+    if (!confirm(`Delete vendor "${name}" permanently? This cannot be undone.`)) return;
+    try {
+      await financeService.deleteVendor(id);
+      loadData();
+    } catch (error) {
+      console.error('Failed to delete vendor:', error);
+      alert('Failed to delete vendor');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft':
@@ -272,6 +283,9 @@ const VendorsPurchaseOrders: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -307,6 +321,15 @@ const VendorsPurchaseOrders: React.FC = () => {
                         >
                           {vendor.is_active ? 'Active' : 'Inactive'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleDeleteVendor(vendor.id, vendor.vendor_name)}
+                          className="text-red-500 hover:text-red-700"
+                          title="Delete vendor"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
                       </td>
                     </tr>
                   ))}

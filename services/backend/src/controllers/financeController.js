@@ -1258,6 +1258,78 @@ class FinanceController {
     }
   }
 
+  async deleteIncome(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const { id } = req.params;
+      const result = await pool.query(
+        `DELETE FROM income_records WHERE id = $1 AND tenant_id = $2 RETURNING id`,
+        [id, tenantId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Income record not found' });
+      }
+      res.json({ success: true, message: 'Income record deleted' });
+    } catch (error) {
+      console.error('Error deleting income record:', error);
+      res.status(500).json({ error: 'Failed to delete income record' });
+    }
+  }
+
+  async deleteExpense(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const { id } = req.params;
+      const result = await pool.query(
+        `DELETE FROM expense_records WHERE id = $1 AND tenant_id = $2 RETURNING id`,
+        [id, tenantId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Expense record not found' });
+      }
+      res.json({ success: true, message: 'Expense record deleted' });
+    } catch (error) {
+      console.error('Error deleting expense record:', error);
+      res.status(500).json({ error: 'Failed to delete expense record' });
+    }
+  }
+
+  async deleteVendor(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const { id } = req.params;
+      const result = await pool.query(
+        `DELETE FROM vendors WHERE id = $1 AND tenant_id = $2 RETURNING id`,
+        [id, tenantId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Vendor not found' });
+      }
+      res.json({ success: true, message: 'Vendor deleted' });
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
+      res.status(500).json({ error: 'Failed to delete vendor' });
+    }
+  }
+
+  async deleteBankTransaction(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const { id } = req.params;
+      const result = await pool.query(
+        `DELETE FROM bank_transactions WHERE id = $1 AND tenant_id = $2 RETURNING id, account_id, to_account_id, transaction_type, amount`,
+        [id, tenantId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      res.json({ success: true, message: 'Bank transaction deleted' });
+    } catch (error) {
+      console.error('Error deleting bank transaction:', error);
+      res.status(500).json({ error: 'Failed to delete bank transaction' });
+    }
+  }
+
 }
 
 export default new FinanceController();

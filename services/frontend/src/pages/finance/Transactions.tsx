@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Filter, Download, Check, X, Eye, XCircle, Search } from 'lucide-react';
+import { Plus, Filter, Download, Check, X, Eye, XCircle, Search, Trash2 } from 'lucide-react';
 import financeService, { IncomeRecord, ExpenseRecord } from '@/services/financeService';
 import api from '@/services/api';
 
@@ -212,7 +212,7 @@ export default function Transactions() {
 
   const handlePayExpense = async (id: string) => {
     if (!confirm('Mark this expense as paid?')) return;
-    
+
     try {
       await financeService.payExpense(id);
       alert('Expense marked as paid');
@@ -220,6 +220,28 @@ export default function Transactions() {
     } catch (error) {
       console.error('Failed to pay expense:', error);
       alert('Failed to mark expense as paid');
+    }
+  };
+
+  const handleDeleteIncome = async (id: string) => {
+    if (!confirm('Delete this income record permanently? This cannot be undone.')) return;
+    try {
+      await financeService.deleteIncome(id);
+      loadTransactions();
+    } catch (error) {
+      console.error('Failed to delete income:', error);
+      alert('Failed to delete income record');
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm('Delete this expense record permanently? This cannot be undone.')) return;
+    try {
+      await financeService.deleteExpense(id);
+      loadTransactions();
+    } catch (error) {
+      console.error('Failed to delete expense:', error);
+      alert('Failed to delete expense record');
     }
   };
 
@@ -421,13 +443,22 @@ export default function Transactions() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button 
-                        onClick={() => handleViewDetails(record)}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="View Details"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleViewDetails(record)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="View Details"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteIncome(record.id)}
+                          className="text-red-500 hover:text-red-700"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -497,6 +528,13 @@ export default function Transactions() {
                         title="View Details"
                       >
                         <Eye className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteExpense(record.id)}
+                        className="text-red-500 hover:text-red-700"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-5 w-5" />
                       </button>
                     </div>
                   </td>

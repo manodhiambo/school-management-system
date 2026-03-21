@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Filter, Download, Check, X, Eye, XCircle, Search, Trash2 } from 'lucide-react';
+import { Plus, Filter, Download, Check, X, Eye, XCircle, Search, Trash2, Printer, FileText, FileSpreadsheet } from 'lucide-react';
 import financeService, { IncomeRecord, ExpenseRecord } from '@/services/financeService';
 import api from '@/services/api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 type TransactionType = 'income' | 'expense';
 
@@ -122,8 +125,128 @@ export default function Transactions() {
     setShowDetailsModal(true);
   };
 
-  const handlePrintReceipt = () => {
-    window.print();
+  const handlePrintReceipt = async () => {
+    if (!selectedRecord) return;
+    const isIncome = activeTab === 'income';
+
+    // Fetch school settings for header
+    let schoolName = 'School';
+    let schoolAddress = '';
+    let schoolPhone = '';
+    try {
+      const s: any = await api.getSettings();
+      const settings = s?.data || s || {};
+      schoolName = settings.school_name || 'School';
+      schoolAddress = [settings.address, settings.city].filter(Boolean).join(', ');
+      schoolPhone = settings.phone || '';
+    } catch (_) { /* use defaults */ }
+
+    const doc = new jsPDF({ unit: 'mm', format: 'a5' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const today = new Date().toLocaleDateString('en-KE', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // ── Header ──────────────────────────────────────────────
+    doc.setFillColor(37, 99, 235); // blue-600
+    doc.rect(0, 0, pageW, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(schoolName, pageW / 2, 11, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    if (schoolAddress) doc.text(schoolAddress, pageW / 2, 17, { align: 'center' });
+    if (schoolPhone) doc.text(`Tel: ${schoolPhone}`, pageW / 2, 22, { align: 'center' });
+
+    // ── Title bar ───────────────────────────────────────────
+    doc.setFillColor(239, 246, 255); // blue-50
+    doc.rect(0, 28, pageW, 12, 'F');
+    doc.setTextColor(37, 99, 235);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(isIncome ? 'RECEIPT' : 'EXPENSE VOUCHER', pageW / 2, 36, { align: 'center' });
+
+    // ── Receipt number & date ───────────────────────────────
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    const refNo = isIncome ? selectedRecord.income_number : selectedRecord.expense_number;
+    const txDate = formatDate(isIncome ? selectedRecord.income_date : selectedRecord.expense_date);
+    doc.text(`Receipt No: ${refNo || '-'}`, 10, 48);
+    doc.text(`Date: ${txDate}`, pageW - 10, 48, { align: 'right' });
+    doc.text(`Print Date: ${today}`, pageW - 10, 54, { align: 'right' });
+
+    // ── Divider ─────────────────────────────────────────────
+    doc.setDrawColor(200, 200, 200);
+    doc.line(10, 57, pageW - 10, 57);
+
+    // ── Details rows ────────────────────────────────────────
+    const rows: [string, string][] = [];
+    if (isIncome) {
+      if (selectedRecord.student_name || selectedRecord.payer_name) {
+        rows.push(['Received From', selectedRecord.student_name || selectedRecord.payer_name]);
+      }
+      if (selectedRecord.admission_number) rows.push(['Admission No', selectedRecord.admission_number]);
+    } else {
+      if (selectedRecord.vendor_name) rows.push(['Vendor', selectedRecord.vendor_name]);
+    }
+    rows.push(['Account', selectedRecord.account_name || '-']);
+    rows.push(['Category', isIncome ? selectedRecord.income_category : selectedRecord.expense_category || '-']);
+    rows.push(['Payment Method', (selectedRecord.payment_method || '-').toUpperCase()]);
+    if (selectedRecord.payment_reference) rows.push(['Reference', selectedRecord.payment_reference]);
+    if (selectedRecord.description) rows.push(['Description', selectedRecord.description]);
+    rows.push(['Status', (selectedRecord.status || '-').toUpperCase()]);
+
+    let y = 65;
+    doc.setFontSize(9);
+    rows.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 100, 100);
+      doc.text(label + ':', 10, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(String(value), 55, y);
+      y += 7;
+    });
+
+    // ── Amount box ──────────────────────────────────────────
+    y += 3;
+    doc.setDrawColor(200, 200, 200);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(10, y, pageW - 20, 28, 2, 2, 'FD');
+
+    const amt = parseFloat(selectedRecord.amount || 0);
+    const vat = parseFloat(selectedRecord.vat_amount || 0);
+    const total = parseFloat(selectedRecord.total_amount || amt + vat);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text('Amount:', 14, y + 7);
+    doc.text(formatCurrency(amt), pageW - 14, y + 7, { align: 'right' });
+    doc.text('VAT (16%):', 14, y + 14);
+    doc.text(formatCurrency(vat), pageW - 14, y + 14, { align: 'right' });
+    doc.setDrawColor(180, 180, 180);
+    doc.line(14, y + 17, pageW - 14, y + 17);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(37, 99, 235);
+    doc.text('TOTAL:', 14, y + 24);
+    doc.text(formatCurrency(total), pageW - 14, y + 24, { align: 'right' });
+
+    // ── Footer ──────────────────────────────────────────────
+    const footerY = doc.internal.pageSize.getHeight() - 12;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(10, footerY - 4, pageW - 10, footerY - 4);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(140, 140, 140);
+    doc.text('This is a computer-generated receipt and does not require a signature.', pageW / 2, footerY, { align: 'center' });
+    doc.text(schoolName, pageW / 2, footerY + 5, { align: 'center' });
+
+    // ── Open in new tab (print/share) ───────────────────────
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -275,6 +398,137 @@ export default function Transactions() {
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
+  // ── Shared helpers for exports ──────────────────────────────────────────
+  const getExportRows = () => {
+    if (activeTab === 'income') {
+      return incomeRecords.map((r: any) => ({
+        Date: formatDate(r.income_date),
+        'Receipt No': r.income_number || '-',
+        Description: r.description || '-',
+        Account: r.account_name || '-',
+        'Student / Payer': r.student_name || r.payer_name || '-',
+        'Admission No': r.admission_number || '-',
+        'Payment Method': (r.payment_method || '-').toUpperCase(),
+        Reference: r.payment_reference || '-',
+        'Amount (KES)': parseFloat(r.amount || 0),
+        'VAT (KES)': parseFloat(r.vat_amount || 0),
+        'Total (KES)': parseFloat(r.total_amount || 0),
+        Status: (r.status || '-').toUpperCase(),
+      }));
+    }
+    return expenseRecords.map((r: any) => ({
+      Date: formatDate(r.expense_date),
+      'Voucher No': r.expense_number || '-',
+      Description: r.description || '-',
+      Account: r.account_name || '-',
+      Vendor: r.vendor_name || '-',
+      'Payment Method': (r.payment_method || '-').toUpperCase(),
+      Reference: r.payment_reference || '-',
+      'Amount (KES)': parseFloat(r.amount || 0),
+      'VAT (KES)': parseFloat(r.vat_amount || 0),
+      'Total (KES)': parseFloat(r.total_amount || 0),
+      'Approval Status': (r.approval_status || '-').toUpperCase(),
+      Status: (r.status || '-').toUpperCase(),
+    }));
+  };
+
+  const exportCSV = () => {
+    const rows = getExportRows();
+    if (!rows.length) return alert('No records to export.');
+    const headers = Object.keys(rows[0]);
+    const csv = [
+      headers.join(','),
+      ...rows.map(row =>
+        headers.map(h => {
+          const val = (row as any)[h];
+          return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+        }).join(',')
+      ),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeTab}-records-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportExcel = () => {
+    const rows = getExportRows();
+    if (!rows.length) return alert('No records to export.');
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Auto-size columns
+    const colWidths = Object.keys(rows[0]).map(k => ({
+      wch: Math.max(k.length, ...rows.map(r => String((r as any)[k]).length)) + 2,
+    }));
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, activeTab === 'income' ? 'Income Records' : 'Expense Records');
+    XLSX.writeFile(wb, `${activeTab}-records-${Date.now()}.xlsx`);
+  };
+
+  const exportPDF = async () => {
+    const rows = getExportRows();
+    if (!rows.length) return alert('No records to export.');
+
+    let schoolName = 'School';
+    try {
+      const s: any = await api.getSettings();
+      schoolName = (s?.data || s)?.school_name || 'School';
+    } catch (_) {}
+
+    const isIncome = activeTab === 'income';
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const today = new Date().toLocaleDateString('en-KE', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Header
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pageW, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(schoolName, pageW / 2, 9, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(isIncome ? 'Income Records Report' : 'Expense Records Report', pageW / 2, 16, { align: 'center' });
+
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8);
+    doc.text(`Generated: ${today}   |   Total records: ${rows.length}`, 14, 26);
+
+    // Summary totals
+    const totalAmt = rows.reduce((s, r) => s + (r as any)['Amount (KES)'], 0);
+    const totalVat = rows.reduce((s, r) => s + (r as any)['VAT (KES)'], 0);
+    const totalNet = rows.reduce((s, r) => s + (r as any)['Total (KES)'], 0);
+    doc.text(
+      `Total Amount: KES ${totalAmt.toLocaleString()}   |   Total VAT: KES ${totalVat.toLocaleString()}   |   Grand Total: KES ${totalNet.toLocaleString()}`,
+      14, 31
+    );
+
+    const headers = Object.keys(rows[0]);
+    autoTable(doc, {
+      startY: 35,
+      head: [headers],
+      body: rows.map(r => headers.map(h => (r as any)[h])),
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+      didParseCell: (data: any) => {
+        if (data.section === 'body') {
+          const val = String(data.cell.raw);
+          if (val === 'PAID' || val === 'COMPLETED' || val === 'APPROVED') data.cell.styles.textColor = [22, 163, 74];
+          else if (val === 'PENDING') data.cell.styles.textColor = [234, 179, 8];
+          else if (val === 'REJECTED' || val === 'CANCELLED') data.cell.styles.textColor = [220, 38, 38];
+        }
+      },
+    });
+
+    const blob = doc.output('blob');
+    window.open(URL.createObjectURL(blob), '_blank');
+  };
+
   return (
     <>
       <style>
@@ -310,13 +564,36 @@ export default function Transactions() {
           <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
           <p className="text-gray-600 mt-1">Manage income and expenses</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          New {activeTab === 'income' ? 'Income' : 'Expense'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCSV}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            title="Download CSV"
+          >
+            <Download className="h-4 w-4" /> CSV
+          </button>
+          <button
+            onClick={exportExcel}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50"
+            title="Download Excel"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Excel
+          </button>
+          <button
+            onClick={exportPDF}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
+            title="Download PDF"
+          >
+            <FileText className="h-4 w-4" /> PDF
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="h-5 w-5" />
+            New {activeTab === 'income' ? 'Income' : 'Expense'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -858,9 +1135,9 @@ export default function Transactions() {
               </h2>
               <button
                 onClick={handlePrintReceipt}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 print:hidden"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                Print Receipt
+                <Printer className="h-4 w-4" /> Print / Save Receipt
               </button>
               <button
                 onClick={() => {

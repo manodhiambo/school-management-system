@@ -397,66 +397,92 @@ async function generateStudentReportPDF(
   y += 9;
   doc.setTextColor(0, 0, 0);
 
-  // Build fees breakdown from feeStructures (per-item list) + actuals from feeAccount
-  const totalPaid = Number(feeAccount?.paid) || 0;
-  const balance = Number(feeAccount?.pending) || 0;
+  // Correct field paths: API returns summary.total_paid / summary.total_balance
+  const totalPaid = Number(feeAccount?.summary?.total_paid) || 0;
+  const balance   = Number(feeAccount?.summary?.total_balance) || 0;
 
-  // Non-transport fee structures applicable to this student.
-  // Exclude auto-created fee_structure entries linked to extra_fees (extra_fee_id != null)
-  // — those are shown separately via the extraFees list below.
-  const nonTransportStructures = feeStructures.filter((f: any) => {
-    if (f.is_transport_fee) return false;
-    if (f.extra_fee_id) return false; // auto-linked extra fee — shown via extraFees
-    const st = f.student_type || 'all';
-    return st === 'all' || st === student.student_type;
+  // Use actual invoices (filtered to this term/year) so payment data is visible.
+  // Fall back to fee structures when no invoices exist yet.
+  const rawInvoices: any[] = feeAccount?.invoices || [];
+  const termInvoices = rawInvoices.filter((inv: any) => {
+    if (inv.term && inv.term !== term) return false;
+    if (inv.academic_year && inv.academic_year !== academicYear) return false;
+    return true;
   });
 
-  // Build transport fee row from actual route assignment (term_fee), or fee structure fallback
-  type FeeItem = { label: string; amount: number };
-  const feeItems: FeeItem[] = nonTransportStructures.map((f: any) => ({
-    label: f.name,
-    amount: Number(f.amount) || 0,
-  }));
+  type FeeItem = { label: string; charged: number; paid: number; balance: number };
+  let feeItems: FeeItem[];
 
-  if (transportAssignment) {
-    const routeFee = Number(transportAssignment.term_fee) || 0;
-    feeItems.push({
-      label: `Transport — ${transportAssignment.route_name || 'Route'}`,
-      amount: routeFee,
-    });
+  if (termInvoices.length > 0) {
+    feeItems = termInvoices.map((inv: any) => ({
+      label:   inv.structure_name || inv.description || 'School Fee',
+      charged: Number(inv.net_amount) || 0,
+      paid:    Number(inv.paid_amount) || 0,
+      balance: Number(inv.balance_amount) || 0,
+    }));
   } else {
-    // Fallback: any transport fee structure if student uses_transport
-    const tStruct = feeStructures.find((f: any) => f.is_transport_fee && student.uses_transport);
-    if (tStruct) {
-      feeItems.push({
-        label: `Transport — ${tStruct.route_name || tStruct.name}`,
-        amount: Number(tStruct.amount) || 0,
-      });
+    // No invoices yet — show expected fee structures so section isn't blank
+    const nonTransport = (feeStructures as any[]).filter((f: any) => {
+      if (f.is_transport_fee) return false;
+      if (f.extra_fee_id) return false;
+      const st = f.student_type || 'all';
+      return st === 'all' || st === student.student_type;
+    });
+    feeItems = nonTransport.map((f: any) => ({
+      label: f.name, charged: Number(f.amount) || 0, paid: 0, balance: Number(f.amount) || 0,
+    }));
+    if (transportAssignment) {
+      const rf = Number(transportAssignment.term_fee) || 0;
+      feeItems.push({ label: `Transport — ${transportAssignment.route_name || 'Route'}`, charged: rf, paid: 0, balance: rf });
+    } else {
+      const tStruct = (feeStructures as any[]).find((f: any) => f.is_transport_fee && student.uses_transport);
+      if (tStruct) feeItems.push({ label: `Transport — ${tStruct.route_name || tStruct.name}`, charged: Number(tStruct.amount) || 0, paid: 0, balance: Number(tStruct.amount) || 0 });
+    }
+    const existingLabels = new Set(feeItems.map((f) => f.label.toLowerCase().trim()));
+    for (const ef of (extraFees as any[])) {
+      if (!existingLabels.has((ef.name || '').toLowerCase().trim())) {
+        const amt = Number(ef.amount) || 0;
+        feeItems.push({ label: ef.name, charged: amt, paid: 0, balance: amt });
+      }
     }
   }
 
-  // Extra / miscellaneous fees — skip any whose name already appears in feeItems (dedup)
-  const existingLabels = new Set(feeItems.map((f) => f.label.toLowerCase().trim()));
-  for (const ef of extraFees) {
-    if (!existingLabels.has((ef.name || '').toLowerCase().trim())) {
-      feeItems.push({ label: ef.name, amount: Number(ef.amount) || 0 });
-    }
-  }
+  const totalCharged = feeItems.reduce((s, f) => s + f.charged, 0);
 
-  const structureTotal = feeItems.reduce((s: number, f) => s + f.amount, 0);
+  // Column layout: FEE ITEM (57%) | CHARGED (21%) | BALANCE (22%)
+  const colW = pageW - 2 * margin;
+  const labelColW = colW * 0.57;
+  const numColW   = colW * 0.215;
+  const chargedX  = margin + labelColW;
+  const balX      = chargedX + numColW;
 
-  // Fee structure line items
+  // Column header row
+  doc.setFillColor(220, 240, 255);
+  doc.rect(margin, y, colW, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(30, 60, 130);
+  doc.text('FEE ITEM', margin + 2, y + 4);
+  doc.text('CHARGED', chargedX + numColW - 2, y + 4, { align: 'right' });
+  doc.text('BALANCE', balX + numColW - 2, y + 4, { align: 'right' });
+  y += 6;
+  doc.setTextColor(0, 0, 0);
+
+  // Fee rows
   doc.setFontSize(8.5);
   feeItems.forEach((f, idx) => {
     if (y > 278) { doc.addPage(); y = 20; }
     if (idx % 2 === 0) {
       doc.setFillColor(240, 253, 244);
-      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
+      doc.rect(margin, y, colW, 6, 'F');
     }
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
-    doc.text(f.label, margin + 4, y + 4);
-    doc.text(`KES ${f.amount.toLocaleString()}`, pageW - margin - 4, y + 4, { align: 'right' });
+    doc.text(f.label.slice(0, 34), margin + 2, y + 4);
+    doc.text(f.charged.toLocaleString(), chargedX + numColW - 2, y + 4, { align: 'right' });
+    if (f.balance > 0) doc.setTextColor(200, 40, 40);
+    doc.text(f.balance.toLocaleString(), balX + numColW - 2, y + 4, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
     y += 6;
   });
 
@@ -464,42 +490,39 @@ async function generateStudentReportPDF(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(150, 150, 150);
-    doc.text('No fee structure configured for this class/student.', margin + 4, y + 4);
+    doc.text('No fee invoices or structure configured for this student.', margin + 2, y + 4);
     y += 6;
   }
 
-  // Divider + Total row
+  // Totals row
   doc.setDrawColor(180, 180, 180);
   doc.line(margin, y + 1, pageW - margin, y + 1);
   y += 3;
   doc.setFillColor(220, 240, 255);
-  doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
+  doc.rect(margin, y, colW, 6, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(0, 0, 0);
-  doc.text('TOTAL FEES', margin + 4, y + 4);
-  doc.text(`KES ${structureTotal.toLocaleString()}`, pageW - margin - 4, y + 4, { align: 'right' });
+  doc.text('TOTAL', margin + 2, y + 4);
+  doc.text(`KES ${totalCharged.toLocaleString()}`, chargedX + numColW - 2, y + 4, { align: 'right' });
+  const totBal = termInvoices.length > 0 ? balance : feeItems.reduce((s, f) => s + f.balance, 0);
+  if (totBal > 0) doc.setTextColor(200, 40, 40);
+  doc.text(`KES ${totBal.toLocaleString()}`, balX + numColW - 2, y + 4, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
   y += 6;
 
-  // Paid & Balance summary
-  const summaryRows: [string, string, boolean][] = [
-    ['Amount Paid', `KES ${totalPaid.toLocaleString()}`, false],
-    ['Outstanding Balance', `KES ${balance.toLocaleString()}`, balance > 0],
-  ];
-  summaryRows.forEach(([label, val, isRed], idx) => {
-    if (idx % 2 === 0) {
-      doc.setFillColor(240, 253, 244);
-      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.text(label, margin + 4, y + 4);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(isRed ? 220 : 0, isRed ? 38 : 0, isRed ? 38 : 0);
-    doc.text(val, pageW - margin - 4, y + 4, { align: 'right' });
-    doc.setTextColor(0, 0, 0);
-    y += 6;
-  });
-  y += 3;
+  // Amount Paid row
+  doc.setFillColor(240, 255, 245);
+  doc.rect(margin, y, colW, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Amount Paid', margin + 2, y + 4);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(22, 163, 74);
+  doc.text(`KES ${totalPaid.toLocaleString()}`, pageW - margin - 2, y + 4, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+  y += 9;
 
   // ── Term Dates ──────────────────────────────────────────────────────────────
   if (closingDate || openingDate) {

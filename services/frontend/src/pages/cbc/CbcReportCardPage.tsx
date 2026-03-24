@@ -405,32 +405,38 @@ async function renderReportCardPage(
   doc.text('TERM DATES', dateX, y + 5);
   y += 7;
 
-  // Fee list header row
-  cell(doc, feeX, y, feeW * 0.55, 6, [235, 235, 235]);
-  cell(doc, feeX + feeW * 0.55, y, feeW * 0.22, 6, [235, 235, 235]);
-  cell(doc, feeX + feeW * 0.77, y, feeW * 0.23, 6, [235, 235, 235]);
+  // Fee list header row — FEE ITEM | CHARGED | PAID | BALANCE
+  cell(doc, feeX, y, feeW * 0.46, 6, [235, 235, 235]);
+  cell(doc, feeX + feeW * 0.46, y, feeW * 0.18, 6, [235, 235, 235]);
+  cell(doc, feeX + feeW * 0.64, y, feeW * 0.18, 6, [235, 235, 235]);
+  cell(doc, feeX + feeW * 0.82, y, feeW * 0.18, 6, [235, 235, 235]);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(0, 0, 0);
   doc.text('FEE ITEM', feeX + 2, y + 4);
-  doc.text('CHARGED', feeX + feeW * 0.55 + 2, y + 4);
-  doc.text('BALANCE', feeX + feeW * 0.77 + 2, y + 4);
+  doc.text('CHARGED', feeX + feeW * 0.46 + 2, y + 4);
+  doc.text('PAID', feeX + feeW * 0.64 + 2, y + 4);
+  doc.text('BALANCE', feeX + feeW * 0.82 + 2, y + 4);
   y += 6;
 
   // Individual fee rows
   doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
   feeRows.forEach((r: any, i: number) => {
     const bg: [number, number, number] = i % 2 === 0 ? [250, 250, 250] : [255, 255, 255];
-    cell(doc, feeX, y, feeW * 0.55, 5, bg);
-    cell(doc, feeX + feeW * 0.55, y, feeW * 0.22, 5, bg);
-    cell(doc, feeX + feeW * 0.77, y, feeW * 0.23, 5, bg);
+    cell(doc, feeX, y, feeW * 0.46, 5, bg);
+    cell(doc, feeX + feeW * 0.46, y, feeW * 0.18, 5, bg);
+    cell(doc, feeX + feeW * 0.64, y, feeW * 0.18, 5, bg);
+    cell(doc, feeX + feeW * 0.82, y, feeW * 0.18, 5, bg);
     doc.setTextColor(0, 0, 0);
     const label = r.is_transport_fee
       ? `Transport${r.route_name ? ` (${r.route_name})` : ''}`
       : r.fee_name;
-    doc.text((label || 'Fee').slice(0, 26), feeX + 2, y + 3.5);
-    doc.text(Number(r.total_amount || 0).toLocaleString('en-KE'), feeX + feeW * 0.55 + 2, y + 3.5);
+    doc.text((label || 'Fee').slice(0, 22), feeX + 2, y + 3.5);
+    doc.text(Number(r.total_amount || 0).toLocaleString('en-KE'), feeX + feeW * 0.46 + 2, y + 3.5);
+    const paid = Number(r.paid_amount || 0);
+    if (paid > 0) doc.setTextColor(22, 163, 74);
+    doc.text(paid.toLocaleString('en-KE'), feeX + feeW * 0.64 + 2, y + 3.5);
     const bal = Number(r.balance_amount || 0);
-    if (bal > 0) doc.setTextColor(200, 40, 40);
-    doc.text(bal.toLocaleString('en-KE'), feeX + feeW * 0.77 + 2, y + 3.5);
+    if (bal > 0) doc.setTextColor(200, 40, 40); else doc.setTextColor(0, 0, 0);
+    doc.text(bal.toLocaleString('en-KE'), feeX + feeW * 0.82 + 2, y + 3.5);
     doc.setTextColor(0, 0, 0);
     y += 5;
   });
@@ -443,22 +449,19 @@ async function renderReportCardPage(
   }
 
   // Total row
-  cell(doc, feeX, y, feeW * 0.55, 6, [220, 235, 255]);
-  cell(doc, feeX + feeW * 0.55, y, feeW * 0.22, 6, [220, 235, 255]);
-  cell(doc, feeX + feeW * 0.77, y, feeW * 0.23, 6, [220, 235, 255]);
+  cell(doc, feeX, y, feeW * 0.46, 6, [220, 235, 255]);
+  cell(doc, feeX + feeW * 0.46, y, feeW * 0.18, 6, [220, 235, 255]);
+  cell(doc, feeX + feeW * 0.64, y, feeW * 0.18, 6, [220, 235, 255]);
+  cell(doc, feeX + feeW * 0.82, y, feeW * 0.18, 6, [220, 235, 255]);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
   doc.text('TOTAL', feeX + 2, y + 4.5);
-  doc.text(totalFees.toLocaleString('en-KE'), feeX + feeW * 0.55 + 2, y + 4.5);
-  if (totalBalance > 0) doc.setTextColor(200, 40, 40);
-  doc.text(totalBalance.toLocaleString('en-KE'), feeX + feeW * 0.77 + 2, y + 4.5);
+  doc.text(totalFees.toLocaleString('en-KE'), feeX + feeW * 0.46 + 2, y + 4.5);
+  doc.setTextColor(22, 163, 74);
+  doc.text(totalPaid.toLocaleString('en-KE'), feeX + feeW * 0.64 + 2, y + 4.5);
+  if (totalBalance > 0) doc.setTextColor(200, 40, 40); else doc.setTextColor(0, 0, 0);
+  doc.text(totalBalance.toLocaleString('en-KE'), feeX + feeW * 0.82 + 2, y + 4.5);
   doc.setTextColor(0, 0, 0);
   y += 6;
-
-  // Paid row
-  cell(doc, feeX, y, feeW, 5, [240, 255, 245]);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
-  doc.text(`Paid: KES ${totalPaid.toLocaleString('en-KE')}`, feeX + 2, y + 3.5);
-  y += 5;
 
   // Term dates table (positioned to the right, aligned with fee list header)
   const termY = feeSectionStartY + 7;

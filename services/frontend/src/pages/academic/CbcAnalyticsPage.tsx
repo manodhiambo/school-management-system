@@ -120,14 +120,13 @@ export function CbcAnalyticsPage() {
 
   const downloadBroadsheetCSV = () => {
     if (!broadsheet) return;
-    const headers = ['Rank', 'Student', 'Adm #', ...broadsheet.subjects.map((s: any) => s.name), 'Overall', 'Score'];
+    const headers = ['Pos', 'Student', 'Adm #', ...broadsheet.subjects.map((s: any) => s.name), 'Overall Outcome'];
     const rows = broadsheet.students.map((st: any) => [
       st.rank,
       `${st.name}`,
       st.admission_number,
       ...broadsheet.subjects.map((s: any) => st.grades?.[s.id] || '—'),
-      st.overall,
-      st.total_score,
+      st.overall || '—',
     ]);
     const csv = [headers, ...rows].map(r => r.map((v: any) => JSON.stringify(v ?? '')).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -158,13 +157,13 @@ export function CbcAnalyticsPage() {
     // Header row
     doc.setFillColor(37, 99, 235); doc.rect(startX, y, pw - 20, 7, 'F');
     doc.setTextColor(255, 255, 255); doc.setFontSize(7); doc.setFont('helvetica', 'bold');
-    doc.text('#', startX + 2, y + 5);
+    doc.text('Pos', startX + 2, y + 5);
     doc.text('Student', startX + 10, y + 5);
     doc.text('Adm #', startX + 46, y + 5);
     subjects.forEach((s: any, i: number) => {
       doc.text((s.name || '').substring(0, 8), startX + 64 + i * colW, y + 5);
     });
-    doc.text('Overall', pw - 28, y + 5); doc.text('Score', pw - 12, y + 5, { align: 'right' });
+    doc.text('Overall Outcome', pw - 32, y + 5);
     y += 7; doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
     let rowBg = false;
     for (const st of broadsheet.students) {
@@ -177,8 +176,7 @@ export function CbcAnalyticsPage() {
         const g = st.grades?.[s.id] || '';
         doc.text(g, startX + 64 + i * colW, y + 4);
       });
-      doc.text(st.overall || '—', pw - 28, y + 4);
-      doc.text(String(st.total_score ?? '—'), pw - 12, y + 4, { align: 'right' });
+      doc.text(st.overall || '—', pw - 32, y + 4);
       y += 6; rowBg = !rowBg;
     }
     doc.save(`broadsheet-${className.replace(/\s+/g, '-')}.pdf`);
@@ -650,23 +648,22 @@ export function CbcAnalyticsPage() {
                       <table className="min-w-full text-xs border-collapse">
                         <thead>
                           <tr className="bg-blue-600 text-white">
-                            <th className="px-3 py-2 text-left sticky left-0 bg-blue-600 z-10">#</th>
-                            <th className="px-3 py-2 text-left sticky left-6 bg-blue-600 z-10 min-w-[140px]">Student</th>
+                            <th className="px-3 py-2 text-center sticky left-0 bg-blue-600 z-10 min-w-[40px]">Pos</th>
+                            <th className="px-3 py-2 text-left sticky left-10 bg-blue-600 z-10 min-w-[140px]">Student</th>
                             <th className="px-3 py-2 text-left min-w-[80px]">Adm #</th>
                             {broadsheet.subjects.map((s: any) => (
                               <th key={s.id} className="px-2 py-2 text-center min-w-[60px] whitespace-nowrap">
                                 {s.name.length > 10 ? s.name.substring(0, 10) + '…' : s.name}
                               </th>
                             ))}
-                            <th className="px-3 py-2 text-center bg-blue-700">Overall</th>
-                            <th className="px-3 py-2 text-center bg-blue-800">Rank</th>
+                            <th className="px-3 py-2 text-center bg-blue-700 min-w-[110px]">Overall Outcome</th>
                           </tr>
                         </thead>
                         <tbody>
                           {broadsheet.students.map((st: any, idx: number) => (
                             <tr key={st.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-3 py-2 text-gray-400 sticky left-0 bg-inherit z-10">{idx + 1}</td>
-                              <td className="px-3 py-2 font-medium sticky left-6 bg-inherit z-10">
+                              <td className="px-3 py-2 text-center font-bold text-blue-700 sticky left-0 bg-inherit z-10">{st.rank}</td>
+                              <td className="px-3 py-2 font-medium sticky left-10 bg-inherit z-10">
                                 {st.name}
                               </td>
                               <td className="px-3 py-2 text-gray-500">{st.admission_number}</td>
@@ -690,9 +687,6 @@ export function CbcAnalyticsPage() {
                                     {st.overall}
                                   </span>
                                 ) : <span className="text-gray-300">—</span>}
-                              </td>
-                              <td className="px-3 py-2 text-center font-bold text-blue-700">
-                                #{st.rank}
                               </td>
                             </tr>
                           ))}

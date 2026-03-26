@@ -116,6 +116,10 @@ export function CbcAnalyticsPage() {
     AE: 'bg-yellow-100 text-yellow-800', BE: 'bg-red-100 text-red-800',
     WD: 'bg-green-100 text-green-800', D: 'bg-blue-100 text-blue-800',
     B: 'bg-red-100 text-red-800',
+    EE1: 'bg-green-200 text-green-900', EE2: 'bg-green-100 text-green-800',
+    ME1: 'bg-blue-200 text-blue-900',   ME2: 'bg-blue-100 text-blue-800',
+    AE1: 'bg-yellow-200 text-yellow-900', AE2: 'bg-yellow-100 text-yellow-800',
+    BE1: 'bg-red-200 text-red-900',     BE2: 'bg-red-100 text-red-800',
   };
 
   const downloadBroadsheetCSV = () => {
@@ -702,6 +706,17 @@ export function CbcAnalyticsPage() {
                         <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-100 text-green-800 font-semibold">WD</span> Well Developed</span>
                         <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">D</span> Developing</span>
                         <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-semibold">B</span> Beginning</span>
+                      </>
+                    ) : broadsheet.education_level === 'junior_secondary' ? (
+                      <>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-200 text-green-900 font-semibold">EE1</span> Exceeding Expectations L1 (90–100%)</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-100 text-green-800 font-semibold">EE2</span> Exceeding Expectations L2 (75–89%)</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-blue-200 text-blue-900 font-semibold">ME1</span> Meeting Expectations L1 (58–74%)</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">ME2</span> Meeting Expectations L2 (41–57%)</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-yellow-200 text-yellow-900 font-semibold">AE1</span> Approaching Expectations L1 (31–40%)</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 font-semibold">AE2</span> Approaching Expectations L2 (21–30%)</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-red-200 text-red-900 font-semibold">BE1</span> Below Expectations L1 (11–20%)</span>
+                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-semibold">BE2</span> Below Expectations L2 (1–10%)</span>
                       </>
                     ) : (
                       <>

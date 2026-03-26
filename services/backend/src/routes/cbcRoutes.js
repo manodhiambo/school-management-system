@@ -1298,7 +1298,11 @@ router.get('/broadsheet', authenticate, async (req, res) => {
     }
 
     // Grade → numeric for ranking
-    const gradeScore = (g) => ({ EE: 4, ME: 3, AE: 2, BE: 1, WD: 4, D: 2, B: 1 }[g] || 0);
+    const isJSS = educationLevel === 'junior_secondary';
+    const gradeScore = (g) => ({
+      EE: 4, ME: 3, AE: 2, BE: 1, WD: 4, D: 2, B: 1,
+      EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
+    }[g] || 0);
 
     // Build student rows
     const resultStudents = students.map(s => {
@@ -1310,7 +1314,14 @@ router.get('/broadsheet', authenticate, async (req, res) => {
         if (g) { totalScore += gradeScore(g); gradeCount++; }
       }
       const avg = gradeCount > 0 ? totalScore / gradeCount : 0;
-      const overall = avg >= 3.5 ? 'EE' : avg >= 2.5 ? 'ME' : avg >= 1.5 ? 'AE' : gradeCount > 0 ? 'BE' : '';
+      let overall = '';
+      if (gradeCount > 0) {
+        if (isJSS) {
+          overall = avg >= 7.5 ? 'EE1' : avg >= 6.5 ? 'EE2' : avg >= 5.5 ? 'ME1' : avg >= 4.5 ? 'ME2' : avg >= 3.5 ? 'AE1' : avg >= 2.5 ? 'AE2' : avg >= 1.5 ? 'BE1' : 'BE2';
+        } else {
+          overall = avg >= 3.5 ? 'EE' : avg >= 2.5 ? 'ME' : avg >= 1.5 ? 'AE' : 'BE';
+        }
+      }
       return {
         id: s.id,
         name: `${s.first_name} ${s.last_name}`,

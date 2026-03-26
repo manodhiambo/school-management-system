@@ -811,6 +811,52 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
 
     const allFees = [...feeBreakdown, ...dedupedExtraFees];
 
+    // ── Class rank for this student ────────────────────────────────────────────
+    let classRank = null;
+    let totalInClass = null;
+    try {
+      // Try student_competency_summary first (same source as competency display)
+      const rankRows = await query(
+        `SELECT cs.student_id, SUM(COALESCE(cs.percentage, 0)) AS total_pct
+         FROM student_competency_summary cs
+         JOIN students st ON st.id = cs.student_id AND st.status = 'active'
+         WHERE cs.tenant_id = $1 AND cs.class_id = $2 AND cs.term = $3 AND cs.academic_year = $4
+         GROUP BY cs.student_id
+         ORDER BY total_pct DESC`,
+        [rc.tenant_id, rc.class_id, rc.term, rc.academic_year]
+      ).catch(() => []);
+
+      let rankSource = rankRows;
+
+      if (!rankSource.length) {
+        // Fall back to cbc_assessments aggregated per student
+        rankSource = await query(
+          `SELECT a.student_id,
+                  SUM(CASE WHEN a.max_score > 0 THEN (COALESCE(a.score,0) / a.max_score * 100) ELSE 0 END) AS total_pct
+           FROM cbc_assessments a
+           JOIN students st ON st.id = a.student_id AND st.status = 'active'
+           WHERE a.tenant_id = $1 AND a.class_id = $2 AND a.term = $3 AND a.academic_year = $4
+           GROUP BY a.student_id
+           ORDER BY total_pct DESC`,
+          [rc.tenant_id, rc.class_id, rc.term, rc.academic_year]
+        ).catch(() => []);
+      }
+
+      if (rankSource.length) {
+        totalInClass = rankSource.length;
+        let rank = 1;
+        for (let i = 0; i < rankSource.length; i++) {
+          if (i > 0 && parseFloat(rankSource[i].total_pct) < parseFloat(rankSource[i - 1].total_pct)) {
+            rank = i + 1;
+          }
+          if (rankSource[i].student_id === rc.student_id) {
+            classRank = rank;
+            break;
+          }
+        }
+      }
+    } catch (_) { /* non-critical */ }
+
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
     // Prefer explicitly stored dates; fall back to academic_terms lookup
     const termEndDate = rc.closing_date ? fmtDate(rc.closing_date) : fmtDate(termDates[0]?.end_date);
@@ -823,6 +869,8 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
       next_term_start_date: nextTermStartDate,
       competencies: finalCompetencies,
       fee_breakdown: allFees,
+      class_rank: classRank,
+      total_in_class: totalInClass,
     } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -25,9 +25,12 @@ const GRADE_LABEL_FULL: Record<string, string> = {
   WD: 'Well Developed', D: 'Developing', B: 'Beginning',
 };
 const GRADE_POINTS: Record<string, number> = {
-  EE: 4, EE1: 4, EE2: 4, ME: 3, ME1: 3, ME2: 3,
-  AE: 2, AE1: 2, AE2: 2, BE: 1, BE1: 1, BE2: 1,
+  EE: 4, ME: 3, AE: 2, BE: 1,
   WD: 4, D: 2, B: 1,
+};
+// JSS 8-level points (Junior Secondary — Grade 7/8/9)
+const GRADE_POINTS_JSS: Record<string, number> = {
+  EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
 };
 
 // Draw a bordered cell
@@ -147,11 +150,16 @@ async function renderReportCardPage(
 
   // ── 2. STUDENT INFO ROW ───────────────────────────────────────────────────
   // Full-width student details (no photo here — photo is in header)
+  const isJSS = detail.education_level === 'junior_secondary';
   const comps: any[] = detail.competencies || [];
-  const totalPts = comps.reduce((s: number, c: any) => s + (GRADE_POINTS[c.overall_cbc_grade || c.pre_primary_grade || ''] || 0), 0);
-  const maxPts = comps.length * 4;
+  const gradePointLookup = (grade: string) =>
+    isJSS ? (GRADE_POINTS_JSS[grade] ?? GRADE_POINTS[grade] ?? 0) : (GRADE_POINTS[grade] ?? 0);
+  const totalPts = comps.reduce((s: number, c: any) => s + gradePointLookup(c.overall_cbc_grade || c.pre_primary_grade || ''), 0);
+  const maxPts = comps.length * (isJSS ? 8 : 4);
   const meanPts = comps.length ? totalPts / comps.length : 0;
-  const perfLevel = meanPts >= 3.5 ? 'Exceeding Expectations' : meanPts >= 2.5 ? 'Meeting Expectations' : meanPts >= 1.5 ? 'Approaching Expectations' : 'Below Expectations';
+  const perfLevel = isJSS
+    ? (meanPts >= 7 ? 'Exceeding Expectations (EE1)' : meanPts >= 6 ? 'Exceeding Expectations (EE2)' : meanPts >= 5 ? 'Meeting Expectations (ME1)' : meanPts >= 4 ? 'Meeting Expectations (ME2)' : meanPts >= 3 ? 'Approaching Expectations (AE1)' : meanPts >= 2 ? 'Approaching Expectations (AE2)' : meanPts >= 1 ? 'Below Expectations (BE1)' : 'Below Expectations (BE2)')
+    : (meanPts >= 3.5 ? 'Exceeding Expectations' : meanPts >= 2.5 ? 'Meeting Expectations' : meanPts >= 1.5 ? 'Approaching Expectations' : 'Below Expectations');
 
   // Name / Adm / Grade / Stream / Term / Year info grid
   const infoRowH = 6;
@@ -182,7 +190,9 @@ async function renderReportCardPage(
   y += 2 * infoRowH + 2;
 
   // ── 3. STATS BAR ─────────────────────────────────────────────────────────
-  const statW = CW / 4;
+  const hasRank = detail.class_rank != null;
+  const statCount = hasRank ? 5 : 4;
+  const statW = CW / statCount;
   doc.setFillColor(240, 240, 240);
   doc.rect(M, y, CW, 15, 'F');
   doc.setDrawColor(200, 200, 200);
@@ -190,12 +200,15 @@ async function renderReportCardPage(
 
   const totalMarksSum = comps.reduce((s: number, c: any) => s + (Number(c.score) || 0), 0);
   const totalMaxSum = comps.reduce((s: number, c: any) => s + (Number(c.max_score) || 0), 0);
-  const statsData = [
+  const statsData: { label: string; val: string; small: boolean }[] = [
     { label: 'Performance Level', val: perfLevel, small: true },
     { label: 'Total Marks', val: totalMaxSum > 0 ? `${totalMarksSum}/${totalMaxSum}` : `${comps.reduce((s: number, c: any) => s + (Number(c.percentage) || 0), 0).toFixed(0)}%`, small: false },
     { label: 'Total Points', val: `${totalPts}/${maxPts}`, small: false },
     { label: 'Mean Points', val: meanPts.toFixed(2), small: false },
   ];
+  if (hasRank) {
+    statsData.push({ label: 'Class Rank', val: `${detail.class_rank}/${detail.total_in_class}`, small: false });
+  }
   statsData.forEach((s, i) => {
     const sx = M + i * statW;
     if (i > 0) { doc.setDrawColor(200, 200, 200); doc.line(sx, y, sx, y + 15); }
@@ -204,8 +217,14 @@ async function renderReportCardPage(
     doc.setFont('helvetica', 'bold'); doc.setFontSize(s.small ? 7.5 : 10); doc.setTextColor(0, 0, 0);
     // Color performance level
     if (i === 0) {
-      const [pr, pg, pb] = meanPts >= 3.5 ? [22, 163, 74] : meanPts >= 2.5 ? [37, 99, 235] : meanPts >= 1.5 ? [202, 138, 4] : [220, 38, 38];
+      const [pr, pg, pb] = isJSS
+        ? (meanPts >= 6 ? [22, 163, 74] : meanPts >= 4 ? [37, 99, 235] : meanPts >= 2 ? [202, 138, 4] : [220, 38, 38])
+        : (meanPts >= 3.5 ? [22, 163, 74] : meanPts >= 2.5 ? [37, 99, 235] : meanPts >= 1.5 ? [202, 138, 4] : [220, 38, 38]);
       doc.setTextColor(pr, pg, pb);
+    }
+    // Color rank (gold for top 3)
+    if (hasRank && i === statCount - 1 && detail.class_rank <= 3) {
+      doc.setTextColor(180, 120, 0);
     }
     doc.text(s.val, sx + statW / 2, y + 11, { align: 'center' });
     doc.setTextColor(0, 0, 0);
@@ -274,12 +293,8 @@ async function renderReportCardPage(
     const scoreStr = c.total_score != null && c.max_score != null
       ? `${Number(c.total_score).toFixed(0)}/${Number(c.max_score).toFixed(0)}`
       : pct;
-    const pts = c.grade_points != null ? String(c.grade_points) : (
-      grade === 'EE' || grade === 'WD' ? '4' :
-      grade === 'ME' ? '3' :
-      grade === 'AE' || grade === 'D' ? '2' :
-      grade === 'BE' || grade === 'B' ? '1' : '—'
-    );
+    const computedPts = gradePointLookup(grade);
+    const pts = c.grade_points != null ? String(c.grade_points) : (computedPts > 0 ? String(computedPts) : '—');
 
     doc.setTextColor(0, 0, 0);
     doc.text((c.subject_name || '').slice(0, 26), COL.subject.x + 2, y + 4.5);
@@ -347,42 +362,95 @@ async function renderReportCardPage(
   doc.text('GRADE DESCRIPTORS', M, y + 4);
   y += 5;
 
-  const dCols = [M, M + 38, M + 38 + 38, M + 38 + 38 + 38, M + 38 + 38 + 38 + 38];
-  const dWidths = [38, 38, 38, 38, CW - 38 * 4];
   const dH = 6;
 
-  // Header row
-  doc.setFillColor(240, 240, 240);
-  doc.rect(M, y, CW, dH, 'F');
-  doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-  ['Performance Level', 'Exceeding Expectations', 'Meeting Expectations', 'Approaching Expectations', 'Below Expectations'].forEach((h, i) => {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
-    doc.text(h.slice(0, 20), dCols[i] + 2, y + 4);
-    doc.setDrawColor(160, 160, 160); doc.line(dCols[i], y, dCols[i], y + dH);
-  });
-  y += dH;
+  if (isJSS) {
+    // JSS 8-level grade descriptor
+    const jssGrades = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2'];
+    const jssPoints = ['8', '7', '6', '5', '4', '3', '2', '1'];
+    const jssRanges = ['90-100', '75-89', '58-74', '41-57', '31-40', '21-30', '11-20', '0-10'];
+    const labelW = 28;
+    const colW = (CW - labelW) / 8;
+    const jssGradeCols = [M, ...jssGrades.map((_, i) => M + labelW + i * colW)];
 
-  // Points row
-  doc.setFillColor(255, 255, 255); doc.rect(M, y, CW, dH, 'F');
-  doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-  doc.text('Points', dCols[0] + 2, y + 4);
-  ['4', '3', '2', '1'].forEach((v, i) => {
-    doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
-    doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 4, { align: 'center' });
-  });
-  y += dH;
+    // Header row
+    doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
+    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
+    doc.text('Level', M + 2, y + 4);
+    jssGrades.forEach((g, i) => {
+      const cx = jssGradeCols[i + 1];
+      doc.setDrawColor(160, 160, 160); doc.line(cx, y, cx, y + dH);
+      const [r, g2, b] = GRADE_HEX[g] || [100, 100, 100];
+      doc.setFillColor(r, g2, b);
+      doc.rect(cx + 1, y + 0.5, colW - 2, dH - 1, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.text(g, cx + colW / 2, y + 4, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+    });
+    y += dH;
 
-  // Range row
-  doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
-  doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-  doc.text('Range (%)', dCols[0] + 2, y + 4);
-  ['75-100', '50-74', '25-49', '0-24'].forEach((v, i) => {
-    doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
-    doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 4, { align: 'center' });
-  });
-  y += dH + 3;
+    // Points row
+    doc.setFillColor(255, 255, 255); doc.rect(M, y, CW, dH, 'F');
+    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+    doc.text('Points', M + 2, y + 4);
+    jssPoints.forEach((v, i) => {
+      const cx = jssGradeCols[i + 1];
+      doc.setDrawColor(160, 160, 160); doc.line(cx, y, cx, y + dH);
+      doc.text(v, cx + colW / 2, y + 4, { align: 'center' });
+    });
+    y += dH;
+
+    // Range row
+    doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
+    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
+    doc.text('Range (%)', M + 2, y + 4);
+    jssRanges.forEach((v, i) => {
+      const cx = jssGradeCols[i + 1];
+      doc.setDrawColor(160, 160, 160); doc.line(cx, y, cx, y + dH);
+      doc.text(v, cx + colW / 2, y + 4, { align: 'center' });
+    });
+    y += dH + 3;
+  } else {
+    // Standard 4-level grade descriptor
+    const dCols = [M, M + 38, M + 38 + 38, M + 38 + 38 + 38, M + 38 + 38 + 38 + 38];
+    const dWidths = [38, 38, 38, 38, CW - 38 * 4];
+
+    // Header row
+    doc.setFillColor(240, 240, 240);
+    doc.rect(M, y, CW, dH, 'F');
+    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+    ['Performance Level', 'Exceeding Expectations', 'Meeting Expectations', 'Approaching Expectations', 'Below Expectations'].forEach((h, i) => {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+      doc.text(h.slice(0, 20), dCols[i] + 2, y + 4);
+      doc.setDrawColor(160, 160, 160); doc.line(dCols[i], y, dCols[i], y + dH);
+    });
+    y += dH;
+
+    // Points row
+    doc.setFillColor(255, 255, 255); doc.rect(M, y, CW, dH, 'F');
+    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    doc.text('Points', dCols[0] + 2, y + 4);
+    ['4', '3', '2', '1'].forEach((v, i) => {
+      doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
+      doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 4, { align: 'center' });
+    });
+    y += dH;
+
+    // Range row
+    doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
+    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.text('Range (%)', dCols[0] + 2, y + 4);
+    ['75-100', '50-74', '25-49', '0-24'].forEach((v, i) => {
+      doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
+      doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 4, { align: 'center' });
+    });
+    y += dH + 3;
+  }
 
   // ── 7. FEES + TERM DATES ──────────────────────────────────────────────────
   const feeRows: any[] = detail.fee_breakdown || [];

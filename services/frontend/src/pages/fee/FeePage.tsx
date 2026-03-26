@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   DollarSign, TrendingUp, AlertCircle, FileText, Plus, Users,
-  Search, Download, Trash2, Eye, RefreshCw, X, CheckCircle
+  Search, Download, Trash2, Eye, RefreshCw, X, CheckCircle, Printer
 } from 'lucide-react';
 import { RecordPaymentModal } from '@/components/modals/RecordPaymentModal';
 import { GenerateInvoicesModal } from '@/components/modals/GenerateInvoicesModal';
@@ -199,6 +199,66 @@ function StatusBadge({ status }: { status: string }) {
 
 const fmt = (n: number | string) =>
   `KES ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+
+function printPaymentReceipt(p: any, studentName?: string, admNo?: string, className?: string, schoolName = 'School') {
+  const doc = new jsPDF({ unit: 'mm', format: 'a5' });
+  const margin = 15;
+  const pageW = 148;
+  let y = margin;
+
+  doc.setFillColor(37, 99, 235);
+  doc.rect(0, 0, pageW, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text(schoolName, pageW / 2, 10, { align: 'center' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text('PAYMENT RECEIPT', pageW / 2, 17, { align: 'center' });
+
+  y = 30;
+  doc.setTextColor(30, 30, 30);
+  doc.setDrawColor(180, 180, 180);
+  doc.line(margin, y, pageW - margin, y);
+  y += 7;
+
+  const addRow = (label: string, value: string) => {
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+    doc.text(label + ':', margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(value, margin + 42, y);
+    y += 6;
+  };
+
+  addRow('Receipt No', p.receipt_number || p.transaction_id || `RCP-${p.id?.slice(-6) || Date.now()}`);
+  addRow('Date', new Date(p.payment_date).toLocaleDateString('en-KE'));
+  if (studentName) addRow('Student', studentName);
+  if (admNo) addRow('Adm No', admNo);
+  if (className) addRow('Class', className);
+  if (p.invoice_number) addRow('Invoice', p.invoice_number);
+  if (p.remarks) addRow('Remarks', p.remarks);
+
+  y += 2;
+  doc.line(margin, y, pageW - margin, y);
+  y += 7;
+
+  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+  doc.text(`Amount Paid: ${fmt(p.amount)}`, margin, y);
+  y += 7;
+
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  addRow('Payment Method', (p.payment_method || '').replace(/_/g, ' ').toUpperCase());
+  if (p.transaction_id) addRow('Reference', p.transaction_id);
+
+  y += 2;
+  doc.line(margin, y, pageW - margin, y);
+  y += 8;
+
+  doc.setFontSize(7); doc.setFont('helvetica', 'italic');
+  doc.setTextColor(120, 120, 120);
+  doc.text('This is a computer-generated receipt. No signature required.', pageW / 2, y, { align: 'center' });
+
+  const filename = `receipt-${(admNo || 'student').replace(/\s/g, '')}-${p.receipt_number || p.transaction_id || p.id?.slice(-6) || Date.now()}.pdf`;
+  doc.save(filename);
+}
 
 // ─── Fee Statement Modal ───────────────────────────────────────────────────────
 function FeeStatementModal({
@@ -453,14 +513,23 @@ function FeeStatementModal({
                           <td className="px-3 py-2 text-xs text-gray-500">{p.remarks || '—'}</td>
                           <td className="px-3 py-2 text-right font-semibold text-green-700">{fmt(p.amount)}</td>
                           <td className="px-2 py-2 text-right">
-                            <button
-                              className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
-                              title="Delete payment"
-                              disabled={deletingPmt === p.id}
-                              onClick={() => handleDeletePayment(p.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                className="text-blue-500 hover:text-blue-700 p-1"
+                                title="Print receipt"
+                                onClick={() => printPaymentReceipt(p, `${student.first_name} ${student.last_name}`, student.admission_number, student.class_name, schoolName)}
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
+                                title="Delete payment"
+                                disabled={deletingPmt === p.id}
+                                onClick={() => handleDeletePayment(p.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -505,6 +574,7 @@ export function FeePage() {
   const [searchInv, setSearchInv] = useState('');
   const [deletingInv, setDeletingInv] = useState<string | null>(null);
   const [deletingPay, setDeletingPay] = useState<string | null>(null);
+  const [pageSchoolName, setPageSchoolName] = useState('School');
 
   const loadSummary = useCallback(async () => {
     try {
@@ -517,6 +587,9 @@ export function FeePage() {
       setStats(statsRes?.data || {});
       setStudents(studRes?.data || []);
       setClasses(classRes?.data || []);
+      if (!pageSchoolName || pageSchoolName === 'School') {
+        api.getSettings().then((r: any) => { if (r?.data?.school_name) setPageSchoolName(r.data.school_name); }).catch(() => {});
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -868,14 +941,23 @@ export function FeePage() {
                       <td className="px-4 py-3 text-xs text-gray-500">{p.transaction_id || p.receipt_number || '—'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-green-700">{fmt(p.amount)}</td>
                       <td className="px-4 py-2 text-right">
-                        <button
-                          className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
-                          title="Delete payment (reverses invoice balance)"
-                          disabled={deletingPay === p.id}
-                          onClick={() => handleDeletePayment(p.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            className="text-blue-500 hover:text-blue-700 p-1"
+                            title="Print receipt"
+                            onClick={() => printPaymentReceipt(p, `${p.first_name || ''} ${p.last_name || ''}`.trim(), p.admission_number, p.class_name, pageSchoolName)}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+                          <button
+                            className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
+                            title="Delete payment (reverses invoice balance)"
+                            disabled={deletingPay === p.id}
+                            onClick={() => handleDeletePayment(p.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -1,19 +1,77 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, CheckCircle, AlertCircle, Clock, CreditCard, FileText } from 'lucide-react';
+import { DollarSign, CheckCircle, AlertCircle, Clock, CreditCard, FileText, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import { jsPDF } from 'jspdf';
+
+function printPaymentReceipt(payment: any, studentName: string, schoolName = 'School') {
+  const doc = new jsPDF({ unit: 'mm', format: 'a5' });
+  const margin = 15;
+  const pageW = 148;
+  let y = margin;
+
+  doc.setFillColor(37, 99, 235);
+  doc.rect(0, 0, pageW, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text(schoolName, pageW / 2, 10, { align: 'center' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text('PAYMENT RECEIPT', pageW / 2, 17, { align: 'center' });
+
+  y = 30;
+  doc.setTextColor(30, 30, 30);
+  doc.setDrawColor(180, 180, 180);
+  doc.line(margin, y, pageW - margin, y);
+  y += 7;
+
+  const addRow = (label: string, value: string) => {
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+    doc.text(label + ':', margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(value, margin + 42, y);
+    y += 6;
+  };
+
+  addRow('Receipt No', payment.receipt_number || payment.transaction_id || `RCP-${Date.now()}`);
+  addRow('Date', new Date(payment.payment_date).toLocaleDateString('en-KE'));
+  addRow('Student', studentName);
+
+  y += 2;
+  doc.line(margin, y, pageW - margin, y);
+  y += 7;
+
+  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+  doc.text(`Amount Paid: KES ${Number(payment.amount || 0).toLocaleString()}`, margin, y);
+  y += 7;
+
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  addRow('Payment Method', (payment.payment_method || '').replace(/_/g, ' ').toUpperCase() || 'N/A');
+  if (payment.transaction_id) addRow('Reference', payment.transaction_id);
+
+  y += 2;
+  doc.line(margin, y, pageW - margin, y);
+  y += 8;
+
+  doc.setFontSize(7); doc.setFont('helvetica', 'italic');
+  doc.setTextColor(120, 120, 120);
+  doc.text('This is a computer-generated receipt. No signature required.', pageW / 2, y, { align: 'center' });
+
+  doc.save(`receipt-${(payment.receipt_number || payment.transaction_id || Date.now())}.pdf`);
+}
 
 export function MyFeesPage() {
   const { user } = useAuthStore();
   const [fees, setFees] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [schoolName, setSchoolName] = useState('School');
 
   useEffect(() => {
     if (user?.id) {
       loadFees();
+      api.getSettings().then((r: any) => { if (r?.data?.school_name) setSchoolName(r.data.school_name); }).catch(() => {});
     }
   }, [user?.id]);
 
@@ -199,8 +257,8 @@ export function MyFeesPage() {
           <CardContent>
             <div className="space-y-3">
               {payments.slice(0, 10).map((payment: any, index: number) => (
-                <div 
-                  key={payment.id || index} 
+                <div
+                  key={payment.id || index}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center space-x-3">
@@ -214,12 +272,22 @@ export function MyFeesPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right text-sm text-gray-500">
-                    {new Date(payment.payment_date).toLocaleDateString('en-KE', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-sm text-gray-500">
+                      {new Date(payment.payment_date).toLocaleDateString('en-KE', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      title="Print receipt"
+                      onClick={() => printPaymentReceipt(payment, user?.name || 'Student', schoolName)}
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}

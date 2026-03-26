@@ -1255,11 +1255,35 @@ router.get('/broadsheet', authenticate, async (req, res) => {
     );
     const educationLevel = classRow[0]?.education_level || '';
 
+    const isJSS = educationLevel === 'junior_secondary';
+    const isPrePrimary = ['playgroup', 'pp1', 'pp2', 'pre_primary'].includes(educationLevel);
+
+    // JSS percentage → 8-level grade
+    const pctToJssGrade = (pct) => {
+      if (pct === null || pct === undefined) return '';
+      if (pct >= 90) return 'EE1';
+      if (pct >= 75) return 'EE2';
+      if (pct >= 58) return 'ME1';
+      if (pct >= 41) return 'ME2';
+      if (pct >= 31) return 'AE1';
+      if (pct >= 21) return 'AE2';
+      if (pct >= 11) return 'BE1';
+      return 'BE2';
+    };
+
+    // Grade code → midpoint percentage (fallback for ranking when percentage not stored)
+    const gradeToMidPct = (g) => ({
+      EE1: 95, EE2: 82, ME1: 66, ME2: 49, AE1: 35.5, AE2: 25.5, BE1: 15.5, BE2: 5.5,
+      EE: 87.5, ME: 66, AE: 49, BE: 20,
+      WD: 87.5, D: 49, B: 20,
+    }[g] ?? null);
+
     // Grades from student_competency_summary (preferred) ─────────────────────
     let gradeParams = [tid, class_id, year];
     let gradeSql = `
       SELECT cs.student_id, sub.name AS subject_name, sub.id AS subject_id,
-             cs.overall_cbc_grade AS overall_grade, cs.pre_primary_grade
+             cs.overall_cbc_grade AS overall_grade, cs.pre_primary_grade,
+             cs.percentage, cs.total_score AS raw_score, cs.max_score AS raw_max
       FROM student_competency_summary cs
       JOIN subjects sub ON sub.id = cs.subject_id
       WHERE cs.tenant_id = $1 AND cs.class_id = $2 AND cs.academic_year = $3`;
@@ -1271,72 +1295,110 @@ router.get('/broadsheet', authenticate, async (req, res) => {
     if (!gradeRows.length) {
       let aParams = [tid, class_id, year];
       let aSql = `
-        SELECT DISTINCT ON (a.student_id, sub.name)
+        SELECT DISTINCT ON (a.student_id, sub.id)
                a.student_id, sub.name AS subject_name, sub.id AS subject_id,
-               a.cbc_grade AS overall_grade, a.pre_primary_grade
+               a.cbc_grade AS overall_grade, a.pre_primary_grade,
+               CASE WHEN a.max_score > 0 THEN ROUND((a.score / a.max_score * 100)::numeric, 2) END AS percentage,
+               a.score AS raw_score, a.max_score AS raw_max
         FROM cbc_assessments a
         JOIN subjects sub ON sub.id = a.subject_id
         WHERE a.tenant_id = $1 AND a.class_id = $2 AND a.academic_year = $3`;
       if (term) { aSql += ` AND a.term = $${aParams.length + 1}`; aParams.push(term); }
-      aSql += ' ORDER BY a.student_id, sub.name, a.assessment_date DESC';
+      aSql += ' ORDER BY a.student_id, sub.id, a.assessment_date DESC';
       gradeRows = await query(aSql, aParams);
     }
 
-    // Build subject list (unique, ordered)
+    // Build subject list (unique, ordered by name)
     const subjectMap = {};
     for (const r of gradeRows) subjectMap[r.subject_id] = r.subject_name;
-    const subjects = Object.entries(subjectMap).map(([id, name]) => ({ id, name }));
+    const subjects = Object.entries(subjectMap)
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Map studentId → { subjectId → grade }
+    // Map studentId → { subjectId → { grade, score } }
     const gradeMap = {};
+    const scoreMap = {};
     for (const r of gradeRows) {
-      if (!gradeMap[r.student_id]) gradeMap[r.student_id] = {};
-      const isPrePrimary = ['playgroup', 'pp1', 'pp2', 'pre_primary'].includes(educationLevel);
-      gradeMap[r.student_id][r.subject_id] = isPrePrimary
-        ? (r.pre_primary_grade || r.overall_grade || '')
-        : (r.overall_grade || '');
-    }
+      if (!gradeMap[r.student_id]) { gradeMap[r.student_id] = {}; scoreMap[r.student_id] = {}; }
 
-    // Grade → numeric for ranking
-    const isJSS = educationLevel === 'junior_secondary';
-    const gradeScore = (g) => ({
-      EE: 4, ME: 3, AE: 2, BE: 1, WD: 4, D: 2, B: 1,
-      EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
-    }[g] || 0);
+      let grade = '';
+      let pct = r.percentage !== null && r.percentage !== undefined ? parseFloat(r.percentage) : null;
+
+      if (isPrePrimary) {
+        grade = r.pre_primary_grade || r.overall_grade || '';
+      } else if (isJSS) {
+        // For JSS: derive 8-level grade from percentage if available,
+        // otherwise use stored grade (which may already be 8-level)
+        if (pct !== null) {
+          grade = pctToJssGrade(pct);
+        } else {
+          grade = r.overall_grade || '';
+          // Back-compute a midpoint percentage from grade for ranking
+          pct = gradeToMidPct(grade);
+        }
+      } else {
+        grade = r.overall_grade || '';
+        if (pct === null) pct = gradeToMidPct(grade);
+      }
+
+      gradeMap[r.student_id][r.subject_id] = grade;
+      scoreMap[r.student_id][r.subject_id] = pct;
+    }
 
     // Build student rows
     const resultStudents = students.map(s => {
       const grades = {};
-      let totalScore = 0; let gradeCount = 0;
+      const scores = {};
+      let totalPct = 0;
+      let scoredCount = 0;
+
       for (const sub of subjects) {
         const g = gradeMap[s.id]?.[sub.id] || '';
+        const pct = scoreMap[s.id]?.[sub.id] ?? null;
         grades[sub.id] = g;
-        if (g) { totalScore += gradeScore(g); gradeCount++; }
+        scores[sub.id] = pct !== null ? parseFloat(pct.toFixed(1)) : null;
+        if (pct !== null) { totalPct += pct; scoredCount++; }
       }
-      const avg = gradeCount > 0 ? totalScore / gradeCount : 0;
+
+      const meanPct = scoredCount > 0 ? parseFloat((totalPct / scoredCount).toFixed(2)) : 0;
+
       let overall = '';
-      if (gradeCount > 0) {
+      if (scoredCount > 0) {
         if (isJSS) {
-          overall = avg >= 7.5 ? 'EE1' : avg >= 6.5 ? 'EE2' : avg >= 5.5 ? 'ME1' : avg >= 4.5 ? 'ME2' : avg >= 3.5 ? 'AE1' : avg >= 2.5 ? 'AE2' : avg >= 1.5 ? 'BE1' : 'BE2';
+          overall = pctToJssGrade(meanPct);
+        } else if (isPrePrimary) {
+          overall = meanPct >= 70 ? 'WD' : meanPct >= 40 ? 'D' : 'B';
         } else {
-          overall = avg >= 3.5 ? 'EE' : avg >= 2.5 ? 'ME' : avg >= 1.5 ? 'AE' : 'BE';
+          overall = meanPct >= 75 ? 'EE' : meanPct >= 58 ? 'ME' : meanPct >= 41 ? 'AE' : 'BE';
         }
       }
+
       return {
         id: s.id,
         name: `${s.first_name} ${s.last_name}`,
         admission_number: s.admission_number,
         student_type: s.student_type,
         grades,
+        scores,             // numeric percentages per subject
         overall,
-        total_score: parseFloat(avg.toFixed(2)),
-        subjects_assessed: gradeCount,
+        total_marks: parseFloat(totalPct.toFixed(1)),     // sum of subject percentages
+        mean_score: meanPct,
+        subjects_assessed: scoredCount,
       };
     });
 
-    // Rank by total_score descending
-    resultStudents.sort((a, b) => b.total_score - a.total_score);
-    resultStudents.forEach((s, i) => { s.rank = i + 1; });
+    // Rank by total_marks descending (then mean_score for tie-break)
+    resultStudents.sort((a, b) =>
+      b.total_marks - a.total_marks || b.mean_score - a.mean_score
+    );
+    // Assign ranks (ties get same rank)
+    let rank = 1;
+    for (let i = 0; i < resultStudents.length; i++) {
+      if (i > 0 && resultStudents[i].total_marks < resultStudents[i - 1].total_marks) {
+        rank = i + 1;
+      }
+      resultStudents[i].rank = rank;
+    }
 
     res.json({ success: true, data: { subjects, students: resultStudents, education_level: educationLevel } });
   } catch (err) {

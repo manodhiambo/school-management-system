@@ -122,14 +122,25 @@ export function CbcAnalyticsPage() {
     BE1: 'bg-red-200 text-red-900',     BE2: 'bg-red-100 text-red-800',
   };
 
+  const isJSSBroadsheet = broadsheet?.education_level === 'junior_secondary';
+
   const downloadBroadsheetCSV = () => {
     if (!broadsheet) return;
-    const headers = ['Pos', 'Student', 'Adm #', ...broadsheet.subjects.map((s: any) => s.name), 'Overall Outcome'];
+    const subjectHeaders = broadsheet.subjects.flatMap((s: any) =>
+      isJSSBroadsheet ? [`${s.name} (%)`, `${s.name} (Grade)`] : [s.name]
+    );
+    const headers = ['Pos', 'Student', 'Adm #', ...subjectHeaders,
+      ...(isJSSBroadsheet ? ['Total Marks', 'Mean (%)'] : []), 'Overall'];
     const rows = broadsheet.students.map((st: any) => [
       st.rank,
-      `${st.name}`,
+      st.name,
       st.admission_number,
-      ...broadsheet.subjects.map((s: any) => st.grades?.[s.id] || '—'),
+      ...broadsheet.subjects.flatMap((s: any) =>
+        isJSSBroadsheet
+          ? [st.scores?.[s.id] ?? '—', st.grades?.[s.id] || '—']
+          : [st.grades?.[s.id] || '—']
+      ),
+      ...(isJSSBroadsheet ? [st.total_marks ?? '—', st.mean_score ?? '—'] : []),
       st.overall || '—',
     ]);
     const csv = [headers, ...rows].map(r => r.map((v: any) => JSON.stringify(v ?? '')).join(',')).join('\n');
@@ -144,6 +155,7 @@ export function CbcAnalyticsPage() {
     const pw = doc.internal.pageSize.getWidth();
     let y = 10;
     const className = classes.find((c: any) => c.id === bsClassId)?.name || 'Class';
+    const isJSS = isJSSBroadsheet;
 
     doc.setFillColor(37, 99, 235);
     doc.rect(0, 0, pw, 22, 'F');
@@ -154,9 +166,11 @@ export function CbcAnalyticsPage() {
     doc.setTextColor(30, 30, 30);
     y = 28;
 
-    const subjects = broadsheet.subjects.slice(0, 10); // cap columns for landscape A4
-    const colW = Math.min(18, (pw - 90) / Math.max(subjects.length, 1));
+    const subjects = broadsheet.subjects.slice(0, isJSS ? 9 : 10);
+    const fixedCols = isJSS ? 64 + 20 + 18 : 64; // extra space for Total+Mean
+    const colW = Math.min(isJSS ? 16 : 18, (pw - fixedCols - 20) / Math.max(subjects.length, 1));
     const startX = 10;
+    const overallX = pw - 30;
 
     // Header row
     doc.setFillColor(37, 99, 235); doc.rect(startX, y, pw - 20, 7, 'F');
@@ -165,9 +179,14 @@ export function CbcAnalyticsPage() {
     doc.text('Student', startX + 10, y + 5);
     doc.text('Adm #', startX + 46, y + 5);
     subjects.forEach((s: any, i: number) => {
-      doc.text((s.name || '').substring(0, 8), startX + 64 + i * colW, y + 5);
+      doc.text((s.name || '').substring(0, isJSS ? 7 : 8), startX + 64 + i * colW, y + 5);
     });
-    doc.text('Overall Outcome', pw - 32, y + 5);
+    if (isJSS) {
+      const totX = startX + 64 + subjects.length * colW;
+      doc.text('Total', totX, y + 5);
+      doc.text('Mean%', totX + 14, y + 5);
+    }
+    doc.text('Overall', overallX, y + 5);
     y += 7; doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
     let rowBg = false;
     for (const st of broadsheet.students) {
@@ -177,10 +196,21 @@ export function CbcAnalyticsPage() {
       doc.text((st.name || '').substring(0, 22), startX + 10, y + 4);
       doc.text(st.admission_number || '', startX + 46, y + 4);
       subjects.forEach((s: any, i: number) => {
-        const g = st.grades?.[s.id] || '';
-        doc.text(g, startX + 64 + i * colW, y + 4);
+        if (isJSS) {
+          const pct = st.scores?.[s.id];
+          const g = st.grades?.[s.id] || '';
+          const cell = pct !== null && pct !== undefined ? `${pct}` : (g || '—');
+          doc.text(cell, startX + 64 + i * colW, y + 4);
+        } else {
+          doc.text(st.grades?.[s.id] || '—', startX + 64 + i * colW, y + 4);
+        }
       });
-      doc.text(st.overall || '—', pw - 32, y + 4);
+      if (isJSS) {
+        const totX = startX + 64 + subjects.length * colW;
+        doc.text(st.total_marks != null ? String(st.total_marks) : '—', totX, y + 4);
+        doc.text(st.mean_score != null ? `${st.mean_score}%` : '—', totX + 14, y + 4);
+      }
+      doc.text(st.overall || '—', overallX, y + 4);
       y += 6; rowBg = !rowBg;
     }
     doc.save(`broadsheet-${className.replace(/\s+/g, '-')}.pdf`);
@@ -656,35 +686,65 @@ export function CbcAnalyticsPage() {
                             <th className="px-3 py-2 text-left sticky left-10 bg-blue-600 z-10 min-w-[140px]">Student</th>
                             <th className="px-3 py-2 text-left min-w-[80px]">Adm #</th>
                             {broadsheet.subjects.map((s: any) => (
-                              <th key={s.id} className="px-2 py-2 text-center min-w-[60px] whitespace-nowrap">
+                              <th key={s.id} className="px-2 py-2 text-center min-w-[70px] whitespace-nowrap">
                                 {s.name.length > 10 ? s.name.substring(0, 10) + '…' : s.name}
                               </th>
                             ))}
-                            <th className="px-3 py-2 text-center bg-blue-700 min-w-[110px]">Overall Outcome</th>
+                            {isJSSBroadsheet && (
+                              <>
+                                <th className="px-3 py-2 text-center bg-blue-800 min-w-[70px] whitespace-nowrap">Total</th>
+                                <th className="px-3 py-2 text-center bg-blue-800 min-w-[70px] whitespace-nowrap">Mean %</th>
+                              </>
+                            )}
+                            <th className="px-3 py-2 text-center bg-blue-700 min-w-[90px]">Overall</th>
                           </tr>
                         </thead>
                         <tbody>
                           {broadsheet.students.map((st: any, idx: number) => (
                             <tr key={st.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                               <td className="px-3 py-2 text-center font-bold text-blue-700 sticky left-0 bg-inherit z-10">{st.rank}</td>
-                              <td className="px-3 py-2 font-medium sticky left-10 bg-inherit z-10">
-                                {st.name}
-                              </td>
+                              <td className="px-3 py-2 font-medium sticky left-10 bg-inherit z-10">{st.name}</td>
                               <td className="px-3 py-2 text-gray-500">{st.admission_number}</td>
                               {broadsheet.subjects.map((s: any) => {
                                 const grade = st.grades?.[s.id];
+                                const score = st.scores?.[s.id];
                                 return (
-                                  <td key={s.id} className="px-2 py-2 text-center">
-                                    {grade ? (
-                                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${GRADE_COLORS[grade] || 'bg-gray-100 text-gray-600'}`}>
-                                        {grade}
-                                      </span>
+                                  <td key={s.id} className="px-2 py-1.5 text-center">
+                                    {isJSSBroadsheet ? (
+                                      score !== null && score !== undefined ? (
+                                        <div className="flex flex-col items-center gap-0.5">
+                                          <span className="font-semibold text-gray-800">{score}</span>
+                                          {grade && (
+                                            <span className={`inline-block px-1 py-0 rounded text-[10px] font-semibold ${GRADE_COLORS[grade] || 'bg-gray-100 text-gray-600'}`}>
+                                              {grade}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : grade ? (
+                                        <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${GRADE_COLORS[grade] || 'bg-gray-100 text-gray-600'}`}>
+                                          {grade}
+                                        </span>
+                                      ) : <span className="text-gray-300">—</span>
                                     ) : (
-                                      <span className="text-gray-300">—</span>
+                                      grade ? (
+                                        <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${GRADE_COLORS[grade] || 'bg-gray-100 text-gray-600'}`}>
+                                          {grade}
+                                        </span>
+                                      ) : <span className="text-gray-300">—</span>
                                     )}
                                   </td>
                                 );
                               })}
+                              {isJSSBroadsheet && (
+                                <>
+                                  <td className="px-3 py-2 text-center font-bold text-blue-900">
+                                    {st.total_marks != null ? st.total_marks : '—'}
+                                  </td>
+                                  <td className="px-3 py-2 text-center font-semibold text-blue-700">
+                                    {st.mean_score != null ? `${st.mean_score}%` : '—'}
+                                  </td>
+                                </>
+                              )}
                               <td className="px-3 py-2 text-center">
                                 {st.overall ? (
                                   <span className={`inline-block px-2 py-0.5 rounded font-bold text-xs ${GRADE_COLORS[st.overall] || 'bg-gray-100 text-gray-600'}`}>

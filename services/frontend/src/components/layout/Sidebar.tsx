@@ -39,6 +39,7 @@ import {
   ArrowUpCircle,
   FolderOpen,
   Star,
+  Globe,
 } from 'lucide-react';
 
 type NavItem = {
@@ -72,6 +73,7 @@ const navigationItems: NavItem[] = [
   { name: 'Projects',           href: '/app/academic',           icon: FolderOpen,    roles: ['admin'],            section: 'Academic' },
   { name: 'Promotion',          href: '/app/academic',           icon: ArrowUpCircle, roles: ['admin'],            section: 'Academic' },
   { name: 'Academic Calendar',  href: '/app/academic-calendar',  icon: CalendarDays,  roles: ['admin'],            section: 'Academic' },
+  { name: 'IGCSE',              href: '/app/igcse',              icon: Globe,         roles: ['admin'],            section: 'Academic', badge: 'IGCSE' },
 
   // ── Academic (teacher) ────────────────────────────────────────────────────
   { name: 'My Classes',    href: '/app/my-classes',   icon: Users,      roles: ['teacher'], section: 'Academic' },
@@ -79,6 +81,7 @@ const navigationItems: NavItem[] = [
   { name: 'Lesson Plans',  href: '/app/academic',     icon: BookOpen,   roles: ['teacher'], section: 'Academic' },
   { name: 'SBA Marks',     href: '/app/academic',     icon: ClipboardList, roles: ['teacher'], section: 'Academic' },
   { name: 'Exams',         href: '/app/teacher-exams',icon: ListChecks, roles: ['teacher'], section: 'Academic' },
+  { name: 'IGCSE',         href: '/app/igcse',         icon: Globe,     roles: ['teacher'], section: 'Academic', badge: 'IGCSE' },
 
   // ── Academic (student) ────────────────────────────────────────────────────
   { name: 'My Exams',          href: '/app/my-exams',      icon: Monitor,   roles: ['student'], section: 'Academic' },
@@ -86,6 +89,7 @@ const navigationItems: NavItem[] = [
   { name: 'My Attendance',     href: '/app/my-attendance', icon: Calendar,  roles: ['student'], section: 'Academic' },
   { name: 'My Results',        href: '/app/my-results',    icon: Award,     roles: ['student'], section: 'Academic' },
   { name: 'Learning Materials',href: '/app/academic',      icon: BookMarked,roles: ['student'], section: 'Academic' },
+  { name: 'IGCSE Results',     href: '/app/igcse',          icon: Globe,     roles: ['student'], section: 'Academic', badge: 'IGCSE' },
 
   // ── Finance ───────────────────────────────────────────────────────────────
   { name: 'Finance Overview',  href: '/app/finance',                  icon: Wallet,    roles: ['admin', 'finance_officer'], section: 'Finance', badge: 'New' },

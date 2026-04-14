@@ -45,6 +45,7 @@ import healthRoutes from './routes/healthRoutes.js';
 import academicsModuleRoutes from './routes/academicsModuleRoutes.js';
 import staffLeaveRoutes from './routes/staffLeaveRoutes.js';
 import extraFeesRoutes from './routes/extraFeesRoutes.js';
+import igcseRoutes from './routes/igcseRoutes.js';
 
 dotenv.config();
 
@@ -116,6 +117,9 @@ app.use('/api/v1/academics', academicsModuleRoutes);
 
 // Staff Leave / Permission Requests
 app.use('/api/v1/staff-leave', staffLeaveRoutes);
+
+// IGCSE (Cambridge International) Module
+app.use('/api/v1/igcse', igcseRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', schoolRegistrationRoutes);

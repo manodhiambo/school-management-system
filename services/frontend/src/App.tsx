@@ -71,6 +71,9 @@ import {
 } from './pages/finance';
 import FinancialYears from "./pages/finance/FinancialYears";
 
+// IGCSE Module
+import { IgcsePage } from './pages/academic/IgcsePage';
+
 // CBC / Academic Pages
 import { CbcAnalyticsPage } from './pages/academic/CbcAnalyticsPage';
 import { CurriculumPage } from './pages/academic/CurriculumPage';
@@ -196,6 +199,9 @@ function App() {
               <Route path="library-management" element={<LibraryManagementPage />} />
               <Route path="library-borrowings" element={<BorrowingsPage />} />
               <Route path="library-members" element={<LibraryMembersPage />} />
+
+              {/* IGCSE Module */}
+              <Route path="igcse" element={<IgcsePage />} />
 
               {/* CBC Routes */}
               <Route path="cbc-analytics" element={<CbcAnalyticsPage />} />

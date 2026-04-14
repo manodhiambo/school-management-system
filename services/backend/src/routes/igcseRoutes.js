@@ -4,10 +4,151 @@
  * Base path: /api/v1/igcse
  */
 import express from 'express';
-import { query } from '../config/database.js';
+import pool, { query } from '../config/database.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
+
+// ── Auto-migration: create IGCSE tables if they don't exist ──────────────────
+// Runs once at startup so any database (prod/staging/local) gets the schema.
+const IGCSE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS igcse_grading_systems (
+  id            SERIAL PRIMARY KEY,
+  tenant_id     INTEGER NOT NULL,
+  name          VARCHAR(100) NOT NULL,
+  scale_type    VARCHAR(20)  NOT NULL DEFAULT 'A_to_G',
+  description   TEXT,
+  is_active     BOOLEAN DEFAULT true,
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS igcse_grade_boundaries (
+  id                  SERIAL PRIMARY KEY,
+  grading_system_id   INTEGER NOT NULL REFERENCES igcse_grading_systems(id) ON DELETE CASCADE,
+  exam_session_id     INTEGER,
+  grade               VARCHAR(5) NOT NULL,
+  min_score           NUMERIC(6,2) NOT NULL,
+  max_score           NUMERIC(6,2) NOT NULL,
+  sort_order          INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS igcse_exam_sessions (
+  id          SERIAL PRIMARY KEY,
+  tenant_id   INTEGER NOT NULL,
+  name        VARCHAR(150) NOT NULL,
+  series      VARCHAR(30)  NOT NULL,
+  year        INTEGER      NOT NULL,
+  start_date  DATE,
+  end_date    DATE,
+  is_active   BOOLEAN DEFAULT false,
+  is_locked   BOOLEAN DEFAULT false,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS igcse_subjects (
+  id              SERIAL PRIMARY KEY,
+  tenant_id       INTEGER NOT NULL,
+  name            VARCHAR(200) NOT NULL,
+  code            VARCHAR(20)  NOT NULL,
+  subject_group   VARCHAR(100),
+  description     TEXT,
+  is_active       BOOLEAN DEFAULT true,
+  created_at      TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS igcse_syllabi (
+  id                  SERIAL PRIMARY KEY,
+  subject_id          INTEGER NOT NULL REFERENCES igcse_subjects(id) ON DELETE CASCADE,
+  syllabus_code       VARCHAR(20) NOT NULL,
+  version             VARCHAR(50),
+  description         TEXT,
+  grading_system_id   INTEGER REFERENCES igcse_grading_systems(id),
+  has_tiers           BOOLEAN DEFAULT true,
+  is_active           BOOLEAN DEFAULT true,
+  created_at          TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS igcse_components (
+  id              SERIAL PRIMARY KEY,
+  syllabus_id     INTEGER NOT NULL REFERENCES igcse_syllabi(id) ON DELETE CASCADE,
+  name            VARCHAR(100) NOT NULL,
+  component_code  VARCHAR(20),
+  type            VARCHAR(30) NOT NULL DEFAULT 'written',
+  tier            VARCHAR(20) DEFAULT 'both',
+  weight          NUMERIC(6,2) NOT NULL DEFAULT 100,
+  max_marks       NUMERIC(6,2) NOT NULL,
+  duration_minutes INTEGER,
+  sort_order      INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS igcse_teacher_assignments (
+  id              SERIAL PRIMARY KEY,
+  tenant_id       INTEGER NOT NULL,
+  teacher_id      INTEGER NOT NULL,
+  syllabus_id     INTEGER NOT NULL REFERENCES igcse_syllabi(id) ON DELETE CASCADE,
+  exam_session_id INTEGER NOT NULL REFERENCES igcse_exam_sessions(id) ON DELETE CASCADE,
+  class_id        INTEGER,
+  created_at      TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS igcse_student_enrollments (
+  id                SERIAL PRIMARY KEY,
+  tenant_id         INTEGER NOT NULL,
+  student_id        INTEGER NOT NULL,
+  syllabus_id       INTEGER NOT NULL REFERENCES igcse_syllabi(id) ON DELETE CASCADE,
+  exam_session_id   INTEGER NOT NULL REFERENCES igcse_exam_sessions(id) ON DELETE CASCADE,
+  tier              VARCHAR(20) DEFAULT 'extended',
+  candidate_number  VARCHAR(30),
+  centre_number     VARCHAR(20),
+  class_id          INTEGER,
+  is_active         BOOLEAN DEFAULT true,
+  created_at        TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS igcse_marks (
+  id              SERIAL PRIMARY KEY,
+  enrollment_id   INTEGER NOT NULL REFERENCES igcse_student_enrollments(id) ON DELETE CASCADE,
+  component_id    INTEGER NOT NULL REFERENCES igcse_components(id) ON DELETE CASCADE,
+  raw_score       NUMERIC(6,2),
+  moderated_score NUMERIC(6,2),
+  is_absent       BOOLEAN DEFAULT false,
+  is_locked       BOOLEAN DEFAULT false,
+  entered_by      INTEGER,
+  locked_by       INTEGER,
+  entered_at      TIMESTAMP DEFAULT NOW(),
+  locked_at       TIMESTAMP,
+  notes           TEXT
+);
+CREATE TABLE IF NOT EXISTS igcse_final_grades (
+  id              SERIAL PRIMARY KEY,
+  enrollment_id   INTEGER NOT NULL REFERENCES igcse_student_enrollments(id) ON DELETE CASCADE,
+  weighted_score  NUMERIC(6,2),
+  final_grade     VARCHAR(5),
+  is_official     BOOLEAN DEFAULT false,
+  computed_at     TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS igcse_report_cards (
+  id              SERIAL PRIMARY KEY,
+  tenant_id       INTEGER NOT NULL,
+  student_id      INTEGER NOT NULL,
+  exam_session_id INTEGER REFERENCES igcse_exam_sessions(id),
+  generated_at    TIMESTAMP DEFAULT NOW(),
+  generated_by    INTEGER,
+  is_released     BOOLEAN DEFAULT false,
+  notes           TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_subjects_code        ON igcse_subjects(tenant_id, code);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_teacher_assign       ON igcse_teacher_assignments(tenant_id, teacher_id, syllabus_id, exam_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_enrollment           ON igcse_student_enrollments(tenant_id, student_id, syllabus_id, exam_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_marks                ON igcse_marks(enrollment_id, component_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_final_grade          ON igcse_final_grades(enrollment_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_boundary             ON igcse_grade_boundaries(grading_system_id, COALESCE(exam_session_id, -1), grade);
+CREATE INDEX IF NOT EXISTS idx_igcse_subjects_tenant              ON igcse_subjects(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_igcse_sessions_tenant              ON igcse_exam_sessions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_igcse_syllabi_subject              ON igcse_syllabi(subject_id);
+CREATE INDEX IF NOT EXISTS idx_igcse_components_syllabus          ON igcse_components(syllabus_id);
+CREATE INDEX IF NOT EXISTS idx_igcse_enrollments_student          ON igcse_student_enrollments(student_id, tenant_id);
+CREATE INDEX IF NOT EXISTS idx_igcse_enrollments_session          ON igcse_student_enrollments(exam_session_id);
+CREATE INDEX IF NOT EXISTS idx_igcse_marks_enrollment             ON igcse_marks(enrollment_id);
+`;
+
+pool.query(IGCSE_SCHEMA)
+  .then(() => console.log('IGCSE schema ready'))
+  .catch(err => console.error('IGCSE schema init error:', err.message));
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const router = express.Router();
 router.use(authenticate);
@@ -95,16 +236,20 @@ router.post('/grading-systems/:gsId/boundaries', requireRole(['admin']), async (
     const { boundaries, exam_session_id } = req.body;
     // boundaries: [{grade, min_score, max_score, sort_order}]
     // Upsert all at once
+    // Delete existing boundaries for this system+session before re-inserting
+    // (avoids NULL-in-unique-constraint issues with ON CONFLICT)
+    await query(
+      `DELETE FROM igcse_grade_boundaries
+       WHERE grading_system_id = $1
+         AND COALESCE(exam_session_id::text, '__null__') = COALESCE($2::text, '__null__')`,
+      [req.params.gsId, exam_session_id || null]
+    );
     const result = [];
     for (const b of boundaries) {
       const row = await query(
         `INSERT INTO igcse_grade_boundaries
            (grading_system_id, exam_session_id, grade, min_score, max_score, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6)
-         ON CONFLICT (grading_system_id, exam_session_id, grade)
-         DO UPDATE SET min_score=EXCLUDED.min_score, max_score=EXCLUDED.max_score,
-                       sort_order=EXCLUDED.sort_order
-         RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
         [req.params.gsId, exam_session_id || null, b.grade, b.min_score, b.max_score, b.sort_order ?? 0]
       );
       result.push(row[0]);

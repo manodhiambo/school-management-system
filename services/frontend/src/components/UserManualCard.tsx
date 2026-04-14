@@ -8,22 +8,22 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
     label: 'Administrator Manual',
     color: 'text-blue-700',
     bg: 'from-blue-600 to-indigo-600',
-    chapters: 12,
-    description: 'Full system guide: students, teachers, fees, CBC academics, welfare, library and settings.',
+    chapters: 13,
+    description: 'Full system guide: students, teachers, fees, CBC academics, IGCSE Cambridge module, welfare, library and settings.',
   },
   teacher: {
     label: 'Teacher Manual',
     color: 'text-indigo-700',
     bg: 'from-indigo-600 to-purple-600',
-    chapters: 14,
-    description: 'Attendance, grade book, CBC SBA, lesson plans, schemes of work, assignments, projects and leave requests.',
+    chapters: 15,
+    description: 'Attendance, grade book, CBC SBA, lesson plans, schemes of work, assignments, projects, leave requests and IGCSE mark entry.',
   },
   student: {
     label: 'Student Manual',
     color: 'text-emerald-700',
     bg: 'from-emerald-600 to-teal-600',
-    chapters: 11,
-    description: 'Courses, assignments, results, exams, fees, attendance, timetable and library.',
+    chapters: 12,
+    description: 'Courses, assignments, results, exams, fees, attendance, timetable, library and IGCSE Cambridge results.',
   },
   parent: {
     label: 'Parent Manual',
@@ -42,9 +42,9 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
 };
 
 const HIGHLIGHTS: Record<string, string[]> = {
-  admin: ['Manage students & staff', 'CBC analytics & broadsheet', 'Finance & fee management', 'Reports & system settings'],
-  teacher: ['Mark class attendance', 'Enter CBC grades (SBA)', 'Create lesson plans & schemes', 'Manage assignments & projects'],
-  student: ['View grades & results', 'Submit assignments', 'Check fee balance', 'Library & timetable'],
+  admin: ['Manage students & staff', 'CBC & IGCSE curriculum modules', 'Finance & fee management', 'Reports, settings & user accounts'],
+  teacher: ['Mark attendance & grade book', 'CBC SBA, lesson plans & schemes', 'IGCSE mark entry & grade calculation', 'Assignments, projects & leave requests'],
+  student: ['View CBC & IGCSE grades', 'Submit assignments & online exams', 'Check fee balance & timetable', 'Library, messages & notifications'],
   parent: ['Track children\'s progress', 'View fee statements', 'Receive school alerts', 'Message teachers'],
   finance_officer: ['Record fee payments', 'Student payments & defaulters report', 'Budget management', 'Vendor & purchase orders'],
 };

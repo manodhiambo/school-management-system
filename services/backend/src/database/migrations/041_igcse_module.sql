@@ -22,8 +22,7 @@ CREATE TABLE IF NOT EXISTS igcse_grade_boundaries (
   grade               VARCHAR(5) NOT NULL,      -- 'A*','A','B','C','D','E','F','G','U'
   min_score           NUMERIC(6,2) NOT NULL,
   max_score           NUMERIC(6,2) NOT NULL,
-  sort_order          INTEGER DEFAULT 0,
-  UNIQUE(grading_system_id, exam_session_id, grade)
+  sort_order          INTEGER DEFAULT 0
 );
 
 -- Exam Sessions (May/June 2026, Oct/Nov 2026 …)

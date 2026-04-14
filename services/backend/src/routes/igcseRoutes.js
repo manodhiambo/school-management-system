@@ -214,17 +214,24 @@ router.delete('/grading-systems/:id', requireRole(['admin']), async (req, res) =
 
 router.get('/grading-systems/:gsId/boundaries', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
+    // Verify grading system belongs to this tenant
+    const [gs] = await query(
+      'SELECT id FROM igcse_grading_systems WHERE id=$1 AND tenant_id=$2',
+      [req.params.gsId, tid(req)]
+    );
+    if (!gs) return res.status(404).json({ error: 'Grading system not found' });
+
     const { session_id } = req.query;
-    let where = 'grading_system_id = $1';
+    let where = 'gb.grading_system_id = $1';
     const params = [req.params.gsId];
     if (session_id) {
-      where += ` AND (exam_session_id = $2 OR exam_session_id IS NULL)`;
+      where += ` AND (gb.exam_session_id = $2 OR gb.exam_session_id IS NULL)`;
       params.push(session_id);
     } else {
-      where += ' AND exam_session_id IS NULL';
+      where += ' AND gb.exam_session_id IS NULL';
     }
     const rows = await query(
-      `SELECT * FROM igcse_grade_boundaries WHERE ${where} ORDER BY sort_order ASC, min_score DESC`,
+      `SELECT gb.* FROM igcse_grade_boundaries gb WHERE ${where} ORDER BY gb.sort_order ASC, gb.min_score DESC`,
       params
     );
     res.json({ data: rows });
@@ -233,11 +240,23 @@ router.get('/grading-systems/:gsId/boundaries', requireRole(['admin', 'teacher']
 
 router.post('/grading-systems/:gsId/boundaries', requireRole(['admin']), async (req, res) => {
   try {
+    // Verify grading system belongs to this tenant
+    const [gs] = await query(
+      'SELECT id FROM igcse_grading_systems WHERE id=$1 AND tenant_id=$2',
+      [req.params.gsId, tid(req)]
+    );
+    if (!gs) return res.status(404).json({ error: 'Grading system not found' });
+
     const { boundaries, exam_session_id } = req.body;
-    // boundaries: [{grade, min_score, max_score, sort_order}]
-    // Upsert all at once
+    // If session provided, verify it belongs to this tenant
+    if (exam_session_id) {
+      const [sess] = await query(
+        'SELECT id FROM igcse_exam_sessions WHERE id=$1 AND tenant_id=$2',
+        [exam_session_id, tid(req)]
+      );
+      if (!sess) return res.status(404).json({ error: 'Exam session not found' });
+    }
     // Delete existing boundaries for this system+session before re-inserting
-    // (avoids NULL-in-unique-constraint issues with ON CONFLICT)
     await query(
       `DELETE FROM igcse_grade_boundaries
        WHERE grading_system_id = $1
@@ -260,6 +279,14 @@ router.post('/grading-systems/:gsId/boundaries', requireRole(['admin']), async (
 
 router.delete('/grade-boundaries/:id', requireRole(['admin']), async (req, res) => {
   try {
+    // Verify boundary belongs to a grading system owned by this tenant
+    const [boundary] = await query(
+      `SELECT gb.id FROM igcse_grade_boundaries gb
+       JOIN igcse_grading_systems gs ON gs.id = gb.grading_system_id
+       WHERE gb.id = $1 AND gs.tenant_id = $2`,
+      [req.params.id, tid(req)]
+    );
+    if (!boundary) return res.status(404).json({ error: 'Boundary not found' });
     await query('DELETE FROM igcse_grade_boundaries WHERE id=$1', [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -381,20 +408,19 @@ router.delete('/subjects/:id', requireRole(['admin']), async (req, res) => {
 
 router.get('/syllabi', requireRole(['admin', 'teacher', 'student']), async (req, res) => {
   try {
-    const { subject_id } = req.query;
-    let where = 's.is_active = true';
-    const params = [];
-    let i = 1;
-    if (subject_id) { where += ` AND s.subject_id = $${i++}`; params.push(subject_id); }
+    // Always filter syllabi through the subjects table which carries tenant_id
+    const params = [tid(req)];
+    let extraWhere = '';
+    if (req.query.subject_id) { extraWhere += ` AND s.subject_id = $2`; params.push(req.query.subject_id); }
     const rows = await query(
       `SELECT s.*,
          sub.name AS subject_name, sub.code AS subject_code, sub.subject_group,
          gs.name AS grading_system_name, gs.scale_type,
          (SELECT COUNT(*) FROM igcse_components c WHERE c.syllabus_id = s.id) AS component_count
        FROM igcse_syllabi s
-       JOIN igcse_subjects sub ON sub.id = s.subject_id
-       LEFT JOIN igcse_grading_systems gs ON gs.id = s.grading_system_id
-       WHERE ${where}
+       JOIN igcse_subjects sub ON sub.id = s.subject_id AND sub.tenant_id = $1
+       LEFT JOIN igcse_grading_systems gs ON gs.id = s.grading_system_id AND gs.tenant_id = $1
+       WHERE s.is_active = true${extraWhere}
        ORDER BY sub.name, s.version`,
       params
     );
@@ -405,6 +431,20 @@ router.get('/syllabi', requireRole(['admin', 'teacher', 'student']), async (req,
 router.post('/syllabi', requireRole(['admin']), async (req, res) => {
   try {
     const { subject_id, syllabus_code, version, description, grading_system_id, has_tiers } = req.body;
+    // Verify subject belongs to this tenant
+    const [subject] = await query(
+      'SELECT id FROM igcse_subjects WHERE id=$1 AND tenant_id=$2',
+      [subject_id, tid(req)]
+    );
+    if (!subject) return res.status(404).json({ error: 'Subject not found' });
+    // If grading system provided, verify it belongs to this tenant
+    if (grading_system_id) {
+      const [gs] = await query(
+        'SELECT id FROM igcse_grading_systems WHERE id=$1 AND tenant_id=$2',
+        [grading_system_id, tid(req)]
+      );
+      if (!gs) return res.status(404).json({ error: 'Grading system not found' });
+    }
     const row = await query(
       `INSERT INTO igcse_syllabi (subject_id, syllabus_code, version, description, grading_system_id, has_tiers)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -417,23 +457,67 @@ router.post('/syllabi', requireRole(['admin']), async (req, res) => {
 router.put('/syllabi/:id', requireRole(['admin']), async (req, res) => {
   try {
     const { syllabus_code, version, description, grading_system_id, has_tiers, is_active } = req.body;
+    // Verify syllabus belongs to this tenant via its parent subject
+    const [owned] = await query(
+      `SELECT s.id FROM igcse_syllabi s
+       JOIN igcse_subjects sub ON sub.id = s.subject_id AND sub.tenant_id = $1
+       WHERE s.id = $2`,
+      [tid(req), req.params.id]
+    );
+    if (!owned) return res.status(404).json({ error: 'Syllabus not found' });
+    if (grading_system_id) {
+      const [gs] = await query(
+        'SELECT id FROM igcse_grading_systems WHERE id=$1 AND tenant_id=$2',
+        [grading_system_id, tid(req)]
+      );
+      if (!gs) return res.status(404).json({ error: 'Grading system not found' });
+    }
     const row = await query(
       `UPDATE igcse_syllabi
        SET syllabus_code=$1, version=$2, description=$3, grading_system_id=$4, has_tiers=$5, is_active=$6
        WHERE id=$7 RETURNING *`,
       [syllabus_code, version, description, grading_system_id || null, has_tiers ?? true, is_active ?? true, req.params.id]
     );
-    if (!row.length) return res.status(404).json({ error: 'Not found' });
     res.json({ data: row[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/syllabi/:id', requireRole(['admin']), async (req, res) => {
   try {
+    const [owned] = await query(
+      `SELECT s.id FROM igcse_syllabi s
+       JOIN igcse_subjects sub ON sub.id = s.subject_id AND sub.tenant_id = $1
+       WHERE s.id = $2`,
+      [tid(req), req.params.id]
+    );
+    if (!owned) return res.status(404).json({ error: 'Syllabus not found' });
     await query('DELETE FROM igcse_syllabi WHERE id=$1', [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── Helper: verify a syllabus belongs to this tenant ────────────────────────
+async function ownsSyllabus(syllabusId, tenantId) {
+  const [row] = await query(
+    `SELECT s.id FROM igcse_syllabi s
+     JOIN igcse_subjects sub ON sub.id = s.subject_id AND sub.tenant_id = $1
+     WHERE s.id = $2`,
+    [tenantId, syllabusId]
+  );
+  return !!row;
+}
+
+// ── Helper: verify a component belongs to this tenant ───────────────────────
+async function ownsComponent(componentId, tenantId) {
+  const [row] = await query(
+    `SELECT c.id FROM igcse_components c
+     JOIN igcse_syllabi s ON s.id = c.syllabus_id
+     JOIN igcse_subjects sub ON sub.id = s.subject_id AND sub.tenant_id = $1
+     WHERE c.id = $2`,
+    [tenantId, componentId]
+  );
+  return !!row;
+}
 
 // ============================================================
 // COMPONENTS
@@ -441,6 +525,9 @@ router.delete('/syllabi/:id', requireRole(['admin']), async (req, res) => {
 
 router.get('/syllabi/:syllabusId/components', requireRole(['admin', 'teacher', 'student']), async (req, res) => {
   try {
+    if (!await ownsSyllabus(req.params.syllabusId, tid(req))) {
+      return res.status(404).json({ error: 'Syllabus not found' });
+    }
     const rows = await query(
       `SELECT * FROM igcse_components WHERE syllabus_id=$1 ORDER BY sort_order, name`,
       [req.params.syllabusId]
@@ -451,6 +538,9 @@ router.get('/syllabi/:syllabusId/components', requireRole(['admin', 'teacher', '
 
 router.post('/syllabi/:syllabusId/components', requireRole(['admin']), async (req, res) => {
   try {
+    if (!await ownsSyllabus(req.params.syllabusId, tid(req))) {
+      return res.status(404).json({ error: 'Syllabus not found' });
+    }
     const { name, component_code, type, tier, weight, max_marks, duration_minutes, sort_order } = req.body;
     const row = await query(
       `INSERT INTO igcse_components
@@ -465,6 +555,9 @@ router.post('/syllabi/:syllabusId/components', requireRole(['admin']), async (re
 
 router.put('/components/:id', requireRole(['admin']), async (req, res) => {
   try {
+    if (!await ownsComponent(req.params.id, tid(req))) {
+      return res.status(404).json({ error: 'Component not found' });
+    }
     const { name, component_code, type, tier, weight, max_marks, duration_minutes, sort_order } = req.body;
     const row = await query(
       `UPDATE igcse_components
@@ -481,6 +574,9 @@ router.put('/components/:id', requireRole(['admin']), async (req, res) => {
 
 router.delete('/components/:id', requireRole(['admin']), async (req, res) => {
   try {
+    if (!await ownsComponent(req.params.id, tid(req))) {
+      return res.status(404).json({ error: 'Component not found' });
+    }
     await query('DELETE FROM igcse_components WHERE id=$1', [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -520,6 +616,15 @@ router.get('/teacher-assignments', requireRole(['admin', 'teacher']), async (req
 router.post('/teacher-assignments', requireRole(['admin']), async (req, res) => {
   try {
     const { teacher_id, syllabus_id, exam_session_id, class_id } = req.body;
+    // Verify both syllabus and session belong to this tenant
+    if (!await ownsSyllabus(syllabus_id, tid(req))) {
+      return res.status(404).json({ error: 'Syllabus not found' });
+    }
+    const [sess] = await query(
+      'SELECT id FROM igcse_exam_sessions WHERE id=$1 AND tenant_id=$2',
+      [exam_session_id, tid(req)]
+    );
+    if (!sess) return res.status(404).json({ error: 'Exam session not found' });
     const row = await query(
       `INSERT INTO igcse_teacher_assignments (tenant_id, teacher_id, syllabus_id, exam_session_id, class_id)
        VALUES ($1,$2,$3,$4,$5)
@@ -583,6 +688,15 @@ router.get('/enrollments', requireRole(['admin', 'teacher', 'student']), async (
 router.post('/enrollments', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const { student_id, syllabus_id, exam_session_id, tier, candidate_number, centre_number, class_id } = req.body;
+    // Verify syllabus and session belong to this tenant
+    if (!await ownsSyllabus(syllabus_id, tid(req))) {
+      return res.status(404).json({ error: 'Syllabus not found' });
+    }
+    const [sess] = await query(
+      'SELECT id FROM igcse_exam_sessions WHERE id=$1 AND tenant_id=$2',
+      [exam_session_id, tid(req)]
+    );
+    if (!sess) return res.status(404).json({ error: 'Exam session not found' });
     const row = await query(
       `INSERT INTO igcse_student_enrollments
          (tenant_id, student_id, syllabus_id, exam_session_id, tier, candidate_number, centre_number, class_id)
@@ -600,6 +714,15 @@ router.post('/enrollments/bulk', requireRole(['admin']), async (req, res) => {
   try {
     // Enroll multiple students in one subject
     const { student_ids, syllabus_id, exam_session_id, tier, class_id } = req.body;
+    // Verify syllabus and session belong to this tenant
+    if (!await ownsSyllabus(syllabus_id, tid(req))) {
+      return res.status(404).json({ error: 'Syllabus not found' });
+    }
+    const [sess] = await query(
+      'SELECT id FROM igcse_exam_sessions WHERE id=$1 AND tenant_id=$2',
+      [exam_session_id, tid(req)]
+    );
+    if (!sess) return res.status(404).json({ error: 'Exam session not found' });
     let enrolled = 0;
     for (const sid of student_ids) {
       const r = await query(
@@ -641,8 +764,41 @@ router.delete('/enrollments/:id', requireRole(['admin']), async (req, res) => {
 // ============================================================
 
 // Get marks for an enrollment (all components)
+// ── Helper: verify an enrollment belongs to this tenant ─────────────────────
+async function ownsEnrollment(enrollmentId, tenantId) {
+  const [row] = await query(
+    'SELECT id FROM igcse_student_enrollments WHERE id=$1 AND tenant_id=$2',
+    [enrollmentId, tenantId]
+  );
+  return !!row;
+}
+
+// ── Helper: verify all enrollment_ids in a batch belong to this tenant ───────
+async function ownAllEnrollments(enrollmentIds, tenantId) {
+  if (!enrollmentIds.length) return true;
+  const unique = [...new Set(enrollmentIds)];
+  const rows = await query(
+    `SELECT id FROM igcse_student_enrollments
+     WHERE id = ANY($1::int[]) AND tenant_id = $2`,
+    [unique, tenantId]
+  );
+  return rows.length === unique.length;
+}
+
 router.get('/enrollments/:enrollmentId/marks', requireRole(['admin', 'teacher', 'student']), async (req, res) => {
   try {
+    // Students may only read their own enrollment marks
+    if (req.user.role === 'student') {
+      const [enroll] = await query(
+        'SELECT id FROM igcse_student_enrollments WHERE id=$1 AND tenant_id=$2 AND student_id=$3',
+        [req.params.enrollmentId, tid(req), uid(req)]
+      );
+      if (!enroll) return res.status(404).json({ error: 'Enrollment not found' });
+    } else {
+      if (!await ownsEnrollment(req.params.enrollmentId, tid(req))) {
+        return res.status(404).json({ error: 'Enrollment not found' });
+      }
+    }
     const rows = await query(
       `SELECT m.*, c.name AS component_name, c.max_marks, c.weight, c.type, c.tier
        FROM igcse_marks m
@@ -659,6 +815,14 @@ router.get('/enrollments/:enrollmentId/marks', requireRole(['admin', 'teacher', 
 router.post('/marks', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const { enrollment_id, component_id, raw_score, is_absent, notes } = req.body;
+    // Verify enrollment belongs to this tenant
+    if (!await ownsEnrollment(enrollment_id, tid(req))) {
+      return res.status(404).json({ error: 'Enrollment not found' });
+    }
+    // Verify component belongs to this tenant via syllabus → subject chain
+    if (!await ownsComponent(component_id, tid(req))) {
+      return res.status(404).json({ error: 'Component not found' });
+    }
     // Check not locked (unless admin)
     if (req.user.role !== 'admin') {
       const existing = await query(
@@ -685,8 +849,13 @@ router.post('/marks', requireRole(['admin', 'teacher']), async (req, res) => {
 // Batch upsert marks for a class/syllabus (teacher workflow)
 router.post('/marks/batch', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
-    // marks: [{enrollment_id, component_id, raw_score, is_absent, notes}]
     const { marks } = req.body;
+    if (!marks?.length) return res.status(400).json({ error: 'No marks provided' });
+    // Verify ALL enrollment_ids belong to this tenant in one query
+    const enrollmentIds = marks.map(m => m.enrollment_id);
+    if (!await ownAllEnrollments(enrollmentIds, tid(req))) {
+      return res.status(403).json({ error: 'One or more enrollments do not belong to your school' });
+    }
     const result = [];
     for (const m of marks) {
       const row = await query(
@@ -707,6 +876,10 @@ router.post('/marks/batch', requireRole(['admin', 'teacher']), async (req, res) 
 // Moderate coursework mark
 router.put('/marks/:enrollmentId/:componentId/moderate', requireRole(['admin']), async (req, res) => {
   try {
+    // Verify enrollment belongs to this tenant
+    if (!await ownsEnrollment(req.params.enrollmentId, tid(req))) {
+      return res.status(404).json({ error: 'Enrollment not found' });
+    }
     const { moderated_score, notes } = req.body;
     const row = await query(
       `UPDATE igcse_marks

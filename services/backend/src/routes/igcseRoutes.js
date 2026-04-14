@@ -14,7 +14,7 @@ import requireRole from '../middleware/roleMiddleware.js';
 const IGCSE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS igcse_grading_systems (
   id            SERIAL PRIMARY KEY,
-  tenant_id     INTEGER NOT NULL,
+  tenant_id     UUID NOT NULL,
   name          VARCHAR(100) NOT NULL,
   scale_type    VARCHAR(20)  NOT NULL DEFAULT 'A_to_G',
   description   TEXT,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS igcse_grade_boundaries (
 );
 CREATE TABLE IF NOT EXISTS igcse_exam_sessions (
   id          SERIAL PRIMARY KEY,
-  tenant_id   INTEGER NOT NULL,
+  tenant_id   UUID NOT NULL,
   name        VARCHAR(150) NOT NULL,
   series      VARCHAR(30)  NOT NULL,
   year        INTEGER      NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS igcse_exam_sessions (
 );
 CREATE TABLE IF NOT EXISTS igcse_subjects (
   id              SERIAL PRIMARY KEY,
-  tenant_id       INTEGER NOT NULL,
+  tenant_id       UUID NOT NULL,
   name            VARCHAR(200) NOT NULL,
   code            VARCHAR(20)  NOT NULL,
   subject_group   VARCHAR(100),
@@ -77,23 +77,23 @@ CREATE TABLE IF NOT EXISTS igcse_components (
 );
 CREATE TABLE IF NOT EXISTS igcse_teacher_assignments (
   id              SERIAL PRIMARY KEY,
-  tenant_id       INTEGER NOT NULL,
-  teacher_id      INTEGER NOT NULL,
+  tenant_id       UUID NOT NULL,
+  teacher_id      UUID NOT NULL,
   syllabus_id     INTEGER NOT NULL REFERENCES igcse_syllabi(id) ON DELETE CASCADE,
   exam_session_id INTEGER NOT NULL REFERENCES igcse_exam_sessions(id) ON DELETE CASCADE,
-  class_id        INTEGER,
+  class_id        UUID,
   created_at      TIMESTAMP DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS igcse_student_enrollments (
   id                SERIAL PRIMARY KEY,
-  tenant_id         INTEGER NOT NULL,
-  student_id        INTEGER NOT NULL,
+  tenant_id         UUID NOT NULL,
+  student_id        UUID NOT NULL,
   syllabus_id       INTEGER NOT NULL REFERENCES igcse_syllabi(id) ON DELETE CASCADE,
   exam_session_id   INTEGER NOT NULL REFERENCES igcse_exam_sessions(id) ON DELETE CASCADE,
   tier              VARCHAR(20) DEFAULT 'extended',
   candidate_number  VARCHAR(30),
   centre_number     VARCHAR(20),
-  class_id          INTEGER,
+  class_id          UUID,
   is_active         BOOLEAN DEFAULT true,
   created_at        TIMESTAMP DEFAULT NOW()
 );
@@ -105,8 +105,8 @@ CREATE TABLE IF NOT EXISTS igcse_marks (
   moderated_score NUMERIC(6,2),
   is_absent       BOOLEAN DEFAULT false,
   is_locked       BOOLEAN DEFAULT false,
-  entered_by      INTEGER,
-  locked_by       INTEGER,
+  entered_by      UUID,
+  locked_by       UUID,
   entered_at      TIMESTAMP DEFAULT NOW(),
   locked_at       TIMESTAMP,
   notes           TEXT
@@ -121,11 +121,11 @@ CREATE TABLE IF NOT EXISTS igcse_final_grades (
 );
 CREATE TABLE IF NOT EXISTS igcse_report_cards (
   id              SERIAL PRIMARY KEY,
-  tenant_id       INTEGER NOT NULL,
-  student_id      INTEGER NOT NULL,
+  tenant_id       UUID NOT NULL,
+  student_id      UUID NOT NULL,
   exam_session_id INTEGER REFERENCES igcse_exam_sessions(id),
   generated_at    TIMESTAMP DEFAULT NOW(),
-  generated_by    INTEGER,
+  generated_by    UUID,
   is_released     BOOLEAN DEFAULT false,
   notes           TEXT
 );

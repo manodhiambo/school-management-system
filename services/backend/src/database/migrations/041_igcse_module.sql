@@ -1,12 +1,14 @@
 -- ============================================================
 -- Migration 041: IGCSE (Cambridge International) Module
 -- Fully isolated from CBC curriculum — opt-in per school
+-- NOTE: Uses UUID for tenant_id, student_id, teacher_id, class_id
+--       to match the rest of the system. IGCSE-internal FKs stay INTEGER.
 -- ============================================================
 
 -- Grading Systems (A*-G or 9-1 scale, dynamic thresholds)
 CREATE TABLE IF NOT EXISTS igcse_grading_systems (
   id            SERIAL PRIMARY KEY,
-  tenant_id     INTEGER NOT NULL,
+  tenant_id     UUID NOT NULL,
   name          VARCHAR(100) NOT NULL,          -- "IGCSE A*-G"
   scale_type    VARCHAR(20)  NOT NULL DEFAULT 'A_to_G', -- 'A_to_G' | '9_to_1'
   description   TEXT,
@@ -28,7 +30,7 @@ CREATE TABLE IF NOT EXISTS igcse_grade_boundaries (
 -- Exam Sessions (May/June 2026, Oct/Nov 2026 …)
 CREATE TABLE IF NOT EXISTS igcse_exam_sessions (
   id          SERIAL PRIMARY KEY,
-  tenant_id   INTEGER NOT NULL,
+  tenant_id   UUID NOT NULL,
   name        VARCHAR(150) NOT NULL,            -- "May/June 2026"
   series      VARCHAR(30)  NOT NULL,            -- 'May/June' | 'Oct/Nov'
   year        INTEGER      NOT NULL,
@@ -42,14 +44,13 @@ CREATE TABLE IF NOT EXISTS igcse_exam_sessions (
 -- IGCSE Subjects (Cambridge catalogue)
 CREATE TABLE IF NOT EXISTS igcse_subjects (
   id              SERIAL PRIMARY KEY,
-  tenant_id       INTEGER NOT NULL,
+  tenant_id       UUID NOT NULL,
   name            VARCHAR(200) NOT NULL,        -- "Mathematics"
   code            VARCHAR(20)  NOT NULL,        -- "0580"
   subject_group   VARCHAR(100),                 -- "Sciences" | "Languages" | "Humanities" …
   description     TEXT,
   is_active       BOOLEAN DEFAULT true,
-  created_at      TIMESTAMP DEFAULT NOW(),
-  UNIQUE(tenant_id, code)
+  created_at      TIMESTAMP DEFAULT NOW()
 );
 
 -- Syllabi (versioned; a subject can have multiple active versions)
@@ -82,29 +83,27 @@ CREATE TABLE IF NOT EXISTS igcse_components (
 -- Teacher–Subject–Session assignments
 CREATE TABLE IF NOT EXISTS igcse_teacher_assignments (
   id              SERIAL PRIMARY KEY,
-  tenant_id       INTEGER NOT NULL,
-  teacher_id      INTEGER NOT NULL,
+  tenant_id       UUID NOT NULL,
+  teacher_id      UUID NOT NULL,
   syllabus_id     INTEGER NOT NULL REFERENCES igcse_syllabi(id) ON DELETE CASCADE,
   exam_session_id INTEGER NOT NULL REFERENCES igcse_exam_sessions(id) ON DELETE CASCADE,
-  class_id        INTEGER,
-  created_at      TIMESTAMP DEFAULT NOW(),
-  UNIQUE(tenant_id, teacher_id, syllabus_id, exam_session_id)
+  class_id        UUID,
+  created_at      TIMESTAMP DEFAULT NOW()
 );
 
 -- Student Enrollments per Subject per Session
 CREATE TABLE IF NOT EXISTS igcse_student_enrollments (
   id                SERIAL PRIMARY KEY,
-  tenant_id         INTEGER NOT NULL,
-  student_id        INTEGER NOT NULL,
+  tenant_id         UUID NOT NULL,
+  student_id        UUID NOT NULL,
   syllabus_id       INTEGER NOT NULL REFERENCES igcse_syllabi(id) ON DELETE CASCADE,
   exam_session_id   INTEGER NOT NULL REFERENCES igcse_exam_sessions(id) ON DELETE CASCADE,
   tier              VARCHAR(20) DEFAULT 'extended',  -- 'core'|'extended'
   candidate_number  VARCHAR(30),
   centre_number     VARCHAR(20),
-  class_id          INTEGER,
+  class_id          UUID,
   is_active         BOOLEAN DEFAULT true,
-  created_at        TIMESTAMP DEFAULT NOW(),
-  UNIQUE(tenant_id, student_id, syllabus_id, exam_session_id)
+  created_at        TIMESTAMP DEFAULT NOW()
 );
 
 -- Raw Marks per Component
@@ -116,18 +115,17 @@ CREATE TABLE IF NOT EXISTS igcse_marks (
   moderated_score NUMERIC(6,2),                -- for coursework moderation
   is_absent       BOOLEAN DEFAULT false,
   is_locked       BOOLEAN DEFAULT false,
-  entered_by      INTEGER,
-  locked_by       INTEGER,
+  entered_by      UUID,
+  locked_by       UUID,
   entered_at      TIMESTAMP DEFAULT NOW(),
   locked_at       TIMESTAMP,
-  notes           TEXT,
-  UNIQUE(enrollment_id, component_id)
+  notes           TEXT
 );
 
 -- Computed Final Grades (server-side cached after all marks entered)
 CREATE TABLE IF NOT EXISTS igcse_final_grades (
   id              SERIAL PRIMARY KEY,
-  enrollment_id   INTEGER NOT NULL REFERENCES igcse_student_enrollments(id) ON DELETE CASCADE UNIQUE,
+  enrollment_id   INTEGER NOT NULL REFERENCES igcse_student_enrollments(id) ON DELETE CASCADE,
   weighted_score  NUMERIC(6,2),
   final_grade     VARCHAR(5),                  -- 'A*','A','B' …
   is_official     BOOLEAN DEFAULT false,
@@ -137,16 +135,25 @@ CREATE TABLE IF NOT EXISTS igcse_final_grades (
 -- Report Cards
 CREATE TABLE IF NOT EXISTS igcse_report_cards (
   id              SERIAL PRIMARY KEY,
-  tenant_id       INTEGER NOT NULL,
-  student_id      INTEGER NOT NULL,
+  tenant_id       UUID NOT NULL,
+  student_id      UUID NOT NULL,
   exam_session_id INTEGER REFERENCES igcse_exam_sessions(id),
   generated_at    TIMESTAMP DEFAULT NOW(),
-  generated_by    INTEGER,
+  generated_by    UUID,
   is_released     BOOLEAN DEFAULT false,
   notes           TEXT
 );
 
--- Indexes
+-- Unique indexes
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_subjects_code   ON igcse_subjects(tenant_id, code);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_teacher_assign  ON igcse_teacher_assignments(tenant_id, teacher_id, syllabus_id, exam_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_enrollment      ON igcse_student_enrollments(tenant_id, student_id, syllabus_id, exam_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_marks           ON igcse_marks(enrollment_id, component_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_final_grade     ON igcse_final_grades(enrollment_id);
+-- NULL-safe boundary uniqueness (PostgreSQL NULL != NULL in plain UNIQUE)
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_igcse_boundary        ON igcse_grade_boundaries(grading_system_id, COALESCE(exam_session_id, -1), grade);
+
+-- Performance indexes
 CREATE INDEX IF NOT EXISTS idx_igcse_subjects_tenant         ON igcse_subjects(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_igcse_sessions_tenant         ON igcse_exam_sessions(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_igcse_syllabi_subject         ON igcse_syllabi(subject_id);

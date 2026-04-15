@@ -12,7 +12,7 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get all students
-router.get('/', requireRole(['admin', 'teacher', 'parent']), async (req, res) => {
+router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer']), async (req, res) => {
   try {
     const { classId, status, search } = req.query;
     const tid = req.user.tenant_id;

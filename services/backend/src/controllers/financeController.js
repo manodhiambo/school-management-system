@@ -961,7 +961,22 @@ class FinanceController {
     try {
       const tenantId = req.tenantId;
       const result = await pool.query(`
-        SELECT * FROM v_fee_collection_summary
+        SELECT
+          COUNT(DISTINCT id)                         AS total_invoices,
+          COUNT(DISTINCT student_id)                 AS total_students,
+          COALESCE(SUM(total_amount),   0)            AS total_billed,
+          COALESCE(SUM(paid_amount),    0)            AS total_collected,
+          COALESCE(SUM(balance_amount), 0)            AS total_outstanding,
+          ROUND(
+            CASE WHEN SUM(total_amount) > 0
+              THEN SUM(paid_amount) / SUM(total_amount) * 100
+              ELSE 0
+            END, 2)                                  AS collection_rate,
+          COUNT(*) FILTER (WHERE status = 'paid')    AS paid_invoices,
+          COUNT(*) FILTER (WHERE status = 'partial') AS partial_invoices,
+          COUNT(*) FILTER (WHERE status = 'pending') AS pending_invoices,
+          COUNT(*) FILTER (WHERE status = 'overdue') AS overdue_invoices
+        FROM fee_invoices
         WHERE tenant_id = $1
       `, [tenantId]);
 

@@ -8,11 +8,11 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
-  BookOpen, Users, UserCheck, Shield,
+  BookOpen, Users, UserCheck, Shield, Wallet,
 } from 'lucide-react';
 
 type View = 'role' | 'login' | 'forgot' | 'forgot-success';
-type Role = 'teacher' | 'student' | 'parent' | 'admin';
+type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer';
 
 const ROLES: { key: Role; label: string; description: string; icon: React.ElementType; color: string; bg: string; border: string }[] = [
   {
@@ -41,6 +41,15 @@ const ROLES: { key: Role; label: string; description: string; icon: React.Elemen
     color: 'text-purple-600',
     bg: 'bg-purple-50 hover:bg-purple-100',
     border: 'border-purple-200 hover:border-purple-400',
+  },
+  {
+    key: 'finance_officer',
+    label: 'Finance Officer',
+    description: 'Manage fees, expenses & financial reports',
+    icon: Wallet,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50 hover:bg-amber-100',
+    border: 'border-amber-200 hover:border-amber-400',
   },
 ];
 
@@ -81,9 +90,11 @@ export function LoginPage() {
       const response: any = await api.login(email, password);
       const { accessToken, refreshToken, user } = response.data;
 
-      // Validate the logged-in user's role matches selection (skip for admin)
-      if (selectedRole && selectedRole !== 'admin' && user.role !== selectedRole) {
-        const roleLabel = selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1);
+      // Validate the logged-in user's role matches the selected tile
+      const skipRoleCheck = !selectedRole || selectedRole === 'admin';
+      if (!skipRoleCheck && user.role !== selectedRole) {
+        const roleConfig = ROLES.find(r => r.key === selectedRole);
+        const roleLabel = roleConfig ? roleConfig.label : selectedRole;
         setLoginError(`This account is not registered as a ${roleLabel}. Please select the correct role.`);
         setLoginLoading(false);
         return;
@@ -198,18 +209,17 @@ export function LoginPage() {
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </button>
-                  {selectedRoleConfig && (
+                  {selectedRoleConfig ? (
                     <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${selectedRoleConfig.bg} ${selectedRoleConfig.color} border ${selectedRoleConfig.border}`}>
                       <selectedRoleConfig.icon className="h-3.5 w-3.5" />
                       {selectedRoleConfig.label}
                     </div>
-                  )}
-                  {selectedRole === 'admin' && (
+                  ) : selectedRole === 'admin' ? (
                     <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                       <Shield className="h-3.5 w-3.5" />
                       Administrator
                     </div>
-                  )}
+                  ) : null}
                 </div>
                 <CardTitle className="text-xl">Sign In</CardTitle>
                 <CardDescription>Enter your credentials to access your account</CardDescription>

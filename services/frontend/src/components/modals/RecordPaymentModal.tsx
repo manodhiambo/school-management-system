@@ -9,6 +9,17 @@ import { Search, Printer, Share2, Download, CheckCircle2, X, Loader2 } from 'luc
 import api from '@/services/api';
 import jsPDF from 'jspdf';
 
+const PAYMENT_METHODS = [
+  { value: 'mpesa', label: 'M-Pesa' },
+  { value: 'coop_bus_bank', label: 'Co-op Bus Bank' },
+  { value: 'coop_bus_paybill', label: 'Co-Op Bus Paybill' },
+  { value: 'fee_paybill', label: 'Fee Paybill' },
+  { value: 'fee_bank_account', label: 'Fee Bank Account' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'card', label: 'Card' },
+];
+
 interface RecordPaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -21,7 +32,7 @@ const EMPTY_FORM = {
   student_id: '',
   invoice_id: '',
   amount: '',
-  payment_method: 'cash',
+  payment_method: 'mpesa',
   transaction_id: '',
   payment_date: new Date().toISOString().split('T')[0],
   remarks: '',
@@ -460,11 +471,9 @@ export function RecordPaymentModal({
                   className="w-full border rounded-md px-3 py-2 text-sm mt-1"
                   required
                 >
-                  <option value="cash">Cash</option>
-                  <option value="mpesa">M-Pesa</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="card">Card</option>
+                  {PAYMENT_METHODS.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
                 </select>
               </div>
               <div>

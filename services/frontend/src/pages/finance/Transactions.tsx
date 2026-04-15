@@ -6,10 +6,24 @@ import api from '@/services/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { useAuthStore } from '@/store/authStore';
+
+const PAYMENT_METHODS = [
+  { value: 'mpesa', label: 'M-Pesa' },
+  { value: 'coop_bus_bank', label: 'Co-op Bus Bank' },
+  { value: 'coop_bus_paybill', label: 'Co-Op Bus Paybill' },
+  { value: 'fee_paybill', label: 'Fee Paybill' },
+  { value: 'fee_bank_account', label: 'Fee Bank Account' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'card', label: 'Card' },
+];
 
 type TransactionType = 'income' | 'expense';
 
 export default function Transactions() {
+  const { user } = useAuthStore();
+  const isFinanceOfficer = user?.role === 'finance_officer';
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TransactionType>(
     (searchParams.get('type') as TransactionType) || 'income'
@@ -44,7 +58,7 @@ export default function Transactions() {
     amount: '',
     description: '',
     reference_number: '',
-    payment_method: 'cash',
+    payment_method: 'mpesa',
     include_vat: true,
   });
 
@@ -300,7 +314,7 @@ export default function Transactions() {
       amount: '',
       description: '',
       reference_number: '',
-      payment_method: 'cash',
+      payment_method: 'mpesa',
       include_vat: true,
     });
     setSelectedStudent(null);
@@ -735,13 +749,15 @@ export default function Transactions() {
                         >
                           <Eye className="h-3.5 w-3.5" /> View
                         </button>
-                        <button
-                          onClick={() => handleDeleteIncome(record.id)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete
-                        </button>
+                        {!isFinanceOfficer && (
+                          <button
+                            onClick={() => handleDeleteIncome(record.id)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -813,13 +829,15 @@ export default function Transactions() {
                       >
                         <Eye className="h-3.5 w-3.5" /> View
                       </button>
-                      <button
-                        onClick={() => handleDeleteExpense(record.id)}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                      </button>
+                      {!isFinanceOfficer && (
+                        <button
+                          onClick={() => handleDeleteExpense(record.id)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1007,10 +1025,9 @@ export default function Transactions() {
                     onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   >
-                    <option value="cash">Cash</option>
-                    <option value="mpesa">M-Pesa</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="cheque">Cheque</option>
+                    {PAYMENT_METHODS.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>

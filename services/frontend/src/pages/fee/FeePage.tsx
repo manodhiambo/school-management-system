@@ -13,6 +13,7 @@ import { RecordPaymentModal } from '@/components/modals/RecordPaymentModal';
 import { GenerateInvoicesModal } from '@/components/modals/GenerateInvoicesModal';
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
+import { useAuthStore } from '@/store/authStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface StudentSummary {
@@ -268,6 +269,8 @@ function FeeStatementModal({
   onClose: () => void;
   onPaymentRecorded: () => void;
 }) {
+  const { user } = useAuthStore();
+  const isFinanceOfficer = user?.role === 'finance_officer';
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expected, setExpected] = useState<ExpectedFee[]>([]);
@@ -470,14 +473,16 @@ function FeeStatementModal({
                               >
                                 <DollarSign className="h-3.5 w-3.5" />
                               </button>
-                              <button
-                                className="text-red-400 hover:text-red-600 p-1"
-                                title="Delete invoice"
-                                onClick={() => handleDeleteInvoice(inv.id)}
-                                disabled={deleting === inv.id}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              {!isFinanceOfficer && (
+                                <button
+                                  className="text-red-400 hover:text-red-600 p-1"
+                                  title="Delete invoice"
+                                  onClick={() => handleDeleteInvoice(inv.id)}
+                                  disabled={deleting === inv.id}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -521,14 +526,16 @@ function FeeStatementModal({
                               >
                                 <Printer className="h-3.5 w-3.5" />
                               </button>
-                              <button
-                                className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
-                                title="Delete payment"
-                                disabled={deletingPmt === p.id}
-                                onClick={() => handleDeletePayment(p.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              {!isFinanceOfficer && (
+                                <button
+                                  className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
+                                  title="Delete payment"
+                                  disabled={deletingPmt === p.id}
+                                  onClick={() => handleDeletePayment(p.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -558,6 +565,8 @@ function FeeStatementModal({
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export function FeePage() {
+  const { user } = useAuthStore();
+  const isFinanceOfficer = user?.role === 'finance_officer';
   const [stats, setStats] = useState<any>(null);
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -883,14 +892,16 @@ export function FeePage() {
                           <StatusBadge status={inv.status} />
                         </td>
                         <td className="px-4 py-2">
-                          <button
-                            className="text-red-400 hover:text-red-600 p-1"
-                            title="Delete invoice"
-                            disabled={deletingInv === inv.id}
-                            onClick={() => handleDeleteInvoice(inv.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {!isFinanceOfficer && (
+                            <button
+                              className="text-red-400 hover:text-red-600 p-1"
+                              title="Delete invoice"
+                              disabled={deletingInv === inv.id}
+                              onClick={() => handleDeleteInvoice(inv.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -949,14 +960,16 @@ export function FeePage() {
                           >
                             <Printer className="h-4 w-4" />
                           </button>
-                          <button
-                            className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
-                            title="Delete payment (reverses invoice balance)"
-                            disabled={deletingPay === p.id}
-                            onClick={() => handleDeletePayment(p.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {!isFinanceOfficer && (
+                            <button
+                              className="text-red-400 hover:text-red-600 p-1 disabled:opacity-40"
+                              title="Delete payment (reverses invoice balance)"
+                              disabled={deletingPay === p.id}
+                              onClick={() => handleDeletePayment(p.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

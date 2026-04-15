@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, DollarSign, Bus, Users, Loader2, Eye, CheckCircle2, XCircle, Link2 } from 'lucide-react';
 import api from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 
 const STUDENT_TYPE_LABEL: Record<string, string> = {
   all: 'All Students',
@@ -32,6 +33,8 @@ const EMPTY_FORM = {
 };
 
 export function FeeStructurePage() {
+  const { user } = useAuthStore();
+  const isFinanceOfficer = user?.role === 'finance_officer';
   const [activeTab, setActiveTab] = useState<'structures' | 'bulk'>('structures');
   const [structures, setStructures] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -196,7 +199,7 @@ export function FeeStructurePage() {
           <h2 className="text-3xl font-bold">Fee Structures</h2>
           <p className="text-gray-500">Manage fee structures and bulk invoice generation</p>
         </div>
-        {activeTab === 'structures' && (
+        {activeTab === 'structures' && !isFinanceOfficer && (
           <Button onClick={() => { resetForm(); setShowModal(true); }}>
             <Plus className="mr-2 h-4 w-4" /> Add Fee Structure
           </Button>
@@ -284,6 +287,8 @@ export function FeeStructurePage() {
                           <td className="px-4 py-3">
                             {(s.is_transport_fee || s.extra_fee_id) ? (
                               <p className="text-xs text-gray-400 text-center italic">Auto-managed</p>
+                            ) : isFinanceOfficer ? (
+                              <p className="text-xs text-gray-400 text-center italic">View only</p>
                             ) : (
                               <div className="flex justify-center gap-2">
                                 <Button size="sm" variant="outline" onClick={() => handleEdit(s)}>

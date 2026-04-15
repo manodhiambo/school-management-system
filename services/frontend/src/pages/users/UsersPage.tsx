@@ -95,8 +95,14 @@ export function UsersPage() {
       teacher: 'bg-purple-100 text-purple-800',
       student: 'bg-green-100 text-green-800',
       parent: 'bg-blue-100 text-blue-800',
+      finance_officer: 'bg-amber-100 text-amber-800',
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getRoleLabel = (role: string) => {
+    if (role === 'finance_officer') return 'Finance Officer';
+    return role.charAt(0).toUpperCase() + role.slice(1);
   };
 
   const userCounts = {
@@ -105,6 +111,7 @@ export function UsersPage() {
     teacher: users.filter(u => u.role === 'teacher').length,
     student: users.filter(u => u.role === 'student').length,
     parent: users.filter(u => u.role === 'parent').length,
+    finance_officer: users.filter(u => u.role === 'finance_officer').length,
   };
 
   if (loading) {
@@ -135,9 +142,9 @@ export function UsersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-5">
-        {['all', 'admin', 'teacher', 'student', 'parent'].map((role) => (
-          <Card 
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        {['all', 'admin', 'teacher', 'student', 'parent', 'finance_officer'].map((role) => (
+          <Card
             key={role}
             className={`cursor-pointer transition-all ${roleFilter === role ? 'ring-2 ring-blue-500' : 'hover:shadow-md'}`}
             onClick={() => setRoleFilter(role)}
@@ -145,20 +152,24 @@ export function UsersPage() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase">{role === 'all' ? 'Total' : role}s</p>
+                  <p className="text-xs text-gray-500 uppercase">
+                    {role === 'all' ? 'Total' : role === 'finance_officer' ? 'Finance' : role}s
+                  </p>
                   <p className="text-2xl font-bold">{userCounts[role as keyof typeof userCounts]}</p>
                 </div>
                 <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
                   role === 'all' ? 'bg-gray-100' :
                   role === 'admin' ? 'bg-red-100' :
                   role === 'teacher' ? 'bg-purple-100' :
-                  role === 'student' ? 'bg-green-100' : 'bg-blue-100'
+                  role === 'student' ? 'bg-green-100' :
+                  role === 'finance_officer' ? 'bg-amber-100' : 'bg-blue-100'
                 }`}>
                   {role === 'all' ? <Users className="h-5 w-5 text-gray-600" /> :
                    role === 'admin' ? <Shield className="h-5 w-5 text-red-600" /> :
                    <Users className={`h-5 w-5 ${
                      role === 'teacher' ? 'text-purple-600' :
-                     role === 'student' ? 'text-green-600' : 'text-blue-600'
+                     role === 'student' ? 'text-green-600' :
+                     role === 'finance_officer' ? 'text-amber-600' : 'text-blue-600'
                    }`} />}
                 </div>
               </div>
@@ -223,8 +234,8 @@ export function UsersPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getRoleBadgeColor(user.role)}`}>
-                          {user.role}
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
+                          {getRoleLabel(user.role)}
                         </span>
                       </td>
                       <td className="p-4">

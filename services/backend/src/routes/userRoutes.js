@@ -20,12 +20,12 @@ router.get('/', requireRole(['admin']), async (req, res) => {
     const users = await query(`
       SELECT
         u.id, u.email, u.role, u.is_active, u.is_verified, u.last_login, u.created_at,
-        COALESCE(s.first_name, t.first_name, p.first_name) as first_name,
-        COALESCE(s.last_name, t.last_name, p.last_name) as last_name
+        COALESCE(s.first_name, t.first_name, p.first_name, u.first_name) as first_name,
+        COALESCE(s.last_name,  t.last_name,  p.last_name,  u.last_name)  as last_name
       FROM users u
-      LEFT JOIN students s ON u.id = s.user_id
-      LEFT JOIN teachers t ON u.id = t.user_id
-      LEFT JOIN parents p ON u.id = p.user_id
+      LEFT JOIN students s ON u.id = s.user_id AND s.tenant_id = u.tenant_id
+      LEFT JOIN teachers t ON u.id = t.user_id AND t.tenant_id = u.tenant_id
+      LEFT JOIN parents  p ON u.id = p.user_id AND p.tenant_id = u.tenant_id
       WHERE u.tenant_id = $1
       ORDER BY u.created_at DESC
     `, [tenantId]);
@@ -43,12 +43,12 @@ router.get('/:id', authenticate, async (req, res) => {
     const users = await query(`
       SELECT
         u.id, u.email, u.role, u.is_active, u.is_verified, u.last_login, u.created_at,
-        COALESCE(s.first_name, t.first_name, p.first_name) as first_name,
-        COALESCE(s.last_name, t.last_name, p.last_name) as last_name
+        COALESCE(s.first_name, t.first_name, p.first_name, u.first_name) as first_name,
+        COALESCE(s.last_name,  t.last_name,  p.last_name,  u.last_name)  as last_name
       FROM users u
-      LEFT JOIN students s ON u.id = s.user_id
-      LEFT JOIN teachers t ON u.id = t.user_id
-      LEFT JOIN parents p ON u.id = p.user_id
+      LEFT JOIN students s ON u.id = s.user_id AND s.tenant_id = u.tenant_id
+      LEFT JOIN teachers t ON u.id = t.user_id AND t.tenant_id = u.tenant_id
+      LEFT JOIN parents  p ON u.id = p.user_id AND p.tenant_id = u.tenant_id
       WHERE u.id = $1 AND u.tenant_id = $2
     `, [req.params.id, tenantId]);
 
@@ -78,10 +78,14 @@ router.post('/', requireRole(['admin']), async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = uuidv4();
 
+    // For roles without a profile table (admin, finance_officer) store names directly on users row
+    const storeNameOnUser = ['admin', 'finance_officer'].includes(role);
     await query(
-      `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified)
-       VALUES ($1, $2, $3, $4, $5, TRUE, TRUE)`,
-      [userId, email, hashedPassword, role, tenantId]
+      `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified, first_name, last_name)
+       VALUES ($1, $2, $3, $4, $5, TRUE, TRUE, $6, $7)`,
+      [userId, email, hashedPassword, role, tenantId,
+        storeNameOnUser ? (firstName || null) : null,
+        storeNameOnUser ? (lastName  || null) : null]
     );
 
     // Create corresponding profile record with tenant_id

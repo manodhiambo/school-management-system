@@ -13,45 +13,66 @@ interface AddUserModalProps {
   onSuccess: () => void;
 }
 
+const ROLES = [
+  { value: 'student', label: 'Student' },
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'parent', label: 'Parent' },
+  { value: 'finance_officer', label: 'Finance Officer' },
+  { value: 'admin', label: 'Admin' },
+];
+
+const ROLES_WITH_NAMES = ['student', 'teacher', 'parent', 'finance_officer'];
+
 export function AddUserModal({ open, onOpenChange, onSuccess }: AddUserModalProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     role: 'student',
+    firstName: '',
+    lastName: '',
     send_credentials: true,
   });
 
   const handleChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setError('');
   };
 
   const generatePassword = () => {
-    const password = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
+    const password = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     setFormData(prev => ({ ...prev, password }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
-      // await api.createUser(formData);
-      alert('User created successfully!' + (formData.send_credentials ? ' Credentials sent via email.' : ''));
+      const payload: any = {
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+      };
+      if (ROLES_WITH_NAMES.includes(formData.role)) {
+        payload.firstName = formData.firstName;
+        payload.lastName = formData.lastName;
+      }
+      await api.createUser(payload);
       onSuccess();
       onOpenChange(false);
-      setFormData({
-        email: '',
-        password: '',
-        role: 'student',
-        send_credentials: true,
-      });
-    } catch (error: any) {
-      alert(error.message || 'Failed to create user');
+      setFormData({ email: '', password: '', role: 'student', firstName: '', lastName: '', send_credentials: true });
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err.message || 'Failed to create user');
     } finally {
       setLoading(false);
     }
   };
+
+  const needsName = ROLES_WITH_NAMES.includes(formData.role);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,6 +90,45 @@ export function AddUserModal({ open, onOpenChange, onSuccess }: AddUserModalProp
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
+              <Label htmlFor="role">Role *</Label>
+              <Select
+                id="role"
+                value={formData.role}
+                onChange={(e) => handleChange('role', e.target.value)}
+                required
+              >
+                {ROLES.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </Select>
+            </div>
+
+            {needsName && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="firstName">First Name *</Label>
+                  <Input
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={(e) => handleChange('firstName', e.target.value)}
+                    placeholder="First name"
+                    required={needsName}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) => handleChange('lastName', e.target.value)}
+                    placeholder="Last name"
+                    required={needsName}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
               <Label htmlFor="email">Email Address *</Label>
               <Input
                 id="email"
@@ -78,21 +138,6 @@ export function AddUserModal({ open, onOpenChange, onSuccess }: AddUserModalProp
                 placeholder="user@school.com"
                 required
               />
-            </div>
-
-            <div>
-              <Label htmlFor="role">Role *</Label>
-              <Select
-                id="role"
-                value={formData.role}
-                onChange={(e) => handleChange('role', e.target.value)}
-                required
-              >
-                <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
-                <option value="parent">Parent</option>
-                <option value="admin">Admin</option>
-              </Select>
             </div>
 
             <div>
@@ -110,27 +155,18 @@ export function AddUserModal({ open, onOpenChange, onSuccess }: AddUserModalProp
                   Generate
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Click "Generate" for a secure random password
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Click "Generate" for a secure random password</p>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="send_credentials"
-                checked={formData.send_credentials}
-                onChange={(e) => handleChange('send_credentials', e.target.checked)}
-                className="h-4 w-4"
-              />
-              <Label htmlFor="send_credentials" className="font-normal">
-                Send login credentials via email
-              </Label>
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded p-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
 
             <div className="bg-blue-50 border border-blue-200 rounded p-3">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> The user will receive an email with their login credentials.
+                <strong>Note:</strong> Share the email and password with the user.
                 They can change their password after first login.
               </p>
             </div>

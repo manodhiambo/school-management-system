@@ -43,7 +43,7 @@ class BudgetController {
             WHEN b.total_amount > 0 THEN
               ROUND((COALESCE(SUM(bi.spent_amount), 0) / b.total_amount * 100), 2)
             ELSE 0
-          END as utilization_percentage
+          END::float AS utilization_percentage
         FROM budgets b
         LEFT JOIN financial_years fy ON b.financial_year_id = fy.id
         LEFT JOIN users u ON b.created_by = u.id
@@ -363,7 +363,7 @@ class BudgetController {
             WHEN bi.allocated_amount > 0 THEN
               ROUND((bi.spent_amount / bi.allocated_amount * 100), 2)
             ELSE 0
-          END as utilization_percentage
+          END::float AS utilization_percentage
         FROM budget_items bi
         LEFT JOIN chart_of_accounts coa ON bi.account_id = coa.id
         WHERE bi.budget_id = $1
@@ -508,7 +508,7 @@ class BudgetController {
             WHEN b.total_amount > 0 THEN
               ROUND((b.spent_amount / b.total_amount * 100), 2)
             ELSE 0
-          END as utilization_percentage,
+          END::float AS utilization_percentage,
           COUNT(bi.id) as total_items,
           COUNT(CASE WHEN bi.spent_amount >= bi.allocated_amount THEN 1 END) as exhausted_items,
           COALESCE(SUM(bi.allocated_amount), 0) as total_allocated,
@@ -569,7 +569,7 @@ class BudgetController {
             WHEN bi.allocated_amount > 0 THEN
               ROUND(((bi.spent_amount - bi.allocated_amount) / bi.allocated_amount * 100), 2)
             ELSE 0
-          END as variance_percentage,
+          END::float AS variance_percentage,
           CASE
             WHEN bi.spent_amount > bi.allocated_amount THEN 'Over Budget'
             WHEN bi.spent_amount < bi.allocated_amount * 0.8 THEN 'Under Utilized'

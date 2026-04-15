@@ -1125,7 +1125,7 @@ const BudgetManagement: React.FC = () => {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-500">Utilization</div>
             <div className="text-2xl font-bold text-gray-900 mt-2">
-              {budgetSummary.utilization_percentage.toFixed(1)}%
+              {Number(budgetSummary.utilization_percentage || 0).toFixed(1)}%
             </div>
           </div>
         </div>
@@ -1284,7 +1284,7 @@ const BudgetManagement: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                       <span className={Number(item.variance_percentage) > 0 ? 'text-red-600' : 'text-green-600'}>
-                        {item.variance_percentage > 0 ? '+' : ''}{item.variance_percentage.toFixed(1)}%
+                        {Number(item.variance_percentage) > 0 ? '+' : ''}{Number(item.variance_percentage || 0).toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

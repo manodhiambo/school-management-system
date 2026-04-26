@@ -421,10 +421,10 @@ export function LandingPage() {
               Register Your School
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <a href="tel:0703445756">
+            <a href="tel:0110421320">
               <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 text-base px-10">
                 <Phone className="mr-2 h-4 w-4" />
-                Call: 0703 445 756
+                Call: 0110 421 320
               </Button>
             </a>
           </div>
@@ -452,22 +452,40 @@ export function LandingPage() {
               {/* Developer credit */}
               <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 rounded-xl p-4 border border-blue-800/30">
                 <p className="text-xs text-blue-300 font-semibold uppercase tracking-wider mb-3">Developed &amp; Maintained By</p>
-                <p className="text-white font-bold text-lg mb-2">Helvino Technologies Limited</p>
+                <a href="https://helvino.org" target="_blank" rel="noopener noreferrer" className="text-white font-bold text-lg mb-1 hover:text-blue-300 transition-colors block">
+                  Helvino Technologies Limited
+                </a>
+                <p className="text-xs text-gray-400 mb-3">Siaya, Kenya · <a href="https://helvino.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">helvino.org</a></p>
                 <div className="space-y-2">
                   <a
-                    href="mailto:helvinotechltd@gmail.com"
+                    href="mailto:info@helvino.org"
                     className="flex items-center gap-2 text-sm text-gray-300 hover:text-blue-400 transition-colors"
                   >
                     <Mail className="h-4 w-4 text-blue-400" />
-                    helvinotechltd@gmail.com
+                    info@helvino.org
                   </a>
                   <a
-                    href="tel:0703445756"
+                    href="tel:0110421320"
                     className="flex items-center gap-2 text-sm text-gray-300 hover:text-blue-400 transition-colors"
                   >
                     <Phone className="h-4 w-4 text-blue-400" />
-                    0703 445 756
+                    0110 421 320
                   </a>
+                </div>
+              </div>
+
+              {/* M-Pesa Payment */}
+              <div className="bg-gradient-to-r from-green-900/40 to-emerald-900/40 rounded-xl p-4 border border-green-800/30 mt-4">
+                <p className="text-xs text-green-300 font-semibold uppercase tracking-wider mb-3">M-Pesa Payment</p>
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Paybill No.</span>
+                    <span className="text-white font-bold tracking-wider">522533</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Account No.</span>
+                    <span className="text-white font-bold tracking-wider">8071524</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -501,7 +519,7 @@ export function LandingPage() {
 
           {/* Bottom bar */}
           <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-            <p>© {new Date().getFullYear()} Skul Manager — <span className="text-gray-400">Helvino Technologies Limited</span>. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Skul Manager — <a href="https://helvino.org" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">Helvino Technologies Limited</a>, Siaya. All rights reserved.</p>
             <div className="flex items-center gap-1 text-xs">
               <span>Made with</span>
               <span className="text-red-500">❤</span>

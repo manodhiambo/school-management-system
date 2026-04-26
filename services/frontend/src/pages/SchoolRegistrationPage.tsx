@@ -367,8 +367,8 @@ export function SchoolRegistrationPage() {
 
         {/* Footer */}
         <div className="text-center mt-5 space-y-1">
-          <p className="text-blue-200 text-xs">Powered by <strong>Helvino Technologies Limited</strong></p>
-          <p className="text-blue-300 text-xs">helvinotechltd@gmail.com · 0703 445 756</p>
+          <p className="text-blue-200 text-xs">Powered by <a href="https://helvino.org" target="_blank" rel="noopener noreferrer" className="font-bold hover:text-white transition-colors">Helvino Technologies Limited</a>, Siaya</p>
+          <p className="text-blue-300 text-xs">info@helvino.org · 0110 421 320</p>
           <Link to="/" className="text-blue-400 text-xs hover:text-white">← Back to Home</Link>
         </div>
       </div>

@@ -324,17 +324,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <p className="text-[10px] text-gray-400">
               © {new Date().getFullYear()} ·{' '}
               <a
-                href="mailto:helvinotechltd@gmail.com"
+                href="https://helvino.org"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-indigo-400 hover:text-indigo-600 transition-colors font-medium"
               >
                 Helvino Technologies
               </a>
             </p>
             <a
-              href="tel:0703445756"
+              href="tel:0110421320"
               className="block text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
             >
-              0703 445 756
+              0110 421 320
             </a>
           </div>
         </div>

@@ -376,7 +376,7 @@ export function LoginPage() {
         </Card>
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          © {new Date().getFullYear()} Helvino Technologies Limited · 0703 445 756
+          © {new Date().getFullYear()} <a href="https://helvino.org" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">Helvino Technologies Limited</a>, Siaya · 0110 421 320
         </p>
       </div>
     </div>

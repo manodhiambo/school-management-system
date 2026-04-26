@@ -6,40 +6,66 @@
     <link rel="shortcut icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Primary SEO -->
-    <title>SkulManager — Kenya's #1 CBC School Management System</title>
-    <meta name="description" content="SkulManager is Kenya's most comprehensive CBC-aligned school management system. Manage students, teachers, fees, exams, timetables and parent communication — all in one secure cloud platform." />
-    <meta name="keywords" content="school management system Kenya, CBC curriculum software, Kenya school software, student management Kenya, CBC grading system, M-Pesa school fees, SkulManager, Helvino Technologies" />
+    <!-- Primary SEO — keyword-first title for Google ranking -->
+    <title>School Management System Kenya | SkulManager – CBC Aligned</title>
+    <meta name="description" content="School management system built for Kenya's CBC curriculum. SkulManager manages students, teachers, fees, exams, timetables and parent communication — all in one secure cloud platform. M-Pesa integrated." />
+    <meta name="keywords" content="school management system Kenya, school management system, Kenya school management software, CBC school system, CBC curriculum software, student management system Kenya, CBC grading EE ME AE BE, M-Pesa school fees, Kenya school software, SkulManager, skulmanager.org, Helvino Technologies Siaya" />
     <meta name="author" content="Helvino Technologies Limited" />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
     <link rel="canonical" href="https://skulmanager.org/" />
 
-    <!-- Open Graph (Facebook / WhatsApp previews) -->
+    <!-- Geo targeting — helps rank in Kenya searches -->
+    <meta name="geo.region" content="KE" />
+    <meta name="geo.placename" content="Kenya" />
+    <meta name="language" content="English" />
+    <meta name="revisit-after" content="7 days" />
+
+    <!-- Open Graph (Facebook / WhatsApp / LinkedIn previews) -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://skulmanager.org/" />
-    <meta property="og:title" content="SkulManager — Kenya's #1 CBC School Management System" />
-    <meta property="og:description" content="Cloud-based school management built for Kenya's CBC curriculum. Manage students, fees, exams, timetables and parent communication in one place." />
+    <meta property="og:title" content="School Management System Kenya | SkulManager – CBC Aligned" />
+    <meta property="og:description" content="Kenya's #1 cloud-based school management system for CBC curriculum. Manage students, fees, exams, timetables and parent communication in one place. M-Pesa integrated." />
     <meta property="og:image" content="https://skulmanager.org/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:site_name" content="SkulManager" />
     <meta property="og:locale" content="en_KE" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="SkulManager — Kenya's #1 CBC School Management System" />
-    <meta name="twitter:description" content="Cloud-based school management built for Kenya's CBC curriculum. M-Pesa integrated, CBC-aligned, secure." />
+    <meta name="twitter:title" content="School Management System Kenya | SkulManager – CBC Aligned" />
+    <meta name="twitter:description" content="Kenya's #1 school management system for CBC. M-Pesa integrated, CBC-aligned, secure cloud platform. Try SkulManager today." />
     <meta name="twitter:image" content="https://skulmanager.org/og-image.png" />
 
-    <!-- Structured Data (JSON-LD) -->
+    <!-- Schema 1: SoftwareApplication -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "SkulManager",
+      "alternateName": "Skul Manager School Management System",
       "url": "https://skulmanager.org",
-      "description": "Kenya's most comprehensive CBC-aligned school management system for students, teachers, parents and administrators.",
+      "description": "Kenya's most comprehensive CBC-aligned school management system. Manage students, teachers, fees, exams, timetables and parent communication all in one place.",
       "applicationCategory": "EducationApplication",
-      "operatingSystem": "Web",
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KES" },
+      "applicationSubCategory": "School Management System",
+      "operatingSystem": "Web Browser",
+      "inLanguage": "en-KE",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "KES",
+        "description": "Contact Helvino Technologies for pricing"
+      },
+      "featureList": [
+        "CBC Curriculum Management",
+        "Student Records Management",
+        "M-Pesa Fee Collection",
+        "Exam and Results Management",
+        "Parent Communication Portal",
+        "Timetable Scheduling",
+        "CBC Report Cards (EE/ME/AE/BE)",
+        "Real-time Analytics Dashboard"
+      ],
       "publisher": {
         "@type": "Organization",
         "name": "Helvino Technologies Limited",
@@ -52,6 +78,91 @@
           "addressCountry": "KE"
         }
       }
+    }
+    </script>
+
+    <!-- Schema 2: Organization (brand authority signal) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Helvino Technologies Limited",
+      "url": "https://helvino.org",
+      "logo": "https://skulmanager.org/favicon.svg",
+      "email": "info@helvino.org",
+      "telephone": "+254110421320",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Siaya",
+        "addressCountry": "KE"
+      },
+      "sameAs": ["https://skulmanager.org"]
+    }
+    </script>
+
+    <!-- Schema 3: WebSite with search action (enables Google Sitelinks Searchbox) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "SkulManager – School Management System Kenya",
+      "url": "https://skulmanager.org",
+      "description": "School management system for Kenya's CBC curriculum",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://skulmanager.org/?s={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Schema 4: FAQPage (triggers Google's answer box / featured snippet) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the best school management system in Kenya?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "SkulManager (skulmanager.org) is Kenya's #1 cloud-based school management system, built specifically for the CBC curriculum. It manages students, teachers, fees (M-Pesa integrated), exams, timetables and parent communication all in one platform. Developed by Helvino Technologies Limited, Siaya."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which school management system supports Kenya CBC curriculum?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "SkulManager is fully aligned with Kenya's CBC (Competency Based Curriculum). It supports CBC grading (EE, ME, AE, BE), strand-based assessments, CBC report cards, School Based Assessments (SBA), and all education levels from Playgroup to Senior Secondary."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I register my school on SkulManager?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Visit skulmanager.org and click 'Register Your School'. Fill in your school details and you will receive access credentials. For support contact Helvino Technologies at info@helvino.org or call 0110 421 320."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does SkulManager support M-Pesa school fee payments?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. SkulManager has built-in M-Pesa integration for fee collection. Schools use Paybill 522533, Account 8071524. Parents can pay fees directly and the system automatically updates student fee records."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Who developed SkulManager?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "SkulManager is developed and maintained by Helvino Technologies Limited, based in Siaya, Kenya. Website: helvino.org, Email: info@helvino.org, Phone: 0110 421 320."
+          }
+        }
+      ]
     }
     </script>
   </head>

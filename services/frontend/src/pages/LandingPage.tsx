@@ -129,15 +129,16 @@ export function LandingPage() {
                 Kenya's #1 School Management Platform
               </div>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
-                Empowering<br />
+                Kenya's #1<br />
                 <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  Kenya's Future
+                  School Management
                 </span><br />
-                Through Education
+                System
               </h1>
               <p className="text-lg text-blue-100 mb-8 max-w-lg leading-relaxed">
-                A complete, cloud-based school management system built for Kenya's CBC curriculum —
-                managing students, teachers, fees, exams, and parent communication all in one place.
+                The complete cloud-based school management system for Kenya's CBC curriculum —
+                students, teachers, fees, exams, timetables and parent communication,
+                all in one secure platform at <span className="text-yellow-300 font-semibold">skulmanager.org</span>.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
@@ -331,11 +332,11 @@ export function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <span className="inline-block bg-yellow-100 text-yellow-700 text-sm font-semibold rounded-full px-4 py-1 mb-5">Why Skul Manager</span>
-              <h2 className="text-4xl font-bold text-gray-900 mb-6">Built for Kenyan Schools, by Kenyan Developers</h2>
+              <h2 className="text-4xl font-bold text-gray-900 mb-6">A School Management System Built for Kenya, by Kenyans</h2>
               <p className="text-gray-500 mb-8 leading-relaxed">
-                We understand the unique challenges faced by Kenyan educational institutions —
-                from CBC implementation to M-Pesa fee collection. Skul Manager was designed
-                from the ground up to address these specific needs.
+                SkulManager is the only school management system built from the ground up for Kenya's
+                CBC curriculum and local needs — from M-Pesa fee collection to NEMIS-compatible records.
+                Trusted by schools across Kenya, hosted at <a href="https://skulmanager.org" className="text-blue-600 hover:underline font-medium">skulmanager.org</a>.
               </p>
               <div className="grid sm:grid-cols-2 gap-4">
                 {[

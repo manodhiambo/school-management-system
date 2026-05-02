@@ -7,14 +7,14 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import api from '@/services/api';
-import { getCBCGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbcGrades';
+import { getCBEGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbeGrades';
 
 export function ChildrenProgressPage() {
   const { user } = useAuthStore();
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChild, setSelectedChild] = useState<any>(null);
   const [progress, setProgress] = useState<any>(null);
-  const [cbcData, setCbcData] = useState<any>(null);
+  const [cbeData, setCbcData] = useState<any>(null);
   const [upcomingExams, setUpcomingExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function ChildrenProgressPage() {
       setChildren(childrenData);
       if (childrenData.length > 0) setSelectedChild(childrenData[0]);
 
-      // Load parent CBC overview
+      // Load parent CBE overview
       try {
         const overviewRes: any = await api.getCbcParentOverview();
         const overviewData = overviewRes.data || overviewRes;
@@ -112,7 +112,7 @@ export function ChildrenProgressPage() {
   const educationLevel = selectedChild?.education_level;
 
   // Build performance trend from grade history
-  const trendData = cbcData?.grade_history?.slice(0, 10).map((h: any) => ({
+  const trendData = cbeData?.grade_history?.slice(0, 10).map((h: any) => ({
     exam: h.exam_name?.slice(0, 12) || 'Exam',
     '%': parseFloat(h.percentage) || 0,
     subject: h.subject_name || ''
@@ -123,16 +123,16 @@ export function ChildrenProgressPage() {
   const absent = progress?.attendance?.summary?.absent ?? progress?.attendance?.absent ?? 0;
   const late = progress?.attendance?.summary?.late ?? progress?.attendance?.late ?? 0;
 
-  // Latest CBC grade
-  const latestGrade = cbcData?.grade_history?.[0]?.cbc_grade;
-  const classRank = cbcData?.class_rank;
+  // Latest CBE grade
+  const latestGrade = cbeData?.grade_history?.[0]?.cbc_grade;
+  const classRank = cbeData?.class_rank;
   const attendancePct = (present + absent + late) > 0 ? Math.round((present / (present + absent + late)) * 100) : 0;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold">Children Progress</h2>
-        <p className="text-gray-500">Track your children's CBC academic performance</p>
+        <p className="text-gray-500">Track your children's CBE academic performance</p>
       </div>
 
       {/* Child Selector */}
@@ -197,12 +197,12 @@ export function ChildrenProgressPage() {
               <CardContent>
                 <div className="text-2xl font-bold">
                   {latestGrade ? (
-                    <span className={`px-3 py-1 rounded-lg border-2 text-lg font-bold ${getCBCGradeBadgeClass(latestGrade)}`}>
+                    <span className={`px-3 py-1 rounded-lg border-2 text-lg font-bold ${getCBEGradeBadgeClass(latestGrade)}`}>
                       {latestGrade}
                     </span>
                   ) : 'N/A'}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">CBC Grade</p>
+                <p className="text-xs text-gray-500 mt-1">CBE Grade</p>
               </CardContent>
             </Card>
           </div>
@@ -225,8 +225,8 @@ export function ChildrenProgressPage() {
             </Card>
           )}
 
-          {/* Subject performance table from CBC history */}
-          {cbcData?.grade_history?.length > 0 && (
+          {/* Subject performance table from CBE history */}
+          {cbeData?.grade_history?.length > 0 && (
             <Card>
               <CardHeader><CardTitle>Subject Performance</CardTitle></CardHeader>
               <CardContent>
@@ -237,17 +237,17 @@ export function ChildrenProgressPage() {
                         <th className="py-2 pr-4">Exam</th>
                         <th className="py-2 pr-4">Subject</th>
                         <th className="py-2 pr-4">Score</th>
-                        <th className="py-2">CBC Grade</th>
+                        <th className="py-2">CBE Grade</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {cbcData.grade_history.slice(0, 10).map((h: any, i: number) => (
+                      {cbeData.grade_history.slice(0, 10).map((h: any, i: number) => (
                         <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
                           <td className="py-2 pr-4">{h.exam_name}</td>
                           <td className="py-2 pr-4">{h.subject_name || '–'}</td>
                           <td className="py-2 pr-4">{h.marks_obtained}/{h.max_marks} ({h.percentage}%)</td>
                           <td className="py-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBCGradeBadgeClass(h.cbc_grade)}`}>
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBEGradeBadgeClass(h.cbc_grade)}`}>
                               {h.cbc_grade || '–'}
                             </span>
                           </td>

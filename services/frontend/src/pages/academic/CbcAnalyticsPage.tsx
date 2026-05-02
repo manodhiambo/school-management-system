@@ -8,7 +8,7 @@ import {
   LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer
 } from 'recharts';
 import api from '@/services/api';
-import { getCBCGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbcGrades';
+import { getCBEGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbeGrades';
 
 type Tab = 'overview' | 'class' | 'student' | 'subject' | 'broadsheet';
 
@@ -160,7 +160,7 @@ export function CbcAnalyticsPage() {
     doc.setFillColor(37, 99, 235);
     doc.rect(0, 0, pw, 22, 'F');
     doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-    doc.text('CBC PERFORMANCE BROADSHEET', pw / 2, 10, { align: 'center' });
+    doc.text('CBE PERFORMANCE BROADSHEET', pw / 2, 10, { align: 'center' });
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.text(`${className}${bsTerm ? ' · ' + bsTerm.toUpperCase() : ''}${bsYear ? ' · ' + bsYear : ''} · Generated: ${new Date().toLocaleDateString('en-KE')}`, pw / 2, 18, { align: 'center' });
     doc.setTextColor(30, 30, 30);
@@ -232,7 +232,7 @@ export function CbcAnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold">CBC Analytics</h2>
+        <h2 className="text-3xl font-bold">CBE Analytics</h2>
         <p className="text-gray-500">Kenya Competency-Based Curriculum performance insights</p>
       </div>
 
@@ -368,7 +368,7 @@ export function CbcAnalyticsPage() {
               {/* Grade distribution */}
               {classAnalytics.grade_distribution?.length > 0 && (
                 <Card>
-                  <CardHeader><CardTitle>CBC Grade Distribution</CardTitle></CardHeader>
+                  <CardHeader><CardTitle>CBE Grade Distribution</CardTitle></CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={classAnalytics.grade_distribution.map((g: any) => ({ grade: g.cbc_grade, count: parseInt(g.count) }))}>
@@ -523,7 +523,7 @@ export function CbcAnalyticsPage() {
                               <td className="py-2 pr-4">{h.subject_name || '–'}</td>
                               <td className="py-2 pr-4">{h.marks_obtained}/{h.max_marks} ({h.percentage}%)</td>
                               <td className="py-2">
-                                <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBCGradeBadgeClass(h.cbc_grade)}`}>
+                                <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBEGradeBadgeClass(h.cbc_grade)}`}>
                                   {h.cbc_grade || '–'}
                                 </span>
                               </td>

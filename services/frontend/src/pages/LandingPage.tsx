@@ -45,37 +45,37 @@ const PHOTOS = {
 };
 
 const FEATURES = [
-  { icon: <Users className="h-7 w-7 text-blue-600" />,   title: 'Student Management',     desc: 'Comprehensive student records, CBC tracking, and performance analytics for every learner.' },
-  { icon: <BookOpen className="h-7 w-7 text-green-600" />, title: 'Kenya CBC Curriculum',   desc: 'Full CBC grading (EE/ME/AE/BE), strand-based learning, and competency reports for all levels.' },
+  { icon: <Users className="h-7 w-7 text-blue-600" />,   title: 'Student Management',     desc: 'Comprehensive student records, CBE tracking, and performance analytics for every learner.' },
+  { icon: <BookOpen className="h-7 w-7 text-green-600" />, title: 'Kenya CBE Curriculum',   desc: 'Full CBE grading (EE/ME/AE/BE), strand-based learning, and competency reports for all levels.' },
   { icon: <Calendar className="h-7 w-7 text-purple-600" />,title: 'Smart Scheduling',        desc: 'Automated timetable generation, exam scheduling and conflict-free allocation.' },
   { icon: <TrendingUp className="h-7 w-7 text-orange-600"/>,title: 'Finance & Fees',         desc: 'M-Pesa-integrated fee collection, budget tracking, and automated payment reminders.' },
   { icon: <Shield className="h-7 w-7 text-red-600" />,    title: 'Secure & Role-Based',     desc: 'Military-grade role access for Admin, Teacher, Student, Parent and Finance Officer.' },
-  { icon: <BarChart3 className="h-7 w-7 text-indigo-600"/>,title: 'Real-Time Analytics',    desc: 'Live dashboards, attendance rates, grade distributions, and CBC competency heatmaps.' },
+  { icon: <BarChart3 className="h-7 w-7 text-indigo-600"/>,title: 'Real-Time Analytics',    desc: 'Live dashboards, attendance rates, grade distributions, and CBE competency heatmaps.' },
 ];
 
 const ROLES = [
   {
     role: 'Admin', gradient: 'from-red-500 to-rose-600', icon: <Shield className="h-10 w-10 text-white" />,
-    items: ['Manage Students, Teachers & Parents', 'Finance & Budget Oversight', 'CBC Analytics Dashboard', 'User Roles & Permissions', 'System Settings & Audit Logs'],
+    items: ['Manage Students, Teachers & Parents', 'Finance & Budget Oversight', 'CBE Analytics Dashboard', 'User Roles & Permissions', 'System Settings & Audit Logs'],
   },
   {
     role: 'Teachers', gradient: 'from-blue-500 to-cyan-600', icon: <GraduationCap className="h-10 w-10 text-white" />,
-    items: ['Record Attendance & CBC Grades', 'Create Online & Offline Exams', 'Manage Class Assignments', 'View Timetable & My Classes', 'Communicate with Parents'],
+    items: ['Record Attendance & CBE Grades', 'Create Online & Offline Exams', 'Manage Class Assignments', 'View Timetable & My Classes', 'Communicate with Parents'],
   },
   {
     role: 'Students', gradient: 'from-green-500 to-emerald-600', icon: <BookOpen className="h-10 w-10 text-white" />,
-    items: ['Take Online CBC Exams', 'View Results & CBC Grades', 'Submit Assignments', 'Check Fees & Timetable', 'Message Teachers'],
+    items: ['Take Online CBE Exams', 'View Results & CBE Grades', 'Submit Assignments', 'Check Fees & Timetable', 'Message Teachers'],
   },
   {
     role: 'Parents', gradient: 'from-purple-500 to-violet-600', icon: <UserCheck className="h-10 w-10 text-white" />,
-    items: ["Monitor Child's CBC Progress", 'View Attendance & Results', 'Track Fee Payments', 'Receive School Notifications', "View Upcoming Exams"],
+    items: ["Monitor Child's CBE Progress", 'View Attendance & Results', 'Track Fee Payments', 'Receive School Notifications', "View Upcoming Exams"],
   },
 ];
 
 const STATS = [
   { label: 'Students Managed',  value: '10,000+', icon: <Users className="h-6 w-6" /> },
   { label: 'Schools Using',     value: '50+',     icon: <Globe className="h-6 w-6" /> },
-  { label: 'CBC Subjects',      value: '200+',    icon: <BookOpen className="h-6 w-6" /> },
+  { label: 'CBE Subjects',      value: '200+',    icon: <BookOpen className="h-6 w-6" /> },
   { label: 'Uptime Guaranteed', value: '99.9%',   icon: <Zap className="h-6 w-6" /> },
 ];
 
@@ -136,7 +136,7 @@ export function LandingPage() {
                 System
               </h1>
               <p className="text-lg text-blue-100 mb-8 max-w-lg leading-relaxed">
-                The complete cloud-based school management system for Kenya's CBC curriculum —
+                The complete cloud-based school management system for Kenya's CBE curriculum —
                 students, teachers, fees, exams, timetables and parent communication,
                 all in one secure platform at <span className="text-yellow-300 font-semibold">skulmanager.org</span>.
               </p>
@@ -161,7 +161,7 @@ export function LandingPage() {
 
               {/* Trust badges */}
               <div className="flex items-center gap-6 mt-10 text-sm text-blue-200">
-                <div className="flex items-center gap-1"><CheckCircle className="h-4 w-4 text-green-400" /> CBC Aligned</div>
+                <div className="flex items-center gap-1"><CheckCircle className="h-4 w-4 text-green-400" /> CBE Aligned</div>
                 <div className="flex items-center gap-1"><CheckCircle className="h-4 w-4 text-green-400" /> M-Pesa Ready</div>
                 <div className="flex items-center gap-1"><CheckCircle className="h-4 w-4 text-green-400" /> Cloud Hosted</div>
               </div>
@@ -275,7 +275,7 @@ export function LandingPage() {
             <span className="inline-block bg-blue-100 text-blue-700 text-sm font-semibold rounded-full px-4 py-1 mb-4">Platform Features</span>
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Everything Your School Needs</h2>
             <p className="text-xl text-gray-500 max-w-2xl mx-auto">
-              Purpose-built for Kenya's CBC education system with every tool to run a modern school
+              Purpose-built for Kenya's CBE education system with every tool to run a modern school
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -335,12 +335,12 @@ export function LandingPage() {
               <h2 className="text-4xl font-bold text-gray-900 mb-6">A School Management System Built for Kenya, by Kenyans</h2>
               <p className="text-gray-500 mb-8 leading-relaxed">
                 SkulManager is the only school management system built from the ground up for Kenya's
-                CBC curriculum and local needs — from M-Pesa fee collection to NEMIS-compatible records.
+                CBE curriculum and local needs — from M-Pesa fee collection to NEMIS-compatible records.
                 Trusted by schools across Kenya, hosted at <a href="https://skulmanager.org" className="text-blue-600 hover:underline font-medium">skulmanager.org</a>.
               </p>
               <div className="grid sm:grid-cols-2 gap-4">
                 {[
-                  { icon: <CheckCircle className="h-5 w-5 text-green-500" />, text: 'Full Kenya CBC curriculum support' },
+                  { icon: <CheckCircle className="h-5 w-5 text-green-500" />, text: 'Full Kenya CBE curriculum support' },
                   { icon: <CheckCircle className="h-5 w-5 text-green-500" />, text: 'M-Pesa integrated fee payments' },
                   { icon: <CheckCircle className="h-5 w-5 text-green-500" />, text: 'Offline-capable for low connectivity' },
                   { icon: <CheckCircle className="h-5 w-5 text-green-500" />, text: 'NEMIS-compatible student records' },
@@ -380,7 +380,7 @@ export function LandingPage() {
                   <Award className="h-6 w-6 text-yellow-600" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-gray-900">CBC Compliant</div>
+                  <div className="text-sm font-bold text-gray-900">CBE Compliant</div>
                   <div className="text-xs text-gray-500">Fully aligned with KICD</div>
                 </div>
               </div>
@@ -446,7 +446,7 @@ export function LandingPage() {
                 <span className="text-xl font-bold">Skul Manager</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6 max-w-sm">
-                Kenya's most comprehensive school management platform — CBC-aligned, M-Pesa ready,
+                Kenya's most comprehensive school management platform — CBE-aligned, M-Pesa ready,
                 and built for every level from Playgroup to Senior Secondary.
               </p>
 
@@ -495,7 +495,7 @@ export function LandingPage() {
             <div>
               <h4 className="font-semibold text-white mb-4">Platform</h4>
               <ul className="space-y-3 text-sm text-gray-400">
-                {['Student Management', 'CBC Curriculum', 'Finance & Fees', 'Exams & Results', 'Parent Portal', 'Analytics'].map(l => (
+                {['Student Management', 'CBE Curriculum', 'Finance & Fees', 'Exams & Results', 'Parent Portal', 'Analytics'].map(l => (
                   <li key={l} className="hover:text-white cursor-pointer transition-colors">{l}</li>
                 ))}
               </ul>

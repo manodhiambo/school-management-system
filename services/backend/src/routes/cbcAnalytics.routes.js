@@ -61,7 +61,7 @@ router.get('/overview', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('CBC overview error:', error);
+    console.error('CBE overview error:', error);
     res.status(500).json({ success: false, message: 'Error fetching overview' });
   }
 });
@@ -80,7 +80,7 @@ router.get('/class/:classId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // Use cbc_assessments (CBC data source) for class view
+    // Use cbc_assessments (CBE data source) for class view
     const rankings = await query(`
       SELECT
         s.id, s.first_name, s.last_name, s.admission_number,
@@ -125,7 +125,7 @@ router.get('/class/:classId', async (req, res) => {
       data: { rankings, subject_performance: subjectPerformance, grade_distribution: gradeDistribution }
     });
   } catch (error) {
-    console.error('CBC class analytics error:', error);
+    console.error('CBE class analytics error:', error);
     res.status(500).json({ success: false, message: 'Error fetching class analytics' });
   }
 });
@@ -177,6 +177,7 @@ router.get('/student/:studentId', async (req, res) => {
       JOIN exams e ON e.id = er.exam_id
       LEFT JOIN subjects sub ON sub.id = er.subject_id
       WHERE er.student_id = $1 AND er.tenant_id = $2
+        AND e.is_results_published = true
       ORDER BY sub.name, e.start_date DESC
     `, [req.params.studentId, tenantId]);
 
@@ -218,7 +219,7 @@ router.get('/student/:studentId', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('CBC student analytics error:', error);
+    console.error('CBE student analytics error:', error);
     res.status(500).json({ success: false, message: 'Error fetching student analytics' });
   }
 });
@@ -363,7 +364,7 @@ router.get('/subject/:subjectId', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('CBC subject analytics error:', error);
+    console.error('CBE subject analytics error:', error);
     res.status(500).json({ success: false, message: 'Error fetching subject analytics' });
   }
 });

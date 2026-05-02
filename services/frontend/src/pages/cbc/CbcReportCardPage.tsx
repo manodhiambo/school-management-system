@@ -40,7 +40,7 @@ function cell(doc: jsPDF, x: number, y: number, w: number, h: number, fill?: [nu
   doc.rect(x, y, w, h, 'D');
 }
 
-// ── Generate a single report card page (Kenya CBC format) ────────────────────
+// ── Generate a single report card page (Kenya CBE format) ────────────────────
 async function renderReportCardPage(
   doc: jsPDF,
   detail: any,
@@ -700,8 +700,8 @@ export function CbcReportCardPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CBC Report Cards</h1>
-          <p className="text-sm text-gray-500 mt-1">Holistic Learner Progress Reports — Kenya CBC</p>
+          <h1 className="text-2xl font-bold text-gray-900">CBE Report Cards</h1>
+          <p className="text-sm text-gray-500 mt-1">Holistic Learner Progress Reports — Kenya CBE</p>
         </div>
 
         {/* Download PDF dropdown */}

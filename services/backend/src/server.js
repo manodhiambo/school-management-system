@@ -34,10 +34,10 @@ import subjectsRoutes from './routes/subjects.routes.js';
 import examsRoutes from './routes/exams.routes.js';
 import onlineExamRoutes from './routes/onlineExam.routes.js';
 import offlineResultsRoutes from './routes/offlineResults.routes.js';
-import cbcAnalyticsRoutes from './routes/cbcAnalytics.routes.js';
+import cbeAnalyticsRoutes from './routes/cbcAnalytics.routes.js';
 
-// New comprehensive Kenya CBC routes
-import cbcRoutes from './routes/cbcRoutes.js';
+// New comprehensive Kenya CBE routes
+import cbeRoutes from './routes/cbcRoutes.js';
 import parentAlertsRoutes from './routes/parentAlertsRoutes.js';
 import disciplineRoutes from './routes/disciplineRoutes.js';
 import transportRoutes from './routes/transportRoutes.js';
@@ -103,16 +103,16 @@ app.use('/api/v1/library', libraryRoutes);
 app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/online-exams', onlineExamRoutes);
 app.use('/api/v1/offline-results', offlineResultsRoutes);
-app.use('/api/v1/cbc-analytics', cbcAnalyticsRoutes);
+app.use('/api/v1/cbe-analytics', cbeAnalyticsRoutes);
 
-// Comprehensive Kenya CBC routes
-app.use('/api/v1/cbc', cbcRoutes);
+// Comprehensive Kenya CBE routes
+app.use('/api/v1/cbe', cbeRoutes);
 app.use('/api/v1/parent-alerts', parentAlertsRoutes);
 app.use('/api/v1/discipline', disciplineRoutes);
 app.use('/api/v1/transport', transportRoutes);
 app.use('/api/v1/health', healthRoutes);
 
-// Comprehensive CBC Academics Module
+// Comprehensive CBE Academics Module
 app.use('/api/v1/academics', academicsModuleRoutes);
 
 // Staff Leave / Permission Requests

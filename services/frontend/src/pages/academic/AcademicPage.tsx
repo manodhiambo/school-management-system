@@ -13,7 +13,7 @@ import {
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 
-// ── Helper: CBC grade badge ──────────────────────────────────
+// ── Helper: CBE grade badge ──────────────────────────────────
 const GRADE_COLORS: Record<string, string> = {
   EE: 'bg-green-100 text-green-800',
   ME: 'bg-blue-100 text-blue-800',
@@ -99,7 +99,7 @@ export function AcademicPage() {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">CBC Academics Module</h2>
+        <h2 className="text-2xl font-bold text-gray-900">CBE Academics Module</h2>
         <p className="text-sm text-gray-500">Kenya Competency-Based Curriculum — full academic management</p>
       </div>
 
@@ -217,12 +217,12 @@ function OverviewTab({ dashboard, isAdmin, onSetupDone }: { dashboard: any; isAd
           <div className="flex-1">
             <h3 className="font-semibold text-indigo-800">Set Up Your School's Academic Structure</h3>
             <p className="text-sm text-indigo-600 mt-0.5">
-              No classes or subjects found. Load the complete Kenya CBC curriculum — all classes from Playgroup to Grade 12
+              No classes or subjects found. Load the complete Kenya CBE curriculum — all classes from Playgroup to Grade 12
               and all learning areas per level — with one click. You can add more or customize after.
             </p>
           </div>
           <Button onClick={seedAll} disabled={seeding} className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
-            {seeding ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Loading...</> : '🇰🇪 Load CBC Defaults'}
+            {seeding ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Loading...</> : '🇰🇪 Load CBE Defaults'}
           </Button>
         </div>
       )}
@@ -233,7 +233,7 @@ function OverviewTab({ dashboard, isAdmin, onSetupDone }: { dashboard: any; isAd
           </span>
           <Button size="sm" variant="outline" onClick={seedAll} disabled={seeding}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${seeding ? 'animate-spin' : ''}`} />
-            Add Missing CBC Defaults
+            Add Missing CBE Defaults
           </Button>
         </div>
       )}
@@ -258,7 +258,7 @@ function OverviewTab({ dashboard, isAdmin, onSetupDone }: { dashboard: any; isAd
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">CBC Grading Scale</CardTitle>
+          <CardTitle className="text-base">CBE Grading Scale</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -295,7 +295,7 @@ function OverviewTab({ dashboard, isAdmin, onSetupDone }: { dashboard: any; isAd
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Kenya CBC Education Structure</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Kenya CBE Education Structure</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-2">
             {[
@@ -1661,7 +1661,7 @@ function PromotionTab({ classes, currentYear, isAdmin }: any) {
                 <div><Label>Min Attendance %</Label><Input type="number" value={ruleForm.min_attendance_percent} onChange={e => setRuleForm((f: any) => ({ ...f, min_attendance_percent: e.target.value }))} /></div>
                 <div><Label>Min Subjects Passed</Label><Input type="number" value={ruleForm.min_subjects_passed} onChange={e => setRuleForm((f: any) => ({ ...f, min_subjects_passed: e.target.value }))} /></div>
                 <div><Label>Min Average %</Label><Input type="number" value={ruleForm.min_average_percent} onChange={e => setRuleForm((f: any) => ({ ...f, min_average_percent: e.target.value }))} /></div>
-                <div><Label>Min ME Grades (CBC)</Label><Input type="number" value={ruleForm.cbc_min_me_count} onChange={e => setRuleForm((f: any) => ({ ...f, cbc_min_me_count: e.target.value }))} /></div>
+                <div><Label>Min ME Grades (CBE)</Label><Input type="number" value={ruleForm.cbc_min_me_count} onChange={e => setRuleForm((f: any) => ({ ...f, cbc_min_me_count: e.target.value }))} /></div>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={saveRule}><Save className="h-4 w-4 mr-1" /> Save Rule</Button>
@@ -1947,7 +1947,7 @@ function ClassesRoomsTab({ classes, subjects, isAdmin, onRefresh }: any) {
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={seedClasses} disabled={seeding}>
               <RefreshCw className={`h-3.5 w-3.5 mr-1 ${seeding ? 'animate-spin' : ''}`} />
-              Load CBC Defaults
+              Load CBE Defaults
             </Button>
             <Button size="sm" onClick={() => { setEditingClass(null); setClassForm({ name: '', section: 'A', education_level: 'lower_primary', grade_number: '', capacity: 45, room_id: '', class_teacher_id: '', academic_year: new Date().getFullYear().toString() }); setShowClassForm(true); }}>
               <Plus className="h-4 w-4 mr-1" /> Add Class
@@ -2051,7 +2051,7 @@ function ClassesRoomsTab({ classes, subjects, isAdmin, onRefresh }: any) {
             <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
               <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p className="font-medium">No classes yet</p>
-              <p className="text-sm mt-1">Click "Load CBC Defaults" to add all Kenya CBC classes automatically</p>
+              <p className="text-sm mt-1">Click "Load CBE Defaults" to add all Kenya CBE classes automatically</p>
             </div>
           )}
           {LEVEL_ORDER.filter(l => grouped[l]?.length > 0).map(level => (
@@ -2361,7 +2361,7 @@ function SubjectsTab({ subjects, isAdmin, onRefresh }: any) {
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={seedSubjects} disabled={seeding}>
               <RefreshCw className={`h-3.5 w-3.5 mr-1 ${seeding ? 'animate-spin' : ''}`} />
-              Load CBC Defaults
+              Load CBE Defaults
             </Button>
             <Button size="sm" onClick={() => { setEditingSubject(null); setForm({ name: '', code: '', description: '', education_level: 'lower_primary', category: 'core', subject_group: 'stem', is_elective: false, weekly_periods: 5, color: '#3b82f6' }); setShowForm(true); }}>
               <Plus className="h-4 w-4 mr-1" /> Add Subject
@@ -2418,7 +2418,7 @@ function SubjectsTab({ subjects, isAdmin, onRefresh }: any) {
         <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
           <Layers className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No learning areas yet</p>
-          <p className="text-sm mt-1">Click "Load CBC Defaults" to add all Kenya CBC learning areas automatically</p>
+          <p className="text-sm mt-1">Click "Load CBE Defaults" to add all Kenya CBE learning areas automatically</p>
         </div>
       )}
 

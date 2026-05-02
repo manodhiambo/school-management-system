@@ -9,14 +9,14 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
     color: 'text-blue-700',
     bg: 'from-blue-600 to-indigo-600',
     chapters: 13,
-    description: 'Full system guide: students, teachers, fees, CBC academics, IGCSE Cambridge module, welfare, library and settings.',
+    description: 'Full system guide: students, teachers, fees, CBE academics, IGCSE Cambridge module, welfare, library and settings.',
   },
   teacher: {
     label: 'Teacher Manual',
     color: 'text-indigo-700',
     bg: 'from-indigo-600 to-purple-600',
     chapters: 15,
-    description: 'Attendance, grade book, CBC SBA, lesson plans, schemes of work, assignments, projects, leave requests and IGCSE mark entry.',
+    description: 'Attendance, grade book, CBE SBA, lesson plans, schemes of work, assignments, projects, leave requests and IGCSE mark entry.',
   },
   student: {
     label: 'Student Manual',
@@ -42,9 +42,9 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
 };
 
 const HIGHLIGHTS: Record<string, string[]> = {
-  admin: ['Manage students & staff', 'CBC & IGCSE curriculum modules', 'Finance & fee management', 'Reports, settings & user accounts'],
-  teacher: ['Mark attendance & grade book', 'CBC SBA, lesson plans & schemes', 'IGCSE mark entry & grade calculation', 'Assignments, projects & leave requests'],
-  student: ['View CBC & IGCSE grades', 'Submit assignments & online exams', 'Check fee balance & timetable', 'Library, messages & notifications'],
+  admin: ['Manage students & staff', 'CBE & IGCSE curriculum modules', 'Finance & fee management', 'Reports, settings & user accounts'],
+  teacher: ['Mark attendance & grade book', 'CBE SBA, lesson plans & schemes', 'IGCSE mark entry & grade calculation', 'Assignments, projects & leave requests'],
+  student: ['View CBE & IGCSE grades', 'Submit assignments & online exams', 'Check fee balance & timetable', 'Library, messages & notifications'],
   parent: ['Track children\'s progress', 'View fee statements', 'Receive school alerts', 'Message teachers'],
   finance_officer: ['Record fee payments', 'Student payments & defaulters report', 'Budget management', 'Vendor & purchase orders'],
 };

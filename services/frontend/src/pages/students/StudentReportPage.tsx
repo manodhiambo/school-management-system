@@ -199,7 +199,7 @@ async function generateStudentReportPDF(
     doc.setFillColor(37, 99, 235);
     doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.text('CBC ASSESSMENT RESULTS', margin + 4, y + 4.5);
+    doc.text('CBE ASSESSMENT RESULTS', margin + 4, y + 4.5);
     y += 9;
     doc.setTextColor(0, 0, 0);
 
@@ -705,7 +705,7 @@ export function StudentReportPage() {
           <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
             <p>The PDF report will include:</p>
             <p>• School logo, name, address and contact</p>
-            <p>• Student details and CBC assessment grades with auto-comments</p>
+            <p>• Student details and CBE assessment grades with auto-comments</p>
             <p>• Fees section: amount billed, paid, outstanding balance</p>
             <p>• Transport charges and next term expected fees</p>
             <p>• Term closing and next term opening dates (if set)</p>

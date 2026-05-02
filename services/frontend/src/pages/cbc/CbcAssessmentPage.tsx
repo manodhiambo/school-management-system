@@ -9,7 +9,7 @@ import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { Plus, BookOpen, Download, Pencil, Trash2, X, Check, Search } from 'lucide-react';
 
-const CBC_GRADES = ['EE', 'ME', 'AE', 'BE'];
+const CBE_GRADES = ['EE', 'ME', 'AE', 'BE'];
 const JSS_GRADES = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2'];
 const PP_GRADES = ['WD', 'D', 'B'];
 const GRADE_COLORS: Record<string, string> = {
@@ -52,7 +52,7 @@ const EMPTY_FORM = {
 };
 
 function downloadCSV(assessments: any[]) {
-  const headers = ['Student', 'Subject', 'Strand', 'Type', 'Exam Period', 'Term', 'Year', 'Score', 'Max Score', 'CBC Grade', 'Grade Points', 'Result Code', 'Date', 'Facilitator'];
+  const headers = ['Student', 'Subject', 'Strand', 'Type', 'Exam Period', 'Term', 'Year', 'Score', 'Max Score', 'CBE Grade', 'Grade Points', 'Result Code', 'Date', 'Facilitator'];
   const rows = assessments.map((a: any) => [
     a.student_name,
     a.subject_name,
@@ -192,7 +192,7 @@ export function CbcAssessmentPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CBC Assessments</h1>
+          <h1 className="text-2xl font-bold text-gray-900">CBE Assessments</h1>
           <p className="text-sm text-gray-500 mt-1">Competency-Based Assessment records — Formative & Summative</p>
         </div>
         <div className="flex gap-2">
@@ -213,9 +213,9 @@ export function CbcAssessmentPage() {
       <Card>
         <CardContent className="pt-4 space-y-3">
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Standard CBC (Primary &amp; Senior Secondary)</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Standard CBE (Primary &amp; Senior Secondary)</p>
             <div className="flex flex-wrap gap-3">
-              {CBC_GRADES.map(g => (
+              {CBE_GRADES.map(g => (
                 <div key={g} className="flex items-center gap-2">
                   <Badge className={GRADE_COLORS[g]}>{g}</Badge>
                   <span className="text-xs text-gray-600">{GRADE_LABELS[g]}</span>
@@ -287,7 +287,7 @@ export function CbcAssessmentPage() {
                 <Label>Education Level</Label>
                 <select className="w-full border rounded-md px-3 py-2 text-sm mt-1"
                   value={form.education_level} onChange={e => handleFormChange('education_level', e.target.value)}>
-                  <option value="">Standard CBC (Primary)</option>
+                  <option value="">Standard CBE (Primary)</option>
                   <option value="pre_primary">Pre-Primary (PP1/PP2)</option>
                   <option value="playgroup">Playgroup</option>
                   <option value="junior_secondary">Junior Secondary (Grade 7–9)</option>

@@ -421,6 +421,7 @@ router.get("/:id/exam-results", async (req, res) => {
       JOIN exams e ON er.exam_id = e.id
       LEFT JOIN subjects s ON er.subject_id = s.id
       WHERE er.student_id = $1 AND e.tenant_id = $2
+        AND e.is_results_published = true
       ORDER BY e.start_date DESC, s.name
     `, [actualStudentId, tid]);
 

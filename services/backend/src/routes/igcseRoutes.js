@@ -1,6 +1,6 @@
 /**
  * IGCSE (Cambridge International) Module Routes
- * Fully isolated from CBC — activated per school
+ * Fully isolated from CBE — activated per school
  * Base path: /api/v1/igcse
  */
 import express from 'express';

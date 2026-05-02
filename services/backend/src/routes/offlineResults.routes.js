@@ -10,7 +10,7 @@ router.use(authenticate);
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
-function computeCBCGrade(percentage, educationLevel) {
+function computeCBEGrade(percentage, educationLevel) {
   if (['playgroup','pre_primary','lower_primary','upper_primary'].includes(educationLevel)) {
     if (percentage >= 75) return 'EE';
     if (percentage >= 50) return 'ME';
@@ -81,7 +81,7 @@ router.post('/bulk', async (req, res) => {
         }
 
         const percentage = max_marks > 0 ? (marks_obtained / max_marks) * 100 : 0;
-        const cbcGrade = is_absent ? null : computeCBCGrade(percentage, educationLevel);
+        const cbeGrade = is_absent ? null : computeCBEGrade(percentage, educationLevel);
 
         const existing = await query(
           'SELECT id FROM exam_results WHERE exam_id = $1 AND student_id = $2 AND tenant_id = $3 AND (subject_id = $4 OR ($4::uuid IS NULL AND subject_id IS NULL))',
@@ -93,13 +93,13 @@ router.post('/bulk', async (req, res) => {
             `UPDATE exam_results
              SET marks_obtained=$1, max_marks=$2, remarks=$3, cbc_grade=$4, is_absent=$5, updated_at=NOW()
              WHERE id=$6`,
-            [marks_obtained || 0, max_marks || 100, remarks || null, cbcGrade, is_absent || false, existing[0].id]
+            [marks_obtained || 0, max_marks || 100, remarks || null, cbeGrade, is_absent || false, existing[0].id]
           );
         } else {
           await query(
             `INSERT INTO exam_results (id, tenant_id, exam_id, student_id, subject_id, marks_obtained, max_marks, remarks, cbc_grade, is_absent)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-            [uuidv4(), tenantId, exam_id, student_id, subject_id || null, marks_obtained || 0, max_marks || 100, remarks || null, cbcGrade, is_absent || false]
+            [uuidv4(), tenantId, exam_id, student_id, subject_id || null, marks_obtained || 0, max_marks || 100, remarks || null, cbeGrade, is_absent || false]
           );
         }
 
@@ -171,14 +171,14 @@ router.put('/:examId/:studentId/:subjectId', async (req, res) => {
 
     const educationLevel = exams[0].education_level || 'lower_primary';
     const percentage = max_marks > 0 ? (marks_obtained / max_marks) * 100 : 0;
-    const cbcGrade = is_absent ? null : computeCBCGrade(percentage, educationLevel);
+    const cbeGrade = is_absent ? null : computeCBEGrade(percentage, educationLevel);
 
     await query(
       `UPDATE exam_results
        SET marks_obtained=$1, max_marks=$2, remarks=$3, cbc_grade=$4, is_absent=$5, updated_at=NOW()
        WHERE exam_id=$6 AND student_id=$7 AND tenant_id=$8
          AND (subject_id=$9 OR ($9::uuid IS NULL AND subject_id IS NULL))`,
-      [marks_obtained, max_marks, remarks || null, cbcGrade, is_absent || false,
+      [marks_obtained, max_marks, remarks || null, cbeGrade, is_absent || false,
        req.params.examId, req.params.studentId, tenantId,
        req.params.subjectId === 'null' ? null : req.params.subjectId]
     );
@@ -190,11 +190,11 @@ router.put('/:examId/:studentId/:subjectId', async (req, res) => {
   }
 });
 
-// POST /offline-results/:examId/publish  [admin]
+// POST /offline-results/:examId/publish  [admin, teacher]
 router.post('/:examId/publish', async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Admin only' });
+    if (!['admin', 'teacher'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
     const tenantId = req.tenantId;
 

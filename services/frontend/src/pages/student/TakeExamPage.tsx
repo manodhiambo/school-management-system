@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, ChevronLeft, ChevronRight, CheckCircle, AlertCircle } from 'lucide-react';
 import api from '@/services/api';
-import { getCBCGradeBadgeClass } from '@/utils/cbcGrades';
+import { getCBEGradeBadgeClass } from '@/utils/cbeGrades';
 
 export function TakeExamPage() {
   const { examId } = useParams<{ examId: string }>();
@@ -158,7 +158,7 @@ export function TakeExamPage() {
     const breakdown = result.breakdown || result.answers || [];
     const totalScore = attempt.total_score ?? result.total_score;
     const maxScore = attempt.max_score ?? result.max_score;
-    const cbcGrade = attempt.cbc_grade ?? result.cbc_grade;
+    const cbeGrade = attempt.cbc_grade ?? result.cbc_grade;
     const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
     return (
@@ -171,8 +171,8 @@ export function TakeExamPage() {
         <Card>
           <CardContent className="pt-6 text-center space-y-4">
             <div className="flex flex-col items-center gap-2">
-              <span className={`text-4xl font-bold px-6 py-2 rounded-xl border-2 ${getCBCGradeBadgeClass(cbcGrade)}`}>
-                {cbcGrade}
+              <span className={`text-4xl font-bold px-6 py-2 rounded-xl border-2 ${getCBEGradeBadgeClass(cbeGrade)}`}>
+                {cbeGrade}
               </span>
               <p className="text-2xl font-semibold">{totalScore} / {maxScore}</p>
               <p className="text-gray-500">{percentage}%</p>

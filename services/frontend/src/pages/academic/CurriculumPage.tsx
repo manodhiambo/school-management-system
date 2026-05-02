@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, ChevronDown, ChevronUp, GraduationCap, Users } from 'lucide-react';
 import api from '@/services/api';
-import { EDUCATION_LEVELS, getGradingScale } from '@/utils/cbcGrades';
+import { EDUCATION_LEVELS, getGradingScale } from '@/utils/cbeGrades';
 
 interface LevelInfo {
   value: string;
@@ -82,7 +82,7 @@ export function CurriculumPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold">Kenya CBC Curriculum</h2>
+        <h2 className="text-3xl font-bold">Kenya CBE Curriculum</h2>
         <p className="text-gray-500">Competency-Based Curriculum structure — Playgroup to University</p>
       </div>
 
@@ -200,7 +200,7 @@ export function CurriculumPage() {
                       ))}
                     </div>
                     {schoolSubjects.length === 0 && (
-                      <p className="text-xs text-gray-400 mt-1">* Default CBC subjects shown. Configure subjects in Academic settings.</p>
+                      <p className="text-xs text-gray-400 mt-1">* Default CBE subjects shown. Configure subjects in Academic settings.</p>
                     )}
                   </div>
                 </CardContent>

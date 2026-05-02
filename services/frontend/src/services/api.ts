@@ -1043,89 +1043,89 @@ class ApiService {
   }
 
   // ======================
-  // CBC ANALYTICS
+  // CBE ANALYTICS
   // ======================
   getCbcOverview() {
-    return this.api.get('/cbc-analytics/overview');
+    return this.api.get('/cbe-analytics/overview');
   }
 
   getCbcClassAnalytics(classId: string) {
-    return this.api.get('/cbc-analytics/class/' + classId);
+    return this.api.get('/cbe-analytics/class/' + classId);
   }
 
   getCbcStudentAnalytics(studentId: string) {
-    return this.api.get('/cbc-analytics/student/' + studentId);
+    return this.api.get('/cbe-analytics/student/' + studentId);
   }
 
   getCbcParentOverview() {
-    return this.api.get('/cbc-analytics/parent-overview');
+    return this.api.get('/cbe-analytics/parent-overview');
   }
 
   getCbcSubjectAnalytics(subjectId: string) {
-    return this.api.get('/cbc-analytics/subject/' + subjectId);
+    return this.api.get('/cbe-analytics/subject/' + subjectId);
   }
 
   // ======================
-  // CBC COMPREHENSIVE
+  // CBE COMPREHENSIVE
   // ======================
 
   // Strands
-  getCbcStrands(params?: any) { return this.api.get('/cbc/strands', { params }); }
-  createCbcStrand(data: any) { return this.api.post('/cbc/strands', data); }
-  updateCbcStrand(id: string, data: any) { return this.api.put('/cbc/strands/' + id, data); }
-  deleteCbcStrand(id: string) { return this.api.delete('/cbc/strands/' + id); }
+  getCbcStrands(params?: any) { return this.api.get('/cbe/strands', { params }); }
+  createCbcStrand(data: any) { return this.api.post('/cbe/strands', data); }
+  updateCbcStrand(id: string, data: any) { return this.api.put('/cbe/strands/' + id, data); }
+  deleteCbcStrand(id: string) { return this.api.delete('/cbe/strands/' + id); }
 
   // Sub-strands
-  getCbcSubStrands(params?: any) { return this.api.get('/cbc/sub-strands', { params }); }
-  createCbcSubStrand(data: any) { return this.api.post('/cbc/sub-strands', data); }
-  updateCbcSubStrand(id: string, data: any) { return this.api.put('/cbc/sub-strands/' + id, data); }
-  deleteCbcSubStrand(id: string) { return this.api.delete('/cbc/sub-strands/' + id); }
+  getCbcSubStrands(params?: any) { return this.api.get('/cbe/sub-strands', { params }); }
+  createCbcSubStrand(data: any) { return this.api.post('/cbe/sub-strands', data); }
+  updateCbcSubStrand(id: string, data: any) { return this.api.put('/cbe/sub-strands/' + id, data); }
+  deleteCbcSubStrand(id: string) { return this.api.delete('/cbe/sub-strands/' + id); }
 
   // Assessments
-  getCbcAssessments(params?: any) { return this.api.get('/cbc/assessments', { params }); }
-  createCbcAssessment(data: any) { return this.api.post('/cbc/assessments', data); }
-  updateCbcAssessment(id: string, data: any) { return this.api.put('/cbc/assessments/' + id, data); }
-  deleteCbcAssessment(id: string) { return this.api.delete('/cbc/assessments/' + id); }
+  getCbcAssessments(params?: any) { return this.api.get('/cbe/assessments', { params }); }
+  createCbcAssessment(data: any) { return this.api.post('/cbe/assessments', data); }
+  updateCbcAssessment(id: string, data: any) { return this.api.put('/cbe/assessments/' + id, data); }
+  deleteCbcAssessment(id: string) { return this.api.delete('/cbe/assessments/' + id); }
 
   // Competency Summary
-  getCbcCompetencySummary(params?: any) { return this.api.get('/cbc/competency-summary', { params }); }
-  saveCbcCompetencySummary(data: any) { return this.api.post('/cbc/competency-summary', data); }
+  getCbcCompetencySummary(params?: any) { return this.api.get('/cbe/competency-summary', { params }); }
+  saveCbcCompetencySummary(data: any) { return this.api.post('/cbe/competency-summary', data); }
 
   // Report Cards
-  getCbcReportCards(params?: any) { return this.api.get('/cbc/report-cards', { params }); }
-  getCbcReportCard(id: string) { return this.api.get('/cbc/report-cards/' + id); }
-  createCbcReportCard(data: any) { return this.api.post('/cbc/report-cards', data); }
-  generateCbcReportCards(data: any) { return this.api.post('/cbc/report-cards/generate', data); }
-  publishCbcReportCard(id: string) { return this.api.put('/cbc/report-cards/' + id + '/publish'); }
+  getCbcReportCards(params?: any) { return this.api.get('/cbe/report-cards', { params }); }
+  getCbcReportCard(id: string) { return this.api.get('/cbe/report-cards/' + id); }
+  createCbcReportCard(data: any) { return this.api.post('/cbe/report-cards', data); }
+  generateCbcReportCards(data: any) { return this.api.post('/cbe/report-cards/generate', data); }
+  publishCbcReportCard(id: string) { return this.api.put('/cbe/report-cards/' + id + '/publish'); }
   bulkPublishCbcReportCards(data: { ids?: string[]; class_id?: string; term?: string; academic_year?: string }) {
-    return this.api.put('/cbc/report-cards/bulk-publish', data);
+    return this.api.put('/cbe/report-cards/bulk-publish', data);
   }
   shareReportCard(id: string, channels: string[], contact?: { name: string; phone: string; email: string }) {
-    return this.api.post('/cbc/report-cards/' + id + '/share', {
+    return this.api.post('/cbe/report-cards/' + id + '/share', {
       channels,
       override_email: contact?.email || undefined,
       override_phone: contact?.phone || undefined,
       override_name:  contact?.name  || undefined,
     });
   }
-  acknowledgeCbcReportCard(id: string, data: any) { return this.api.put('/cbc/report-cards/' + id + '/acknowledge', data); }
+  acknowledgeCbcReportCard(id: string, data: any) { return this.api.put('/cbe/report-cards/' + id + '/acknowledge', data); }
 
   // Portfolios
-  getCbcPortfolios(params?: any) { return this.api.get('/cbc/portfolios', { params }); }
-  createCbcPortfolio(data: any) { return this.api.post('/cbc/portfolios', data); }
-  deleteCbcPortfolio(id: string) { return this.api.delete('/cbc/portfolios/' + id); }
+  getCbcPortfolios(params?: any) { return this.api.get('/cbe/portfolios', { params }); }
+  createCbcPortfolio(data: any) { return this.api.post('/cbe/portfolios', data); }
+  deleteCbcPortfolio(id: string) { return this.api.delete('/cbe/portfolios/' + id); }
 
   // Academic Terms
-  getAcademicTerms() { return this.api.get('/cbc/terms'); }
-  getCurrentTerm() { return this.api.get('/cbc/terms/current'); }
-  createAcademicTerm(data: any) { return this.api.post('/cbc/terms', data); }
-  setCurrentTerm(id: string) { return this.api.put('/cbc/terms/' + id + '/set-current'); }
+  getAcademicTerms() { return this.api.get('/cbe/terms'); }
+  getCurrentTerm() { return this.api.get('/cbe/terms/current'); }
+  createAcademicTerm(data: any) { return this.api.post('/cbe/terms', data); }
+  setCurrentTerm(id: string) { return this.api.put('/cbe/terms/' + id + '/set-current'); }
 
-  // CBC Class Summary
-  getCbcClassSummary(classId: string, params?: any) { return this.api.get('/cbc/class-summary/' + classId, { params }); }
+  // CBE Class Summary
+  getCbcClassSummary(classId: string, params?: any) { return this.api.get('/cbe/class-summary/' + classId, { params }); }
 
-  // CBC Broadsheet
-  getCbcBroadsheet(params?: any) { return this.api.get('/cbc/broadsheet', { params }); }
+  // CBE Broadsheet
+  getCbcBroadsheet(params?: any) { return this.api.get('/cbe/broadsheet', { params }); }
 
   // ======================
   // PARENT ALERTS
@@ -1253,7 +1253,7 @@ class ApiService {
   }
 
   // ======================
-  // ACADEMICS MODULE (CBC Comprehensive)
+  // ACADEMICS MODULE (CBE Comprehensive)
   // ======================
 
   // Dashboard

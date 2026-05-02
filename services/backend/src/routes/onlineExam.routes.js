@@ -10,7 +10,7 @@ router.use(authenticate);
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
-function computeCBCGrade(percentage, educationLevel) {
+function computeCBEGrade(percentage, educationLevel) {
   if (['playgroup','pre_primary','lower_primary','upper_primary'].includes(educationLevel)) {
     if (percentage >= 75) return 'EE';
     if (percentage >= 50) return 'ME';
@@ -287,7 +287,7 @@ router.post('/:examId/submit', async (req, res) => {
     }
 
     const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
-    const cbcGrade = computeCBCGrade(percentage, educationLevel);
+    const cbeGrade = computeCBEGrade(percentage, educationLevel);
     const now = new Date();
 
     await query(
@@ -295,7 +295,7 @@ router.post('/:examId/submit', async (req, res) => {
        SET submitted_at=$1, total_score=$2, max_score=$3, cbc_grade=$4, status='submitted',
            time_spent_seconds=EXTRACT(EPOCH FROM ($1 - started_at))::INTEGER
        WHERE id=$5`,
-      [now, totalScore, maxScore, cbcGrade, attempt.id]
+      [now, totalScore, maxScore, cbeGrade, attempt.id]
     );
 
     // Upsert into exam_results
@@ -308,19 +308,19 @@ router.post('/:examId/submit', async (req, res) => {
       await query(
         `INSERT INTO exam_results (id, tenant_id, exam_id, student_id, marks_obtained, max_marks, cbc_grade)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [uuidv4(), tenantId, req.params.examId, studentId, totalScore, maxScore, cbcGrade]
+        [uuidv4(), tenantId, req.params.examId, studentId, totalScore, maxScore, cbeGrade]
       );
     } else {
       await query(
         'UPDATE exam_results SET marks_obtained=$1, max_marks=$2, cbc_grade=$3, updated_at=NOW() WHERE id=$4',
-        [totalScore, maxScore, cbcGrade, existingResult[0].id]
+        [totalScore, maxScore, cbeGrade, existingResult[0].id]
       );
     }
 
     res.json({
       success: true,
       message: 'Exam submitted successfully',
-      data: { total_score: totalScore, max_score: maxScore, percentage: Math.round(percentage), cbc_grade: cbcGrade, breakdown }
+      data: { total_score: totalScore, max_score: maxScore, percentage: Math.round(percentage), cbc_grade: cbeGrade, breakdown }
     });
   } catch (error) {
     console.error('Submit exam error:', error);

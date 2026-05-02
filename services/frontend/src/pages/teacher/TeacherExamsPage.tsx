@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Award, Plus, Trash2, Check, X, Save, Eye, Upload } from 'lucide-react';
 import api from '@/services/api';
-import { computeCBCGrade, getCBCGradeBadgeClass, EDUCATION_LEVELS } from '@/utils/cbcGrades';
+import { computeCBEGrade, getCBEGradeBadgeClass, EDUCATION_LEVELS } from '@/utils/cbeGrades';
 
 type Tab = 'my-exams' | 'create' | 'offline-results';
 
@@ -391,14 +391,14 @@ export function TeacherExamsPage() {
                         <th className="text-left py-2 px-2 w-28">Marks</th>
                         <th className="text-left py-2 px-2 w-28">Max Marks</th>
                         <th className="text-left py-2 px-2 w-20">Absent</th>
-                        <th className="text-left py-2 px-2 w-20">CBC Grade</th>
+                        <th className="text-left py-2 px-2 w-20">CBE Grade</th>
                       </tr>
                     </thead>
                     <tbody>
                       {offlineStudents.map(student => {
                         const r = offlineResults[student.id] || { marks: 0, max_marks: 100, absent: false };
                         const pct = r.max_marks > 0 ? (r.marks / r.max_marks) * 100 : 0;
-                        const grade = r.absent ? '–' : computeCBCGrade(pct, getOfflineExamClass());
+                        const grade = r.absent ? '–' : computeCBEGrade(pct, getOfflineExamClass());
                         return (
                           <tr key={student.id} className="border-b last:border-0">
                             <td className="py-2 pr-4 font-medium">
@@ -434,7 +434,7 @@ export function TeacherExamsPage() {
                               />
                             </td>
                             <td className="py-1 px-2">
-                              <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBCGradeBadgeClass(grade)}`}>
+                              <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBEGradeBadgeClass(grade)}`}>
                                 {grade}
                               </span>
                             </td>

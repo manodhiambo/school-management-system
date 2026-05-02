@@ -131,7 +131,7 @@ export function SchoolRegistrationPage() {
             <GraduationCap className="h-10 w-10 text-yellow-400 mr-3" />
             <span className="text-3xl font-bold text-white">Skul Manager</span>
           </div>
-          <p className="text-blue-200 text-sm">Kenya's #1 CBC School Management Platform</p>
+          <p className="text-blue-200 text-sm">Kenya's #1 CBE School Management Platform</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">

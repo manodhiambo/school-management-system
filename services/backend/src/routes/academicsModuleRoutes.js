@@ -1,5 +1,5 @@
 /**
- * Comprehensive CBC Academics Module Routes
+ * Comprehensive CBE Academics Module Routes
  * Covers: Schemes of Work, Lesson Plans, SBA, Projects,
  *         Life Skills, Career Guidance, Learning Materials, Promotions
  */
@@ -1277,7 +1277,7 @@ router.delete('/subjects/:id', requireRole(['admin']), async (req, res) => {
 });
 
 // ================================================================
-// SEED CBC DEFAULTS (classes + subjects)
+// SEED CBE DEFAULTS (classes + subjects)
 // ================================================================
 
 const CBC_CLASSES = [

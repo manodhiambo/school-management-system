@@ -59,6 +59,8 @@
 }
 
 @media print {
-  body > *:not(.print-receipt) { display: none !important; }
+  body > *:not(.print-receipt):not(.print-timetable) { display: none !important; }
   .print-receipt { display: block !important; }
+  .print-timetable { display: block !important; }
+  .no-print { display: none !important; }
 }

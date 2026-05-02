@@ -197,14 +197,30 @@ export function ExamsPage() {
                     )}
                   </div>
                 </div>
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" className="flex-1">
                     View Details
                   </Button>
-                  {exam.status === 'completed' && (
-                    <Button size="sm" className="flex-1">
-                      View Results
+                  {!exam.is_results_published ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
+                      onClick={async () => {
+                        try {
+                          await api.publishExamResults(exam.id);
+                          loadExams();
+                        } catch (e: any) {
+                          alert(e?.response?.data?.message || 'Failed to publish');
+                        }
+                      }}
+                    >
+                      Publish Results
                     </Button>
+                  ) : (
+                    <span className="flex-1 text-center text-xs py-1 text-green-600 font-medium">
+                      ✓ Results Published
+                    </span>
                   )}
                 </div>
               </CardContent>

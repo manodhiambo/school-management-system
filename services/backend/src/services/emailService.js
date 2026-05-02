@@ -233,7 +233,7 @@ const templates = {
   }),
 
   reportCard: (data) => ({
-    subject: `CBC Report Card — ${data.studentName} | ${data.term} ${data.academicYear}`,
+    subject: `CBE Report Card — ${data.studentName} | ${data.term} ${data.academicYear}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -266,12 +266,12 @@ const templates = {
       <body>
         <div class="container">
           <div class="header">
-            <h1>📋 CBC Report Card</h1>
+            <h1>📋 CBE Report Card</h1>
             <p>${data.schoolName}</p>
           </div>
           <div class="content">
             <p class="greeting">Dear <strong>${data.guardianName}</strong>,</p>
-            <p style="color:#4b5563;">The CBC Report Card for <strong>${data.term} ${data.academicYear}</strong> is now available for your child:</p>
+            <p style="color:#4b5563;">The CBE Report Card for <strong>${data.term} ${data.academicYear}</strong> is now available for your child:</p>
 
             <div class="student-card">
               <h2>${data.studentName}</h2>
@@ -313,7 +313,7 @@ const templates = {
     `,
     text:
       `Dear ${data.guardianName},\n\n` +
-      `The CBC Report Card for ${data.term} ${data.academicYear} is available for ${data.studentName}.\n\n` +
+      `The CBE Report Card for ${data.term} ${data.academicYear} is available for ${data.studentName}.\n\n` +
       `Class: ${data.className}\nOverall Grade: ${data.overallGrade}\n` +
       `Days Present: ${data.daysPresent} | Days Absent: ${data.daysAbsent}\n` +
       (data.teacherComment ? `\nTeacher's Comment:\n"${data.teacherComment}"\n` : '') +

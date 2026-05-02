@@ -54,11 +54,11 @@ const ADMIN_MANUAL: ManualChapter[] = [
           '   – User Management: create login accounts and assign roles',
           '',
           '• ACADEMIC',
-          '   – CBC Academics: Schemes of Work, Lesson Plans, SBA, Projects, Life Skills, Career Guidance, Learning Materials, Promotions',
+          '   – CBE Academics: Schemes of Work, Lesson Plans, SBA, Projects, Life Skills, Career Guidance, Learning Materials, Promotions',
           '   – Classes & Subjects: add/edit class groups and learning areas',
-          '   – CBC Assessments: record and view individual assessment marks',
-          '   – CBC Analytics: grade distribution charts and class rankings',
-          '   – CBC Report Cards: generate, publish, share, and download PDF report cards',
+          '   – CBE Assessments: record and view individual assessment marks',
+          '   – CBE Analytics: grade distribution charts and class rankings',
+          '   – CBE Report Cards: generate, publish, share, and download PDF report cards',
           '   – Grade Book: quick mark entry per class',
           '   – Attendance: view and mark daily attendance',
           '   – IGCSE: full Cambridge International module (see Chapter 13)',
@@ -197,7 +197,7 @@ const ADMIN_MANUAL: ManualChapter[] = [
     ],
   },
   {
-    chapter: '5. Academic Management (CBC)',
+    chapter: '5. Academic Management (CBE)',
     sections: [
       {
         title: 'Managing Classes & Learning Areas',
@@ -205,7 +205,7 @@ const ADMIN_MANUAL: ManualChapter[] = [
           '1. Go to Academic in the sidebar.',
           '2. Use the "Classes" tab to add/edit class groups (e.g., Grade 4 East).',
           '3. Use the "Learning Areas" tab to manage subjects per grade level.',
-          'CBC Grade Levels: Playgroup → PP1/PP2 → Grade 1–6 → Grade 7–9 (JSS) → Grade 10–12 (SSS).',
+          'CBE Grade Levels: Playgroup → PP1/PP2 → Grade 1–6 → Grade 7–9 (JSS) → Grade 10–12 (SSS).',
         ],
       },
       {
@@ -220,9 +220,9 @@ const ADMIN_MANUAL: ManualChapter[] = [
         ],
       },
       {
-        title: 'CBC Assessments — Recording Marks',
+        title: 'CBE Assessments — Recording Marks',
         content: [
-          '1. Go to "CBC Assessments" in the sidebar under Academic.',
+          '1. Go to "CBE Assessments" in the sidebar under Academic.',
           '2. Click "+ Record Assessment".',
           '3. Fill in the form:',
           '   – Class, Student, Subject',
@@ -236,7 +236,7 @@ const ADMIN_MANUAL: ManualChapter[] = [
           '   – AE/AE1/AE2 → "Can do better"   BE/BE1/BE2 → "Put More Effort"',
           '   You can still type your own comment to override.',
           '5. Click "Save Assessment".',
-          'CBC Grade Scales:',
+          'CBE Grade Scales:',
           '  Standard (Grade 1–6, Senior Secondary):',
           '    EE ≥80% | ME 60–79% | AE 40–59% | BE <40%',
           '  JSS 2025 KJSEA (Grade 7–9) — 8 Achievement Levels:',
@@ -248,9 +248,9 @@ const ADMIN_MANUAL: ManualChapter[] = [
         ],
       },
       {
-        title: 'CBC Assessments — Editing & Deleting Records',
+        title: 'CBE Assessments — Editing & Deleting Records',
         content: [
-          '1. Go to "CBC Assessments" in the sidebar.',
+          '1. Go to "CBE Assessments" in the sidebar.',
           '2. Use the filters (Class, Subject, Term, Year) to find the record.',
           '3. To edit: click the pencil icon on the assessment row.',
           '   – Update the score, max score, exam period, special status (WD/Y), or comments inline.',
@@ -260,9 +260,9 @@ const ADMIN_MANUAL: ManualChapter[] = [
         ],
       },
       {
-        title: 'CBC Assessments — Downloading Results',
+        title: 'CBE Assessments — Downloading Results',
         content: [
-          '1. Go to "CBC Assessments" in the sidebar.',
+          '1. Go to "CBE Assessments" in the sidebar.',
           '2. Use the filters to narrow down to the class, subject, or term you need.',
           '3. Click the "Download CSV" button (top right of the page).',
           '4. A spreadsheet file downloads to your device containing:',
@@ -271,9 +271,9 @@ const ADMIN_MANUAL: ManualChapter[] = [
         ],
       },
       {
-        title: 'CBC Report Cards — Generating & Sharing',
+        title: 'CBE Report Cards — Generating & Sharing',
         content: [
-          '1. Go to "CBC Report Cards" in the sidebar.',
+          '1. Go to "CBE Report Cards" in the sidebar.',
           '2. Select the Class, Term, and Academic Year.',
           '3. Click "Generate Report Cards for All Students".',
           '4. Click on a student\'s name to open their individual report card.',
@@ -285,11 +285,11 @@ const ADMIN_MANUAL: ManualChapter[] = [
         ],
       },
       {
-        title: 'CBC Report Cards — Bulk PDF Download',
+        title: 'CBE Report Cards — Bulk PDF Download',
         content: [
           'You can download report cards as a single PDF file for printing or record-keeping.',
           '',
-          '1. Go to "CBC Report Cards" in the sidebar.',
+          '1. Go to "CBE Report Cards" in the sidebar.',
           '2. Select the Class, Term, and Academic Year to load the report cards.',
           '3. Click the "Download PDF" dropdown button (top right of the page).',
           '4. Choose one of three options:',
@@ -301,7 +301,7 @@ const ADMIN_MANUAL: ManualChapter[] = [
           '   – School name and logo (set in Account → Settings)',
           '   – Student name, class, and admission number',
           '   – Attendance summary',
-          '   – Learning area grades with colour-coded CBC badges',
+          '   – Learning area grades with colour-coded CBE badges',
           '   – Teacher comments and overall grade',
           'TIP: Use "Published Only" before parents\' day to print only finalised cards.',
           'TIP: Set your school logo in Account → Settings so it appears on the PDF header.',
@@ -309,26 +309,26 @@ const ADMIN_MANUAL: ManualChapter[] = [
         ],
       },
       {
-        title: 'CBC Analytics — Class View',
+        title: 'CBE Analytics — Class View',
         content: [
-          '1. Go to "CBC Analytics" in the sidebar.',
+          '1. Go to "CBE Analytics" in the sidebar.',
           '2. Click the "Class View" tab.',
           '3. Select a class from the dropdown.',
           '4. The system displays:',
-          '   – CBC Grade Distribution chart (EE / ME / AE / BE breakdown)',
-          '   – Student Rankings by average score across all CBC assessments',
+          '   – CBE Grade Distribution chart (EE / ME / AE / BE breakdown)',
+          '   – Student Rankings by average score across all CBE assessments',
           '   – Subject Performance showing average % per learning area',
-          'NOTE: Data comes from CBC Assessments you have recorded — the more',
+          'NOTE: Data comes from CBE Assessments you have recorded — the more',
           'assessments entered, the richer the analytics.',
           'TIP: Use Class View to identify students who need extra support (BE/AE).',
         ],
       },
       {
-        title: 'CBC Analytics — Broadsheet (Class Performance Grid)',
+        title: 'CBE Analytics — Broadsheet (Class Performance Grid)',
         content: [
           'The Broadsheet gives you a complete class performance snapshot — all students × all subjects in one table.',
           '',
-          '1. Go to "CBC Analytics" in the sidebar.',
+          '1. Go to "CBE Analytics" in the sidebar.',
           '2. Click the "Broadsheet" tab.',
           '3. Select a Class, Term (optional), and Academic Year.',
           '4. Click "Generate" — the grid loads automatically.',
@@ -336,7 +336,7 @@ const ADMIN_MANUAL: ManualChapter[] = [
           'Reading the Broadsheet:',
           '   – Rows = individual students',
           '   – Columns = learning areas / subjects',
-          '   – Each cell shows the CBC grade for that student in that subject:',
+          '   – Each cell shows the CBE grade for that student in that subject:',
           '       EE (green) = Exceeding Expectations (≥80%)',
           '       ME (blue)  = Meeting Expectations (60–79%)',
           '       AE (yellow)= Approaching Expectations (40–59%)',
@@ -629,7 +629,7 @@ const ADMIN_MANUAL: ManualChapter[] = [
           '     Supported formats: JPG, PNG, GIF. Recommended: square image, at least 256×256 px.',
           '   – The image is automatically resized and stored. A preview appears immediately.',
           '   – To remove the logo, click the "Remove" link below the preview.',
-          '   – The logo appears on CBC Report Card PDFs and other printed documents.',
+          '   – The logo appears on CBE Report Card PDFs and other printed documents.',
           'TIP: Use a clear, square version of your school crest for best results on printed reports.',
           '',
           '3. Click "Save Settings" to apply all changes.',
@@ -653,7 +653,7 @@ const ADMIN_MANUAL: ManualChapter[] = [
         title: 'What is the IGCSE Module?',
         content: [
           'The IGCSE module supports the Cambridge International General Certificate of Secondary',
-          'Education curriculum alongside (not instead of) the Kenya CBC curriculum.',
+          'Education curriculum alongside (not instead of) the Kenya CBE curriculum.',
           '',
           'It provides:',
           '  • Subject and syllabus management with Cambridge subject codes (e.g. 0580 = Maths)',
@@ -951,7 +951,7 @@ const TEACHER_MANUAL: ManualChapter[] = [
           '1. Go to Academic → Grade Book in the sidebar.',
           '2. Select the Class and Learning Area.',
           '3. Click the assessment column or "Add Assessment".',
-          '4. Enter the student\'s score. The CBC grade is calculated automatically:',
+          '4. Enter the student\'s score. The CBE grade is calculated automatically:',
           '   – EE: 80%+ | ME: 60–79% | AE: 40–59% | BE: below 40%',
           '5. Click "Save". Grades are immediately visible to students.',
         ],
@@ -959,12 +959,12 @@ const TEACHER_MANUAL: ManualChapter[] = [
     ],
   },
   {
-    chapter: '5. CBC Assessments (SBA)',
+    chapter: '5. CBE Assessments (SBA)',
     sections: [
       {
-        title: 'Recording a CBC Assessment',
+        title: 'Recording a CBE Assessment',
         content: [
-          '1. Go to "CBC Assessments" in the sidebar.',
+          '1. Go to "CBE Assessments" in the sidebar.',
           '2. Click "+ Record Assessment".',
           '3. Fill in the form:',
           '   – Class → Student → Subject',
@@ -982,7 +982,7 @@ const TEACHER_MANUAL: ManualChapter[] = [
       {
         title: 'Editing or Deleting an Assessment',
         content: [
-          '1. Go to "CBC Assessments" in the sidebar.',
+          '1. Go to "CBE Assessments" in the sidebar.',
           '2. Use the filters (Class, Subject, Term) to find the record.',
           '3. To EDIT: click the pencil icon on the row.',
           '   – Change score, max score, exam period, special status (WD/Y), or comments.',
@@ -994,7 +994,7 @@ const TEACHER_MANUAL: ManualChapter[] = [
       {
         title: 'Downloading Assessment Results',
         content: [
-          '1. Go to "CBC Assessments" in the sidebar.',
+          '1. Go to "CBE Assessments" in the sidebar.',
           '2. Set your filters (Class, Subject, Term, Year) to get the records you need.',
           '3. Click "Download CSV" at the top right.',
           '4. A spreadsheet file is saved to your device.',
@@ -1004,7 +1004,7 @@ const TEACHER_MANUAL: ManualChapter[] = [
       {
         title: 'Understanding Grade Codes',
         content: [
-          'Standard CBC (Grade 1–6, Senior Secondary Grade 10–12):',
+          'Standard CBE (Grade 1–6, Senior Secondary Grade 10–12):',
           '   EE – Exceeding Expectations (80%+)     → EXCELLENT',
           '   ME – Meeting Expectations (60–79%)     → GOOD',
           '   AE – Approaching Expectations (40–59%) → Can do better',
@@ -1114,7 +1114,7 @@ const TEACHER_MANUAL: ManualChapter[] = [
         content: [
           '1. Go to Academic → "Values & Life Skills" tab.',
           '2. Select your class.',
-          '3. For each student, rate the CBC core values and competencies.',
+          '3. For each student, rate the CBE core values and competencies.',
           '4. Click "Save Assessment".',
           'Core Values: Integrity, Respect, Responsibility, Love, Unity, Peace, Patriotism, Ubuntu.',
           'Competencies: Communication, Critical Thinking, Creativity, Collaboration, Digital Literacy.',
@@ -1358,7 +1358,7 @@ const STUDENT_MANUAL: ManualChapter[] = [
         content: [
           '1. Click "My Results" in the sidebar.',
           '2. Select the Term to view results for that period.',
-          '3. Your CBC grades are shown per subject:',
+          '3. Your CBE grades are shown per subject:',
           '   – EE (Exceeding Expectations): 80%+  – Excellent!',
           '   – ME (Meeting Expectations): 60–79%  – Good',
           '   – AE (Approaching Expectations): 40–59%  – Needs improvement',
@@ -1629,7 +1629,7 @@ const PARENT_MANUAL: ManualChapter[] = [
         content: [
           '1. Click "Children\'s Progress" in the sidebar.',
           '2. Select the child and term.',
-          '3. View their CBC grades per subject:',
+          '3. View their CBE grades per subject:',
           '   – EE (Exceeding Expectations): 80%+',
           '   – ME (Meeting Expectations): 60–79%',
           '   – AE (Approaching Expectations): 40–59%',

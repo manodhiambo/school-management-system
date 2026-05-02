@@ -10,6 +10,7 @@ import api from '@/services/api';
 import jsPDF from 'jspdf';
 
 const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
   { value: 'mpesa', label: 'M-Pesa' },
   { value: 'coop_bus_bank', label: 'Co-op Bus Bank' },
   { value: 'coop_bus_paybill', label: 'Co-Op Bus Paybill' },

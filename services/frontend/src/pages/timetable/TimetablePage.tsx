@@ -5,9 +5,10 @@ import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Clock, Plus, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Clock, Plus, Trash2, AlertTriangle, RefreshCw, Printer, Download } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import jsPDF from 'jspdf';
 
 export function TimetablePage() {
   const { user } = useAuthStore();
@@ -157,6 +158,71 @@ export function TimetablePage() {
     });
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPDF = () => {
+    const className = classes.find(c => c.id === selectedClass);
+    const classLabel = className ? `${className.name} ${className.section || ''}`.trim() : 'Class';
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+    const margin = 12;
+    let y = margin;
+    const pageW = 297;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Timetable — ${classLabel}`, pageW / 2, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-KE')}`, pageW / 2, y, { align: 'center' });
+    y += 8;
+
+    const colW = (pageW - margin * 2) / daysOfWeek.length;
+    const headerH = 9;
+
+    // Day headers
+    doc.setFillColor(59, 130, 246);
+    daysOfWeek.forEach((day, i) => {
+      const x = margin + i * colW;
+      doc.setFillColor(59, 130, 246);
+      doc.rect(x, y, colW, headerH, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(day.label, x + colW / 2, y + 6, { align: 'center' });
+    });
+    doc.setTextColor(0, 0, 0);
+    y += headerH + 2;
+
+    const maxRows = Math.max(...daysOfWeek.map(d => (groupedTimetable[d.value] || []).length));
+    const rowH = 16;
+
+    for (let row = 0; row < maxRows; row++) {
+      daysOfWeek.forEach((day, i) => {
+        const x = margin + i * colW;
+        const entry = (groupedTimetable[day.value] || [])[row];
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(x, y, colW, rowH);
+        if (entry) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          const subj = entry.subject_name || 'Subject';
+          doc.text(subj.slice(0, 18), x + 2, y + 5);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.text(entry.teacher_name || '', x + 2, y + 10);
+          const timeStr = `${(entry.start_time || '').slice(0, 5)}–${(entry.end_time || '').slice(0, 5)}`;
+          doc.text(timeStr + (entry.room ? ` · ${entry.room}` : ''), x + 2, y + 14.5);
+        }
+      });
+      y += rowH;
+    }
+
+    doc.save(`timetable-${classLabel.replace(/\s+/g, '-')}.pdf`);
+  };
+
   const groupByDay = (entries: any[]) => {
     const grouped: Record<string, any[]> = {};
     daysOfWeek.forEach(day => {
@@ -182,24 +248,38 @@ export function TimetablePage() {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 print-timetable">
+      <div className="flex items-center justify-between no-print">
         <div>
           <h2 className="text-3xl font-bold">Timetable Management</h2>
           <p className="text-gray-500">View and manage class schedules</p>
         </div>
-        {isAdmin && (
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={() => setShowResetModal(true)} className="text-red-600">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Reset Timetable
-            </Button>
-            <Button onClick={() => setShowAddModal(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Entry
-            </Button>
-          </div>
-        )}
+        <div className="flex space-x-2">
+          {timetable.length > 0 && (
+            <>
+              <Button variant="outline" onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </Button>
+              <Button variant="outline" onClick={handleDownloadPDF}>
+                <Download className="mr-2 h-4 w-4" />
+                Download PDF
+              </Button>
+            </>
+          )}
+          {isAdmin && (
+            <>
+              <Button variant="outline" onClick={() => setShowResetModal(true)} className="text-red-600">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reset Timetable
+              </Button>
+              <Button onClick={() => setShowAddModal(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Entry
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <Card>

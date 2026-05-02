@@ -6,8 +6,8 @@ import { sendEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
-// Helper: compute CBC grade from percentage and education level
-function computeCBCGrade(percentage, level) {
+// Helper: compute CBE grade from percentage and education level
+function computeCBEGrade(percentage, level) {
   if (['playgroup', 'pre_primary'].includes(level)) {
     if (percentage >= 75) return 'WD'; // Well Developed
     if (percentage >= 40) return 'D';  // Developing
@@ -24,7 +24,7 @@ function computeCBCGrade(percentage, level) {
     if (percentage >= 11) return 'BE1'; // Below Expectations Level 1
     return 'BE2';                        // Below Expectations Level 2
   }
-  // Standard CBC for lower_primary, upper_primary, senior_secondary
+  // Standard CBE for lower_primary, upper_primary, senior_secondary
   if (percentage >= 80) return 'EE'; // Exceeding Expectations
   if (percentage >= 60) return 'ME'; // Meeting Expectations
   if (percentage >= 40) return 'AE'; // Approaching Expectations
@@ -42,7 +42,7 @@ function gradePoints(grade) {
   return points[grade] ?? null;
 }
 
-function cbcGradeLabel(grade) {
+function cbeGradeLabel(grade) {
   const labels = {
     EE: 'Exceeding Expectations', ME: 'Meeting Expectations',
     AE: 'Approaching Expectations', BE: 'Below Expectations',
@@ -70,7 +70,7 @@ function autoComment(grade) {
 // STRANDS
 // ============================================================
 
-// GET /api/v1/cbc/strands?subject_id=&education_level=
+// GET /api/v1/cbe/strands?subject_id=&education_level=
 router.get('/strands', authenticate, async (req, res) => {
   try {
     const { subject_id, education_level } = req.query;
@@ -90,7 +90,7 @@ router.get('/strands', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/strands
+// POST /api/v1/cbe/strands
 router.post('/strands', authenticate, async (req, res) => {
   try {
     const { subject_id, name, code, education_level, order_index } = req.body;
@@ -107,7 +107,7 @@ router.post('/strands', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/strands/:id
+// PUT /api/v1/cbe/strands/:id
 router.put('/strands/:id', authenticate, async (req, res) => {
   try {
     const { name, code, education_level, order_index } = req.body;
@@ -123,7 +123,7 @@ router.put('/strands/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/v1/cbc/strands/:id
+// DELETE /api/v1/cbe/strands/:id
 router.delete('/strands/:id', authenticate, async (req, res) => {
   try {
     await query('DELETE FROM cbc_strands WHERE id=$1 AND tenant_id=$2', [req.params.id, req.user.tenant_id]);
@@ -137,7 +137,7 @@ router.delete('/strands/:id', authenticate, async (req, res) => {
 // SUB-STRANDS
 // ============================================================
 
-// GET /api/v1/cbc/sub-strands?strand_id=
+// GET /api/v1/cbe/sub-strands?strand_id=
 router.get('/sub-strands', authenticate, async (req, res) => {
   try {
     const { strand_id } = req.query;
@@ -154,7 +154,7 @@ router.get('/sub-strands', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/sub-strands
+// POST /api/v1/cbe/sub-strands
 router.post('/sub-strands', authenticate, async (req, res) => {
   try {
     const { strand_id, name, code, order_index } = req.body;
@@ -172,7 +172,7 @@ router.post('/sub-strands', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/sub-strands/:id
+// PUT /api/v1/cbe/sub-strands/:id
 router.put('/sub-strands/:id', authenticate, async (req, res) => {
   try {
     const { name, code, order_index } = req.body;
@@ -190,7 +190,7 @@ router.put('/sub-strands/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/v1/cbc/sub-strands/:id
+// DELETE /api/v1/cbe/sub-strands/:id
 router.delete('/sub-strands/:id', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
@@ -208,7 +208,7 @@ router.delete('/sub-strands/:id', authenticate, async (req, res) => {
 // ASSESSMENTS
 // ============================================================
 
-// GET /api/v1/cbc/assessments?student_id=&class_id=&subject_id=&term=&academic_year=
+// GET /api/v1/cbe/assessments?student_id=&class_id=&subject_id=&term=&academic_year=
 router.get('/assessments', authenticate, async (req, res) => {
   try {
     const { student_id, class_id, subject_id, term, academic_year } = req.query;
@@ -237,7 +237,7 @@ router.get('/assessments', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/assessments
+// POST /api/v1/cbe/assessments
 router.post('/assessments', authenticate, async (req, res) => {
   try {
     const {
@@ -254,9 +254,9 @@ router.post('/assessments', authenticate, async (req, res) => {
     if (!result_code && score != null && max_score > 0) {
       const pct = (score / max_score) * 100;
       if (['playgroup', 'pre_primary'].includes(education_level)) {
-        pre_primary_grade = computeCBCGrade(pct, education_level);
+        pre_primary_grade = computeCBEGrade(pct, education_level);
       } else {
-        cbc_grade = computeCBCGrade(pct, education_level || 'lower_primary');
+        cbc_grade = computeCBEGrade(pct, education_level || 'lower_primary');
         grade_pts = gradePoints(cbc_grade);
       }
     }
@@ -284,7 +284,7 @@ router.post('/assessments', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/assessments/:id — admin or teacher who created it
+// PUT /api/v1/cbe/assessments/:id — admin or teacher who created it
 router.put('/assessments/:id', authenticate, async (req, res) => {
   if (!['admin', 'superadmin', 'teacher'].includes(req.user.role)) {
     return res.status(403).json({ success: false, message: 'Access denied' });
@@ -304,9 +304,9 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
     if (!result_code && score != null && max_score > 0 && !cbc_grade && !pre_primary_grade) {
       const pct = (score / max_score) * 100;
       if (['playgroup', 'pre_primary'].includes(education_level)) {
-        ppGrade = computeCBCGrade(pct, education_level);
+        ppGrade = computeCBEGrade(pct, education_level);
       } else {
-        grade = computeCBCGrade(pct, education_level || 'lower_primary');
+        grade = computeCBEGrade(pct, education_level || 'lower_primary');
       }
     }
     if (!result_code && grade) grade_pts = gradePoints(grade);
@@ -326,7 +326,7 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/v1/cbc/assessments/:id — admin or teacher who created it
+// DELETE /api/v1/cbe/assessments/:id — admin or teacher who created it
 router.delete('/assessments/:id', authenticate, async (req, res) => {
   if (!['admin', 'superadmin', 'teacher'].includes(req.user.role)) {
     return res.status(403).json({ success: false, message: 'Access denied' });
@@ -349,7 +349,7 @@ router.delete('/assessments/:id', authenticate, async (req, res) => {
 // COMPETENCY SUMMARY (per student per subject per term)
 // ============================================================
 
-// GET /api/v1/cbc/competency-summary?student_id=&term=&academic_year=
+// GET /api/v1/cbe/competency-summary?student_id=&term=&academic_year=
 router.get('/competency-summary', authenticate, async (req, res) => {
   try {
     const { student_id, class_id, term, academic_year } = req.query;
@@ -373,7 +373,7 @@ router.get('/competency-summary', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/competency-summary (upsert)
+// POST /api/v1/cbe/competency-summary (upsert)
 router.post('/competency-summary', authenticate, async (req, res) => {
   try {
     const {
@@ -409,7 +409,7 @@ router.post('/competency-summary', authenticate, async (req, res) => {
 // REPORT CARDS
 // ============================================================
 
-// GET /api/v1/cbc/report-cards?student_id=&term=&academic_year=&class_id=
+// GET /api/v1/cbe/report-cards?student_id=&term=&academic_year=&class_id=
 // When class_id is provided, returns ALL students in that class (LEFT JOIN) so students without
 // a report card yet still appear in the list.
 router.get('/report-cards', authenticate, async (req, res) => {
@@ -472,7 +472,7 @@ router.get('/report-cards', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/report-cards/generate — bulk-create draft report cards for all students in a class
+// POST /api/v1/cbe/report-cards/generate — bulk-create draft report cards for all students in a class
 router.post('/report-cards/generate', authenticate, async (req, res) => {
   try {
     const { class_id, term, academic_year, closing_date, opening_date } = req.body;
@@ -877,7 +877,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/report-cards/:id/share — send report card to parent via email and/or WhatsApp
+// POST /api/v1/cbe/report-cards/:id/share — send report card to parent via email and/or WhatsApp
 router.post('/report-cards/:id/share', authenticate, async (req, res) => {
   try {
     // channels: ['email', 'whatsapp']
@@ -960,7 +960,7 @@ router.post('/report-cards/:id/share', authenticate, async (req, res) => {
 
         const message =
           `Dear ${toName},\n\n` +
-          `${rc.student_name}'s CBC Report Card for ${termLabel} ${rc.academic_year} is ready.\n\n` +
+          `${rc.student_name}'s CBE Report Card for ${termLabel} ${rc.academic_year} is ready.\n\n` +
           `📚 Class: ${rc.class_name}\n` +
           `🏅 Overall Grade: ${gradeLabel}\n` +
           `✅ Days Present: ${rc.days_present ?? 'N/A'}\n` +
@@ -992,7 +992,7 @@ router.post('/report-cards/:id/share', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/report-cards (create or upsert)
+// POST /api/v1/cbe/report-cards (create or upsert)
 router.post('/report-cards', authenticate, async (req, res) => {
   try {
     const {
@@ -1032,7 +1032,7 @@ router.post('/report-cards', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/report-cards/bulk-publish — publish multiple cards at once
+// PUT /api/v1/cbe/report-cards/bulk-publish — publish multiple cards at once
 // Must come before /:id routes so Express doesn't treat "bulk-publish" as an :id
 router.put('/report-cards/bulk-publish', authenticate, async (req, res) => {
   try {
@@ -1066,7 +1066,7 @@ router.put('/report-cards/bulk-publish', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/report-cards/:id/publish
+// PUT /api/v1/cbe/report-cards/:id/publish
 router.put('/report-cards/:id/publish', authenticate, async (req, res) => {
   try {
     const rows = await query(
@@ -1081,7 +1081,7 @@ router.put('/report-cards/:id/publish', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/report-cards/:id/acknowledge (parent acknowledges)
+// PUT /api/v1/cbe/report-cards/:id/acknowledge (parent acknowledges)
 router.put('/report-cards/:id/acknowledge', authenticate, async (req, res) => {
   try {
     const { comment } = req.body;
@@ -1100,7 +1100,7 @@ router.put('/report-cards/:id/acknowledge', authenticate, async (req, res) => {
 // PORTFOLIOS
 // ============================================================
 
-// GET /api/v1/cbc/portfolios?student_id=&subject_id=&term=&academic_year=
+// GET /api/v1/cbe/portfolios?student_id=&subject_id=&term=&academic_year=
 router.get('/portfolios', authenticate, async (req, res) => {
   try {
     const { student_id, subject_id, term, academic_year } = req.query;
@@ -1124,7 +1124,7 @@ router.get('/portfolios', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/portfolios
+// POST /api/v1/cbe/portfolios
 router.post('/portfolios', authenticate, async (req, res) => {
   try {
     const { student_id, subject_id, strand_id, title, description, evidence_type, file_url, term, academic_year } = req.body;
@@ -1141,7 +1141,7 @@ router.post('/portfolios', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/v1/cbc/portfolios/:id
+// DELETE /api/v1/cbe/portfolios/:id
 router.delete('/portfolios/:id', authenticate, async (req, res) => {
   try {
     await query('DELETE FROM student_portfolios WHERE id=$1', [req.params.id]);
@@ -1155,7 +1155,7 @@ router.delete('/portfolios/:id', authenticate, async (req, res) => {
 // ACADEMIC TERMS
 // ============================================================
 
-// GET /api/v1/cbc/terms
+// GET /api/v1/cbe/terms
 router.get('/terms', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
@@ -1169,7 +1169,7 @@ router.get('/terms', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/v1/cbc/terms/current
+// GET /api/v1/cbe/terms/current
 router.get('/terms/current', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
@@ -1183,7 +1183,7 @@ router.get('/terms/current', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/v1/cbc/terms
+// POST /api/v1/cbe/terms
 router.post('/terms', authenticate, async (req, res) => {
   try {
     const {
@@ -1220,7 +1220,7 @@ router.post('/terms', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/v1/cbc/terms/:id/set-current
+// PUT /api/v1/cbe/terms/:id/set-current
 router.put('/terms/:id/set-current', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
@@ -1235,10 +1235,10 @@ router.put('/terms/:id/set-current', authenticate, async (req, res) => {
 });
 
 // ============================================================
-// CBC GRADE SUMMARY FOR CLASS (bulk report)
+// CBE GRADE SUMMARY FOR CLASS (bulk report)
 // ============================================================
 
-// GET /api/v1/cbc/class-summary/:classId?term=&academic_year=
+// GET /api/v1/cbe/class-summary/:classId?term=&academic_year=
 router.get('/class-summary/:classId', authenticate, async (req, res) => {
   try {
     const { classId } = req.params;
@@ -1275,7 +1275,7 @@ router.get('/class-summary/:classId', authenticate, async (req, res) => {
 });
 
 // ── BROADSHEET ─────────────────────────────────────────────────────────────
-// GET /api/v1/cbc/broadsheet?class_id=&term=&academic_year=
+// GET /api/v1/cbe/broadsheet?class_id=&term=&academic_year=
 // Returns a class-wide performance grid: students (rows) × subjects (columns)
 router.get('/broadsheet', authenticate, async (req, res) => {
   try {

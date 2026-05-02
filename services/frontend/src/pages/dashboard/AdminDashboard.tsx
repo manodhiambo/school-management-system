@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import { UserManualCard } from '@/components/UserManualCard';
+import { SystemBlueprintCard } from '@/components/SystemBlueprintCard';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
@@ -406,8 +407,11 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      {/* User Manual Download */}
-      <UserManualCard />
+      {/* Downloads: Blueprint + User Manual */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SystemBlueprintCard />
+        <UserManualCard />
+      </div>
     </div>
   );
 }

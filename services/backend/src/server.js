@@ -46,6 +46,9 @@ import academicsModuleRoutes from './routes/academicsModuleRoutes.js';
 import staffLeaveRoutes from './routes/staffLeaveRoutes.js';
 import extraFeesRoutes from './routes/extraFeesRoutes.js';
 import igcseRoutes from './routes/igcseRoutes.js';
+import driverRoutes from './routes/driverRoutes.js';
+import teacherCheckinRoutes from './routes/teacherCheckinRoutes.js';
+import smsRoutes from './routes/smsRoutes.js';
 
 dotenv.config();
 
@@ -120,6 +123,11 @@ app.use('/api/v1/staff-leave', staffLeaveRoutes);
 
 // IGCSE (Cambridge International) Module
 app.use('/api/v1/igcse', igcseRoutes);
+
+// Driver / transport tracking / teacher check-in / SMS
+app.use('/api/v1/driver', driverRoutes);
+app.use('/api/v1/checkin', teacherCheckinRoutes);
+app.use('/api/v1/sms', smsRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', schoolRegistrationRoutes);

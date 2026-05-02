@@ -90,6 +90,11 @@ import { StaffLeavePage } from './pages/staff/StaffLeavePage';
 // Parent Alerts
 import { ParentAlertsPage } from './pages/parent/ParentAlertsPage';
 
+// New features: Transport Tracking / Teacher Check-in / SMS
+import { TransportTrackingPage } from './pages/transport/TransportTrackingPage';
+import { TeacherCheckinAdminPage } from './pages/teacher/TeacherCheckinAdminPage';
+import { SMSPage } from './pages/sms/SMSPage';
+
 // Shared Pages
 import { ProfilePage } from './pages/settings/ProfilePage';
 
@@ -213,8 +218,15 @@ function App() {
               {/* Discipline / Transport / Health */}
               <Route path="discipline" element={<DisciplinePage />} />
               <Route path="transport" element={<TransportPage />} />
+              <Route path="transport-tracking" element={<TransportTrackingPage />} />
               <Route path="health" element={<HealthPage />} />
               <Route path="staff-leave" element={<StaffLeavePage />} />
+
+              {/* Teacher Check-in Admin */}
+              <Route path="teacher-checkin" element={<TeacherCheckinAdminPage />} />
+
+              {/* SMS Messaging */}
+              <Route path="sms" element={<SMSPage />} />
 
               {/* Parent Alerts */}
               <Route path="my-alerts" element={<ParentAlertsPage />} />

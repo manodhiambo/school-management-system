@@ -40,6 +40,9 @@ import {
   FolderOpen,
   Star,
   Globe,
+  Navigation,
+  CheckCircle,
+  MessageCircle,
 } from 'lucide-react';
 
 type NavItem = {
@@ -123,10 +126,15 @@ const navigationItems: NavItem[] = [
   { name: 'Notifications', href: '/app/notifications', icon: Bell,          roles: ['parent', 'student'],         section: 'Messages' },
 
   // ── Student Welfare ───────────────────────────────────────────────────────
-  { name: 'Discipline',    href: '/app/discipline',  icon: AlertTriangle, roles: ['admin', 'teacher'], section: 'Welfare' },
-  { name: 'Health',        href: '/app/health',      icon: Heart,         roles: ['admin', 'teacher'], section: 'Welfare' },
-  { name: 'Staff Leave',   href: '/app/staff-leave', icon: ClipboardList, roles: ['admin', 'teacher'], section: 'Welfare' },
-  { name: 'Transport',   href: '/app/transport',  icon: Bus,           roles: ['admin'],            section: 'Welfare' },
+  { name: 'Discipline',         href: '/app/discipline',         icon: AlertTriangle, roles: ['admin', 'teacher'],                   section: 'Welfare' },
+  { name: 'Health',             href: '/app/health',             icon: Heart,         roles: ['admin', 'teacher'],                   section: 'Welfare' },
+  { name: 'Staff Leave',        href: '/app/staff-leave',        icon: ClipboardList, roles: ['admin', 'teacher'],                   section: 'Welfare' },
+  { name: 'Transport',          href: '/app/transport',          icon: Bus,           roles: ['admin'],                              section: 'Welfare' },
+  { name: 'Transport Tracking', href: '/app/transport-tracking', icon: Navigation,    roles: ['admin', 'teacher'],                   section: 'Welfare' },
+  { name: 'My Route',           href: '/app/dashboard',          icon: Bus,           roles: ['driver'],                             section: 'Welfare' },
+  { name: 'Teacher Check-in',   href: '/app/teacher-checkin',    icon: CheckCircle,   roles: ['admin'],                              section: 'Welfare' },
+  { name: 'SMS Messaging',      href: '/app/sms',                icon: MessageCircle, roles: ['admin', 'teacher'],                   section: 'Messages' },
+  { name: 'My Transport',       href: '/app/my-transport',       icon: Bus,           roles: ['parent'],                             section: 'Family' },
 
   // ── Library ───────────────────────────────────────────────────────────────
   { name: 'Library Catalog',    href: '/app/library',            icon: Library,  roles: ['admin', 'teacher', 'student', 'parent'], section: 'Library' },

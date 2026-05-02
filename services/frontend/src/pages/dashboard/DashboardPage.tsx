@@ -4,6 +4,7 @@ import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDashboard } from './StudentDashboard';
 import { ParentDashboard } from './ParentDashboard';
 import { FinanceOfficerDashboard } from './FinanceOfficerDashboard';
+import { DriverDashboard } from '../driver/DriverDashboard';
 
 export function DashboardPage() {
   const { user } = useAuthStore();
@@ -19,6 +20,8 @@ export function DashboardPage() {
       return <ParentDashboard />;
     case 'finance_officer':
       return <FinanceOfficerDashboard />;
+    case 'driver':
+      return <DriverDashboard />;
     default:
       return <StudentDashboard />;
   }

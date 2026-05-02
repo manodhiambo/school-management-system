@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { UserManualCard } from '@/components/UserManualCard';
+import { ParentTransportWidget } from '@/components/ParentTransportWidget';
 
 export function ParentDashboard() {
   const { user } = useAuthStore();
@@ -253,6 +254,9 @@ export function ParentDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Transport Status */}
+      <ParentTransportWidget />
 
       {/* User Manual Download */}
       <UserManualCard />

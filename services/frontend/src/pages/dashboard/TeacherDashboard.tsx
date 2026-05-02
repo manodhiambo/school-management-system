@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { UserManualCard } from '@/components/UserManualCard';
+import { TeacherCheckinWidget } from '@/components/TeacherCheckinWidget';
 
 export function TeacherDashboard() {
   const { user } = useAuthStore();
@@ -295,6 +296,9 @@ export function TeacherDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Daily Check-in */}
+      <TeacherCheckinWidget />
 
       {/* User Manual Download */}
       <UserManualCard />

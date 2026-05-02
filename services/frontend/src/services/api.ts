@@ -1162,6 +1162,29 @@ class ApiService {
   bulkAssignStudentTransport(data: any) { return this.api.post('/transport/students/bulk', data); }
   removeStudentTransport(id: string) { return this.api.delete('/transport/students/' + id); }
 
+  // Driver tracking
+  getDriverRoute(params?: any) { return this.api.get('/driver/my-route', { params }); }
+  getDriverSession(params?: any) { return this.api.get('/driver/session', { params }); }
+  recordDriverPickup(data: any) { return this.api.post('/driver/pickup', data); }
+  getDrivers() { return this.api.get('/driver/drivers'); }
+  assignDriverToRoute(routeId: string, data: any) { return this.api.put('/driver/routes/' + routeId + '/driver', data); }
+  getTransportTrackingOverview(params?: any) { return this.api.get('/driver/tracking-overview', { params }); }
+  getChildTransportStatus(params?: any) { return this.api.get('/driver/my-child-status', { params }); }
+
+  // Teacher check-in
+  teacherCheckin(data: any) { return this.api.post('/checkin/checkin', data); }
+  teacherCheckout(data: any) { return this.api.post('/checkin/checkout', data); }
+  getMyCheckinStatus(params?: any) { return this.api.get('/checkin/my-status', { params }); }
+  getTeacherCheckins(params?: any) { return this.api.get('/checkin/today', { params }); }
+  getTeacherCheckinHistory(params?: any) { return this.api.get('/checkin/history', { params }); }
+
+  // SMS
+  sendSMS(data: any) { return this.api.post('/sms/send', data); }
+  sendBulkSMS(data: any) { return this.api.post('/sms/bulk', data); }
+  getSMSLogs(params?: any) { return this.api.get('/sms/logs', { params }); }
+  getSMSTemplates() { return this.api.get('/sms/templates'); }
+  getSMSStats() { return this.api.get('/sms/stats'); }
+
   // ======================
   // STUDENT HEALTH
   // ======================

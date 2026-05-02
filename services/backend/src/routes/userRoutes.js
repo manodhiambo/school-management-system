@@ -78,8 +78,8 @@ router.post('/', requireRole(['admin']), async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = uuidv4();
 
-    // For roles without a profile table (admin, finance_officer) store names directly on users row
-    const storeNameOnUser = ['admin', 'finance_officer'].includes(role);
+    // For roles without a profile table (admin, finance_officer, driver) store names directly on users row
+    const storeNameOnUser = ['admin', 'finance_officer', 'driver'].includes(role);
     await query(
       `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified, first_name, last_name)
        VALUES ($1, $2, $3, $4, $5, TRUE, TRUE, $6, $7)`,

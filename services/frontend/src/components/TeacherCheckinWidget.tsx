@@ -19,11 +19,24 @@ export function TeacherCheckinWidget() {
 
   const getCoords = (): Promise<{ lat: number; lng: number } | null> =>
     new Promise(resolve => {
-      if (!navigator.geolocation) { setGpsMsg('GPS unavailable'); resolve(null); return; }
+      if (!navigator.geolocation) {
+        setGpsMsg('GPS not supported by this browser');
+        resolve(null);
+        return;
+      }
       navigator.geolocation.getCurrentPosition(
-        p  => { setGpsMsg(''); resolve({ lat: p.coords.latitude, lng: p.coords.longitude }); },
-        () => { setGpsMsg('Location could not be retrieved'); resolve(null); },
-        { timeout: 8000, enableHighAccuracy: true }
+        p => { setGpsMsg(''); resolve({ lat: p.coords.latitude, lng: p.coords.longitude }); },
+        err => {
+          if (err.code === 1) {
+            setGpsMsg('Location blocked — please allow location access in your browser settings, then check in again');
+          } else if (err.code === 3) {
+            setGpsMsg('Location timed out — check-in recorded without GPS');
+          } else {
+            setGpsMsg('Location unavailable — check-in recorded without GPS');
+          }
+          resolve(null);
+        },
+        { timeout: 10000, enableHighAccuracy: false, maximumAge: 60000 }
       );
     });
 

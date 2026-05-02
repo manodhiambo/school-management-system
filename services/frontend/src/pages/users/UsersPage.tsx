@@ -96,6 +96,7 @@ export function UsersPage() {
       student: 'bg-green-100 text-green-800',
       parent: 'bg-blue-100 text-blue-800',
       finance_officer: 'bg-amber-100 text-amber-800',
+      driver: 'bg-orange-100 text-orange-800',
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
@@ -112,6 +113,7 @@ export function UsersPage() {
     student: users.filter(u => u.role === 'student').length,
     parent: users.filter(u => u.role === 'parent').length,
     finance_officer: users.filter(u => u.role === 'finance_officer').length,
+    driver: users.filter(u => u.role === 'driver').length,
   };
 
   if (loading) {
@@ -142,8 +144,8 @@ export function UsersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-        {['all', 'admin', 'teacher', 'student', 'parent', 'finance_officer'].map((role) => (
+      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
+        {['all', 'admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver'].map((role) => (
           <Card
             key={role}
             className={`cursor-pointer transition-all ${roleFilter === role ? 'ring-2 ring-blue-500' : 'hover:shadow-md'}`}
@@ -162,14 +164,16 @@ export function UsersPage() {
                   role === 'admin' ? 'bg-red-100' :
                   role === 'teacher' ? 'bg-purple-100' :
                   role === 'student' ? 'bg-green-100' :
-                  role === 'finance_officer' ? 'bg-amber-100' : 'bg-blue-100'
+                  role === 'finance_officer' ? 'bg-amber-100' :
+                  role === 'driver' ? 'bg-orange-100' : 'bg-blue-100'
                 }`}>
                   {role === 'all' ? <Users className="h-5 w-5 text-gray-600" /> :
                    role === 'admin' ? <Shield className="h-5 w-5 text-red-600" /> :
                    <Users className={`h-5 w-5 ${
                      role === 'teacher' ? 'text-purple-600' :
                      role === 'student' ? 'text-green-600' :
-                     role === 'finance_officer' ? 'text-amber-600' : 'text-blue-600'
+                     role === 'finance_officer' ? 'text-amber-600' :
+                     role === 'driver' ? 'text-orange-600' : 'text-blue-600'
                    }`} />}
                 </div>
               </div>

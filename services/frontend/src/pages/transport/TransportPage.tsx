@@ -18,6 +18,7 @@ export function TransportPage() {
 
   const EMPTY_ROUTE = {
     route_name: '', route_code: '', vehicle_registration: '', vehicle_capacity: 30,
+    vehicle_type: 'bus', driver_user_id: '',
     driver_name: '', driver_phone: '', morning_pickup_time: '',
     afternoon_dropoff_time: '', monthly_fee: 0, term_fee: 0,
     fare_per_km: 0, distance_km: 0,
@@ -43,6 +44,11 @@ export function TransportPage() {
     queryKey: ['students-all'],
     queryFn: () => api.getStudents(),
     enabled: showAssignPanel,
+  });
+
+  const { data: driversData } = useQuery({
+    queryKey: ['drivers-list'],
+    queryFn: () => (api as any).getDrivers(),
   });
 
   const createRouteMutation = useMutation({
@@ -95,6 +101,7 @@ export function TransportPage() {
   const routes = (routesData as any)?.data || [];
   const routeDetail = (routeDetailData as any)?.data;
   const allStudents = (studentsData as any)?.data || [];
+  const drivers = (driversData as any)?.data || [];
 
   async function downloadTransportPDF(routeFilter?: string) {
     try {
@@ -267,11 +274,47 @@ export function TransportPage() {
               <div><Label>Vehicle Registration</Label>
                 <Input value={routeForm.vehicle_registration} onChange={e => setRouteForm({ ...routeForm, vehicle_registration: e.target.value })} placeholder="KCB 123A" />
               </div>
+              <div><Label>Vehicle Type</Label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={routeForm.vehicle_type}
+                  onChange={e => setRouteForm({ ...routeForm, vehicle_type: e.target.value })}
+                >
+                  <option value="bus">Bus</option>
+                  <option value="minibus">Minibus</option>
+                  <option value="van">Van</option>
+                  <option value="car">Car</option>
+                </select>
+              </div>
               <div><Label>Capacity</Label>
                 <Input type="number" value={routeForm.vehicle_capacity} onChange={e => setRouteForm({ ...routeForm, vehicle_capacity: parseInt(e.target.value) })} />
               </div>
+              <div>
+                <Label>Assign Driver Account</Label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={routeForm.driver_user_id || ''}
+                  onChange={e => {
+                    const sel = drivers.find((d: any) => d.id === e.target.value);
+                    setRouteForm({
+                      ...routeForm,
+                      driver_user_id: e.target.value || '',
+                      driver_name: sel ? `${sel.first_name} ${sel.last_name}` : routeForm.driver_name,
+                      driver_phone: sel?.phone || routeForm.driver_phone,
+                    });
+                  }}
+                >
+                  <option value="">— No driver assigned —</option>
+                  {drivers.map((d: any) => (
+                    <option key={d.id} value={d.id}>
+                      {d.first_name} {d.last_name}{d.route_name ? ` (${d.route_name})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-0.5">Links a driver account so they can use the Driver app</p>
+              </div>
               <div><Label>Driver Name</Label>
-                <Input value={routeForm.driver_name} onChange={e => setRouteForm({ ...routeForm, driver_name: e.target.value })} />
+                <Input value={routeForm.driver_name} onChange={e => setRouteForm({ ...routeForm, driver_name: e.target.value })} placeholder="Auto-filled when account selected" />
               </div>
               <div><Label>Driver Phone</Label>
                 <Input value={routeForm.driver_phone} onChange={e => setRouteForm({ ...routeForm, driver_phone: e.target.value })} placeholder="0712345678" />
@@ -385,6 +428,8 @@ export function TransportPage() {
                           route_code: routeDetail.route_code || '',
                           vehicle_registration: routeDetail.vehicle_registration || '',
                           vehicle_capacity: routeDetail.vehicle_capacity || 30,
+                          vehicle_type: routeDetail.vehicle_type || 'bus',
+                          driver_user_id: routeDetail.driver_user_id || '',
                           driver_name: routeDetail.driver_name || '',
                           driver_phone: routeDetail.driver_phone || '',
                           morning_pickup_time: routeDetail.morning_pickup_time || '',
@@ -414,11 +459,23 @@ export function TransportPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
-                    {routeDetail.driver_name && (
-                      <p><span className="font-medium">Driver:</span> {routeDetail.driver_name} {routeDetail.driver_phone && `(${routeDetail.driver_phone})`}</p>
+                    {(routeDetail.driver_user_name || routeDetail.driver_name) && (
+                      <p>
+                        <span className="font-medium">Driver:</span>{' '}
+                        {routeDetail.driver_user_name || routeDetail.driver_name}
+                        {routeDetail.driver_user_phone || routeDetail.driver_phone
+                          ? ` (${routeDetail.driver_user_phone || routeDetail.driver_phone})`
+                          : ''}
+                        {routeDetail.driver_user_id && (
+                          <span className="ml-1 inline-flex items-center text-xs bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5">Linked Account</span>
+                        )}
+                      </p>
                     )}
                     {routeDetail.vehicle_registration && (
-                      <p><span className="font-medium">Vehicle:</span> {routeDetail.vehicle_registration}</p>
+                      <p>
+                        <span className="font-medium">Vehicle:</span> {routeDetail.vehicle_registration}
+                        {routeDetail.vehicle_type && <span className="ml-1 text-gray-400 capitalize">({routeDetail.vehicle_type})</span>}
+                      </p>
                     )}
                     {routeDetail.morning_pickup_time && (
                       <p><span className="font-medium">Morning:</span> {routeDetail.morning_pickup_time}</p>

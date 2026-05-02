@@ -36,10 +36,12 @@ router.get('/routes', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
-      `SELECT r.*, COUNT(st.id) as student_count
+      `SELECT r.*, COUNT(st.id) as student_count,
+              u.first_name||' '||u.last_name AS driver_user_name, u.phone AS driver_user_phone
        FROM transport_routes r
        LEFT JOIN student_transport st ON st.route_id = r.id AND st.is_active=TRUE
-       WHERE r.tenant_id=$1 GROUP BY r.id ORDER BY r.route_name`,
+       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $1
+       WHERE r.tenant_id=$1 GROUP BY r.id, u.first_name, u.last_name, u.phone ORDER BY r.route_name`,
       [tid]
     );
     res.json({ success: true, data: rows });
@@ -53,7 +55,13 @@ router.get('/routes', authenticate, async (req, res) => {
 router.get('/routes/:id', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const rows = await query('SELECT * FROM transport_routes WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
+    const rows = await query(
+      `SELECT r.*, u.first_name||' '||u.last_name AS driver_user_name, u.phone AS driver_user_phone
+       FROM transport_routes r
+       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
+       WHERE r.id=$1 AND r.tenant_id=$2`,
+      [req.params.id, tid]
+    );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Route not found' });
     // Get students on this route
     const students = await query(
@@ -76,6 +84,7 @@ router.post('/routes', authenticate, async (req, res) => {
   try {
     const {
       route_name, route_code, description, vehicle_registration, vehicle_capacity,
+      vehicle_type, driver_user_id,
       driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
       morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee,
       fare_per_km, distance_km
@@ -84,11 +93,13 @@ router.post('/routes', authenticate, async (req, res) => {
     const rows = await query(
       `INSERT INTO transport_routes
        (route_name, route_code, description, vehicle_registration, vehicle_capacity,
+        vehicle_type, driver_user_id,
         driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
         morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee,
         fare_per_km, distance_km, tenant_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
       [route_name, route_code, description, vehicle_registration, vehicle_capacity || 30,
+       vehicle_type || 'bus', driver_user_id || null,
        driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
        morning_pickup_time, afternoon_dropoff_time,
        JSON.stringify(stops || []), monthly_fee || 0, term_fee || 0,
@@ -107,6 +118,7 @@ router.put('/routes/:id', authenticate, async (req, res) => {
   try {
     const {
       route_name, route_code, description, vehicle_registration, vehicle_capacity,
+      vehicle_type, driver_user_id,
       driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
       morning_pickup_time, afternoon_dropoff_time, stops, monthly_fee, term_fee, is_active,
       fare_per_km, distance_km
@@ -116,17 +128,22 @@ router.put('/routes/:id', authenticate, async (req, res) => {
       `UPDATE transport_routes SET
        route_name=COALESCE($1,route_name), route_code=COALESCE($2,route_code),
        description=COALESCE($3,description), vehicle_registration=COALESCE($4,vehicle_registration),
-       vehicle_capacity=COALESCE($5,vehicle_capacity), driver_name=COALESCE($6,driver_name),
-       driver_phone=COALESCE($7,driver_phone), driver_license=COALESCE($8,driver_license),
-       conductor_name=COALESCE($9,conductor_name), conductor_phone=COALESCE($10,conductor_phone),
-       morning_pickup_time=COALESCE($11,morning_pickup_time),
-       afternoon_dropoff_time=COALESCE($12,afternoon_dropoff_time),
-       stops=COALESCE($13,stops), monthly_fee=COALESCE($14,monthly_fee),
-       term_fee=COALESCE($15,term_fee), is_active=COALESCE($16,is_active),
-       fare_per_km=COALESCE($17,fare_per_km), distance_km=COALESCE($18,distance_km),
+       vehicle_capacity=COALESCE($5,vehicle_capacity),
+       vehicle_type=COALESCE($6,vehicle_type),
+       driver_user_id=$7,
+       driver_name=COALESCE($8,driver_name),
+       driver_phone=COALESCE($9,driver_phone), driver_license=COALESCE($10,driver_license),
+       conductor_name=COALESCE($11,conductor_name), conductor_phone=COALESCE($12,conductor_phone),
+       morning_pickup_time=COALESCE($13,morning_pickup_time),
+       afternoon_dropoff_time=COALESCE($14,afternoon_dropoff_time),
+       stops=COALESCE($15,stops), monthly_fee=COALESCE($16,monthly_fee),
+       term_fee=COALESCE($17,term_fee), is_active=COALESCE($18,is_active),
+       fare_per_km=COALESCE($19,fare_per_km), distance_km=COALESCE($20,distance_km),
        updated_at=NOW()
-       WHERE id=$19 AND tenant_id=$20 RETURNING *`,
+       WHERE id=$21 AND tenant_id=$22 RETURNING *`,
       [route_name, route_code, description, vehicle_registration, vehicle_capacity,
+       vehicle_type || null,
+       driver_user_id !== undefined ? (driver_user_id || null) : null,
        driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
        morning_pickup_time, afternoon_dropoff_time,
        stops ? JSON.stringify(stops) : null,

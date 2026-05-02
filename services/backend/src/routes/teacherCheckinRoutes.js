@@ -65,9 +65,12 @@ router.post('/checkin', async (req, res) => {
         ? `${teacherInfo[0].first_name} ${teacherInfo[0].last_name}`
         : 'A teacher';
       const timeStr = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+      const locationPart = latitude
+        ? ` GPS: https://www.google.com/maps?q=${latitude},${longitude}`
+        : ' (no GPS)';
       const msgText = status === 'late'
-        ? `${name} checked in LATE at ${timeStr}.${latitude ? ` Location recorded.` : ''}`
-        : `${name} checked in at ${timeStr}.${latitude ? ` Location recorded.` : ''}`;
+        ? `${name} checked in LATE at ${timeStr}.${locationPart}`
+        : `${name} checked in at ${timeStr}.${locationPart}`;
 
       // Insert notification for all admins
       const admins = await query(

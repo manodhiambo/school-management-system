@@ -9,13 +9,14 @@ import {
 } from 'lucide-react';
 
 type TripType = 'morning' | 'afternoon';
-type PickupStatus = 'pending' | 'picked' | 'missed' | 'absent';
+type PickupStatus = 'pending' | 'picked' | 'dropped' | 'missed' | 'absent';
 
 const STATUS_META: Record<PickupStatus, { label: string; color: string; bg: string; icon: any }> = {
-  pending:  { label: 'Pending',  color: 'text-gray-500',  bg: 'bg-gray-100',   icon: Clock         },
-  picked:   { label: 'Picked',   color: 'text-green-700', bg: 'bg-green-100',  icon: CheckCircle2  },
-  missed:   { label: 'Missed',   color: 'text-red-700',   bg: 'bg-red-100',    icon: XCircle       },
-  absent:   { label: 'Absent',   color: 'text-amber-700', bg: 'bg-amber-100',  icon: AlertTriangle },
+  pending:  { label: 'Pending',    color: 'text-gray-500',  bg: 'bg-gray-100',   icon: Clock         },
+  picked:   { label: 'Picked',     color: 'text-green-700', bg: 'bg-green-100',  icon: CheckCircle2  },
+  dropped:  { label: 'Dropped Off',color: 'text-green-700', bg: 'bg-green-100',  icon: CheckCircle2  },
+  missed:   { label: 'Not Found',  color: 'text-red-700',   bg: 'bg-red-100',    icon: XCircle       },
+  absent:   { label: 'Absent',     color: 'text-amber-700', bg: 'bg-amber-100',  icon: AlertTriangle },
 };
 
 export function DriverDashboard() {
@@ -45,11 +46,16 @@ export function DriverDashboard() {
 
   const getCoords = (): Promise<{ lat: number; lng: number } | null> =>
     new Promise(resolve => {
-      if (!navigator.geolocation) { setGpsError('GPS not available'); resolve(null); return; }
+      if (!navigator.geolocation) { setGpsError('GPS not supported'); resolve(null); return; }
       navigator.geolocation.getCurrentPosition(
-        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => { setGpsError('Could not get GPS location — marking without coordinates'); resolve(null); },
-        { timeout: 8000, enableHighAccuracy: true }
+        pos => { setGpsError(''); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+        err => {
+          if (err.code === 1) setGpsError('Location blocked — allow location in browser settings');
+          else if (err.code === 3) setGpsError('GPS timed out — marking without coordinates');
+          else setGpsError('GPS unavailable — marking without coordinates');
+          resolve(null);
+        },
+        { timeout: 10000, enableHighAccuracy: false, maximumAge: 60000 }
       );
     });
 
@@ -156,12 +162,14 @@ export function DriverDashboard() {
         </Card>
 
         {/* Summary bar */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className={`grid gap-2 ${tripType === 'afternoon' ? 'grid-cols-5' : 'grid-cols-4'}`}>
           {[
             { label: 'Total',   val: summary.total   || students.length, color: 'bg-blue-50   text-blue-700',   filter: 'all'     },
-            { label: 'Picked',  val: summary.picked  || 0,               color: 'bg-green-50  text-green-700',  filter: 'picked'  },
+            { label: tripType === 'afternoon' ? 'Picked' : 'Picked',
+              val: summary.picked  || 0,               color: 'bg-green-50  text-green-700',  filter: 'picked'  },
+            ...(tripType === 'afternoon' ? [{ label: 'Dropped', val: students.filter((s:any) => s.pickup_status === 'dropped').length, color: 'bg-green-50 text-green-700', filter: 'dropped' }] : []),
             { label: 'Pending', val: summary.pending || 0,               color: 'bg-gray-50   text-gray-600',   filter: 'pending' },
-            { label: 'Missed',  val: summary.missed  || 0,               color: 'bg-red-50    text-red-700',    filter: 'missed'  },
+            { label: 'Not Found',  val: summary.missed  || 0,               color: 'bg-red-50    text-red-700',    filter: 'missed'  },
           ].map(s => (
             <button
               key={s.label}
@@ -201,9 +209,10 @@ export function DriverDashboard() {
                   const isBusy = marking === student.student_id;
                   return (
                     <Card key={student.student_id} className={`border-l-4 ${
-                      student.pickup_status === 'picked' ? 'border-green-500' :
-                      student.pickup_status === 'missed' ? 'border-red-500'   :
-                      student.pickup_status === 'absent' ? 'border-amber-500' :
+                      student.pickup_status === 'picked'  ? 'border-green-500' :
+                      student.pickup_status === 'dropped' ? 'border-green-500' :
+                      student.pickup_status === 'missed'  ? 'border-red-500'   :
+                      student.pickup_status === 'absent'  ? 'border-amber-500' :
                       'border-gray-200'
                     }`}>
                       <CardContent className="p-3">

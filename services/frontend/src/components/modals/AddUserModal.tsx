@@ -18,10 +18,11 @@ const ROLES = [
   { value: 'teacher', label: 'Teacher' },
   { value: 'parent', label: 'Parent' },
   { value: 'finance_officer', label: 'Finance Officer' },
+  { value: 'driver', label: 'Driver' },
   { value: 'admin', label: 'Admin' },
 ];
 
-const ROLES_WITH_NAMES = ['student', 'teacher', 'parent', 'finance_officer'];
+const ROLES_WITH_NAMES = ['student', 'teacher', 'parent', 'finance_officer', 'driver'];
 
 export function AddUserModal({ open, onOpenChange, onSuccess }: AddUserModalProps) {
   const [loading, setLoading] = useState(false);

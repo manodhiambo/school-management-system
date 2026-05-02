@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection } from './config/database.js';
+import { runMigrations } from './database/runMigrations.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -70,8 +71,9 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
-// Test database connection
+// Test database connection and auto-run pending migrations
 testConnection();
+runMigrations();
 
 // Health check route
 app.get('/health', (req, res) => {

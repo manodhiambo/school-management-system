@@ -279,15 +279,29 @@ router.get('/drivers', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Admin only' });
     }
     const tid = req.tenantId;
-    const drivers = await query(
-      `SELECT u.id, u.first_name, u.last_name, u.email, u.phone,
-              r.id AS route_id, r.route_name, r.vehicle_registration
-       FROM users u
-       LEFT JOIN transport_routes r ON r.driver_user_id = u.id AND r.tenant_id = $1
-       WHERE u.role = 'driver' AND u.tenant_id = $1
-       ORDER BY u.first_name`,
-      [tid]
-    );
+    let drivers;
+    try {
+      // Full query — requires driver_user_id column (migration 048)
+      drivers = await query(
+        `SELECT u.id, u.first_name, u.last_name, u.email, u.phone,
+                r.id AS route_id, r.route_name, r.vehicle_registration
+         FROM users u
+         LEFT JOIN transport_routes r ON r.driver_user_id = u.id AND r.tenant_id = $1
+         WHERE u.role = 'driver' AND u.tenant_id = $1
+         ORDER BY u.first_name`,
+        [tid]
+      );
+    } catch {
+      // Fallback: driver_user_id not yet added — return drivers without route info
+      drivers = await query(
+        `SELECT u.id, u.first_name, u.last_name, u.email, u.phone,
+                NULL::uuid AS route_id, NULL::text AS route_name, NULL::text AS vehicle_registration
+         FROM users u
+         WHERE u.role = 'driver' AND u.tenant_id = $1
+         ORDER BY u.first_name`,
+        [tid]
+      );
+    }
     res.json({ success: true, data: drivers });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -324,25 +338,41 @@ router.get('/tracking-overview', async (req, res) => {
     const { date, trip_type = 'morning' } = req.query;
     const d = date || new Date().toISOString().split('T')[0];
 
-    const rows = await query(
-      `SELECT
-         r.id AS route_id, r.route_name, r.vehicle_registration,
-         u.first_name||' '||u.last_name AS driver_name, u.phone AS driver_phone,
-         COUNT(st.id) AS total_students,
-         COUNT(tp.id) FILTER (WHERE tp.status='picked')  AS picked,
-         COUNT(tp.id) FILTER (WHERE tp.status='dropped') AS dropped,
-         COUNT(tp.id) FILTER (WHERE tp.status='missed')  AS missed,
-         COUNT(tp.id) FILTER (WHERE tp.status='absent')  AS absent
-       FROM transport_routes r
-       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $3
-       LEFT JOIN student_transport st ON st.route_id = r.id AND st.is_active = TRUE AND st.tenant_id = $3
-       LEFT JOIN transport_pickups tp
-         ON tp.route_id = r.id AND tp.trip_date = $1 AND tp.trip_type = $2 AND tp.tenant_id = $3
-       WHERE r.tenant_id = $3 AND r.is_active = TRUE
-       GROUP BY r.id, r.route_name, r.vehicle_registration, u.first_name, u.last_name, u.phone
-       ORDER BY r.route_name`,
-      [d, trip_type, tid]
-    );
+    let rows;
+    try {
+      rows = await query(
+        `SELECT
+           r.id AS route_id, r.route_name, r.vehicle_registration,
+           u.first_name||' '||u.last_name AS driver_name, u.phone AS driver_phone,
+           COUNT(st.id) AS total_students,
+           COUNT(tp.id) FILTER (WHERE tp.status='picked')  AS picked,
+           COUNT(tp.id) FILTER (WHERE tp.status='dropped') AS dropped,
+           COUNT(tp.id) FILTER (WHERE tp.status='missed')  AS missed,
+           COUNT(tp.id) FILTER (WHERE tp.status='absent')  AS absent
+         FROM transport_routes r
+         LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $3
+         LEFT JOIN student_transport st ON st.route_id = r.id AND st.is_active = TRUE AND st.tenant_id = $3
+         LEFT JOIN transport_pickups tp
+           ON tp.route_id = r.id AND tp.trip_date = $1 AND tp.trip_type = $2 AND tp.tenant_id = $3
+         WHERE r.tenant_id = $3 AND r.is_active = TRUE
+         GROUP BY r.id, r.route_name, r.vehicle_registration, u.first_name, u.last_name, u.phone
+         ORDER BY r.route_name`,
+        [d, trip_type, tid]
+      );
+    } catch {
+      // Fallback when driver_user_id or transport_pickups don't exist yet
+      rows = await query(
+        `SELECT r.id AS route_id, r.route_name, r.vehicle_registration,
+                NULL::text AS driver_name, NULL::text AS driver_phone,
+                COUNT(st.id) AS total_students, 0 AS picked, 0 AS dropped, 0 AS missed, 0 AS absent
+         FROM transport_routes r
+         LEFT JOIN student_transport st ON st.route_id = r.id AND st.is_active = TRUE AND st.tenant_id = $1
+         WHERE r.tenant_id = $1 AND r.is_active = TRUE
+         GROUP BY r.id, r.route_name, r.vehicle_registration
+         ORDER BY r.route_name`,
+        [tid]
+      );
+    }
     res.json({ success: true, data: rows });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

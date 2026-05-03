@@ -35,24 +35,41 @@ const router = express.Router();
 router.get('/routes', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    // COUNT in a subquery avoids GROUP BY on r.* (which causes ambiguity errors)
-    const rows = await query(
-      `SELECT r.*,
-              COALESCE(sc.student_count, 0) AS student_count,
-              u.first_name||' '||u.last_name AS driver_user_name,
-              u.phone AS driver_user_phone
-       FROM transport_routes r
-       LEFT JOIN (
-         SELECT route_id, COUNT(id) AS student_count
-         FROM student_transport
-         WHERE is_active = TRUE
-         GROUP BY route_id
-       ) sc ON sc.route_id = r.id
-       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $1
-       WHERE r.tenant_id = $1
-       ORDER BY r.route_name`,
-      [tid]
-    );
+    let rows;
+    try {
+      // Full query — requires driver_user_id column (migration 048)
+      rows = await query(
+        `SELECT r.*,
+                COALESCE(sc.student_count, 0) AS student_count,
+                u.first_name||' '||u.last_name AS driver_user_name,
+                u.phone AS driver_user_phone
+         FROM transport_routes r
+         LEFT JOIN (
+           SELECT route_id, COUNT(id) AS student_count
+           FROM student_transport WHERE is_active = TRUE GROUP BY route_id
+         ) sc ON sc.route_id = r.id
+         LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $1
+         WHERE r.tenant_id = $1
+         ORDER BY r.route_name`,
+        [tid]
+      );
+    } catch {
+      // Fallback: driver_user_id column not yet added — return routes without driver info
+      rows = await query(
+        `SELECT r.*,
+                COALESCE(sc.student_count, 0) AS student_count,
+                NULL::text AS driver_user_name,
+                NULL::text AS driver_user_phone
+         FROM transport_routes r
+         LEFT JOIN (
+           SELECT route_id, COUNT(id) AS student_count
+           FROM student_transport WHERE is_active = TRUE GROUP BY route_id
+         ) sc ON sc.route_id = r.id
+         WHERE r.tenant_id = $1
+         ORDER BY r.route_name`,
+        [tid]
+      );
+    }
     res.json({ success: true, data: rows });
   } catch (err) {
     logger.error('Get transport routes error:', err);

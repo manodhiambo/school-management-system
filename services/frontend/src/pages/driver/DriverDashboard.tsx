@@ -31,15 +31,16 @@ export function DriverDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Load route and session independently — a session failure must not hide the route
     try {
-      const [routeRes, sessionRes]: any[] = await Promise.all([
-        (api as any).getDriverRoute(),
-        (api as any).getDriverSession({ trip_type: tripType }),
-      ]);
+      const routeRes: any = await (api as any).getDriverRoute();
       setRouteData(routeRes?.data);
+    } catch { /* no route assigned or server error */ }
+    try {
+      const sessionRes: any = await (api as any).getDriverSession({ trip_type: tripType });
       setSession(sessionRes?.data);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+    } catch { /* session not available yet */ }
+    setLoading(false);
   }, [tripType]);
 
   useEffect(() => { load(); }, [load]);

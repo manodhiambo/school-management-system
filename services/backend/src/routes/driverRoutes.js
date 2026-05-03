@@ -19,13 +19,18 @@ router.get('/my-route', async (req, res) => {
     const tid = req.tenantId;
     const driverId = req.user.role === 'driver' ? req.user.id : req.query.driver_id;
 
-    const routes = await query(
-      `SELECT r.*, u.first_name||' '||u.last_name AS driver_name
-       FROM transport_routes r
-       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
-       WHERE r.driver_user_id = $1 AND r.tenant_id = $2 AND r.is_active = TRUE`,
-      [driverId, tid]
-    );
+    let routes = [];
+    try {
+      routes = await query(
+        `SELECT r.*, u.first_name||' '||u.last_name AS driver_name
+         FROM transport_routes r
+         LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
+         WHERE r.driver_user_id = $1 AND r.tenant_id = $2 AND r.is_active = TRUE`,
+        [driverId, tid]
+      );
+    } catch (colErr) {
+      logger.warn('my-route query error (driver_user_id may not exist yet):', colErr.message);
+    }
     if (!routes.length) {
       return res.status(404).json({ success: false, message: 'No route assigned to this driver' });
     }
@@ -74,39 +79,61 @@ router.get('/session', async (req, res) => {
 
     let routeId = route_id;
     if (!routeId && req.user.role === 'driver') {
-      const r = await query(
-        'SELECT id FROM transport_routes WHERE driver_user_id=$1 AND tenant_id=$2 AND is_active=TRUE LIMIT 1',
-        [req.user.id, tid]
-      );
-      if (r.length) routeId = r[0].id;
+      try {
+        const r = await query(
+          'SELECT id FROM transport_routes WHERE driver_user_id=$1 AND tenant_id=$2 AND is_active=TRUE LIMIT 1',
+          [req.user.id, tid]
+        );
+        if (r.length) routeId = r[0].id;
+      } catch { /* driver_user_id column may not exist yet */ }
     }
 
     if (!routeId) return res.status(400).json({ success: false, message: 'route_id required' });
 
-    // All students on route + their pickup status for today
-    const students = await query(
-      `SELECT
-         st.student_id, st.pickup_stop, st.dropoff_stop,
-         s.first_name, s.last_name, s.admission_number, s.profile_photo_url,
-         c.name AS class_name,
-         COALESCE(tp.status, 'pending') AS pickup_status,
-         tp.id AS pickup_id,
-         tp.pickup_time, tp.latitude, tp.longitude, tp.notes
-       FROM student_transport st
-       JOIN students s ON s.id = st.student_id AND s.tenant_id = $3
-       LEFT JOIN classes c ON c.id = s.class_id
-       LEFT JOIN transport_pickups tp
-         ON tp.student_id = st.student_id
-         AND tp.route_id = st.route_id
-         AND tp.trip_date = $1
-         AND tp.trip_type = $2
-         AND tp.tenant_id = $3
-       WHERE st.route_id = $4 AND st.is_active = TRUE AND st.tenant_id = $3
-       ORDER BY st.pickup_stop, s.first_name`,
-      [sessionDate, trip_type, tid, routeId]
-    );
+    // All students on route + pickup status — fallback to no-pickups if transport_pickups missing
+    let students = [];
+    try {
+      students = await query(
+        `SELECT
+           st.student_id, st.pickup_stop, st.dropoff_stop,
+           s.first_name, s.last_name, s.admission_number, s.profile_photo_url,
+           c.name AS class_name,
+           COALESCE(tp.status, 'pending') AS pickup_status,
+           tp.id AS pickup_id,
+           tp.pickup_time, tp.latitude, tp.longitude, tp.notes
+         FROM student_transport st
+         JOIN students s ON s.id = st.student_id AND s.tenant_id = $3
+         LEFT JOIN classes c ON c.id = s.class_id
+         LEFT JOIN transport_pickups tp
+           ON tp.student_id = st.student_id
+           AND tp.route_id = st.route_id
+           AND tp.trip_date = $1
+           AND tp.trip_type = $2
+           AND tp.tenant_id = $3
+         WHERE st.route_id = $4 AND st.is_active = TRUE AND st.tenant_id = $3
+         ORDER BY st.pickup_stop, s.first_name`,
+        [sessionDate, trip_type, tid, routeId]
+      );
+    } catch {
+      // transport_pickups not yet created — return students with pending status
+      try {
+        students = await query(
+          `SELECT st.student_id, st.pickup_stop, st.dropoff_stop,
+                  s.first_name, s.last_name, s.admission_number, s.profile_photo_url,
+                  c.name AS class_name,
+                  'pending' AS pickup_status,
+                  NULL AS pickup_id, NULL AS pickup_time,
+                  NULL AS latitude, NULL AS longitude, NULL AS notes
+           FROM student_transport st
+           JOIN students s ON s.id = st.student_id AND s.tenant_id = $2
+           LEFT JOIN classes c ON c.id = s.class_id
+           WHERE st.route_id = $1 AND st.is_active = TRUE AND st.tenant_id = $2
+           ORDER BY st.pickup_stop, s.first_name`,
+          [routeId, tid]
+        );
+      } catch { students = []; }
+    }
 
-    // Summary counts
     const picked  = students.filter(s => s.pickup_status === 'picked').length;
     const missed  = students.filter(s => s.pickup_status === 'missed').length;
     const pending = students.filter(s => s.pickup_status === 'pending').length;

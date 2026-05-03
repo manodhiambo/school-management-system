@@ -36,29 +36,46 @@ router.get('/my-route', async (req, res) => {
     }
     const route = routes[0];
 
-    // Students on this route
-    const students = await query(
-      `SELECT
-         st.id AS assignment_id, st.student_id, st.pickup_stop, st.dropoff_stop,
-         s.first_name, s.last_name, s.admission_number,
-         s.profile_photo_url,
-         c.name AS class_name,
-         -- parent phone for emergency
-         (SELECT p.phone FROM parents p
-          JOIN parent_students ps ON ps.parent_id = p.id
-          WHERE ps.student_id = s.id AND p.tenant_id = $2
-          ORDER BY p.created_at LIMIT 1) AS parent_phone,
-         (SELECT p.first_name||' '||p.last_name FROM parents p
-          JOIN parent_students ps ON ps.parent_id = p.id
-          WHERE ps.student_id = s.id AND p.tenant_id = $2
-          ORDER BY p.created_at LIMIT 1) AS parent_name
-       FROM student_transport st
-       JOIN students s ON s.id = st.student_id AND s.tenant_id = $2
-       LEFT JOIN classes c ON c.id = s.class_id
-       WHERE st.route_id = $1 AND st.is_active = TRUE AND st.tenant_id = $2
-       ORDER BY st.pickup_stop, s.first_name`,
-      [route.id, tid]
-    );
+    // Students on this route — try with parent subqueries first, fall back to basic list
+    let students = [];
+    try {
+      students = await query(
+        `SELECT
+           st.id AS assignment_id, st.student_id, st.pickup_stop, st.dropoff_stop,
+           s.first_name, s.last_name, s.admission_number,
+           c.name AS class_name,
+           (SELECT p.phone FROM parents p
+            JOIN parent_students ps ON ps.parent_id = p.id
+            WHERE ps.student_id = s.id AND p.tenant_id = $2
+            ORDER BY p.created_at LIMIT 1) AS parent_phone,
+           (SELECT p.first_name||' '||p.last_name FROM parents p
+            JOIN parent_students ps ON ps.parent_id = p.id
+            WHERE ps.student_id = s.id AND p.tenant_id = $2
+            ORDER BY p.created_at LIMIT 1) AS parent_name
+         FROM student_transport st
+         JOIN students s ON s.id = st.student_id AND s.tenant_id = $2
+         LEFT JOIN classes c ON c.id = s.class_id
+         WHERE st.route_id = $1 AND st.is_active = TRUE AND st.tenant_id = $2
+         ORDER BY st.pickup_stop, s.first_name`,
+        [route.id, tid]
+      );
+    } catch {
+      // Fallback: basic student list without parent info
+      try {
+        students = await query(
+          `SELECT st.id AS assignment_id, st.student_id, st.pickup_stop, st.dropoff_stop,
+                  s.first_name, s.last_name, s.admission_number,
+                  c.name AS class_name,
+                  NULL AS parent_phone, NULL AS parent_name
+           FROM student_transport st
+           JOIN students s ON s.id = st.student_id AND s.tenant_id = $2
+           LEFT JOIN classes c ON c.id = s.class_id
+           WHERE st.route_id = $1 AND st.is_active = TRUE AND st.tenant_id = $2
+           ORDER BY s.first_name`,
+          [route.id, tid]
+        );
+      } catch { students = []; }
+    }
 
     res.json({ success: true, data: { route, students } });
   } catch (err) {

@@ -81,21 +81,29 @@ router.get('/routes', authenticate, async (req, res) => {
 router.get('/routes/:id', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const rows = await query(
-      `SELECT r.*, u.first_name||' '||u.last_name AS driver_user_name, u.phone AS driver_user_phone
-       FROM transport_routes r
-       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
-       WHERE r.id=$1 AND r.tenant_id=$2`,
-      [req.params.id, tid]
-    );
+    let rows;
+    try {
+      rows = await query(
+        `SELECT r.*, u.first_name||' '||u.last_name AS driver_user_name, u.phone AS driver_user_phone
+         FROM transport_routes r
+         LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
+         WHERE r.id=$1 AND r.tenant_id=$2`,
+        [req.params.id, tid]
+      );
+    } catch {
+      rows = await query(
+        `SELECT r.*, NULL AS driver_user_name, NULL AS driver_user_phone
+         FROM transport_routes r WHERE r.id=$1 AND r.tenant_id=$2`,
+        [req.params.id, tid]
+      );
+    }
     if (!rows.length) return res.status(404).json({ success: false, message: 'Route not found' });
-    // Get students on this route
     const students = await query(
       `SELECT st.*, s.first_name||' '||s.last_name as student_name,
        s.admission_number, c.name as class_name
        FROM student_transport st
        JOIN students s ON s.id = st.student_id AND s.tenant_id=$2
-       LEFT JOIN classes c ON c.id = s.class_id
+       LEFT JOIN classes c ON c.id = s.class_id AND c.tenant_id=$2
        WHERE st.route_id=$1 AND st.is_active=TRUE AND st.tenant_id=$2 ORDER BY s.first_name`,
       [req.params.id, tid]
     );

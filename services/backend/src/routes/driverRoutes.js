@@ -291,14 +291,14 @@ router.get('/drivers', async (req, res) => {
          ORDER BY u.first_name`,
         [tid]
       );
-    } catch {
-      // Fallback: driver_user_id not yet added — return drivers without route info
+    } catch (e) {
+      // Fallback: driver_user_id column not yet added
       drivers = await query(
-        `SELECT u.id, u.first_name, u.last_name, u.email, u.phone,
-                NULL::uuid AS route_id, NULL::text AS route_name, NULL::text AS vehicle_registration
-         FROM users u
-         WHERE u.role = 'driver' AND u.tenant_id = $1
-         ORDER BY u.first_name`,
+        `SELECT id, first_name, last_name, email, phone,
+                NULL AS route_id, NULL AS route_name, NULL AS vehicle_registration
+         FROM users
+         WHERE role = 'driver' AND tenant_id = $1
+         ORDER BY first_name`,
         [tid]
       );
     }
@@ -359,11 +359,11 @@ router.get('/tracking-overview', async (req, res) => {
          ORDER BY r.route_name`,
         [d, trip_type, tid]
       );
-    } catch {
+    } catch (e) {
       // Fallback when driver_user_id or transport_pickups don't exist yet
       rows = await query(
         `SELECT r.id AS route_id, r.route_name, r.vehicle_registration,
-                NULL::text AS driver_name, NULL::text AS driver_phone,
+                NULL AS driver_name, NULL AS driver_phone,
                 COUNT(st.id) AS total_students, 0 AS picked, 0 AS dropped, 0 AS missed, 0 AS absent
          FROM transport_routes r
          LEFT JOIN student_transport st ON st.route_id = r.id AND st.is_active = TRUE AND st.tenant_id = $1

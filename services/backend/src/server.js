@@ -71,9 +71,8 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
-// Test database connection and auto-run pending migrations
-testConnection();
-runMigrations();
+// Test database connection, then await migrations before the server listens
+// (Neon DDL via direct connection can take a few seconds — don't race requests against it)
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -148,8 +147,18 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+async function startServer() {
+  try {
+    await testConnection();
+    await runMigrations();
+  } catch (err) {
+    console.error('Startup error (migrations may be incomplete):', err.message);
+  }
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer();
 
 export default app;

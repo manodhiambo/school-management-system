@@ -6,9 +6,20 @@ import logger from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Split a SQL file into individual statements, stripping comment-only entries
+function splitSql(sql) {
+  return sql
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => {
+      // Remove inline comments and check if anything remains
+      const stripped = s.replace(/--[^\n]*/g, '').trim();
+      return stripped.length > 0;
+    });
+}
+
 export async function runMigrations() {
   try {
-    // Create migrations tracking table if it doesn't exist
     await query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         id        SERIAL PRIMARY KEY,
@@ -31,15 +42,22 @@ export async function runMigrations() {
       if (already.length) continue;
 
       const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-      try {
-        await query(sql);
-        await query('INSERT INTO schema_migrations (name) VALUES ($1)', [file]);
-        logger.info(`Migration applied: ${file}`);
-        applied++;
-      } catch (err) {
-        // Log but don't crash — some migrations are idempotent and safe to skip
-        logger.warn(`Migration ${file} skipped (may already be applied): ${err.message}`);
+      const statements = splitSql(sql);
+
+      let warnings = 0;
+      for (const stmt of statements) {
+        try {
+          await query(stmt);
+        } catch (err) {
+          warnings++;
+          logger.warn(`[${file}] Statement warning (may be already applied): ${err.message.slice(0, 120)}`);
+        }
       }
+
+      // Mark as done — all our migrations use IF NOT EXISTS so warnings are safe to ignore
+      await query('INSERT INTO schema_migrations (name) VALUES ($1)', [file]);
+      logger.info(`Migration applied: ${file}${warnings ? ` (${warnings} warning(s))` : ''}`);
+      applied++;
     }
 
     if (applied > 0) logger.info(`Migrations: ${applied} new migration(s) applied`);

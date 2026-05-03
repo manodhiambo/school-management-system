@@ -22,12 +22,15 @@ function timeToday(hhmm) {
 router.get('/school-hours', async (req, res) => {
   try {
     const tid = req.tenantId;
-    const rows = await query(
-      `SELECT teacher_checkin_start, teacher_checkin_late_after, teacher_checkin_end
-       FROM settings WHERE tenant_id = $1 LIMIT 1`,
-      [tid]
-    );
-    const s = rows[0] || {};
+    let s = {};
+    try {
+      const rows = await query(
+        `SELECT teacher_checkin_start, teacher_checkin_late_after, teacher_checkin_end
+         FROM settings WHERE tenant_id = $1 LIMIT 1`,
+        [tid]
+      );
+      s = rows[0] || {};
+    } catch { /* columns not yet migrated — return defaults */ }
     res.json({
       success: true,
       data: {
@@ -51,13 +54,16 @@ router.post('/checkin', async (req, res) => {
     const { latitude, longitude, notes } = req.body;
     const today = new Date().toISOString().split('T')[0];
 
-    // Read configurable late-after and end time from settings
-    const settingsRows = await query(
-      `SELECT teacher_checkin_late_after, teacher_checkin_end
-       FROM settings WHERE tenant_id = $1 LIMIT 1`,
-      [tid]
-    );
-    const sch = settingsRows[0] || {};
+    // Read configurable late-after and end time from settings (fallback to defaults if columns missing)
+    let sch = {};
+    try {
+      const settingsRows = await query(
+        `SELECT teacher_checkin_late_after, teacher_checkin_end
+         FROM settings WHERE tenant_id = $1 LIMIT 1`,
+        [tid]
+      );
+      sch = settingsRows[0] || {};
+    } catch { /* columns not yet migrated — use defaults */ }
     const lateAfter = sch.teacher_checkin_late_after || '08:15';
     const checkinEnd = sch.teacher_checkin_end || '17:00';
 
@@ -192,25 +198,33 @@ router.get('/today', async (req, res) => {
     const { date } = req.query;
     const d = date || new Date().toISOString().split('T')[0];
 
-    const rows = await query(
-      `SELECT
-         tc.*,
-         u.first_name, u.last_name, u.email, u.phone,
-         u.profile_photo_url
-       FROM teacher_checkins tc
-       JOIN users u ON u.id = tc.teacher_id AND u.tenant_id = $2
-       WHERE tc.checkin_date = $1 AND tc.tenant_id = $2
-       ORDER BY tc.checkin_time ASC`,
-      [d, tid]
-    );
-
-    // Also get teachers who haven't checked in
+    // Always fetch teachers first — this table always exists
     const allTeachers = await query(
       `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.profile_photo_url
        FROM users u
-       WHERE u.role = 'teacher' AND u.tenant_id = $1 AND u.is_active = TRUE`,
+       WHERE u.role = 'teacher' AND u.tenant_id = $1 AND u.is_active = TRUE
+       ORDER BY u.first_name`,
       [tid]
     );
+
+    // Fetch check-ins — gracefully return empty if table doesn't exist yet
+    let rows = [];
+    try {
+      rows = await query(
+        `SELECT
+           tc.*,
+           u.first_name, u.last_name, u.email, u.phone,
+           u.profile_photo_url
+         FROM teacher_checkins tc
+         JOIN users u ON u.id = tc.teacher_id AND u.tenant_id = $2
+         WHERE tc.checkin_date = $1 AND tc.tenant_id = $2
+         ORDER BY tc.checkin_time ASC`,
+        [d, tid]
+      );
+    } catch (tableErr) {
+      logger.warn('teacher_checkins table not ready yet:', tableErr.message);
+      // Return teachers as all-absent so the admin sees the list
+    }
 
     const checkedInIds = new Set(rows.map(r => r.teacher_id));
     const notCheckedIn = allTeachers.filter(t => !checkedInIds.has(t.id)).map(t => ({

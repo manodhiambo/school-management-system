@@ -13,6 +13,7 @@ import autoTable from 'jspdf-autotable';
 export function TeacherCheckinAdminPage() {
   const [data, setData]           = useState<any>(null);
   const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string>('');
   const [date, setDate]           = useState(new Date().toISOString().split('T')[0]);
   const [hours, setHours]         = useState<any>({ start: '08:00', late_after: '08:15', end: '17:00' });
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -20,15 +21,23 @@ export function TeacherCheckinAdminPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const [checkinRes, hoursRes]: any[] = await Promise.all([
-        (api as any).getTeacherCheckins({ date }),
-        (api as any).getCheckinSchoolHours(),
-      ]);
+      // Load check-ins and school hours independently so one failure does not blank the other
+      const checkinRes: any = await (api as any).getTeacherCheckins({ date });
       setData(checkinRes?.data);
-      if (hoursRes?.data) setHours(hoursRes.data);
       setLastRefresh(new Date());
-    } finally { setLoading(false); }
+    } catch (err: any) {
+      const msg = err?.message || err?.error || 'Failed to load check-in data';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+    // Fetch hours separately — non-critical, failure is silent
+    try {
+      const hoursRes: any = await (api as any).getCheckinSchoolHours();
+      if (hoursRes?.data) setHours(hoursRes.data);
+    } catch { /* use defaults */ }
   }, [date]);
 
   useEffect(() => { load(); }, [load]);
@@ -118,6 +127,17 @@ export function TeacherCheckinAdminPage() {
           Refreshed: {lastRefresh.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Could not load check-in data</p>
+            <p className="text-xs mt-0.5 text-red-500">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -267,11 +287,12 @@ export function TeacherCheckinAdminPage() {
       )}
 
       {/* Empty state for today */}
-      {!loading && checkins.length === 0 && not_checked_in.length === 0 && (
+      {!loading && !error && checkins.length === 0 && not_checked_in.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Clock className="h-12 w-12 text-gray-200 mx-auto mb-3" />
             <p className="text-gray-400">No teacher data found for {date}</p>
+            <p className="text-xs text-gray-400 mt-1">Teachers with role "teacher" will appear here once they check in or are detected as absent.</p>
           </CardContent>
         </Card>
       )}

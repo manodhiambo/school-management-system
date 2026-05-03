@@ -35,13 +35,22 @@ const router = express.Router();
 router.get('/routes', authenticate, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    // COUNT in a subquery avoids GROUP BY on r.* (which causes ambiguity errors)
     const rows = await query(
-      `SELECT r.*, COUNT(st.id) as student_count,
-              u.first_name||' '||u.last_name AS driver_user_name, u.phone AS driver_user_phone
+      `SELECT r.*,
+              COALESCE(sc.student_count, 0) AS student_count,
+              u.first_name||' '||u.last_name AS driver_user_name,
+              u.phone AS driver_user_phone
        FROM transport_routes r
-       LEFT JOIN student_transport st ON st.route_id = r.id AND st.is_active=TRUE
+       LEFT JOIN (
+         SELECT route_id, COUNT(id) AS student_count
+         FROM student_transport
+         WHERE is_active = TRUE
+         GROUP BY route_id
+       ) sc ON sc.route_id = r.id
        LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $1
-       WHERE r.tenant_id=$1 GROUP BY r.id, u.first_name, u.last_name, u.phone ORDER BY r.route_name`,
+       WHERE r.tenant_id = $1
+       ORDER BY r.route_name`,
       [tid]
     );
     res.json({ success: true, data: rows });
@@ -195,7 +204,7 @@ router.get('/students/report', authenticate, async (req, res) => {
         COALESCE(fi.balance_amount::numeric, r.term_fee) AS balance_amount
       FROM student_transport st
       JOIN students s ON s.id = st.student_id AND s.tenant_id = $1
-      LEFT JOIN classes c ON c.id = s.class_id
+      LEFT JOIN classes c ON c.id = s.class_id AND c.tenant_id = $1
       JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $1
       LEFT JOIN LATERAL (
         SELECT fi.status, fi.paid_amount, fi.balance_amount
@@ -227,9 +236,9 @@ router.get('/students', authenticate, async (req, res) => {
     let sql = `SELECT st.*, s.first_name||' '||s.last_name as student_name,
                s.admission_number, c.name as class_name, r.route_name, r.term_fee
                FROM student_transport st
-               JOIN students s ON s.id = st.student_id
-               LEFT JOIN classes c ON c.id = s.class_id
-               JOIN transport_routes r ON r.id = st.route_id
+               JOIN students s ON s.id = st.student_id AND s.tenant_id = $1
+               LEFT JOIN classes c ON c.id = s.class_id AND c.tenant_id = $1
+               JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $1
                WHERE st.tenant_id=$1 AND st.is_active=TRUE`;
     const params = [tid];
     if (route_id) { sql += ` AND st.route_id=$${params.length+1}`; params.push(route_id); }

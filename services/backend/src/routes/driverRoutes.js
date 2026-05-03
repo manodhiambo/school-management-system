@@ -22,7 +22,7 @@ router.get('/my-route', async (req, res) => {
     const routes = await query(
       `SELECT r.*, u.first_name||' '||u.last_name AS driver_name
        FROM transport_routes r
-       LEFT JOIN users u ON u.id = r.driver_user_id
+       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
        WHERE r.driver_user_id = $1 AND r.tenant_id = $2 AND r.is_active = TRUE`,
       [driverId, tid]
     );
@@ -170,9 +170,9 @@ router.post('/pickup', async (req, res) => {
                 p.phone AS parent_phone,
                 r.route_name
          FROM students s
-         LEFT JOIN parent_students ps ON ps.student_id = s.id
-         LEFT JOIN parents p ON p.id = ps.parent_id
-         JOIN transport_routes r ON r.id = $2
+         LEFT JOIN parent_students ps ON ps.student_id = s.id AND ps.tenant_id = $3
+         LEFT JOIN parents p ON p.id = ps.parent_id AND p.tenant_id = $3
+         JOIN transport_routes r ON r.id = $2 AND r.tenant_id = $3
          WHERE s.id = $1 AND s.tenant_id = $3
          LIMIT 1`,
         [student_id, route_id, tid]
@@ -334,7 +334,7 @@ router.get('/tracking-overview', async (req, res) => {
          COUNT(tp.id) FILTER (WHERE tp.status='missed')  AS missed,
          COUNT(tp.id) FILTER (WHERE tp.status='absent')  AS absent
        FROM transport_routes r
-       LEFT JOIN users u ON u.id = r.driver_user_id
+       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $3
        LEFT JOIN student_transport st ON st.route_id = r.id AND st.is_active = TRUE AND st.tenant_id = $3
        LEFT JOIN transport_pickups tp
          ON tp.route_id = r.id AND tp.trip_date = $1 AND tp.trip_type = $2 AND tp.tenant_id = $3
@@ -364,8 +364,8 @@ router.get('/my-child-status', async (req, res) => {
     if (req.user.role === 'parent') {
       const children = await query(
         `SELECT s.id FROM students s
-         JOIN parent_students ps ON ps.student_id = s.id
-         JOIN parents p ON p.id = ps.parent_id
+         JOIN parent_students ps ON ps.student_id = s.id AND ps.tenant_id = $2
+         JOIN parents p ON p.id = ps.parent_id AND p.tenant_id = $2
          WHERE p.user_id = $1 AND s.tenant_id = $2`,
         [req.user.id, tid]
       );
@@ -391,7 +391,7 @@ router.get('/my-child-status', async (req, res) => {
        FROM students s
        JOIN student_transport st ON st.student_id = s.id AND st.is_active = TRUE AND st.tenant_id = $2
        JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $2
-       LEFT JOIN users u ON u.id = r.driver_user_id
+       LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
        LEFT JOIN transport_pickups tp_m
          ON tp_m.student_id = s.id AND tp_m.route_id = r.id
          AND tp_m.trip_date = $3 AND tp_m.trip_type = 'morning' AND tp_m.tenant_id = $2

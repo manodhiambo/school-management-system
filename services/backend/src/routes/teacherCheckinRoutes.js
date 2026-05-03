@@ -198,7 +198,7 @@ router.get('/today', async (req, res) => {
          u.first_name, u.last_name, u.email, u.phone,
          u.profile_photo_url
        FROM teacher_checkins tc
-       JOIN users u ON u.id = tc.teacher_id
+       JOIN users u ON u.id = tc.teacher_id AND u.tenant_id = $2
        WHERE tc.checkin_date = $1 AND tc.tenant_id = $2
        ORDER BY tc.checkin_time ASC`,
       [d, tid]

@@ -36,10 +36,12 @@ export function TransportTrackingPage() {
 
   useEffect(() => { loadOverview(); }, [tripType]);
 
-  const total   = overview.reduce((a, r) => a + Number(r.total_students || 0), 0);
-  const picked  = overview.reduce((a, r) => a + Number(r.picked  || 0), 0);
-  const missed  = overview.reduce((a, r) => a + Number(r.missed  || 0), 0);
-  const onboard = total - picked - missed;
+  const total      = overview.reduce((a, r) => a + Number(r.total_students || 0), 0);
+  const picked     = overview.reduce((a, r) => a + Number(r.picked   || 0), 0);
+  const dropped    = overview.reduce((a, r) => a + Number(r.dropped  || 0), 0);
+  const successful = picked + dropped;
+  const missed     = overview.reduce((a, r) => a + Number(r.missed   || 0), 0);
+  const onboard    = total - successful - missed;
 
   return (
     <div className="space-y-6">
@@ -61,10 +63,10 @@ export function TransportTrackingPage() {
       {/* Summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Students', val: total,  icon: Users,       color: 'text-blue-600',  bg: 'bg-blue-50'  },
-          { label: 'Picked Up',      val: picked, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Not Yet',        val: onboard,icon: Clock,        color: 'text-gray-500',  bg: 'bg-gray-50'  },
-          { label: 'Missed',         val: missed, icon: XCircle,      color: 'text-red-600',   bg: 'bg-red-50'   },
+          { label: 'Total Students', val: total,      icon: Users,       color: 'text-blue-600',  bg: 'bg-blue-50'  },
+          { label: 'Picked/Dropped', val: successful, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Not Yet',        val: onboard,    icon: Clock,        color: 'text-gray-500',  bg: 'bg-gray-50'  },
+          { label: 'Not Found',      val: missed,     icon: XCircle,      color: 'text-red-600',   bg: 'bg-red-50'   },
         ].map(s => {
           const Icon = s.icon;
           return (
@@ -89,8 +91,9 @@ export function TransportTrackingPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {overview.map(route => {
+            const routeSuccessful = Number(route.picked || 0) + Number(route.dropped || 0);
             const pct = route.total_students > 0
-              ? Math.round((Number(route.picked) / Number(route.total_students)) * 100)
+              ? Math.round((routeSuccessful / Number(route.total_students)) * 100)
               : 0;
             return (
               <Card key={route.route_id} className="hover:shadow-md transition-shadow cursor-pointer"
@@ -116,7 +119,7 @@ export function TransportTrackingPage() {
                   {/* Progress bar */}
                   <div>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-500">{route.picked}/{route.total_students} picked</span>
+                      <span className="text-gray-500">{routeSuccessful}/{route.total_students} {tripType === 'afternoon' ? 'picked/dropped' : 'picked'}</span>
                       <span className={pct === 100 ? 'text-green-600 font-semibold' : 'text-blue-600'}>{pct}%</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -124,13 +127,20 @@ export function TransportTrackingPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 text-xs">
-                    <span className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full">
-                      <CheckCircle2 className="h-3 w-3" /> {route.picked} picked
-                    </span>
+                  <div className="flex gap-2 text-xs flex-wrap">
+                    {Number(route.picked) > 0 && (
+                      <span className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full">
+                        <CheckCircle2 className="h-3 w-3" /> {route.picked} picked
+                      </span>
+                    )}
+                    {Number(route.dropped) > 0 && (
+                      <span className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full">
+                        <CheckCircle2 className="h-3 w-3" /> {route.dropped} dropped
+                      </span>
+                    )}
                     {Number(route.missed) > 0 && (
                       <span className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded-full">
-                        <XCircle className="h-3 w-3" /> {route.missed} missed
+                        <XCircle className="h-3 w-3" /> {route.missed} not found
                       </span>
                     )}
                   </div>
@@ -184,12 +194,15 @@ export function TransportTrackingPage() {
                         <td className="py-2 pr-3">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                             s.pickup_status === 'picked'  ? 'bg-green-100 text-green-700' :
+                            s.pickup_status === 'dropped' ? 'bg-green-100 text-green-700' :
                             s.pickup_status === 'missed'  ? 'bg-red-100   text-red-700'   :
                             s.pickup_status === 'absent'  ? 'bg-amber-100 text-amber-700' :
                             'bg-gray-100 text-gray-500'
                           }`}>
-                            {s.pickup_status === 'picked' && s.pickup_time
+                            {(s.pickup_status === 'picked' || s.pickup_status === 'dropped') && s.pickup_time
                               ? new Date(s.pickup_time).toLocaleTimeString('en-KE', {hour:'2-digit',minute:'2-digit'})
+                              : s.pickup_status === 'missed' ? 'Not Found'
+                              : s.pickup_status === 'dropped' ? 'Dropped Off'
                               : s.pickup_status}
                           </span>
                         </td>

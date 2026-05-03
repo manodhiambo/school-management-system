@@ -8,11 +8,11 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
-  BookOpen, Users, UserCheck, Shield, Wallet,
+  BookOpen, Users, UserCheck, Shield, Wallet, Bus,
 } from 'lucide-react';
 
 type View = 'role' | 'login' | 'forgot' | 'forgot-success';
-type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer';
+type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver';
 
 const ROLES: { key: Role; label: string; description: string; icon: React.ElementType; color: string; bg: string; border: string }[] = [
   {
@@ -50,6 +50,15 @@ const ROLES: { key: Role; label: string; description: string; icon: React.Elemen
     color: 'text-amber-600',
     bg: 'bg-amber-50 hover:bg-amber-100',
     border: 'border-amber-200 hover:border-amber-400',
+  },
+  {
+    key: 'driver',
+    label: 'Driver',
+    description: 'Track student pickups & transport routes',
+    icon: Bus,
+    color: 'text-orange-600',
+    bg: 'bg-orange-50 hover:bg-orange-100',
+    border: 'border-orange-200 hover:border-orange-400',
   },
 ];
 
@@ -218,6 +227,11 @@ export function LoginPage() {
                     <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                       <Shield className="h-3.5 w-3.5" />
                       Administrator
+                    </div>
+                  ) : selectedRole === 'driver' ? (
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-200">
+                      <Bus className="h-3.5 w-3.5" />
+                      Driver
                     </div>
                   ) : null}
                 </div>

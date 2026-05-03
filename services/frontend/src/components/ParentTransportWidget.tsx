@@ -88,7 +88,9 @@ export function ParentTransportWidget() {
               {/* Afternoon */}
               <div className={`rounded-lg p-2.5 border ${
                 child.afternoon_status === 'dropped' ? 'bg-green-50 border-green-200' :
+                child.afternoon_status === 'picked'  ? 'bg-green-50 border-green-200' :
                 child.afternoon_status === 'missed'  ? 'bg-red-50   border-red-200'   :
+                child.afternoon_status === 'absent'  ? 'bg-amber-50 border-amber-200' :
                 'bg-gray-50 border-gray-200'
               }`}>
                 <p className="text-xs text-gray-500 mb-1">🌆 Afternoon</p>
@@ -97,17 +99,30 @@ export function ParentTransportWidget() {
                     ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
                     : child.afternoon_status === 'missed'
                     ? <XCircle className="h-4 w-4 text-red-600 shrink-0" />
+                    : child.afternoon_status === 'absent'
+                    ? <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                     : <Clock className="h-4 w-4 text-gray-400 shrink-0" />}
                   <span className={`text-xs font-semibold capitalize ${
                     child.afternoon_status === 'picked' || child.afternoon_status === 'dropped'
                       ? 'text-green-700' :
-                    child.afternoon_status === 'missed' ? 'text-red-700' : 'text-gray-500'
+                    child.afternoon_status === 'missed' ? 'text-red-700' :
+                    child.afternoon_status === 'absent' ? 'text-amber-700' : 'text-gray-500'
                   }`}>
-                    {child.afternoon_status === 'picked' && child.afternoon_time
+                    {(child.afternoon_status === 'picked' || child.afternoon_status === 'dropped') && child.afternoon_time
                       ? new Date(child.afternoon_time).toLocaleTimeString('en-KE', {hour:'2-digit',minute:'2-digit'})
+                      : child.afternoon_status === 'dropped' ? 'Dropped Off'
                       : child.afternoon_status}
                   </span>
                 </div>
+                {child.afternoon_lat && (child.afternoon_status === 'picked' || child.afternoon_status === 'dropped') && (
+                  <a
+                    href={`https://www.google.com/maps?q=${child.afternoon_lat},${child.afternoon_lng}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[10px] text-blue-500 mt-1 hover:underline"
+                  >
+                    <Navigation className="h-2.5 w-2.5" /> Drop-off location
+                  </a>
+                )}
               </div>
             </div>
 
@@ -119,11 +134,27 @@ export function ParentTransportWidget() {
             )}
 
             {(child.morning_status === 'missed' || child.afternoon_status === 'missed') && (
-              <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5 flex items-start gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-red-700">
-                  Your child was not picked up. Contact the driver or school immediately.
-                </p>
+              <div className="mt-2 bg-red-100 border border-red-300 rounded-lg px-3 py-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-red-800">
+                      {child.morning_status === 'missed' ? 'Not found for morning pickup' : 'Not found for afternoon drop-off'}
+                    </p>
+                    <p className="text-xs text-red-700 mt-0.5">Contact the school immediately.</p>
+                    <div className="flex gap-2 mt-1.5">
+                      {child.driver_phone && (
+                        <a
+                          href={`tel:${child.driver_phone}`}
+                          className="flex items-center gap-1 text-xs bg-red-600 text-white rounded px-2 py-1 font-semibold"
+                        >
+                          <Phone className="h-3 w-3" /> Call Driver
+                        </a>
+                      )}
+                      <span className="text-xs text-red-600 flex items-center">Contact school immediately</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

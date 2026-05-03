@@ -241,37 +241,65 @@ export function DriverDashboard() {
                           <div className="flex flex-col items-end gap-1.5 shrink-0">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${meta.bg} ${meta.color} flex items-center gap-1`}>
                               <Icon className="h-3 w-3" />
-                              {student.pickup_status === 'picked' && student.pickup_time
+                              {(student.pickup_status === 'picked' || student.pickup_status === 'dropped') && student.pickup_time
                                 ? new Date(student.pickup_time).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
                                 : meta.label}
                             </span>
 
-                            {student.pickup_status !== 'picked' && (
+                            {student.pickup_status !== 'picked' && student.pickup_status !== 'dropped' && (
                               <div className="flex gap-1">
-                                <button
-                                  onClick={() => markPickup(student.student_id, 'picked')}
-                                  disabled={!!isBusy}
-                                  className="px-2 py-1 bg-green-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1"
-                                >
-                                  {isBusy ? '…' : <><CheckCircle2 className="h-3 w-3" /> Picked</>}
-                                </button>
-                                <button
-                                  onClick={() => markPickup(student.student_id, 'missed')}
-                                  disabled={!!isBusy}
-                                  className="px-2 py-1 bg-red-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1"
-                                >
-                                  {isBusy ? '…' : <><XCircle className="h-3 w-3" /> Missed</>}
-                                </button>
-                                <button
-                                  onClick={() => markPickup(student.student_id, 'absent')}
-                                  disabled={!!isBusy}
-                                  className="px-2 py-1 bg-amber-500 text-white text-xs rounded-lg font-semibold disabled:opacity-50"
-                                >
-                                  Absent
-                                </button>
+                                {tripType === 'morning' ? (
+                                  <>
+                                    <button
+                                      onClick={() => markPickup(student.student_id, 'picked')}
+                                      disabled={!!isBusy}
+                                      className="px-2 py-1 bg-green-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                      {isBusy ? '…' : <><CheckCircle2 className="h-3 w-3" /> Picked Up</>}
+                                    </button>
+                                    <button
+                                      onClick={() => markPickup(student.student_id, 'missed')}
+                                      disabled={!!isBusy}
+                                      className="px-2 py-1 bg-red-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                      {isBusy ? '…' : <><XCircle className="h-3 w-3" /> Not Found</>}
+                                    </button>
+                                    <button
+                                      onClick={() => markPickup(student.student_id, 'absent')}
+                                      disabled={!!isBusy}
+                                      className="px-2 py-1 bg-amber-500 text-white text-xs rounded-lg font-semibold disabled:opacity-50"
+                                    >
+                                      Absent
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => markPickup(student.student_id, 'dropped')}
+                                      disabled={!!isBusy}
+                                      className="px-2 py-1 bg-green-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                      {isBusy ? '…' : <><CheckCircle2 className="h-3 w-3" /> Dropped Off</>}
+                                    </button>
+                                    <button
+                                      onClick={() => markPickup(student.student_id, 'missed')}
+                                      disabled={!!isBusy}
+                                      className="px-2 py-1 bg-red-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                      {isBusy ? '…' : <><XCircle className="h-3 w-3" /> Not Found</>}
+                                    </button>
+                                    <button
+                                      onClick={() => markPickup(student.student_id, 'absent')}
+                                      disabled={!!isBusy}
+                                      className="px-2 py-1 bg-amber-500 text-white text-xs rounded-lg font-semibold disabled:opacity-50"
+                                    >
+                                      Absent
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             )}
-                            {student.pickup_status === 'picked' && student.latitude && (
+                            {(student.pickup_status === 'picked' || student.pickup_status === 'dropped') && student.latitude && (
                               <a
                                 href={`https://www.google.com/maps?q=${student.latitude},${student.longitude}`}
                                 target="_blank"

@@ -56,7 +56,7 @@ type NavItem = {
 
 const navigationItems: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────────────────────
-  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer'], section: '' },
+  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver'], section: '' },
 
   // ── People ────────────────────────────────────────────────────────────────
   { name: 'Students',        href: '/app/students',       icon: Users,         roles: ['admin', 'teacher'], section: 'People' },

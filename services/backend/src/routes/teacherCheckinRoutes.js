@@ -73,10 +73,19 @@ router.post('/checkin', async (req, res) => {
     }
     const status = now > timeToday(lateAfter) ? 'late' : 'present';
 
-    const existing = await query(
-      'SELECT id FROM teacher_checkins WHERE teacher_id=$1 AND checkin_date=$2 AND tenant_id=$3',
-      [req.user.id, today, tid]
-    );
+    // If teacher_checkins table doesn't exist yet (migration pending), tell user clearly
+    let existing;
+    try {
+      existing = await query(
+        'SELECT id FROM teacher_checkins WHERE teacher_id=$1 AND checkin_date=$2 AND tenant_id=$3',
+        [req.user.id, today, tid]
+      );
+    } catch (e) {
+      return res.status(503).json({
+        success: false,
+        message: 'Check-in service is initialising — please try again in 30 seconds.'
+      });
+    }
 
     let record;
     if (existing.length) {
@@ -190,69 +199,61 @@ router.get('/my-status', async (req, res) => {
 
 // ─── Admin: get all teacher check-ins for a date ─────────────────────────────
 router.get('/today', async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Admin only' });
-    }
-    const tid = req.tenantId;
-    const { date } = req.query;
-    const d = date || new Date().toISOString().split('T')[0];
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Admin only' });
+  }
+  const tid = req.tenantId;
+  const { date } = req.query;
+  const d = date || new Date().toISOString().split('T')[0];
 
-    // Always fetch teachers first — this table always exists
-    const allTeachers = await query(
-      `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.profile_photo_url
-       FROM users u
-       WHERE u.role = 'teacher' AND u.tenant_id = $1 AND u.is_active = TRUE
-       ORDER BY u.first_name`,
+  // Each query is independently wrapped — a missing column or table never 500s
+  let allTeachers = [];
+  try {
+    allTeachers = await query(
+      `SELECT id, first_name, last_name, email, phone, profile_photo_url
+       FROM users
+       WHERE role = 'teacher' AND tenant_id = $1 AND is_active = TRUE
+       ORDER BY first_name`,
       [tid]
     );
-
-    // Fetch check-ins — gracefully return empty if table doesn't exist yet
-    let rows = [];
-    try {
-      rows = await query(
-        `SELECT
-           tc.*,
-           u.first_name, u.last_name, u.email, u.phone,
-           u.profile_photo_url
-         FROM teacher_checkins tc
-         JOIN users u ON u.id = tc.teacher_id AND u.tenant_id = $2
-         WHERE tc.checkin_date = $1 AND tc.tenant_id = $2
-         ORDER BY tc.checkin_time ASC`,
-        [d, tid]
-      );
-    } catch (tableErr) {
-      logger.warn('teacher_checkins table not ready yet:', tableErr.message);
-      // Return teachers as all-absent so the admin sees the list
-    }
-
-    const checkedInIds = new Set(rows.map(r => r.teacher_id));
-    const notCheckedIn = allTeachers.filter(t => !checkedInIds.has(t.id)).map(t => ({
-      ...t,
-      checkin_date: d,
-      status: 'absent',
-      checkin_time: null,
-      checkout_time: null,
-      checkin_lat: null,
-      checkin_lng: null,
-    }));
-
-    const present = rows.filter(r => r.status === 'present').length;
-    const late    = rows.filter(r => r.status === 'late').length;
-    const absent  = notCheckedIn.length;
-
-    res.json({
-      success: true,
-      data: {
-        checkins: rows,
-        not_checked_in: notCheckedIn,
-        summary: { present, late, absent, total: allTeachers.length }
-      }
-    });
-  } catch (err) {
-    logger.error('Get teacher checkins error:', err);
-    res.status(500).json({ success: false, message: err.message });
+  } catch (e) {
+    logger.warn('allTeachers query failed:', e.message);
   }
+
+  let rows = [];
+  try {
+    rows = await query(
+      `SELECT tc.*, u.first_name, u.last_name, u.email, u.phone, u.profile_photo_url
+       FROM teacher_checkins tc
+       JOIN users u ON u.id = tc.teacher_id AND u.tenant_id = $2
+       WHERE tc.checkin_date = $1 AND tc.tenant_id = $2
+       ORDER BY tc.checkin_time ASC`,
+      [d, tid]
+    );
+  } catch (e) {
+    logger.warn('teacher_checkins not ready:', e.message);
+  }
+
+  const checkedInIds = new Set(rows.map(r => r.teacher_id));
+  const notCheckedIn = allTeachers.filter(t => !checkedInIds.has(t.id)).map(t => ({
+    ...t,
+    checkin_date: d, status: 'absent',
+    checkin_time: null, checkout_time: null, checkin_lat: null, checkin_lng: null,
+  }));
+
+  return res.json({
+    success: true,
+    data: {
+      checkins: rows,
+      not_checked_in: notCheckedIn,
+      summary: {
+        present: rows.filter(r => r.status === 'present').length,
+        late:    rows.filter(r => r.status === 'late').length,
+        absent:  notCheckedIn.length,
+        total:   allTeachers.length,
+      }
+    }
+  });
 });
 
 // ─── Admin: get check-in history / report ─────────────────────────────────────

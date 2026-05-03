@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon } from 'lucide-react';
+import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck } from 'lucide-react';
 import api from '@/services/api';
 
 // Resize an image file to max 256x256 and return a base64 data URL
@@ -38,7 +38,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance'>('general');
   const [logoUploading, setLogoUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -143,6 +143,15 @@ export function SettingsPage() {
         >
           <Clock className="h-4 w-4 inline mr-2" />
           System
+        </button>
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'attendance' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <UserCheck className="h-4 w-4 inline mr-2" />
+          Attendance
         </button>
       </div>
 
@@ -318,6 +327,62 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Attendance Tab */}
+      {activeTab === 'attendance' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5" />
+                Teacher Check-in Hours
+              </CardTitle>
+              <p className="text-sm text-gray-500">
+                Set when teachers can check in, when they are marked late, and when check-in closes for the day.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-3">
+                <div>
+                  <Label htmlFor="teacher_checkin_start">School Opens (Check-in Opens)</Label>
+                  <Input
+                    id="teacher_checkin_start"
+                    type="time"
+                    value={settings?.teacher_checkin_start || '08:00'}
+                    onChange={(e) => handleChange('teacher_checkin_start', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Teachers can check in from this time</p>
+                </div>
+                <div>
+                  <Label htmlFor="teacher_checkin_late_after">Late After</Label>
+                  <Input
+                    id="teacher_checkin_late_after"
+                    type="time"
+                    value={settings?.teacher_checkin_late_after || '08:15'}
+                    onChange={(e) => handleChange('teacher_checkin_late_after', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Teachers checking in after this time are marked <span className="text-amber-600 font-medium">Late</span></p>
+                </div>
+                <div>
+                  <Label htmlFor="teacher_checkin_end">School Ends (Check-in Closes)</Label>
+                  <Input
+                    id="teacher_checkin_end"
+                    type="time"
+                    value={settings?.teacher_checkin_end || '17:00'}
+                    onChange={(e) => handleChange('teacher_checkin_end', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">No check-ins allowed after this time</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                <strong>Current schedule:</strong> School opens at <strong>{settings?.teacher_checkin_start || '08:00'}</strong>,
+                teachers are late after <strong>{settings?.teacher_checkin_late_after || '08:15'}</strong>,
+                check-in closes at <strong>{settings?.teacher_checkin_end || '17:00'}</strong>.
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* System Tab */}

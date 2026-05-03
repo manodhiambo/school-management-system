@@ -37,7 +37,8 @@ router.put('/', requireRole(['admin']), async (req, res) => {
     const {
       school_name, school_code, phone, email, address, city, state, pincode,
       website, current_academic_year, timezone, currency, date_format, time_format,
-      school_logo_url, motto
+      school_logo_url, motto,
+      teacher_checkin_start, teacher_checkin_late_after, teacher_checkin_end
     } = req.body;
 
     // school_logo_url can be explicitly set to null (remove logo) or a base64/url string
@@ -79,11 +80,16 @@ router.put('/', requireRole(['admin']), async (req, res) => {
           time_format = COALESCE($14, time_format),
           school_logo_url = CASE WHEN $15::boolean THEN $16 ELSE school_logo_url END,
           motto = COALESCE($17, motto),
+          teacher_checkin_start     = COALESCE($18, teacher_checkin_start),
+          teacher_checkin_late_after = COALESCE($19, teacher_checkin_late_after),
+          teacher_checkin_end       = COALESCE($20, teacher_checkin_end),
           updated_at = NOW()
-         WHERE tenant_id = $18`,
+         WHERE tenant_id = $21`,
         [school_name, school_code, phone, email, address, city, state, pincode,
           website, current_academic_year, timezone, currency, date_format, time_format,
-          logoValue !== undefined, logoValue ?? null, motto || null, tenantId]
+          logoValue !== undefined, logoValue ?? null, motto || null,
+          teacher_checkin_start || null, teacher_checkin_late_after || null, teacher_checkin_end || null,
+          tenantId]
       );
     }
 

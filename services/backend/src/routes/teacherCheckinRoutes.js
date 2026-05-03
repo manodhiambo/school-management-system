@@ -10,6 +10,37 @@ router.use(authenticate);
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
+// ─── Helper: parse "HH:MM" into a Date for today ────────────────────────────
+function timeToday(hhmm) {
+  const [h, m] = (hhmm || '08:00').split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+// ─── GET school check-in hours (public to auth users) ────────────────────────
+router.get('/school-hours', async (req, res) => {
+  try {
+    const tid = req.tenantId;
+    const rows = await query(
+      `SELECT teacher_checkin_start, teacher_checkin_late_after, teacher_checkin_end
+       FROM settings WHERE tenant_id = $1 LIMIT 1`,
+      [tid]
+    );
+    const s = rows[0] || {};
+    res.json({
+      success: true,
+      data: {
+        start:      s.teacher_checkin_start      || '08:00',
+        late_after: s.teacher_checkin_late_after  || '08:15',
+        end:        s.teacher_checkin_end         || '17:00',
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ─── Teacher: check in (mark present + GPS) ───────────────────────────────────
 router.post('/checkin', async (req, res) => {
   try {
@@ -20,11 +51,21 @@ router.post('/checkin', async (req, res) => {
     const { latitude, longitude, notes } = req.body;
     const today = new Date().toISOString().split('T')[0];
 
-    // Determine if late (after 08:15 by default; configurable)
+    // Read configurable late-after and end time from settings
+    const settingsRows = await query(
+      `SELECT teacher_checkin_late_after, teacher_checkin_end
+       FROM settings WHERE tenant_id = $1 LIMIT 1`,
+      [tid]
+    );
+    const sch = settingsRows[0] || {};
+    const lateAfter = sch.teacher_checkin_late_after || '08:15';
+    const checkinEnd = sch.teacher_checkin_end || '17:00';
+
     const now = new Date();
-    const cutoff = new Date(now);
-    cutoff.setHours(8, 15, 0, 0);
-    const status = now > cutoff ? 'late' : 'present';
+    if (now > timeToday(checkinEnd)) {
+      return res.status(400).json({ success: false, message: `Check-in is closed for today (closes at ${checkinEnd})` });
+    }
+    const status = now > timeToday(lateAfter) ? 'late' : 'present';
 
     const existing = await query(
       'SELECT id FROM teacher_checkins WHERE teacher_id=$1 AND checkin_date=$2 AND tenant_id=$3',

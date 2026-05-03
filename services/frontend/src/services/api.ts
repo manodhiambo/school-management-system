@@ -1177,6 +1177,7 @@ class ApiService {
   getMyCheckinStatus(params?: any) { return this.api.get('/checkin/my-status', { params }); }
   getTeacherCheckins(params?: any) { return this.api.get('/checkin/today', { params }); }
   getTeacherCheckinHistory(params?: any) { return this.api.get('/checkin/history', { params }); }
+  getCheckinSchoolHours() { return this.api.get('/checkin/school-hours'); }
 
   // SMS
   sendSMS(data: any) { return this.api.post('/sms/send', data); }

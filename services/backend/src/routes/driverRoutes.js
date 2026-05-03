@@ -274,34 +274,18 @@ router.post('/pickup', async (req, res) => {
 
 // ─── Admin: list all drivers ──────────────────────────────────────────────────
 router.get('/drivers', async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Admin only' });
+  }
+  const tid = req.tenantId;
   try {
-    if (!['admin'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Admin only' });
-    }
-    const tid = req.tenantId;
-    let drivers;
-    try {
-      // Full query — requires driver_user_id column (migration 048)
-      drivers = await query(
-        `SELECT u.id, u.first_name, u.last_name, u.email, u.phone,
-                r.id AS route_id, r.route_name, r.vehicle_registration
-         FROM users u
-         LEFT JOIN transport_routes r ON r.driver_user_id = u.id AND r.tenant_id = $1
-         WHERE u.role = 'driver' AND u.tenant_id = $1
-         ORDER BY u.first_name`,
-        [tid]
-      );
-    } catch (e) {
-      // Fallback: driver_user_id column not yet added
-      drivers = await query(
-        `SELECT id, first_name, last_name, email, phone,
-                NULL AS route_id, NULL AS route_name, NULL AS vehicle_registration
-         FROM users
-         WHERE role = 'driver' AND tenant_id = $1
-         ORDER BY first_name`,
-        [tid]
-      );
-    }
+    const drivers = await query(
+      `SELECT id, first_name, last_name, email, phone
+       FROM users
+       WHERE role = 'driver' AND tenant_id = $1
+       ORDER BY first_name`,
+      [tid]
+    );
     res.json({ success: true, data: drivers });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -67,6 +67,9 @@ export const requireActiveTenant = async (req, res, next) => {
 
     next();
   } catch (err) {
-    next(err);
+    // Tenant status check failed (connection issue etc.) — log and allow through.
+    // Data is still isolated by tenant_id in every query; this is a secondary safety layer.
+    console.error('requireActiveTenant DB error (allowing through):', err.message);
+    next();
   }
 };

@@ -280,7 +280,7 @@ router.get('/drivers', async (req, res) => {
   const tid = req.tenantId;
   try {
     const drivers = await query(
-      `SELECT id, first_name, last_name, email, phone
+      `SELECT id, first_name, last_name, email
        FROM users
        WHERE role = 'driver' AND tenant_id = $1
        ORDER BY first_name`,
@@ -327,7 +327,7 @@ router.get('/tracking-overview', async (req, res) => {
       rows = await query(
         `SELECT
            r.id AS route_id, r.route_name, r.vehicle_registration,
-           u.first_name||' '||u.last_name AS driver_name, u.phone AS driver_phone,
+           u.first_name||' '||u.last_name AS driver_name,
            COUNT(st.id) AS total_students,
            COUNT(tp.id) FILTER (WHERE tp.status='picked')  AS picked,
            COUNT(tp.id) FILTER (WHERE tp.status='dropped') AS dropped,
@@ -339,7 +339,7 @@ router.get('/tracking-overview', async (req, res) => {
          LEFT JOIN transport_pickups tp
            ON tp.route_id = r.id AND tp.trip_date = $1 AND tp.trip_type = $2 AND tp.tenant_id = $3
          WHERE r.tenant_id = $3 AND r.is_active = TRUE
-         GROUP BY r.id, r.route_name, r.vehicle_registration, u.first_name, u.last_name, u.phone
+         GROUP BY r.id, r.route_name, r.vehicle_registration, u.first_name, u.last_name
          ORDER BY r.route_name`,
         [d, trip_type, tid]
       );
@@ -394,7 +394,7 @@ router.get('/my-child-status', async (req, res) => {
       `SELECT
          s.id AS student_id, s.first_name, s.last_name, s.admission_number,
          r.route_name, r.vehicle_registration,
-         u.first_name||' '||u.last_name AS driver_name, u.phone AS driver_phone,
+         u.first_name||' '||u.last_name AS driver_name,
          st.pickup_stop, st.dropoff_stop,
          COALESCE(tp_m.status,'pending') AS morning_status,
          tp_m.pickup_time AS morning_pickup_time,

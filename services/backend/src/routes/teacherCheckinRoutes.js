@@ -210,7 +210,7 @@ router.get('/today', async (req, res) => {
   let allTeachers = [];
   try {
     allTeachers = await query(
-      `SELECT id, first_name, last_name, email, phone, profile_photo_url
+      `SELECT id, first_name, last_name, email, profile_photo_url
        FROM users
        WHERE role = 'teacher' AND tenant_id = $1 AND is_active = TRUE
        ORDER BY first_name`,
@@ -223,7 +223,7 @@ router.get('/today', async (req, res) => {
   let rows = [];
   try {
     rows = await query(
-      `SELECT tc.*, u.first_name, u.last_name, u.email, u.phone, u.profile_photo_url
+      `SELECT tc.*, u.first_name, u.last_name, u.email, u.profile_photo_url
        FROM teacher_checkins tc
        JOIN users u ON u.id = tc.teacher_id AND u.tenant_id = $2
        WHERE tc.checkin_date = $1 AND tc.tenant_id = $2

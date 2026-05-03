@@ -41,8 +41,7 @@ router.get('/routes', authenticate, async (req, res) => {
       rows = await query(
         `SELECT r.*,
                 COALESCE(sc.student_count, 0) AS student_count,
-                u.first_name||' '||u.last_name AS driver_user_name,
-                u.phone AS driver_user_phone
+                u.first_name||' '||u.last_name AS driver_user_name
          FROM transport_routes r
          LEFT JOIN (
            SELECT route_id, COUNT(id) AS student_count
@@ -58,8 +57,7 @@ router.get('/routes', authenticate, async (req, res) => {
       rows = await query(
         `SELECT r.*,
                 COALESCE(sc.student_count, 0) AS student_count,
-                NULL::text AS driver_user_name,
-                NULL::text AS driver_user_phone
+                NULL AS driver_user_name
          FROM transport_routes r
          LEFT JOIN (
            SELECT route_id, COUNT(id) AS student_count
@@ -84,7 +82,7 @@ router.get('/routes/:id', authenticate, async (req, res) => {
     let rows;
     try {
       rows = await query(
-        `SELECT r.*, u.first_name||' '||u.last_name AS driver_user_name, u.phone AS driver_user_phone
+        `SELECT r.*, u.first_name||' '||u.last_name AS driver_user_name
          FROM transport_routes r
          LEFT JOIN users u ON u.id = r.driver_user_id AND u.tenant_id = $2
          WHERE r.id=$1 AND r.tenant_id=$2`,

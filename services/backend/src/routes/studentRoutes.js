@@ -340,25 +340,31 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
 router.delete('/:id', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    const sid = req.params.id;
+
     const student = await query(
       'SELECT user_id FROM students WHERE id = $1 AND tenant_id = $2',
-      [req.params.id, tid]
+      [sid, tid]
     );
 
-    if (student.length > 0) {
-      await query('DELETE FROM students WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
-      if (student[0].user_id) {
-        await query('DELETE FROM users WHERE id = $1 AND tenant_id = $2', [student[0].user_id, tid]);
-      }
+    if (!student.length) {
+      return res.json({ success: true, message: 'Student deleted successfully' });
     }
 
-    res.json({
-      success: true,
-      message: 'Student deleted successfully'
-    });
+    // Remove rows in tables that lack ON DELETE CASCADE before deleting the student
+    await query('DELETE FROM mpesa_transactions WHERE student_id = $1', [sid]).catch(() => {});
+    await query('DELETE FROM income_records WHERE student_id = $1', [sid]).catch(() => {});
+
+    await query('DELETE FROM students WHERE id = $1 AND tenant_id = $2', [sid, tid]);
+
+    if (student[0].user_id) {
+      await query('DELETE FROM users WHERE id = $1 AND tenant_id = $2', [student[0].user_id, tid]);
+    }
+
+    res.json({ success: true, message: 'Student deleted successfully' });
   } catch (error) {
     logger.error('Delete student error:', error);
-    res.status(500).json({ success: false, message: 'Error deleting student' });
+    res.status(500).json({ success: false, message: error.message || 'Error deleting student' });
   }
 });
 

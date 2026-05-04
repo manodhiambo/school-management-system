@@ -1415,9 +1415,9 @@ router.get('/broadsheet', authenticate, async (req, res) => {
         if (isJSS) {
           overall = pctToJssGrade(meanPct);
         } else if (isPrePrimary) {
-          overall = meanPct >= 70 ? 'WD' : meanPct >= 40 ? 'D' : 'B';
+          overall = meanPct >= 75 ? 'WD' : meanPct >= 40 ? 'D' : 'B';
         } else {
-          overall = meanPct >= 75 ? 'EE' : meanPct >= 58 ? 'ME' : meanPct >= 41 ? 'AE' : 'BE';
+          overall = meanPct >= 80 ? 'EE' : meanPct >= 60 ? 'ME' : meanPct >= 40 ? 'AE' : 'BE';
         }
       }
 

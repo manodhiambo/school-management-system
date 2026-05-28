@@ -64,9 +64,13 @@ const corsOptions = {
     'https://www.skulmanager.org'
   ],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   optionsSuccessStatus: 200
 };
 
+// Handle preflight OPTIONS requests for all routes
+app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));

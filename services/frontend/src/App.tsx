@@ -95,6 +95,9 @@ import { TransportTrackingPage } from './pages/transport/TransportTrackingPage';
 import { TeacherCheckinAdminPage } from './pages/teacher/TeacherCheckinAdminPage';
 import { SMSPage } from './pages/sms/SMSPage';
 
+// Gate Management
+import { GateManagerPage } from './pages/gate/GateManagerPage';
+
 // Shared Pages
 import { ProfilePage } from './pages/settings/ProfilePage';
 
@@ -227,6 +230,9 @@ function App() {
 
               {/* SMS Messaging */}
               <Route path="sms" element={<SMSPage />} />
+
+              {/* Gate Management */}
+              <Route path="gate-manager" element={<GateManagerPage />} />
 
               {/* Parent Alerts */}
               <Route path="my-alerts" element={<ParentAlertsPage />} />

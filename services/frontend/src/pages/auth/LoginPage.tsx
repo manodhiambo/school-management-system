@@ -8,11 +8,11 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
-  BookOpen, Users, UserCheck, Shield, Wallet, Bus,
+  BookOpen, Users, UserCheck, Shield, Wallet, Bus, ShieldCheck,
 } from 'lucide-react';
 
 type View = 'role' | 'login' | 'forgot' | 'forgot-success';
-type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver';
+type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver' | 'security';
 
 const ROLES: { key: Role; label: string; description: string; icon: React.ElementType; color: string; bg: string; border: string }[] = [
   {
@@ -59,6 +59,15 @@ const ROLES: { key: Role; label: string; description: string; icon: React.Elemen
     color: 'text-orange-600',
     bg: 'bg-orange-50 hover:bg-orange-100',
     border: 'border-orange-200 hover:border-orange-400',
+  },
+  {
+    key: 'security',
+    label: 'Security Officer',
+    description: 'Manage visitors, gate check-in & student pickup',
+    icon: ShieldCheck,
+    color: 'text-slate-700',
+    bg: 'bg-slate-50 hover:bg-slate-100',
+    border: 'border-slate-200 hover:border-slate-400',
   },
 ];
 

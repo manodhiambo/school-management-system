@@ -1187,6 +1187,46 @@ class ApiService {
   getSMSStats() { return this.api.get('/sms/stats'); }
 
   // ======================
+  // GATE MANAGEMENT
+  // ======================
+  getGateDashboard() { return this.api.get('/gate/dashboard'); }
+  // Visitors
+  getVisitors(params?: any) { return this.api.get('/gate/visitors', { params }); }
+  createVisitor(data: any) { return this.api.post('/gate/visitors', data); }
+  getVisitor(id: string) { return this.api.get('/gate/visitors/' + id); }
+  updateVisitor(id: string, data: any) { return this.api.put('/gate/visitors/' + id, data); }
+  // Visits (check-in / check-out)
+  createVisit(data: any) { return this.api.post('/gate/visits', data); }
+  checkoutVisit(id: string, data?: any) { return this.api.post('/gate/visits/' + id + '/checkout', data || {}); }
+  getVisits(params?: any) { return this.api.get('/gate/visits', { params }); }
+  getVisit(id: string) { return this.api.get('/gate/visits/' + id); }
+  // Authorized pickup persons
+  getAuthorizedPersons(studentId: string) { return this.api.get('/gate/pickup/authorized/' + studentId); }
+  addAuthorizedPerson(data: any) { return this.api.post('/gate/pickup/authorized', data); }
+  updateAuthorizedPerson(id: string, data: any) { return this.api.put('/gate/pickup/authorized/' + id, data); }
+  removeAuthorizedPerson(id: string) { return this.api.delete('/gate/pickup/authorized/' + id); }
+  // Pickup
+  searchStudentsForPickup(search: string) { return this.api.get('/gate/pickup/students', { params: { search } }); }
+  releaseStudent(data: any) { return this.api.post('/gate/pickup/release', data); }
+  getPickupHistory(params?: any) { return this.api.get('/gate/pickup/history', { params }); }
+  // OTP
+  requestPickupOTP(data: any) { return this.api.post('/gate/pickup/otp/request', data); }
+  verifyPickupOTP(data: any) { return this.api.post('/gate/pickup/otp/verify', data); }
+  // Live monitoring
+  getLiveVisitors() { return this.api.get('/gate/live/visitors'); }
+  getLiveStudentsWaiting() { return this.api.get('/gate/live/students-waiting'); }
+  // Blacklists
+  getVisitorBlacklist() { return this.api.get('/gate/blacklist/visitors'); }
+  addVisitorBlacklist(data: any) { return this.api.post('/gate/blacklist/visitors', data); }
+  removeVisitorBlacklist(id: string) { return this.api.delete('/gate/blacklist/visitors/' + id); }
+  getGuardianBlacklist() { return this.api.get('/gate/blacklist/guardians'); }
+  addGuardianBlacklist(data: any) { return this.api.post('/gate/blacklist/guardians', data); }
+  removeGuardianBlacklist(id: string) { return this.api.delete('/gate/blacklist/guardians/' + id); }
+  // Reports
+  getGateVisitorReport(params?: any) { return this.api.get('/gate/reports/visitors', { params }); }
+  getGatePickupReport(params?: any) { return this.api.get('/gate/reports/pickups', { params }); }
+
+  // ======================
   // STUDENT HEALTH
   // ======================
   getHealthRecords(params?: any) { return this.api.get('/health/records', { params }); }

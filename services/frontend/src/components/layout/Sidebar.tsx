@@ -43,6 +43,8 @@ import {
   Navigation,
   CheckCircle,
   MessageCircle,
+  ShieldCheck,
+  UserCog,
 } from 'lucide-react';
 
 type NavItem = {
@@ -56,7 +58,7 @@ type NavItem = {
 
 const navigationItems: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────────────────────
-  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver'], section: '' },
+  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security'], section: '' },
 
   // ── People ────────────────────────────────────────────────────────────────
   { name: 'Students',        href: '/app/students',       icon: Users,         roles: ['admin', 'teacher'], section: 'People' },
@@ -133,6 +135,10 @@ const navigationItems: NavItem[] = [
   { name: 'Transport Tracking', href: '/app/transport-tracking', icon: Navigation,    roles: ['admin', 'teacher'],                   section: 'Welfare' },
   { name: 'My Route',           href: '/app/dashboard',          icon: Bus,           roles: ['driver'],                             section: 'Welfare' },
   { name: 'Teacher Check-in',   href: '/app/teacher-checkin',    icon: CheckCircle,   roles: ['admin'],                              section: 'Welfare' },
+  // ── Gate Management ──────────────────────────────────────────────────────
+  { name: 'Gate Manager',       href: '/app/gate-manager',       icon: ShieldCheck,   roles: ['admin'],                              section: 'Security' },
+  { name: 'Gate Dashboard',     href: '/app/dashboard',          icon: ShieldCheck,   roles: ['security'],                           section: 'Security' },
+  { name: 'Visitor Log',        href: '/app/gate-manager',       icon: UserCog,       roles: ['security'],                           section: 'Security' },
   { name: 'SMS Messaging',      href: '/app/sms',                icon: MessageCircle, roles: ['admin', 'teacher'],                   section: 'Messages' },
   { name: 'My Transport',       href: '/app/my-transport',       icon: Bus,           roles: ['parent'],                             section: 'Family' },
 
@@ -145,7 +151,7 @@ const navigationItems: NavItem[] = [
 
   // ── Account ───────────────────────────────────────────────────────────────
   { name: 'Settings',   href: '/app/settings', icon: Settings, roles: ['admin'], section: 'Account' },
-  { name: 'My Profile', href: '/app/profile',  icon: User,     roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer'], section: 'Account' },
+  { name: 'My Profile', href: '/app/profile',  icon: User,     roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security'], section: 'Account' },
 ];
 
 interface SidebarProps {

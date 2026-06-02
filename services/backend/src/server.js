@@ -50,6 +50,7 @@ import igcseRoutes from './routes/igcseRoutes.js';
 import driverRoutes from './routes/driverRoutes.js';
 import teacherCheckinRoutes from './routes/teacherCheckinRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
+import gateRoutes from './routes/gateRoutes.js';
 
 dotenv.config();
 
@@ -133,6 +134,7 @@ app.use('/api/v1/igcse', igcseRoutes);
 app.use('/api/v1/driver', driverRoutes);
 app.use('/api/v1/checkin', teacherCheckinRoutes);
 app.use('/api/v1/sms', smsRoutes);
+app.use('/api/v1/gate', gateRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', schoolRegistrationRoutes);

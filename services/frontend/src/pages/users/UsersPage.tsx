@@ -97,12 +97,14 @@ export function UsersPage() {
       parent: 'bg-blue-100 text-blue-800',
       finance_officer: 'bg-amber-100 text-amber-800',
       driver: 'bg-orange-100 text-orange-800',
+      security: 'bg-slate-100 text-slate-800',
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
 
   const getRoleLabel = (role: string) => {
     if (role === 'finance_officer') return 'Finance Officer';
+    if (role === 'security') return 'Security Officer';
     return role.charAt(0).toUpperCase() + role.slice(1);
   };
 
@@ -114,6 +116,7 @@ export function UsersPage() {
     parent: users.filter(u => u.role === 'parent').length,
     finance_officer: users.filter(u => u.role === 'finance_officer').length,
     driver: users.filter(u => u.role === 'driver').length,
+    security: users.filter(u => u.role === 'security').length,
   };
 
   if (loading) {
@@ -145,7 +148,7 @@ export function UsersPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
-        {['all', 'admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver'].map((role) => (
+        {['all', 'admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security'].map((role) => (
           <Card
             key={role}
             className={`cursor-pointer transition-all ${roleFilter === role ? 'ring-2 ring-blue-500' : 'hover:shadow-md'}`}
@@ -155,7 +158,7 @@ export function UsersPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-500 uppercase">
-                    {role === 'all' ? 'Total' : role === 'finance_officer' ? 'Finance' : role}s
+                    {role === 'all' ? 'Total' : role === 'finance_officer' ? 'Finance' : role === 'security' ? 'Security' : role}s
                   </p>
                   <p className="text-2xl font-bold">{userCounts[role as keyof typeof userCounts]}</p>
                 </div>

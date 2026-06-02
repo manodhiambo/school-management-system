@@ -107,6 +107,7 @@ export function EditUserModal({ open, onOpenChange, onSuccess, user }: EditUserM
                 <option value="admin">Admin</option>
                 <option value="finance_officer">Finance Officer</option>
                 <option value="driver">Driver</option>
+                <option value="security">Security Officer</option>
               </Select>
             </div>
 

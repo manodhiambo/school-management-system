@@ -17,6 +17,211 @@ router.use(requireActiveTenant);
 const tid = (req) => req.user.tenant_id;
 const uid = (req) => req.user.id;
 
+// Ensure all CBE Academics tables + required columns exist at startup
+(async () => {
+  const q = async (sql) => { try { await query(sql, []); } catch (_) {} };
+
+  // Add missing columns to existing tables
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0`);
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`);
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS grade_number INT`);
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS education_level VARCHAR(50) DEFAULT 'lower_primary'`);
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(10)`);
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS room_id UUID`);
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS class_teacher_id UUID`);
+  await q(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS section VARCHAR(10) DEFAULT 'A'`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS subject_group VARCHAR(50)`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS color VARCHAR(20)`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_elective BOOLEAN DEFAULT FALSE`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS weekly_periods INT DEFAULT 5`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description TEXT`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS code VARCHAR(20)`);
+  await q(`ALTER TABLE subjects ADD COLUMN IF NOT EXISTS category VARCHAR(30) DEFAULT 'core'`);
+
+  // rooms
+  await q(`CREATE TABLE IF NOT EXISTS rooms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID,
+    name VARCHAR(100) NOT NULL,
+    room_number VARCHAR(20),
+    capacity INT DEFAULT 45,
+    building VARCHAR(100),
+    floor VARCHAR(20),
+    room_type VARCHAR(30) DEFAULT 'classroom',
+    features TEXT[] DEFAULT '{}',
+    is_available BOOLEAN DEFAULT TRUE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // class_subjects
+  await q(`CREATE TABLE IF NOT EXISTS class_subjects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id UUID, subject_id UUID, teacher_id UUID, tenant_id UUID,
+    is_optional BOOLEAN DEFAULT FALSE, weekly_periods INT DEFAULT 5,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(class_id, subject_id)
+  )`);
+
+  // schemes_of_work
+  await q(`CREATE TABLE IF NOT EXISTS schemes_of_work (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, teacher_id UUID, subject_id UUID, class_id UUID, strand_id UUID,
+    academic_year VARCHAR(10), term INT, title VARCHAR(255),
+    objectives TEXT, resources TEXT, total_weeks INT DEFAULT 13,
+    status VARCHAR(20) DEFAULT 'draft', hod_remarks TEXT,
+    hod_approved_by UUID, hod_approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // scheme_weeks
+  await q(`CREATE TABLE IF NOT EXISTS scheme_weeks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID, week_number INT, topic VARCHAR(255), sub_strand_id UUID,
+    learning_outcomes TEXT, activities TEXT, resources TEXT,
+    assessment_type VARCHAR(50), remarks TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // lesson_plans
+  await q(`CREATE TABLE IF NOT EXISTS lesson_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, teacher_id UUID, subject_id UUID, class_id UUID,
+    scheme_id UUID, strand_id UUID, sub_strand_id UUID,
+    academic_year VARCHAR(10), term INT, week_number INT, lesson_number INT DEFAULT 1,
+    date DATE, duration_minutes INT DEFAULT 40, topic VARCHAR(255),
+    learning_objectives TEXT, key_vocabulary TEXT, prior_knowledge TEXT,
+    teaching_methods TEXT, introduction TEXT, development TEXT, conclusion TEXT,
+    activities TEXT, homework TEXT, resources TEXT, assessment_method TEXT,
+    reflection TEXT, status VARCHAR(20) DEFAULT 'draft',
+    approved_by UUID, approved_at TIMESTAMPTZ, approval_remarks TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // sba_setups
+  await q(`CREATE TABLE IF NOT EXISTS sba_setups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, class_id UUID, subject_id UUID, teacher_id UUID,
+    strand_id UUID, sub_strand_id UUID,
+    academic_year VARCHAR(10), term INT, title VARCHAR(255),
+    assessment_type VARCHAR(50), description TEXT,
+    max_score NUMERIC DEFAULT 100, weight_percentage NUMERIC DEFAULT 10,
+    assessment_date DATE, submission_deadline DATE, instructions TEXT, rubric TEXT,
+    status VARCHAR(20) DEFAULT 'draft', moderated_by UUID, moderated_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // sba_student_records
+  await q(`CREATE TABLE IF NOT EXISTS sba_student_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sba_setup_id UUID, student_id UUID, teacher_id UUID, tenant_id UUID,
+    score NUMERIC, cbc_grade VARCHAR(5), is_absent BOOLEAN DEFAULT FALSE,
+    teacher_remarks TEXT, submitted_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(sba_setup_id, student_id)
+  )`);
+
+  // projects
+  await q(`CREATE TABLE IF NOT EXISTS projects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, teacher_id UUID, class_id UUID, subject_id UUID,
+    strand_id UUID, sub_strand_id UUID,
+    academic_year VARCHAR(10), term INT, title VARCHAR(255), description TEXT,
+    project_type VARCHAR(20) DEFAULT 'individual', is_stem BOOLEAN DEFAULT FALSE,
+    start_date DATE, due_date DATE, max_score NUMERIC DEFAULT 100,
+    rubric TEXT, learning_outcomes TEXT, materials_needed TEXT,
+    status VARCHAR(20) DEFAULT 'draft',
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // project_milestones
+  await q(`CREATE TABLE IF NOT EXISTS project_milestones (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID, title VARCHAR(255), description TEXT,
+    due_date DATE, sort_order INT DEFAULT 0, is_completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // project_submissions
+  await q(`CREATE TABLE IF NOT EXISTS project_submissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID, student_id UUID, project_group_id UUID, tenant_id UUID,
+    title VARCHAR(255), description TEXT, evidence_urls TEXT[] DEFAULT '{}',
+    milestone_id UUID, is_late BOOLEAN DEFAULT FALSE,
+    score NUMERIC, cbc_grade VARCHAR(5), teacher_remarks TEXT,
+    graded_at TIMESTAMPTZ, graded_by UUID,
+    submission_date TIMESTAMPTZ DEFAULT NOW(), created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // life_skills_assessments
+  await q(`CREATE TABLE IF NOT EXISTS life_skills_assessments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, student_id UUID, class_id UUID, teacher_id UUID,
+    academic_year VARCHAR(10), term INT,
+    responsibility VARCHAR(5), respect VARCHAR(5), integrity VARCHAR(5), patriotism VARCHAR(5),
+    communication VARCHAR(5), collaboration VARCHAR(5), critical_thinking VARCHAR(5), creativity VARCHAR(5),
+    digital_literacy VARCHAR(5), self_management VARCHAR(5), leadership VARCHAR(5), physical_health VARCHAR(5),
+    teacher_remarks TEXT, areas_of_improvement TEXT, strengths TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(student_id, class_id, academic_year, term)
+  )`);
+
+  // career_pathways
+  await q(`CREATE TABLE IF NOT EXISTS career_pathways (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, name VARCHAR(255), category VARCHAR(100), description TEXT,
+    required_subjects TEXT[], key_competencies TEXT[], career_options TEXT[], institutions TEXT[],
+    is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // student_career_profiles
+  await q(`CREATE TABLE IF NOT EXISTS student_career_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID, tenant_id UUID, academic_year VARCHAR(10),
+    stem_interest INT, arts_interest INT, social_sciences_interest INT,
+    technical_interest INT, business_interest INT, health_interest INT,
+    recommended_pathway_id UUID, career_aspirations TEXT,
+    teacher_recommendation TEXT, counselor_notes TEXT,
+    subject_combination TEXT[], recommended_by UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(student_id, academic_year)
+  )`);
+
+  // learning_materials
+  await q(`CREATE TABLE IF NOT EXISTS learning_materials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, uploaded_by UUID, subject_id UUID, class_id UUID, strand_id UUID,
+    title VARCHAR(255), description TEXT, material_type VARCHAR(50),
+    education_level VARCHAR(50), academic_year VARCHAR(10), term INT,
+    file_url TEXT, external_url TEXT, is_public BOOLEAN DEFAULT FALSE,
+    tags TEXT[] DEFAULT '{}', download_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
+  // promotion_rules
+  await q(`CREATE TABLE IF NOT EXISTS promotion_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID, from_class_id UUID, to_class_id UUID, academic_year VARCHAR(10),
+    min_attendance_percent NUMERIC DEFAULT 75, min_subjects_passed INT DEFAULT 5,
+    min_average_percent NUMERIC DEFAULT 40, cbc_min_me_count INT DEFAULT 3,
+    auto_promote BOOLEAN DEFAULT FALSE, notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(from_class_id, academic_year)
+  )`);
+
+  // student_promotions
+  await q(`CREATE TABLE IF NOT EXISTS student_promotions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID, tenant_id UUID, from_class_id UUID, to_class_id UUID,
+    academic_year VARCHAR(10), promotion_type VARCHAR(20) DEFAULT 'promoted',
+    attendance_percent NUMERIC, average_score NUMERIC, remarks TEXT,
+    promoted_by UUID, promoted_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(student_id, academic_year)
+  )`);
+})();
+
 // ================================================================
 // SCHEMES OF WORK
 // ================================================================
@@ -68,7 +273,7 @@ router.post('/schemes', requireRole(['admin','teacher']), async (req, res) => {
     const result = await query(`
       INSERT INTO schemes_of_work (tenant_id, subject_id, class_id, teacher_id, academic_year, term, title, strand_id, total_weeks, objectives, resources)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *
-    `, [tid(req), subject_id, class_id, uid(req), academic_year, term, title, strand_id, total_weeks || 13, objectives, resources]);
+    `, [tid(req), subject_id || null, class_id || null, uid(req), academic_year, term, title, strand_id || null, total_weeks || 13, objectives, resources]);
     res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -214,7 +419,7 @@ router.post('/lesson-plans', requireRole(['admin','teacher']), async (req, res) 
         activities, homework, resources, assessment_method
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
       RETURNING *
-    `, [tid(req), uid(req), subject_id, class_id, scheme_id, strand_id, sub_strand_id,
+    `, [tid(req), uid(req), subject_id || null, class_id || null, scheme_id || null, strand_id || null, sub_strand_id || null,
         academic_year, term, week_number, lesson_number || 1, date, duration_minutes || 40,
         topic, learning_objectives, key_vocabulary, prior_knowledge,
         teaching_methods, introduction, development, conclusion,
@@ -338,9 +543,9 @@ router.post('/sba', requireRole(['admin','teacher']), async (req, res) => {
         academic_year, term, title, assessment_type, description, max_score, weight_percentage,
         assessment_date, submission_deadline, instructions, rubric)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *
-    `, [tid(req), class_id, subject_id, uid(req), strand_id, sub_strand_id,
+    `, [tid(req), class_id || null, subject_id || null, uid(req), strand_id || null, sub_strand_id || null,
         academic_year, term, title, assessment_type, description, max_score || 100,
-        weight_percentage || 10, assessment_date, submission_deadline, instructions, rubric]);
+        weight_percentage || 10, assessment_date || null, submission_deadline || null, instructions, rubric]);
     res.status(201).json({ data: result[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -476,9 +681,9 @@ router.post('/projects', requireRole(['admin','teacher']), async (req, res) => {
         academic_year, term, title, description, project_type, is_stem, start_date, due_date,
         max_score, rubric, learning_outcomes, materials_needed)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *
-    `, [tid(req), uid(req), class_id, subject_id, strand_id, sub_strand_id,
+    `, [tid(req), uid(req), class_id || null, subject_id || null, strand_id || null, sub_strand_id || null,
         academic_year, term, title, description, project_type || 'individual',
-        is_stem || false, start_date, due_date, max_score || 100,
+        is_stem || false, start_date || null, due_date || null, max_score || 100,
         rubric, learning_outcomes, materials_needed]);
     res.status(201).json({ data: result[0] });
   } catch (err) {
@@ -764,7 +969,7 @@ router.post('/career/profiles', requireRole(['admin','teacher']), async (req, re
       RETURNING *
     `, [student_id, tid(req), academic_year,
         stem_interest, arts_interest, social_sciences_interest, technical_interest,
-        business_interest, health_interest, recommended_pathway_id,
+        business_interest, health_interest, recommended_pathway_id || null,
         career_aspirations, teacher_recommendation, counselor_notes, subject_combination, uid(req)]);
     res.json({ data: result[0] });
   } catch (err) {
@@ -839,7 +1044,7 @@ router.post('/materials', requireRole(['admin','teacher']), async (req, res) => 
         title, description, material_type, education_level, academic_year, term,
         file_url, external_url, is_public, tags)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *
-    `, [tid(req), uid(req), subject_id, class_id, strand_id, title, description,
+    `, [tid(req), uid(req), subject_id || null, class_id || null, strand_id || null, title, description,
         material_type, education_level, academic_year, term, file_url,
         external_url, is_public || false, tags || []]);
     res.status(201).json({ data: result[0] });
@@ -923,7 +1128,7 @@ router.post('/promotion/rules', requireRole(['admin']), async (req, res) => {
         min_subjects_passed=EXCLUDED.min_subjects_passed, min_average_percent=EXCLUDED.min_average_percent,
         cbc_min_me_count=EXCLUDED.cbc_min_me_count, auto_promote=EXCLUDED.auto_promote, notes=EXCLUDED.notes
       RETURNING *
-    `, [tid(req), from_class_id, to_class_id, academic_year,
+    `, [tid(req), from_class_id || null, to_class_id || null, academic_year,
         min_attendance_percent || 75, min_subjects_passed || 5,
         min_average_percent || 40, cbc_min_me_count || 3,
         auto_promote || false, notes]);
@@ -980,7 +1185,7 @@ router.post('/promotion/promote-student', requireRole(['admin']), async (req, re
         average_score=EXCLUDED.average_score, remarks=EXCLUDED.remarks,
         promoted_by=EXCLUDED.promoted_by, promoted_at=NOW()
       RETURNING *
-    `, [student_id, tid(req), from_class_id, to_class_id, academic_year,
+    `, [student_id || null, tid(req), from_class_id || null, to_class_id || null, academic_year,
         promotion_type || 'promoted', attendance_percent, average_score, remarks, uid(req)]);
 
     // Update student class if promoted
@@ -1006,7 +1211,7 @@ router.post('/promotion/bulk-promote', requireRole(['admin']), async (req, res) 
         ON CONFLICT (student_id, academic_year) DO UPDATE SET
           to_class_id=EXCLUDED.to_class_id, promotion_type=EXCLUDED.promotion_type,
           remarks=EXCLUDED.remarks, promoted_by=EXCLUDED.promoted_by, promoted_at=NOW()
-      `, [p.student_id, tid(req), p.from_class_id, p.to_class_id, academic_year,
+      `, [p.student_id || null, tid(req), p.from_class_id || null, p.to_class_id || null, academic_year,
           p.promotion_type || 'promoted', p.remarks, uid(req)]);
       if (p.to_class_id && p.promotion_type !== 'repeated') {
         await query('UPDATE students SET class_id=$1 WHERE id=$2', [p.to_class_id, p.student_id]);

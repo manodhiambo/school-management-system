@@ -7,6 +7,7 @@ import { AddParentModal } from '@/components/modals/AddParentModal';
 import { EditParentModal } from '@/components/modals/EditParentModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/languageStore';
 
 interface Parent {
   id: string;
@@ -21,6 +22,7 @@ interface Parent {
 }
 
 export function ParentsPage() {
+  const { t } = useLanguageStore();
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -106,12 +108,12 @@ export function ParentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Parents</h2>
-          <p className="text-gray-500">Manage parent accounts and link them to students</p>
+          <h2 className="text-3xl font-bold">{t('Parents')}</h2>
+          <p className="text-gray-500">{t('Manage parent accounts and link them to students')}</p>
         </div>
         <Button onClick={() => setShowAddModal(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Parent
+          {t('Add Parent')}
         </Button>
       </div>
 
@@ -121,7 +123,7 @@ export function ParentsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Total Parents</p>
+                <p className="text-sm text-gray-500">{t('Total Parents')}</p>
                 <p className="text-3xl font-bold">{parents.length}</p>
               </div>
               <Users className="h-10 w-10 text-blue-500 opacity-50" />
@@ -132,7 +134,7 @@ export function ParentsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">With Linked Children</p>
+                <p className="text-sm text-gray-500">{t('With Linked Children')}</p>
                 <p className="text-3xl font-bold text-green-600">
                   {parents.filter(p => (p.children_count || 0) > 0).length}
                 </p>
@@ -145,7 +147,7 @@ export function ParentsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Without Children</p>
+                <p className="text-sm text-gray-500">{t('Without Children')}</p>
                 <p className="text-3xl font-bold text-orange-600">
                   {parents.filter(p => (p.children_count || 0) === 0).length}
                 </p>
@@ -161,7 +163,7 @@ export function ParentsPage() {
           <div className="flex items-center space-x-2">
             <Search className="h-5 w-5 text-gray-400" />
             <Input
-              placeholder="Search parents by name or email..."
+              placeholder={t('Search parents...')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-sm"
@@ -172,10 +174,10 @@ export function ParentsPage() {
           {filteredParents.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">No parents found</p>
+              <p className="text-gray-500 mb-4">{t('No parents found')}</p>
               <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Your First Parent
+                {t('Add Your First Parent')}
               </Button>
             </div>
           ) : (
@@ -183,12 +185,12 @@ export function ParentsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="text-left p-4 font-medium">Name</th>
-                    <th className="text-left p-4 font-medium">Email</th>
-                    <th className="text-left p-4 font-medium">Phone</th>
-                    <th className="text-left p-4 font-medium">Relationship</th>
-                    <th className="text-left p-4 font-medium">Children</th>
-                    <th className="text-left p-4 font-medium">Actions</th>
+                    <th className="text-left p-4 font-medium">{t('Name')}</th>
+                    <th className="text-left p-4 font-medium">{t('Email')}</th>
+                    <th className="text-left p-4 font-medium">{t('Phone')}</th>
+                    <th className="text-left p-4 font-medium">{t('Relationship')}</th>
+                    <th className="text-left p-4 font-medium">{t('Children')}</th>
+                    <th className="text-left p-4 font-medium">{t('Actions')}</th>
                   </tr>
                 </thead>
                 <tbody>

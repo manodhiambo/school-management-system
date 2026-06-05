@@ -8,6 +8,7 @@ import { EditTeacherModal } from '@/components/modals/EditTeacherModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { BulkImportModal } from '@/components/modals/BulkImportModal';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/languageStore';
 
 interface Teacher {
   id: string;
@@ -22,6 +23,7 @@ interface Teacher {
 }
 
 export function TeachersPage() {
+  const { t } = useLanguageStore();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -111,21 +113,21 @@ export function TeachersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Teachers</h2>
-          <p className="text-gray-500">Manage teacher records and assignments</p>
+          <h2 className="text-3xl font-bold">{t('Teachers')}</h2>
+          <p className="text-gray-500">{t('Manage teacher records and assignments')}</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
-            Export
+            {t('Export')}
           </Button>
           <Button variant="outline" onClick={() => setShowBulkImportModal(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {t('Import')}
           </Button>
           <Button onClick={() => setShowAddModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Teacher
+            {t('Add Teacher')}
           </Button>
         </div>
       </div>
@@ -136,14 +138,14 @@ export function TeachersPage() {
             <div className="flex items-center space-x-2 flex-1">
               <Search className="h-5 w-5 text-gray-400" />
               <Input
-                placeholder="Search teachers by name or employee ID..."
+                placeholder={t('Search teachers by name or employee ID...')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="max-w-sm"
               />
             </div>
             <div className="text-sm text-gray-500">
-              Total: {filteredTeachers.length} teachers
+              {t('Total:')} {filteredTeachers.length} {t('Teachers').toLowerCase()}
             </div>
           </div>
         </CardHeader>
@@ -151,12 +153,12 @@ export function TeachersPage() {
           {filteredTeachers.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">
-                {searchTerm ? 'No teachers found matching your search' : 'No teachers found'}
+                {searchTerm ? t('No teachers found matching your search') : t('No teachers found')}
               </p>
               {!searchTerm && (
                 <Button onClick={() => setShowAddModal(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Your First Teacher
+                  {t('Add Your First Teacher')}
                 </Button>
               )}
             </div>
@@ -165,13 +167,13 @@ export function TeachersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-4">Employee ID</th>
-                    <th className="text-left p-4">Name</th>
-                    <th className="text-left p-4">Email</th>
-                    <th className="text-left p-4">Phone</th>
-                    <th className="text-left p-4">Specialization</th>
-                    <th className="text-left p-4">Status</th>
-                    <th className="text-left p-4">Actions</th>
+                    <th className="text-left p-4">{t('Employee ID')}</th>
+                    <th className="text-left p-4">{t('Name')}</th>
+                    <th className="text-left p-4">{t('Email')}</th>
+                    <th className="text-left p-4">{t('Phone')}</th>
+                    <th className="text-left p-4">{t('Specialization')}</th>
+                    <th className="text-left p-4">{t('Status')}</th>
+                    <th className="text-left p-4">{t('Actions')}</th>
                   </tr>
                 </thead>
                 <tbody>

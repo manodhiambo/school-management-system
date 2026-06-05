@@ -10,10 +10,12 @@ import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { UserManualCard } from '@/components/UserManualCard';
 import { TeacherCheckinWidget } from '@/components/TeacherCheckinWidget';
+import { useLanguageStore } from '@/store/languageStore';
 
 export function TeacherDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const { t, language } = useLanguageStore();
   const [stats, setStats] = useState<any>({});
   const [classes, setClasses] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -47,7 +49,7 @@ export function TeacherDashboard() {
         totalClasses: (classesRes?.data || classesRes?.classes || []).length,
         totalStudents,
         totalAssignments: (assignmentsRes?.data || []).length,
-        pendingGrading: (assignmentsRes?.data || []).filter((a: any) => 
+        pendingGrading: (assignmentsRes?.data || []).filter((a: any) =>
           a.submission_count > 0 && a.submission_count > (a.graded_count || 0)
         ).length
       });
@@ -60,6 +62,11 @@ export function TeacherDashboard() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
+    if (language === 'sw') {
+      if (hour < 12) return 'Habari za Asubuhi';
+      if (hour < 17) return 'Habari za Mchana';
+      return 'Habari za Jioni';
+    }
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
@@ -82,7 +89,7 @@ export function TeacherDashboard() {
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-500">Loading dashboard...</p>
+          <p className="mt-4 text-gray-500">{t('Loading...')}</p>
         </div>
       </div>
     );
@@ -97,7 +104,7 @@ export function TeacherDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">{getGreeting()}, Teacher!</h1>
-            <p className="text-purple-100 mt-1">Ready to inspire minds today?</p>
+            <p className="text-purple-100 mt-1">{t('Ready to inspire minds today?')}</p>
           </div>
           <div className="hidden md:flex items-center space-x-2 bg-white/20 rounded-lg px-4 py-2">
             <Calendar className="h-5 w-5" />
@@ -112,7 +119,7 @@ export function TeacherDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">My Classes</p>
+                <p className="text-sm font-medium text-gray-500">{t('My Classes')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.totalClasses}</h3>
               </div>
               <div className="h-14 w-14 bg-purple-100 rounded-2xl flex items-center justify-center">
@@ -126,7 +133,7 @@ export function TeacherDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Students</p>
+                <p className="text-sm font-medium text-gray-500">{t('Total Students')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.totalStudents}</h3>
               </div>
               <div className="h-14 w-14 bg-blue-100 rounded-2xl flex items-center justify-center">
@@ -140,7 +147,7 @@ export function TeacherDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Assignments</p>
+                <p className="text-sm font-medium text-gray-500">{t('Assignments')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.totalAssignments}</h3>
               </div>
               <div className="h-14 w-14 bg-green-100 rounded-2xl flex items-center justify-center">
@@ -154,7 +161,7 @@ export function TeacherDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Today's Classes</p>
+                <p className="text-sm font-medium text-gray-500">{t("Today's Classes")}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{todayClasses.length}</h3>
               </div>
               <div className="h-14 w-14 bg-orange-100 rounded-2xl flex items-center justify-center">
@@ -173,10 +180,10 @@ export function TeacherDashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-semibold flex items-center">
                 <Clock className="h-5 w-5 mr-2 text-purple-600" />
-                Today's Schedule
+                {t("Today's Schedule")}
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={() => navigate('/app/my-timetable')}>
-                View All <ArrowRight className="h-4 w-4 ml-1" />
+                {t('View')} <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           </CardHeader>
@@ -196,7 +203,7 @@ export function TeacherDashboard() {
                       <p className="font-medium text-purple-600">
                         {formatTime(item.start_time)} - {formatTime(item.end_time)}
                       </p>
-                      {item.room && <p className="text-sm text-gray-500">Room {item.room}</p>}
+                      {item.room && <p className="text-sm text-gray-500">{t('Room')} {item.room}</p>}
                     </div>
                   </div>
                 ))}
@@ -204,8 +211,8 @@ export function TeacherDashboard() {
             ) : (
               <div className="text-center py-12 text-gray-400">
                 <Calendar className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">No classes today</p>
-                <p className="text-sm">Enjoy your day off!</p>
+                <p className="text-lg font-medium">{t('No classes today')}</p>
+                <p className="text-sm">{t('Enjoy your day off!')}</p>
               </div>
             )}
           </CardContent>
@@ -217,10 +224,10 @@ export function TeacherDashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-semibold flex items-center">
                 <GraduationCap className="h-5 w-5 mr-2 text-blue-600" />
-                My Classes
+                {t('My Classes')}
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={() => navigate('/app/my-classes')}>
-                View All <ArrowRight className="h-4 w-4 ml-1" />
+                {t('View')} <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           </CardHeader>
@@ -239,7 +246,7 @@ export function TeacherDashboard() {
                       </div>
                     </div>
                     <span className="text-sm font-medium text-blue-600">
-                      {Number(classItem.student_count) || 0} students
+                      {Number(classItem.student_count) || 0} {t('Students').toLowerCase()}
                     </span>
                   </div>
                 ))}
@@ -247,7 +254,7 @@ export function TeacherDashboard() {
             ) : (
               <div className="text-center py-12 text-gray-400">
                 <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                <p>No classes assigned yet</p>
+                <p>{t('No classes assigned yet')}</p>
               </div>
             )}
           </CardContent>
@@ -257,33 +264,33 @@ export function TeacherDashboard() {
       {/* Quick Actions */}
       <Card className="border-0 shadow-lg">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
+          <CardTitle className="text-lg font-semibold">{t('Quick Actions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-purple-50 hover:border-purple-300"
               onClick={() => navigate('/app/attendance')}
             >
               <CheckCircle className="h-8 w-8 mb-2 text-purple-600" />
-              <span>Mark Attendance</span>
+              <span>{t('Mark Attendance')}</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-blue-50 hover:border-blue-300"
               onClick={() => navigate('/app/gradebook')}
             >
               <FileText className="h-8 w-8 mb-2 text-blue-600" />
-              <span>Grade Book</span>
+              <span>{t('Grade Book')}</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-green-50 hover:border-green-300"
               onClick={() => navigate('/app/assignments')}
             >
               <BookOpen className="h-8 w-8 mb-2 text-green-600" />
-              <span>Assignments</span>
+              <span>{t('Assignments')}</span>
             </Button>
             <Button
               variant="outline"
@@ -291,7 +298,7 @@ export function TeacherDashboard() {
               onClick={() => navigate('/app/communication')}
             >
               <Bell className="h-8 w-8 mb-2 text-orange-600" />
-              <span>Messages</span>
+              <span>{t('Messages')}</span>
             </Button>
           </div>
         </CardContent>

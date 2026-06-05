@@ -84,8 +84,10 @@ export function AuditLogPage() {
 
       const qs = new URLSearchParams(params).toString();
       const res: any = await (api as any).api.get(`/audit-log?${qs}`);
-      setLogs(res.data?.logs || res.data || res.logs || []);
-      setTotal(res.data?.total || res.total || 0);
+      // Response interceptor unwraps axios, so res = { success, data: [...rows], total, page, pages }
+      const rows = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setLogs(rows);
+      setTotal(typeof res?.total === 'number' ? res.total : rows.length);
     } catch (e: any) {
       setError(e?.message || 'Failed to load audit log');
     } finally {
@@ -97,7 +99,8 @@ export function AuditLogPage() {
 
   useEffect(() => {
     (api as any).api.get('/audit-log/summary').then((res: any) => {
-      setSummary(res?.data || res || null);
+      // res = { success, data: { total_today, most_active_user, most_common_action } }
+      setSummary(res?.data ?? res ?? null);
     }).catch(() => { /* silent */ });
     (api as any).api.get('/audit-log/actions').then((res: any) => {
       setActions(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);

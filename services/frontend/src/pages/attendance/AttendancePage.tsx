@@ -12,6 +12,7 @@ import { MarkAttendanceModal } from '@/components/modals/MarkAttendanceModal';
 import api from '@/services/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useLanguageStore } from '@/store/languageStore';
 
 // ─── helpers ───────────────────────────────────────────────────────────────────
 const todayIso = () => new Date().toISOString().split('T')[0];
@@ -369,6 +370,7 @@ function AbsentNotificationsModal({ open, onClose, classes }: { open: boolean; o
 
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 export function AttendancePage() {
+  const { t } = useLanguageStore();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<any[]>([]);
@@ -415,12 +417,12 @@ export function AttendancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Attendance Management</h2>
-          <p className="text-gray-500">Track and manage student attendance</p>
+          <h2 className="text-3xl font-bold">{t('Attendance Management')}</h2>
+          <p className="text-gray-500">{t('Track and manage student attendance')}</p>
         </div>
         <Button onClick={() => setShowMarkModal(true)}>
           <Calendar className="mr-2 h-4 w-4" />
-          Mark Attendance
+          {t('Mark Attendance')}
         </Button>
       </div>
 
@@ -428,7 +430,7 @@ export function AttendancePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Total Records</span>
+              <span>{t('Total Records')}</span>
               <Calendar className="h-4 w-4 text-gray-500" />
             </CardTitle>
           </CardHeader>
@@ -441,7 +443,7 @@ export function AttendancePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Present</span>
+              <span>{t('Present')}</span>
               <CheckCircle className="h-4 w-4 text-green-500" />
             </CardTitle>
           </CardHeader>
@@ -453,7 +455,7 @@ export function AttendancePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Absent</span>
+              <span>{t('Absent')}</span>
               <XCircle className="h-4 w-4 text-red-500" />
             </CardTitle>
           </CardHeader>
@@ -465,7 +467,7 @@ export function AttendancePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Late</span>
+              <span>{t('Late')}</span>
               <Clock className="h-4 w-4 text-yellow-500" />
             </CardTitle>
           </CardHeader>
@@ -478,14 +480,14 @@ export function AttendancePage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Today's Attendance Rate</CardTitle>
+            <CardTitle>{t("Today's Attendance Rate")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
               <div className="text-5xl font-bold text-primary">
                 {attendancePercentage}%
               </div>
-              <p className="text-gray-500 mt-2">Overall attendance rate</p>
+              <p className="text-gray-500 mt-2">{t('Overall attendance rate')}</p>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
                 <div
                   className="bg-primary h-2 rounded-full transition-all"
@@ -498,20 +500,20 @@ export function AttendancePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>{t('Quick Actions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Button className="w-full" variant="outline" onClick={() => setShowMarkModal(true)}>
               <Calendar className="mr-2 h-4 w-4" />
-              Mark Today's Attendance
+              {t("Mark Today's Attendance")}
             </Button>
             <Button className="w-full" variant="outline" onClick={() => setShowReportModal(true)}>
               <Download className="mr-2 h-4 w-4" />
-              Download Monthly Report
+              {t('Download Monthly Report')}
             </Button>
             <Button className="w-full" variant="outline" onClick={() => setShowNotifyModal(true)}>
               <Bell className="mr-2 h-4 w-4" />
-              Send Absence Notifications
+              {t('Send Absence Notifications')}
             </Button>
           </CardContent>
         </Card>

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, Edit, Trash2, DollarSign, Bus, Users, Loader2, Eye, CheckCircle2, XCircle, Link2 } from 'lucide-react';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { useLanguageStore } from '@/store/languageStore';
 
 const STUDENT_TYPE_LABEL: Record<string, string> = {
   all: 'All Students',
@@ -34,6 +35,7 @@ const EMPTY_FORM = {
 
 export function FeeStructurePage() {
   const { user } = useAuthStore();
+  const { t } = useLanguageStore();
   const isFinanceOfficer = user?.role === 'finance_officer';
   const [activeTab, setActiveTab] = useState<'structures' | 'bulk'>('structures');
   const [structures, setStructures] = useState<any[]>([]);
@@ -196,12 +198,12 @@ export function FeeStructurePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Fee Structures</h2>
-          <p className="text-gray-500">Manage fee structures and bulk invoice generation</p>
+          <h2 className="text-3xl font-bold">{t('Fee Structures')}</h2>
+          <p className="text-gray-500">{t('Manage fee structures and bulk invoice generation')}</p>
         </div>
         {activeTab === 'structures' && !isFinanceOfficer && (
           <Button onClick={() => { resetForm(); setShowModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Add Fee Structure
+            <Plus className="mr-2 h-4 w-4" /> {t('Add Fee Structure')}
           </Button>
         )}
       </div>
@@ -211,7 +213,7 @@ export function FeeStructurePage() {
         {(['structures', 'bulk'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === tab ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}>
-            {tab === 'structures' ? 'Fee Structures' : 'Bulk Generate Invoices'}
+            {tab === 'structures' ? t('Fee Structures') : t('Bulk Generate Invoices')}
           </button>
         ))}
       </div>
@@ -220,13 +222,13 @@ export function FeeStructurePage() {
         <>
           {/* Stats */}
           <div className="grid gap-4 md:grid-cols-4">
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Active</CardTitle></CardHeader>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Total Active')}</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{structures.length}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Boarder Fees</CardTitle></CardHeader>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Boarder Fees')}</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold text-purple-600">{structures.filter(s => s.student_type === 'boarder').length}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Day Scholar Fees</CardTitle></CardHeader>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Day Scholar Fees')}</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold text-blue-600">{structures.filter(s => s.student_type === 'day_scholar').length}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Transport Fees</CardTitle></CardHeader>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Transport Fees')}</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold text-orange-600">{structures.filter(s => s.is_transport_fee).length}</div></CardContent></Card>
           </div>
 
@@ -236,7 +238,7 @@ export function FeeStructurePage() {
               {structures.length === 0 ? (
                 <div className="text-center py-12">
                   <DollarSign className="h-16 w-16 text-gray-200 mx-auto mb-4" />
-                  <p className="text-gray-500">No active fee structures. Click "Add Fee Structure" to create one.</p>
+                  <p className="text-gray-500">{t('No fee structure found')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

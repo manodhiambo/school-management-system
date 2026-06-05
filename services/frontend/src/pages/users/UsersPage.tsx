@@ -8,6 +8,7 @@ import { EditUserModal } from '@/components/modals/EditUserModal';
 import { ResetPasswordModal } from '@/components/modals/ResetPasswordModal';
 import { SendAnnouncementModal } from '@/components/modals/SendAnnouncementModal';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/languageStore';
 
 interface User {
   id: string;
@@ -21,6 +22,7 @@ interface User {
 }
 
 export function UsersPage() {
+  const { t } = useLanguageStore();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,17 +133,17 @@ export function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">User Management</h2>
-          <p className="text-gray-500">Manage system users, passwords, and send announcements</p>
+          <h2 className="text-3xl font-bold">{t('User Management')}</h2>
+          <p className="text-gray-500">{t('Manage users and their roles')}</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={() => setShowAnnouncementModal(true)}>
             <Bell className="mr-2 h-4 w-4" />
-            Send Announcement
+            {t('Send Announcement')}
           </Button>
           <Button onClick={() => setShowAddModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Add User
+            {t('Add User')}
           </Button>
         </div>
       </div>
@@ -190,7 +192,7 @@ export function UsersPage() {
           <div className="flex items-center space-x-2">
             <Search className="h-5 w-5 text-gray-400" />
             <Input
-              placeholder="Search users by name or email..."
+              placeholder={t('Search users...')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-sm"
@@ -204,10 +206,10 @@ export function UsersPage() {
           {filteredUsers.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">No users found</p>
+              <p className="text-gray-500 mb-4">{t('No users found')}</p>
               <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Add User
+                {t('Add Your First User')}
               </Button>
             </div>
           ) : (
@@ -215,11 +217,11 @@ export function UsersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="text-left p-4 font-medium">User</th>
-                    <th className="text-left p-4 font-medium">Role</th>
-                    <th className="text-left p-4 font-medium">Status</th>
-                    <th className="text-left p-4 font-medium">Last Login</th>
-                    <th className="text-left p-4 font-medium">Actions</th>
+                    <th className="text-left p-4 font-medium">{t('User')}</th>
+                    <th className="text-left p-4 font-medium">{t('Role')}</th>
+                    <th className="text-left p-4 font-medium">{t('Status')}</th>
+                    <th className="text-left p-4 font-medium">{t('Last Login')}</th>
+                    <th className="text-left p-4 font-medium">{t('Actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -260,7 +262,7 @@ export function UsersPage() {
                       <td className="p-4 text-sm text-gray-500">
                         {user.last_login
                           ? new Date(user.last_login).toLocaleDateString()
-                          : 'Never'}
+                          : t('Never')}
                       </td>
                       <td className="p-4">
                         <div className="flex space-x-1">

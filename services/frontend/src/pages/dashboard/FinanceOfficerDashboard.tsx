@@ -11,9 +11,11 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import financeService from '@/services/financeService';
 import { UserManualCard } from '@/components/UserManualCard';
+import { useLanguageStore } from '@/store/languageStore';
 
 export function FinanceOfficerDashboard() {
   const { user } = useAuthStore();
+  const { t, language } = useLanguageStore();
   const [loading, setLoading] = useState(true);
   const [financeDash, setFinanceDash] = useState<any>(null);
   const [feeCollection, setFeeCollection] = useState<any>(null);
@@ -62,6 +64,11 @@ export function FinanceOfficerDashboard() {
 
   const getGreeting = () => {
     const h = new Date().getHours();
+    if (language === 'sw') {
+      if (h < 12) return 'Habari za Asubuhi';
+      if (h < 17) return 'Habari za Mchana';
+      return 'Habari za Jioni';
+    }
     if (h < 12) return 'Good Morning';
     if (h < 17) return 'Good Afternoon';
     return 'Good Evening';
@@ -80,7 +87,7 @@ export function FinanceOfficerDashboard() {
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto" />
-          <p className="mt-4 text-gray-500">Loading finance dashboard...</p>
+          <p className="mt-4 text-gray-500">{t('Loading finance dashboard...')}</p>
         </div>
       </div>
     );
@@ -92,8 +99,8 @@ export function FinanceOfficerDashboard() {
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-bold">{getGreeting()}, Finance Officer!</h1>
-            <p className="text-amber-100 mt-1">Here is your financial overview for today.</p>
+            <h1 className="text-2xl font-bold">{getGreeting()}, {t('Finance Officer')}!</h1>
+            <p className="text-amber-100 mt-1">{t('Here is your financial overview for today.')}</p>
           </div>
           <div className="flex items-center gap-2 bg-white/20 rounded-lg px-4 py-2">
             <Calendar className="h-5 w-5" />
@@ -111,11 +118,11 @@ export function FinanceOfficerDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Income</p>
+                <p className="text-sm font-medium text-gray-500">{t('Total Income')}</p>
                 <h3 className="text-2xl font-bold text-gray-900 mt-1">{fmt(financeDash?.totalIncome)}</h3>
                 <div className="flex items-center mt-2 text-sm text-green-600">
                   <ArrowUpRight className="h-4 w-4 mr-1" />
-                  This year
+                  {t('This Year')}
                 </div>
               </div>
               <div className="h-14 w-14 bg-green-100 rounded-2xl flex items-center justify-center">
@@ -130,11 +137,11 @@ export function FinanceOfficerDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Expenses</p>
+                <p className="text-sm font-medium text-gray-500">{t('Total Expenses')}</p>
                 <h3 className="text-2xl font-bold text-gray-900 mt-1">{fmt(financeDash?.totalExpenses)}</h3>
                 <div className="flex items-center mt-2 text-sm text-red-600">
                   <ArrowDownRight className="h-4 w-4 mr-1" />
-                  This year
+                  {t('This Year')}
                 </div>
               </div>
               <div className="h-14 w-14 bg-red-100 rounded-2xl flex items-center justify-center">
@@ -149,12 +156,12 @@ export function FinanceOfficerDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Net Position</p>
+                <p className="text-sm font-medium text-gray-500">{t('Net Position')}</p>
                 <h3 className={`text-2xl font-bold mt-1 ${netPosition >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
                   {fmt(netPosition)}
                 </h3>
                 <div className="flex items-center mt-2 text-sm text-gray-500">
-                  Income minus expenses
+                  {t('Income minus expenses')}
                 </div>
               </div>
               <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${netPosition >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
@@ -169,10 +176,10 @@ export function FinanceOfficerDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Bank Balance</p>
+                <p className="text-sm font-medium text-gray-500">{t('Bank Balance')}</p>
                 <h3 className="text-2xl font-bold text-gray-900 mt-1">{fmt(totalBankBalance)}</h3>
                 <div className="flex items-center mt-2 text-sm text-indigo-600">
-                  {bankAccounts.length} account{bankAccounts.length !== 1 ? 's' : ''}
+                  {bankAccounts.length} {t('account(s)')}
                 </div>
               </div>
               <div className="h-14 w-14 bg-indigo-100 rounded-2xl flex items-center justify-center">
@@ -191,10 +198,10 @@ export function FinanceOfficerDashboard() {
             <CardTitle className="text-lg font-semibold flex items-center justify-between">
               <span className="flex items-center">
                 <Receipt className="h-5 w-5 mr-2 text-amber-600" />
-                Fee Collection Overview
+                {t('Fee Collection Overview')}
               </span>
               <Link to="/app/fee" className="text-sm text-amber-600 hover:underline font-normal">
-                Manage Fees →
+                {t('Manage Fees')} →
               </Link>
             </CardTitle>
           </CardHeader>
@@ -203,7 +210,7 @@ export function FinanceOfficerDashboard() {
               {/* Progress */}
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Collection Progress</span>
+                  <span className="text-gray-600">{t('Collection Progress')}</span>
                   <span className="font-semibold text-amber-600">{collectionRate}%</span>
                 </div>
                 <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
@@ -216,15 +223,15 @@ export function FinanceOfficerDashboard() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-blue-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Expected</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Expected')}</p>
                   <p className="text-lg font-bold text-blue-700 mt-1">{fmt(feeCollection?.total_amount)}</p>
                 </div>
                 <div className="bg-green-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Collected</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Collected')}</p>
                   <p className="text-lg font-bold text-green-700 mt-1">{fmt(feeCollection?.total_collected)}</p>
                 </div>
                 <div className="bg-red-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Outstanding</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Outstanding')}</p>
                   <p className="text-lg font-bold text-red-700 mt-1">
                     {fmt((feeCollection?.total_amount || 0) - (feeCollection?.total_collected || 0))}
                   </p>
@@ -234,7 +241,7 @@ export function FinanceOfficerDashboard() {
               {/* Monthly trend */}
               {feeByMonth.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-2">Monthly Collection (last 6 months)</p>
+                  <p className="text-sm font-medium text-gray-600 mb-2">{t('Monthly Collection (last 6 months)')}</p>
                   <div className="flex items-end gap-1 h-20">
                     {feeByMonth.map((m: any, i: number) => {
                       const max = Math.max(...feeByMonth.map((x: any) => Number(x.total_collected || x.amount || 0)));
@@ -266,7 +273,7 @@ export function FinanceOfficerDashboard() {
             <CardTitle className="text-lg font-semibold flex items-center justify-between">
               <span className="flex items-center">
                 <Clock className="h-5 w-5 mr-2 text-orange-500" />
-                Pending Approvals
+                {t('Pending Approvals')}
               </span>
               <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${
                 pendingExpenses.length > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
@@ -279,7 +286,7 @@ export function FinanceOfficerDashboard() {
             {pendingExpenses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-gray-400">
                 <CheckCircle className="h-10 w-10 mb-2 text-green-400" />
-                <p className="text-sm">All expenses approved</p>
+                <p className="text-sm">{t('All expenses approved')}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -301,7 +308,7 @@ export function FinanceOfficerDashboard() {
                 )}
                 <Link to="/app/finance/transactions">
                   <div className="mt-2 text-center text-sm text-amber-600 hover:text-amber-700 font-medium cursor-pointer">
-                    Review all →
+                    {t('Review all')} →
                   </div>
                 </Link>
               </div>
@@ -318,10 +325,10 @@ export function FinanceOfficerDashboard() {
             <CardTitle className="text-lg font-semibold flex items-center justify-between">
               <span className="flex items-center">
                 <Building2 className="h-5 w-5 mr-2 text-indigo-600" />
-                Bank Accounts
+                {t('Bank Accounts')}
               </span>
               <Link to="/app/finance/bank-accounts" className="text-sm text-indigo-600 hover:underline font-normal">
-                Manage →
+                {t('Manage')} →
               </Link>
             </CardTitle>
           </CardHeader>
@@ -329,7 +336,7 @@ export function FinanceOfficerDashboard() {
             {bankAccounts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-gray-400">
                 <CreditCard className="h-10 w-10 mb-2 opacity-50" />
-                <p className="text-sm">No bank accounts</p>
+                <p className="text-sm">{t('No bank accounts')}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -343,7 +350,7 @@ export function FinanceOfficerDashboard() {
                   </div>
                 ))}
                 <div className="flex justify-between pt-2 border-t text-sm font-bold">
-                  <span className="text-gray-600">Total</span>
+                  <span className="text-gray-600">{t('Total')}</span>
                   <span className="text-indigo-700">{fmt(totalBankBalance)}</span>
                 </div>
               </div>
@@ -357,17 +364,17 @@ export function FinanceOfficerDashboard() {
             <CardTitle className="text-lg font-semibold flex items-center justify-between">
               <span className="flex items-center">
                 <DollarSign className="h-5 w-5 mr-2 text-yellow-600" />
-                Petty Cash
+                {t('Petty Cash')}
               </span>
               <Link to="/app/finance/petty-cash" className="text-sm text-yellow-600 hover:underline font-normal">
-                Manage →
+                {t('Manage')} →
               </Link>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="bg-yellow-50 rounded-xl p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Current Balance</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Current Balance')}</p>
                 <p className="text-2xl font-bold text-yellow-700 mt-1">
                   {fmt(pettyCashSummary?.balance || pettyCashSummary?.current_balance)}
                 </p>
@@ -375,11 +382,11 @@ export function FinanceOfficerDashboard() {
               {pettyCashSummary && (
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-green-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-500">Total In</p>
+                    <p className="text-xs text-gray-500">{t('Total In')}</p>
                     <p className="text-base font-bold text-green-700">{fmt(pettyCashSummary.total_in || pettyCashSummary.total_replenishments)}</p>
                   </div>
                   <div className="bg-red-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-500">Total Out</p>
+                    <p className="text-xs text-gray-500">{t('Total Out')}</p>
                     <p className="text-base font-bold text-red-700">{fmt(pettyCashSummary.total_out || pettyCashSummary.total_expenses)}</p>
                   </div>
                 </div>
@@ -393,7 +400,7 @@ export function FinanceOfficerDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold flex items-center">
               <Activity className="h-5 w-5 mr-2 text-purple-600" />
-              This Month
+              {t('This Month')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -401,21 +408,21 @@ export function FinanceOfficerDashboard() {
               <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl">
                 <div className="flex items-center">
                   <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
-                  <span className="text-sm text-gray-700">Income</span>
+                  <span className="text-sm text-gray-700">{t('Income')}</span>
                 </div>
                 <span className="font-bold text-green-700">{fmt(financeDash?.monthlyIncome)}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-red-50 rounded-xl">
                 <div className="flex items-center">
                   <TrendingDown className="h-5 w-5 text-red-600 mr-2" />
-                  <span className="text-sm text-gray-700">Expenses</span>
+                  <span className="text-sm text-gray-700">{t('Expenses')}</span>
                 </div>
                 <span className="font-bold text-red-700">{fmt(financeDash?.monthlyExpenses)}</span>
               </div>
               <div className={`flex items-center justify-between p-3 rounded-xl ${(financeDash?.cashFlow || 0) >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
                 <div className="flex items-center">
                   <Wallet className={`h-5 w-5 mr-2 ${(financeDash?.cashFlow || 0) >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
-                  <span className="text-sm text-gray-700">Cash Flow</span>
+                  <span className="text-sm text-gray-700">{t('Cash Flow')}</span>
                 </div>
                 <span className={`font-bold ${(financeDash?.cashFlow || 0) >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
                   {fmt(financeDash?.cashFlow)}
@@ -425,7 +432,7 @@ export function FinanceOfficerDashboard() {
                 <div className="flex items-center p-3 bg-amber-50 rounded-xl border border-amber-200">
                   <AlertTriangle className="h-4 w-4 text-amber-600 mr-2" />
                   <span className="text-sm text-amber-800 font-medium">
-                    {financeDash.pendingApprovals} expense{financeDash.pendingApprovals !== 1 ? 's' : ''} pending approval
+                    {financeDash.pendingApprovals} {t('expense(s) pending approval')}
                   </span>
                 </div>
               )}
@@ -437,19 +444,19 @@ export function FinanceOfficerDashboard() {
       {/* Quick Actions */}
       <Card className="border-0 shadow-lg">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
+          <CardTitle className="text-lg font-semibold">{t('Quick Actions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
             {[
-              { label: 'Record Income', href: '/app/finance/transactions?type=income', icon: TrendingUp, color: 'bg-green-100 text-green-700' },
-              { label: 'Record Expense', href: '/app/finance/transactions?type=expense', icon: TrendingDown, color: 'bg-red-100 text-red-700' },
-              { label: 'Fee Management', href: '/app/fee', icon: Receipt, color: 'bg-amber-100 text-amber-700' },
-              { label: 'Fee Structure', href: '/app/fee-structure', icon: FileText, color: 'bg-orange-100 text-orange-700' },
-              { label: 'Bank Accounts', href: '/app/finance/bank-accounts', icon: CreditCard, color: 'bg-indigo-100 text-indigo-700' },
-              { label: 'Petty Cash', href: '/app/finance/petty-cash', icon: DollarSign, color: 'bg-yellow-100 text-yellow-700' },
-              { label: 'Reports', href: '/app/finance/reports', icon: BarChart2, color: 'bg-purple-100 text-purple-700' },
-              { label: 'Vendors & POs', href: '/app/finance/vendors', icon: Building2, color: 'bg-blue-100 text-blue-700' },
+              { label: t('Record Income'), href: '/app/finance/transactions?type=income', icon: TrendingUp, color: 'bg-green-100 text-green-700' },
+              { label: t('Record Expense'), href: '/app/finance/transactions?type=expense', icon: TrendingDown, color: 'bg-red-100 text-red-700' },
+              { label: t('Fee Management'), href: '/app/fee', icon: Receipt, color: 'bg-amber-100 text-amber-700' },
+              { label: t('Fee Structure'), href: '/app/fee-structure', icon: FileText, color: 'bg-orange-100 text-orange-700' },
+              { label: t('Bank Accounts'), href: '/app/finance/bank-accounts', icon: CreditCard, color: 'bg-indigo-100 text-indigo-700' },
+              { label: t('Petty Cash'), href: '/app/finance/petty-cash', icon: DollarSign, color: 'bg-yellow-100 text-yellow-700' },
+              { label: t('Reports'), href: '/app/finance/reports', icon: BarChart2, color: 'bg-purple-100 text-purple-700' },
+              { label: t('Vendors & POs'), href: '/app/finance/vendors', icon: Building2, color: 'bg-blue-100 text-blue-700' },
             ].map((action) => (
               <Link
                 key={action.label}

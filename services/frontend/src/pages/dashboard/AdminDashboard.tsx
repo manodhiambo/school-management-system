@@ -6,12 +6,14 @@ import {
   Clock, CheckCircle, AlertTriangle, Activity
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { useLanguageStore } from '@/store/languageStore';
 import api from '@/services/api';
 import { UserManualCard } from '@/components/UserManualCard';
 import { SystemBlueprintCard } from '@/components/SystemBlueprintCard';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
+  const { t } = useLanguageStore();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,9 +43,9 @@ export function AdminDashboard() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return t('welcome') === 'Welcome' ? 'Good Morning' : 'Habari za Asubuhi';
+    if (hour < 17) return t('welcome') === 'Welcome' ? 'Good Afternoon' : 'Habari za Mchana';
+    return t('welcome') === 'Welcome' ? 'Good Evening' : 'Habari za Jioni';
   };
 
   if (loading) {
@@ -71,8 +73,8 @@ export function AdminDashboard() {
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{getGreeting()}, Admin!</h1>
-            <p className="text-blue-100 mt-1">Here's what's happening at your school today.</p>
+            <h1 className="text-2xl font-bold">{getGreeting()}, {t('Dashboard') === 'Dashibodi' ? 'Msimamizi' : 'Admin'}!</h1>
+            <p className="text-blue-100 mt-1">{t('School Overview')}</p>
           </div>
           <div className="hidden md:flex items-center space-x-2 bg-white/20 rounded-lg px-4 py-2">
             <Calendar className="h-5 w-5" />
@@ -87,12 +89,12 @@ export function AdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Students</p>
+                <p className="text-sm font-medium text-gray-500">{t('Total Students')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats?.students?.total || 0}</h3>
                 <div className="flex items-center mt-2 text-sm">
                   <span className="flex items-center text-green-600">
                     <ArrowUpRight className="h-4 w-4 mr-1" />
-                    {stats?.students?.active || 0} active
+                    {stats?.students?.active || 0} {t('Active').toLowerCase()}
                   </span>
                 </div>
               </div>
@@ -107,12 +109,12 @@ export function AdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Teachers</p>
+                <p className="text-sm font-medium text-gray-500">{t('Total Teachers')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats?.teachers?.total || 0}</h3>
                 <div className="flex items-center mt-2 text-sm">
                   <span className="flex items-center text-green-600">
                     <CheckCircle className="h-4 w-4 mr-1" />
-                    {stats?.teachers?.active || 0} active
+                    {stats?.teachers?.active || 0} {t('Active').toLowerCase()}
                   </span>
                 </div>
               </div>
@@ -127,7 +129,7 @@ export function AdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Fee Collected</p>
+                <p className="text-sm font-medium text-gray-500">{t('Fee Collected')}</p>
                 <h3 className="text-2xl font-bold text-gray-900 mt-1">
                   {formatCurrency(stats?.fees?.total_collected || 0)}
                 </h3>
@@ -149,10 +151,10 @@ export function AdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Today's Attendance</p>
+                <p className="text-sm font-medium text-gray-500">{t("Today's Attendance")}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{attendanceRate}%</h3>
                 <div className="flex items-center mt-2 text-sm text-gray-500">
-                  <span>{stats?.attendance?.present || 0} present</span>
+                  <span>{stats?.attendance?.present || 0} {t('present')}</span>
                 </div>
               </div>
               <div className="h-14 w-14 bg-orange-100 rounded-2xl flex items-center justify-center">
@@ -170,7 +172,7 @@ export function AdminDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold flex items-center">
               <CreditCard className="h-5 w-5 mr-2 text-green-600" />
-              Fee Collection Overview
+              {t('Fee Collection Rate')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -178,7 +180,7 @@ export function AdminDashboard() {
               {/* Progress Bar */}
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Collection Progress</span>
+                  <span className="text-gray-600">{t('Fee Collection Rate')}</span>
                   <span className="font-semibold text-green-600">{collectionRate}%</span>
                 </div>
                 <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
@@ -192,19 +194,19 @@ export function AdminDashboard() {
               {/* Stats Grid */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-blue-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Total Expected</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Total')}</p>
                   <p className="text-xl font-bold text-blue-700 mt-1">
                     {formatCurrency(stats?.fees?.total_amount || 0)}
                   </p>
                 </div>
                 <div className="bg-green-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Collected</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Amount Paid')}</p>
                   <p className="text-xl font-bold text-green-700 mt-1">
                     {formatCurrency(stats?.fees?.total_collected || 0)}
                   </p>
                 </div>
                 <div className="bg-red-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Pending</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Outstanding Fees')}</p>
                   <p className="text-xl font-bold text-red-700 mt-1">
                     {formatCurrency(stats?.fees?.total_pending || 0)}
                   </p>
@@ -217,9 +219,9 @@ export function AdminDashboard() {
                   <AlertTriangle className="h-5 w-5 text-amber-600 mr-3" />
                   <div>
                     <p className="font-medium text-amber-800">
-                      {stats?.fees?.pending_count} pending invoices
+                      {stats?.fees?.pending_count} {t('pending') === 'Inasubiri' ? 'ankara zinazosubiri' : 'pending invoices'}
                     </p>
-                    <p className="text-sm text-amber-600">Requires attention</p>
+                    <p className="text-sm text-amber-600">{t('pending') === 'Inasubiri' ? 'Inahitaji umakini' : 'Requires attention'}</p>
                   </div>
                 </div>
               )}
@@ -232,7 +234,7 @@ export function AdminDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold flex items-center">
               <Calendar className="h-5 w-5 mr-2 text-orange-600" />
-              Today's Attendance
+              {t("Today's Attendance")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -268,7 +270,7 @@ export function AdminDashboard() {
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-3xl font-bold">{attendanceRate}%</span>
-                    <span className="text-xs text-gray-500">Present</span>
+                    <span className="text-xs text-gray-500">{t('present')}</span>
                   </div>
                 </div>
               </div>
@@ -278,17 +280,17 @@ export function AdminDashboard() {
                 <div className="bg-green-50 rounded-lg p-3">
                   <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
                   <p className="text-lg font-bold text-green-700">{stats?.attendance?.present || 0}</p>
-                  <p className="text-xs text-gray-500">Present</p>
+                  <p className="text-xs text-gray-500">{t('present')}</p>
                 </div>
                 <div className="bg-red-50 rounded-lg p-3">
                   <AlertTriangle className="h-5 w-5 text-red-600 mx-auto mb-1" />
                   <p className="text-lg font-bold text-red-700">{stats?.attendance?.absent || 0}</p>
-                  <p className="text-xs text-gray-500">Absent</p>
+                  <p className="text-xs text-gray-500">{t('absent')}</p>
                 </div>
                 <div className="bg-yellow-50 rounded-lg p-3">
                   <Clock className="h-5 w-5 text-yellow-600 mx-auto mb-1" />
                   <p className="text-lg font-bold text-yellow-700">{stats?.attendance?.late || 0}</p>
-                  <p className="text-xs text-gray-500">Late</p>
+                  <p className="text-xs text-gray-500">{t('late')}</p>
                 </div>
               </div>
             </div>
@@ -301,7 +303,7 @@ export function AdminDashboard() {
         {/* Quick Stats Cards */}
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold">School Overview</CardTitle>
+            <CardTitle className="text-lg font-semibold">{t('School Overview')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
@@ -311,7 +313,7 @@ export function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-indigo-700">{stats?.classes?.total || 0}</p>
-                  <p className="text-sm text-gray-500">Classes</p>
+                  <p className="text-sm text-gray-500">{t('Active Classes')}</p>
                 </div>
               </div>
 
@@ -321,7 +323,7 @@ export function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-teal-700">{stats?.parents?.total || 0}</p>
-                  <p className="text-sm text-gray-500">Parents</p>
+                  <p className="text-sm text-gray-500">{t('Parents')}</p>
                 </div>
               </div>
 
@@ -331,7 +333,7 @@ export function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-pink-700">{stats?.fees?.pending_count || 0}</p>
-                  <p className="text-sm text-gray-500">Pending Invoices</p>
+                  <p className="text-sm text-gray-500">{t('Invoice')}</p>
                 </div>
               </div>
 
@@ -341,7 +343,7 @@ export function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-amber-700">{stats?.notifications || 0}</p>
-                  <p className="text-sm text-gray-500">Notifications</p>
+                  <p className="text-sm text-gray-500">{t('Notifications')}</p>
                 </div>
               </div>
             </div>
@@ -353,7 +355,7 @@ export function AdminDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold flex items-center">
               <Activity className="h-5 w-5 mr-2 text-blue-600" />
-              Recent Activities
+              {t('Recent Activity')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -368,7 +370,7 @@ export function AdminDashboard() {
                       {payment.first_name} {payment.last_name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Paid {formatCurrency(payment.amount)}
+                      {t('payment') === 'Malipo' ? 'Amalipa' : 'Paid'} {formatCurrency(payment.amount)}
                     </p>
                   </div>
                   <span className="text-xs text-gray-400">
@@ -387,7 +389,7 @@ export function AdminDashboard() {
                       {student.first_name} {student.last_name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      New admission - {student.admission_number}
+                      {t('New Admissions')} — {student.admission_number}
                     </p>
                   </div>
                   <span className="text-xs text-gray-400">
@@ -399,7 +401,7 @@ export function AdminDashboard() {
               {(!stats?.recentPayments?.length && !stats?.recentAdmissions?.length) && (
                 <div className="text-center py-8 text-gray-400">
                   <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No recent activities</p>
+                  <p>{t('No records found')}</p>
                 </div>
               )}
             </div>

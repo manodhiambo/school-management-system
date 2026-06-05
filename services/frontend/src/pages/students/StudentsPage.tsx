@@ -13,6 +13,7 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { useLanguageStore } from '@/store/languageStore';
 import { jsPDF } from 'jspdf';
 
 interface Student {
@@ -142,6 +143,7 @@ async function exportToPDF(rows: Student[], filename: string, title: string) {
 
 export function StudentsPage() {
   const user = useAuthStore((s: any) => s.user);
+  const { t } = useLanguageStore();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -236,20 +238,20 @@ export function StudentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-3xl font-bold">Students</h2>
-          <p className="text-gray-500">Manage student records and information</p>
+          <h2 className="text-3xl font-bold">{t('Students')}</h2>
+          <p className="text-gray-500">{t('Manage Students')}</p>
         </div>
         <div className="flex space-x-2 flex-wrap gap-2">
           {isAdmin && (
             <>
               <Button variant="outline" onClick={() => exportToExcel(filteredStudents, `students_${new Date().toISOString().slice(0,10)}.csv`)} className="hidden sm:flex">
-                <Download className="mr-2 h-4 w-4" /> Export CSV
+                <Download className="mr-2 h-4 w-4" /> {t('Export CSV')}
               </Button>
               <Button variant="outline" onClick={() => setShowBulkImportModal(true)} className="hidden sm:flex">
-                <Upload className="mr-2 h-4 w-4" /> Import
+                <Upload className="mr-2 h-4 w-4" /> {t('Import')}
               </Button>
               <Button onClick={() => setShowAddModal(true)}>
-                <Plus className="mr-2 h-4 w-4" /> Add Student
+                <Plus className="mr-2 h-4 w-4" /> {t('Add Student')}
               </Button>
             </>
           )}
@@ -259,10 +261,10 @@ export function StudentsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Students', val: stats.total_students || 0, color: '' },
-          { label: 'Active', val: stats.active_students || 0, color: 'text-green-600' },
-          { label: 'Male', val: stats.male_students || 0, color: 'text-blue-600' },
-          { label: 'Female', val: stats.female_students || 0, color: 'text-pink-600' },
+          { label: t('Total Students'), val: stats.total_students || 0, color: '' },
+          { label: t('Active'), val: stats.active_students || 0, color: 'text-green-600' },
+          { label: t('Boys'), val: stats.male_students || 0, color: 'text-blue-600' },
+          { label: t('Girls'), val: stats.female_students || 0, color: 'text-pink-600' },
         ].map(s => (
           <Card key={s.label}><CardContent className="pt-4">
             <div className={`text-2xl font-bold ${s.color}`}>{s.val}</div>
@@ -273,10 +275,10 @@ export function StudentsPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b">
-        {(['all', 'by-class'] as ViewTab[]).map(t => (
-          <button key={t} onClick={() => setActiveTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-            {t === 'all' ? 'All Students' : 'View By Class'}
+        {(['all', 'by-class'] as ViewTab[]).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {tab === 'all' ? t('All Students') : t('By Class')}
           </button>
         ))}
       </div>
@@ -308,14 +310,14 @@ export function StudentsPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left p-4">Admission No.</th>
-                        <th className="text-left p-4">Name</th>
-                        <th className="text-left p-4 hidden md:table-cell">Class</th>
-                        <th className="text-left p-4 hidden md:table-cell">Category</th>
-                        <th className="text-left p-4 hidden sm:table-cell">Phone</th>
-                        <th className="text-left p-4 hidden lg:table-cell">Gender</th>
-                        <th className="text-left p-4">Status</th>
-                        <th className="text-left p-4">Actions</th>
+                        <th className="text-left p-4">{t('Admission No')}</th>
+                        <th className="text-left p-4">{t('Full Name')}</th>
+                        <th className="text-left p-4 hidden md:table-cell">{t('Class')}</th>
+                        <th className="text-left p-4 hidden md:table-cell">{t('Category')}</th>
+                        <th className="text-left p-4 hidden sm:table-cell">{t('Phone')}</th>
+                        <th className="text-left p-4 hidden lg:table-cell">{t('Gender')}</th>
+                        <th className="text-left p-4">{t('Status')}</th>
+                        <th className="text-left p-4">{t('Actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -327,7 +329,7 @@ export function StudentsPage() {
                           <td className="p-4 hidden md:table-cell">
                             <div className="flex flex-col gap-1">
                               <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${student.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                                {student.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}
+                                {student.student_type === 'boarder' ? t('Boarder') : t('Day Scholar')}
                               </span>
                               {student.uses_transport && (
                                 <span className="flex items-center gap-0.5 text-xs text-orange-600 font-medium">

@@ -10,10 +10,12 @@ import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { UserManualCard } from '@/components/UserManualCard';
 import { ParentTransportWidget } from '@/components/ParentTransportWidget';
+import { useLanguageStore } from '@/store/languageStore';
 
 export function ParentDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const { t, language } = useLanguageStore();
   const [children, setChildren] = useState<any[]>([]);
   const [fees, setFees] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -27,10 +29,10 @@ export function ParentDashboard() {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      
+
       // Get parent info and linked children
       const parentRes: any = await api.getParentByUser(user?.id || '').catch(() => null);
-      
+
       if (parentRes?.data) {
         // Get children's info
         const childrenData = parentRes.data.children || [];
@@ -51,6 +53,11 @@ export function ParentDashboard() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
+    if (language === 'sw') {
+      if (hour < 12) return 'Habari za Asubuhi';
+      if (hour < 17) return 'Habari za Mchana';
+      return 'Habari za Jioni';
+    }
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
@@ -69,7 +76,7 @@ export function ParentDashboard() {
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-          <p className="mt-4 text-gray-500">Loading dashboard...</p>
+          <p className="mt-4 text-gray-500">{t('Loading...')}</p>
         </div>
       </div>
     );
@@ -83,8 +90,8 @@ export function ParentDashboard() {
       <div className="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{getGreeting()}, Parent!</h1>
-            <p className="text-teal-100 mt-1">Stay connected with your child's education.</p>
+            <h1 className="text-2xl font-bold">{getGreeting()}, {t('Parent')}!</h1>
+            <p className="text-teal-100 mt-1">{t('Stay connected with your child\'s education.')}</p>
           </div>
           <div className="hidden md:flex items-center space-x-2 bg-white/20 rounded-lg px-4 py-2">
             <Calendar className="h-5 w-5" />
@@ -99,7 +106,7 @@ export function ParentDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">My Children</p>
+                <p className="text-sm font-medium text-gray-500">{t('My Children')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{children.length}</h3>
               </div>
               <div className="h-14 w-14 bg-teal-100 rounded-2xl flex items-center justify-center">
@@ -113,7 +120,7 @@ export function ParentDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Fee Balance</p>
+                <p className="text-sm font-medium text-gray-500">{t('Fee Balance')}</p>
                 <h3 className={`text-xl font-bold mt-1 ${totalBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                   {formatCurrency(totalBalance)}
                 </h3>
@@ -129,7 +136,7 @@ export function ParentDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Notifications</p>
+                <p className="text-sm font-medium text-gray-500">{t('Notifications')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">0</h3>
               </div>
               <div className="h-14 w-14 bg-blue-100 rounded-2xl flex items-center justify-center">
@@ -143,7 +150,7 @@ export function ParentDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Upcoming Events</p>
+                <p className="text-sm font-medium text-gray-500">{t('Upcoming Events')}</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">0</h3>
               </div>
               <div className="h-14 w-14 bg-purple-100 rounded-2xl flex items-center justify-center">
@@ -159,7 +166,7 @@ export function ParentDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-semibold flex items-center">
             <Users className="h-5 w-5 mr-2 text-teal-600" />
-            My Children
+            {t('My Children')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -177,25 +184,25 @@ export function ParentDashboard() {
                       <div>
                         <h3 className="text-lg font-semibold">{child.first_name} {child.last_name}</h3>
                         <p className="text-sm text-gray-500">{child.admission_number || 'Student'}</p>
-                        <p className="text-sm text-gray-500">{child.class_name || 'Class not assigned'}</p>
+                        <p className="text-sm text-gray-500">{child.class_name || t('Class not assigned')}</p>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-3 gap-2 mt-4">
                     <div className="text-center p-3 bg-white rounded-lg">
                       <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
-                      <p className="text-xs text-gray-500">Attendance</p>
+                      <p className="text-xs text-gray-500">{t('Attendance')}</p>
                       <p className="font-semibold">--</p>
                     </div>
                     <div className="text-center p-3 bg-white rounded-lg">
                       <Award className="h-5 w-5 text-blue-600 mx-auto mb-1" />
-                      <p className="text-xs text-gray-500">Grade</p>
+                      <p className="text-xs text-gray-500">{t('Grade')}</p>
                       <p className="font-semibold">--</p>
                     </div>
                     <div className="text-center p-3 bg-white rounded-lg">
                       <TrendingUp className="h-5 w-5 text-purple-600 mx-auto mb-1" />
-                      <p className="text-xs text-gray-500">Rank</p>
+                      <p className="text-xs text-gray-500">{t('Rank')}</p>
                       <p className="font-semibold">--</p>
                     </div>
                   </div>
@@ -205,8 +212,8 @@ export function ParentDashboard() {
           ) : (
             <div className="text-center py-12 text-gray-400">
               <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No children linked</p>
-              <p className="text-sm">Contact the school to link your children to your account.</p>
+              <p className="text-lg font-medium">{t('No children linked')}</p>
+              <p className="text-sm">{t('Contact the school to link your children to your account.')}</p>
             </div>
           )}
         </CardContent>
@@ -215,33 +222,33 @@ export function ParentDashboard() {
       {/* Quick Actions */}
       <Card className="border-0 shadow-lg">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
+          <CardTitle className="text-lg font-semibold">{t('Quick Actions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-teal-50 hover:border-teal-300"
               onClick={() => navigate('/app/my-children')}
             >
               <Users className="h-8 w-8 mb-2 text-teal-600" />
-              <span>View Children</span>
+              <span>{t('View Children')}</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-green-50 hover:border-green-300"
               onClick={() => navigate('/app/my-fees')}
             >
               <DollarSign className="h-8 w-8 mb-2 text-green-600" />
-              <span>Pay Fees</span>
+              <span>{t('Pay Fees')}</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-blue-50 hover:border-blue-300"
               onClick={() => navigate('/app/communication')}
             >
               <Bell className="h-8 w-8 mb-2 text-blue-600" />
-              <span>Messages</span>
+              <span>{t('Messages')}</span>
             </Button>
             <Button
               variant="outline"
@@ -249,7 +256,7 @@ export function ParentDashboard() {
               onClick={() => navigate('/app/profile')}
             >
               <Award className="h-8 w-8 mb-2 text-purple-600" />
-              <span>My Profile</span>
+              <span>{t('My Profile')}</span>
             </Button>
           </div>
         </CardContent>

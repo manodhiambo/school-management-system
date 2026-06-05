@@ -7,6 +7,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/languageStore';
 
 // Resize an image file to max 256x256 and return a base64 data URL
 function resizeImageToBase64(file: File): Promise<string> {
@@ -35,6 +36,7 @@ function resizeImageToBase64(file: File): Promise<string> {
 }
 
 export function SettingsPage() {
+  const { t } = useLanguageStore();
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -181,12 +183,12 @@ export function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Settings</h2>
-          <p className="text-gray-500">Manage system configuration and preferences</p>
+          <h2 className="text-3xl font-bold">{t('Settings')}</h2>
+          <p className="text-gray-500">{t('Manage system configuration and preferences')}</p>
         </div>
         <Button onClick={handleSave} disabled={saving}>
           <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Saving...' : 'Save Changes'}
+          {saving ? t('Saving...') : t('Save Changes')}
         </Button>
       </div>
 
@@ -199,7 +201,7 @@ export function SettingsPage() {
           }`}
         >
           <School className="h-4 w-4 inline mr-2" />
-          School Info
+          {t('School Info')}
         </button>
         <button
           onClick={() => setActiveTab('contact')}
@@ -208,7 +210,7 @@ export function SettingsPage() {
           }`}
         >
           <Globe className="h-4 w-4 inline mr-2" />
-          Contact & Address
+          {t('Contact & Address')}
         </button>
         <button
           onClick={() => setActiveTab('system')}
@@ -217,7 +219,7 @@ export function SettingsPage() {
           }`}
         >
           <Clock className="h-4 w-4 inline mr-2" />
-          System
+          {t('System')}
         </button>
         <button
           onClick={() => setActiveTab('attendance')}
@@ -226,7 +228,7 @@ export function SettingsPage() {
           }`}
         >
           <UserCheck className="h-4 w-4 inline mr-2" />
-          Attendance
+          {t('Attendance')}
         </button>
         <button
           onClick={() => setActiveTab('security')}
@@ -235,7 +237,7 @@ export function SettingsPage() {
           }`}
         >
           <Shield className="h-4 w-4 inline mr-2" />
-          Security
+          {t('Security')}
         </button>
       </div>
 
@@ -245,13 +247,13 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <School className="h-5 w-5 mr-2" />
-              School Information
+              {t('School Information')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="school_name">School Name *</Label>
+                <Label htmlFor="school_name">{t('School Name')} *</Label>
                 <Input
                   id="school_name"
                   value={settings?.school_name || ''}
@@ -269,7 +271,7 @@ export function SettingsPage() {
                 />
               </div>
               <div className="md:col-span-2">
-                <Label>School Logo</Label>
+                <Label>{t('School Logo')}</Label>
                 <div className="mt-2 flex items-start gap-4">
                   {/* Preview */}
                   <div className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden">
@@ -338,7 +340,7 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Globe className="h-5 w-5 mr-2" />
-              Contact & Address
+              {t('Contact & Address')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -673,7 +675,7 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Clock className="h-5 w-5 mr-2" />
-              System Preferences
+              {t('System Preferences')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

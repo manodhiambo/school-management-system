@@ -14,6 +14,7 @@ import { GenerateInvoicesModal } from '@/components/modals/GenerateInvoicesModal
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
 import { useAuthStore } from '@/store/authStore';
+import { useLanguageStore } from '@/store/languageStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface StudentSummary {
@@ -566,6 +567,7 @@ function FeeStatementModal({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export function FeePage() {
   const { user } = useAuthStore();
+  const { t } = useLanguageStore();
   const isFinanceOfficer = user?.role === 'finance_officer';
   const [stats, setStats] = useState<any>(null);
   const [students, setStudents] = useState<StudentSummary[]>([]);
@@ -677,9 +679,9 @@ export function FeePage() {
   });
 
   const TABS = [
-    { id: 'students', label: 'Students & Expected Fees' },
-    { id: 'invoices', label: 'Invoices' },
-    { id: 'payments', label: 'Payment History' },
+    { id: 'students', label: t('Students & Expected Fees') },
+    { id: 'invoices', label: t('Invoices') },
+    { id: 'payments', label: t('Payment History') },
   ] as const;
 
   return (
@@ -687,15 +689,15 @@ export function FeePage() {
       {/* Top bar */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Fee Management</h2>
-          <p className="text-sm text-gray-500">Manage expected fees, invoices and payments</p>
+          <h2 className="text-2xl font-bold">{t('Fee Management')}</h2>
+          <p className="text-sm text-gray-500">{t('Manage expected fees, invoices and payments')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowInvoiceModal(true)}>
-            <FileText className="h-4 w-4 mr-1" /> Generate Bulk Invoices
+            <FileText className="h-4 w-4 mr-1" /> {t('Generate Bulk Invoices')}
           </Button>
           <Button onClick={() => setShowPaymentModal(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Record Payment
+            <Plus className="h-4 w-4 mr-1" /> {t('Record Payment')}
           </Button>
         </div>
       </div>
@@ -703,10 +705,10 @@ export function FeePage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Invoiced', val: totalAmount, icon: DollarSign, color: 'text-gray-800', sub: `${stats?.total_invoices || 0} invoices` },
-          { label: 'Collected', val: totalCollected, icon: TrendingUp, color: 'text-green-700', sub: `${stats?.paid_count || 0} paid` },
-          { label: 'Outstanding', val: totalPending, icon: AlertCircle, color: 'text-yellow-700', sub: `${stats?.pending_count || 0} pending` },
-          { label: 'Collection Rate', val: null, icon: CheckCircle, color: 'text-primary', sub: `${collectionPct}%`, pct: Number(collectionPct) },
+          { label: t('Total Invoiced'), val: totalAmount, icon: DollarSign, color: 'text-gray-800', sub: `${stats?.total_invoices || 0} ${t('invoices')}` },
+          { label: t('Collected'), val: totalCollected, icon: TrendingUp, color: 'text-green-700', sub: `${stats?.paid_count || 0} ${t('paid')}` },
+          { label: t('Outstanding'), val: totalPending, icon: AlertCircle, color: 'text-yellow-700', sub: `${stats?.pending_count || 0} ${t('pending')}` },
+          { label: t('Collection Rate'), val: null, icon: CheckCircle, color: 'text-primary', sub: `${collectionPct}%`, pct: Number(collectionPct) },
         ].map(({ label, val, icon: Icon, color, sub, pct }) => (
           <Card key={label}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-4 px-4">
@@ -755,7 +757,7 @@ export function FeePage() {
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by name or admission no..."
+                placeholder={t('Search students...')}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9"
@@ -766,13 +768,13 @@ export function FeePage() {
               value={filterClass}
               onChange={e => setFilterClass(e.target.value)}
             >
-              <option value="">All Classes</option>
+              <option value="">{t('All Classes')}</option>
               {classes.map((c: any) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
             <Button variant="outline" size="sm" onClick={loadSummary}>
-              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+              <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('Refresh')}
             </Button>
           </div>
 
@@ -785,18 +787,18 @@ export function FeePage() {
               ) : students.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                  <p>No students found.</p>
+                  <p>{t('No students found.')}</p>
                 </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b">
-                      <th className="text-left px-4 py-3 font-medium">Student</th>
-                      <th className="text-left px-4 py-3 font-medium">Class</th>
-                      <th className="text-right px-4 py-3 font-medium">Invoiced</th>
-                      <th className="text-right px-4 py-3 font-medium">Paid</th>
-                      <th className="text-right px-4 py-3 font-medium">Balance</th>
-                      <th className="text-center px-4 py-3 font-medium">Actions</th>
+                      <th className="text-left px-4 py-3 font-medium">{t('Student')}</th>
+                      <th className="text-left px-4 py-3 font-medium">{t('Class')}</th>
+                      <th className="text-right px-4 py-3 font-medium">{t('Invoiced')}</th>
+                      <th className="text-right px-4 py-3 font-medium">{t('Paid')}</th>
+                      <th className="text-right px-4 py-3 font-medium">{t('Balance')}</th>
+                      <th className="text-center px-4 py-3 font-medium">{t('Actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -820,7 +822,7 @@ export function FeePage() {
                             variant="outline"
                             onClick={() => setSelectedStudent(s)}
                           >
-                            <Eye className="h-3.5 w-3.5 mr-1" /> Statement
+                            <Eye className="h-3.5 w-3.5 mr-1" /> {t('Statement')}
                           </Button>
                         </td>
                       </tr>
@@ -839,7 +841,7 @@ export function FeePage() {
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search invoice or student..."
+              placeholder={t('Search invoice or student...')}
               value={searchInv}
               onChange={e => setSearchInv(e.target.value)}
               className="pl-9"
@@ -854,20 +856,20 @@ export function FeePage() {
               ) : filteredInvoices.length === 0 ? (
                 <div className="text-center py-10 text-gray-400">
                   <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                  <p>No invoices found.</p>
+                  <p>{t('No invoices found.')}</p>
                 </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b">
-                      <th className="text-left px-4 py-3 font-medium">Invoice #</th>
-                      <th className="text-left px-4 py-3 font-medium">Student</th>
-                      <th className="text-left px-4 py-3 font-medium">Class</th>
-                      <th className="text-left px-4 py-3 font-medium">Description</th>
-                      <th className="text-right px-4 py-3 font-medium">Amount</th>
-                      <th className="text-right px-4 py-3 font-medium">Paid</th>
-                      <th className="text-right px-4 py-3 font-medium">Balance</th>
-                      <th className="text-center px-4 py-3 font-medium">Status</th>
+                      <th className="text-left px-4 py-3 font-medium">{t('Invoice #')}</th>
+                      <th className="text-left px-4 py-3 font-medium">{t('Student')}</th>
+                      <th className="text-left px-4 py-3 font-medium">{t('Class')}</th>
+                      <th className="text-left px-4 py-3 font-medium">{t('Description')}</th>
+                      <th className="text-right px-4 py-3 font-medium">{t('Amount')}</th>
+                      <th className="text-right px-4 py-3 font-medium">{t('Paid')}</th>
+                      <th className="text-right px-4 py-3 font-medium">{t('Balance')}</th>
+                      <th className="text-center px-4 py-3 font-medium">{t('Status')}</th>
                       <th className="px-4 py-3" />
                     </tr>
                   </thead>
@@ -924,18 +926,18 @@ export function FeePage() {
             ) : payments.length === 0 ? (
               <div className="text-center py-10 text-gray-400">
                 <DollarSign className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                <p>No payments recorded yet.</p>
+                <p>{t('No payments recorded yet.')}</p>
               </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b">
-                    <th className="text-left px-4 py-3 font-medium">Date</th>
-                    <th className="text-left px-4 py-3 font-medium">Student</th>
-                    <th className="text-left px-4 py-3 font-medium">Invoice</th>
-                    <th className="text-left px-4 py-3 font-medium">Method</th>
-                    <th className="text-left px-4 py-3 font-medium">Reference</th>
-                    <th className="text-right px-4 py-3 font-medium">Amount</th>
+                    <th className="text-left px-4 py-3 font-medium">{t('Date')}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t('Student')}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t('Invoice')}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t('Method')}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t('Reference')}</th>
+                    <th className="text-right px-4 py-3 font-medium">{t('Amount')}</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>

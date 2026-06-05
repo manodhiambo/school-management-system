@@ -102,7 +102,7 @@ function addCoverPage(doc: jsPDF, schoolName: string) {
 
   normal(doc, 11);
   setTxt(doc, [186, 230, 253] as any);
-  doc.text('Competency-Based Education (CBE) • Finance • Welfare • IGCSE', PAGE_W / 2, 148, { align: 'center' });
+  doc.text('CBE • Finance • Welfare • SMS • Transport • Hostel • Payroll • IGCSE', PAGE_W / 2, 148, { align: 'center' });
 
   // School name box
   setFill(doc, [255, 255, 255, 0.1] as any);
@@ -117,9 +117,9 @@ function addCoverPage(doc: jsPDF, schoolName: string) {
 
   // Stats row
   const stats = [
-    { val: '15', lbl: 'Modules' },
-    { val: '300+', lbl: 'Features' },
-    { val: '6', lbl: 'User Roles' },
+    { val: '25+', lbl: 'Modules' },
+    { val: '600+', lbl: 'Features' },
+    { val: '7', lbl: 'User Roles' },
     { val: '100%', lbl: 'CBE Ready' },
   ];
   const boxW = (COL - 12) / 4;
@@ -245,27 +245,32 @@ function addTOC(doc: jsPDF) {
 
   let y = 38;
   const sections = [
-    { num: '1',  title: 'Executive Summary',                    pg: 3  },
-    { num: '2',  title: 'System Modules At a Glance',           pg: 4  },
-    { num: '3',  title: 'People Management',                    pg: 5  },
-    { num: '4',  title: 'Academic Management (CBE)',            pg: 6  },
-    { num: '5',  title: 'Attendance Management',                pg: 8  },
-    { num: '6',  title: 'Results, Exams & Grading',             pg: 9  },
-    { num: '7',  title: 'Finance & Fee Management',             pg: 10 },
-    { num: '8',  title: 'Library Management',                   pg: 12 },
-    { num: '9',  title: 'Communication & Alerts',               pg: 13 },
-    { num: '10', title: 'Student Welfare (Discipline & Health)', pg: 14 },
-    { num: '11', title: 'Transport Management',                 pg: 14 },
-    { num: '12', title: 'Staff Leave Management',               pg: 15 },
-    { num: '13', title: 'IGCSE Cambridge Module',               pg: 15 },
-    { num: '14', title: 'Timetable Management',                 pg: 16 },
-    { num: '15', title: 'Dashboards & Analytics',               pg: 16 },
-    { num: '16', title: 'User Roles & Permissions',             pg: 17 },
-    { num: '17', title: 'CBE Grading Reference',                pg: 18 },
-    { num: '18', title: 'Kenya Education Structure',            pg: 18 },
-    { num: '19', title: 'Payment Methods Supported',            pg: 19 },
-    { num: '20', title: 'Technical Specifications',             pg: 19 },
-    { num: '21', title: 'Getting Started Checklist',            pg: 20 },
+    { num: '1',   title: 'Executive Summary',                    pg: 3  },
+    { num: '2',   title: 'System Modules At a Glance',           pg: 4  },
+    { num: '3',   title: 'People Management',                    pg: 5  },
+    { num: '4',   title: 'Academic Management (CBE)',            pg: 6  },
+    { num: '5',   title: 'Attendance Management',                pg: 8  },
+    { num: '6',   title: 'Results, Exams & Grading',             pg: 9  },
+    { num: '7',   title: 'Finance & Fee Management',             pg: 10 },
+    { num: '8',   title: 'Library Management',                   pg: 12 },
+    { num: '9',   title: 'Communication, SMS & WhatsApp',        pg: 13 },
+    { num: '10',  title: 'Student Welfare (Discipline & Health)', pg: 14 },
+    { num: '11',  title: 'Transport, Driver & Gate Management',  pg: 15 },
+    { num: '11c', title: 'Hostel & Canteen Management',          pg: 16 },
+    { num: '12',  title: 'Staff Leave Management',               pg: 17 },
+    { num: '13',  title: 'IGCSE Cambridge Module',               pg: 17 },
+    { num: '14',  title: 'Timetable Management',                 pg: 18 },
+    { num: '14b', title: 'Payroll, Appraisals & Substitutes',    pg: 18 },
+    { num: '14c', title: 'Bursary & Inventory',                  pg: 19 },
+    { num: '14d', title: 'Teacher Check-in & Counseling',        pg: 19 },
+    { num: '14e', title: 'NEMIS Export & Audit Log',             pg: 20 },
+    { num: '15',  title: 'Dashboards & Analytics',               pg: 20 },
+    { num: '16',  title: 'User Roles & Permissions',             pg: 21 },
+    { num: '17',  title: 'CBE Grading Reference',                pg: 22 },
+    { num: '18',  title: 'Kenya Education Structure',            pg: 22 },
+    { num: '19',  title: 'Payment Methods Supported',            pg: 23 },
+    { num: '20',  title: 'Technical Specifications',             pg: 23 },
+    { num: '21',  title: 'Getting Started Checklist',            pg: 24 },
   ];
 
   sections.forEach((s, i) => {
@@ -317,12 +322,12 @@ function addExecutiveSummary(doc: jsPDF, schoolName: string, pageNum: { n: numbe
 
   // Key value boxes
   const values = [
-    { title: 'CBE-First Design',     desc: 'Built from the ground up for Kenya\'s CBE curriculum with strand-based assessments, competency tracking, and holistic report cards.',      color: C.blue },
-    { title: 'All-in-One Platform',  desc: 'Replaces paper registers, spreadsheets, and disparate tools with a single platform covering every aspect of school operations.',             color: C.teal },
-    { title: 'Real-Time Insights',   desc: 'Live dashboards for every role — admin, teacher, student, parent, finance officer — with data updated as events happen.',                  color: C.green },
-    { title: 'Financial Integrity',  desc: 'Comprehensive fee management, M-Pesa integration, full double-entry finance module, purchase orders, petty cash and asset tracking.',       color: C.amber },
-    { title: 'Student Welfare',      desc: 'Discipline tracking, health records, counselling notes, transport, hostel — holistic oversight of every enrolled learner.',                color: C.purple },
-    { title: 'Multi-Tenant SaaS',    desc: 'Schools are fully isolated tenants. Your data is private, secure, and accessible only to authorised users in your institution.',           color: C.navy },
+    { title: 'CBE-First Design',      desc: 'Built from the ground up for Kenya\'s CBE curriculum with strand-based assessments, competency tracking, and holistic report cards.',     color: C.blue },
+    { title: 'All-in-One Platform',   desc: 'Replaces paper registers, spreadsheets, and disparate tools with a single platform covering 25+ modules and 600+ features.',              color: C.teal },
+    { title: 'SMS & WhatsApp',        desc: 'Africa\'s Talking bulk SMS, device-native WhatsApp, two-way keyword replies — parents stay informed in real time.',                       color: C.green },
+    { title: 'Financial Integrity',   desc: 'Comprehensive fee management, M-Pesa, payroll, bursary, inventory, double-entry finance module, petty cash and asset tracking.',          color: C.amber },
+    { title: 'Student Welfare',       desc: 'Discipline, health records, counselling, transport tracking, hostel, canteen, gate management — holistic oversight of every learner.',    color: C.purple },
+    { title: 'Multi-Tenant SaaS',     desc: 'Schools are fully isolated tenants. Your data is private, secure, and accessible only to authorised users in your institution.',          color: C.navy },
   ];
 
   values.forEach((v, i) => {
@@ -364,11 +369,14 @@ function addExecutiveSummary(doc: jsPDF, schoolName: string, pageNum: { n: numbe
   const bullets = [
     'Designed specifically for Kenyan schools — CBE, 8-4-4 legacy, IGCSE Cambridge all supported',
     'Reduces administrative workload by up to 70% — no more paper registers, manual receipts, or spreadsheet grades',
-    'Parents receive instant alerts for absences, discipline, fees, and results directly on their phones',
-    'Role-based access ensures teachers see only what they need, parents only their children\'s data',
+    'Parents receive instant SMS/WhatsApp alerts for absences, discipline, fees, and results on their phones',
+    'Role-based access (7 roles) — teachers see only what they need, parents only their children\'s data',
+    'Built-in SMS (Africa\'s Talking), device-native WhatsApp, and two-way SMS keyword auto-replies',
+    'Real-time transport tracking — parents see whether their child was picked up this morning',
     'Generate professional CBE report cards, fee receipts, analytics PDFs, and timetables in one click',
+    'NEMIS compliance tools — validate, export, and submit government-required student data',
+    'Full HR suite: payroll, appraisals, substitutes, teacher check-in, leave management',
     'Secure, multi-tenant cloud architecture — your data is never shared with other schools',
-    'Continuous improvement — new features added every term based on school feedback',
   ];
 
   bullets.forEach(b => {
@@ -395,21 +403,26 @@ function addModuleOverview(doc: jsPDF, pageNum: { n: number }) {
   doc.text('2. System Modules At a Glance', M, 18);
 
   const modules = [
-    { icon: '👥', title: 'People Management',      desc: 'Students, teachers, parents, staff profiles and user accounts',                     color: C.blue   },
-    { icon: '📚', title: 'CBE Academics',           desc: 'Classes, subjects, schemes of work, lesson plans, SBA, projects, promotions',        color: C.teal   },
-    { icon: '✅', title: 'Attendance',              desc: 'Daily marking, bulk entry, monthly reports, parent absent alerts',                   color: C.green  },
-    { icon: '📝', title: 'Exams & Results',         desc: 'Online & offline exams, mark entry, publish results, CBE grade computation',         color: C.purple },
-    { icon: '💰', title: 'Fee Management',          desc: 'Invoices, payments, receipts, defaulter reports, extra fees, multi-method support',  color: C.amber  },
-    { icon: '🏦', title: 'Finance Module',          desc: 'Income, expenses, budgets, bank accounts, petty cash, assets, purchase orders',      color: C.red    },
-    { icon: '📖', title: 'Library',                 desc: 'Book catalogue, issue/return, borrowings, fines, member management',                 color: C.teal   },
-    { icon: '💬', title: 'Communication',           desc: 'Messaging, announcements, notifications, parent alerts, PTM scheduling',             color: C.blue   },
-    { icon: '🚌', title: 'Transport',               desc: 'Routes, vehicles, student assignments, transport charges',                           color: C.green  },
-    { icon: '⚕️', title: 'Health & Welfare',       desc: 'Health records, medical profiles, discipline incidents, counselling logs',            color: C.red    },
-    { icon: '🗓️', title: 'Timetable',             desc: 'Class schedules, teacher assignments, conflict detection, PDF download & print',      color: C.navy   },
-    { icon: '🎓', title: 'IGCSE Cambridge',         desc: 'Sessions, syllabi, component marks, grade calculation, results publication',         color: C.purple },
-    { icon: '🏖️', title: 'Staff Leave',            desc: 'Leave requests, types, admin approval, leave balance tracking',                      color: C.amber  },
-    { icon: '📊', title: 'Analytics & Reports',     desc: 'CBE analytics, broadsheet, attendance rates, finance reports, progress trends',      color: C.teal   },
-    { icon: '⚙️', title: 'Settings & Admin',       desc: 'School profile, user roles, logo branding, account management, multi-tenant admin',  color: C.slate  },
+    { icon: '👥', title: 'People Management',      desc: 'Students, teachers, parents, staff profiles and user accounts',                       color: C.blue   },
+    { icon: '📚', title: 'CBE Academics',           desc: 'Classes, subjects, schemes of work, lesson plans, SBA, projects, promotions',          color: C.teal   },
+    { icon: '✅', title: 'Attendance',              desc: 'Daily marking, bulk entry, monthly reports, parent absent alerts',                     color: C.green  },
+    { icon: '📝', title: 'Exams & Results',         desc: 'Online & offline exams, mark entry, publish results, CBE grade computation',           color: C.purple },
+    { icon: '💰', title: 'Fee Management',          desc: 'Invoices, payments, receipts, defaulter reports, extra fees, multi-method support',    color: C.amber  },
+    { icon: '🏦', title: 'Finance Module',          desc: 'Income, expenses, budgets, bank accounts, petty cash, assets, purchase orders',        color: C.red    },
+    { icon: '📖', title: 'Library',                 desc: 'Book catalogue, issue/return, borrowings, fines, member management',                   color: C.teal   },
+    { icon: '💬', title: 'Communication & SMS',     desc: 'Messaging, announcements, bulk SMS (Africa\'s Talking), WhatsApp, two-way SMS',        color: C.blue   },
+    { icon: '🚌', title: 'Transport & Driver',      desc: 'Routes, GPS pickup tracking, driver dashboard, parent transport widget',               color: C.green  },
+    { icon: '⚕️', title: 'Health & Welfare',       desc: 'Health records, medical profiles, discipline incidents, counselling sessions',          color: C.red    },
+    { icon: '🗓️', title: 'Timetable',             desc: 'Class schedules, teacher assignments, conflict detection, PDF download & print',        color: C.navy   },
+    { icon: '🎓', title: 'IGCSE Cambridge',         desc: 'Sessions, syllabi, component marks, grade calculation, results publication',           color: C.purple },
+    { icon: '🏖️', title: 'Staff Leave',            desc: 'Leave requests, types, admin approval, leave balance tracking',                        color: C.amber  },
+    { icon: '📊', title: 'Analytics & Reports',     desc: 'CBE analytics, broadsheet, attendance rates, finance reports, exam analytics',         color: C.teal   },
+    { icon: '🏠', title: 'Hostel & Canteen',        desc: 'Hostel rooms, student allocation, canteen items, student wallet, top-up',              color: C.slate  },
+    { icon: '💼', title: 'Payroll & Appraisals',    desc: 'Staff payroll, payslips, performance appraisals, substitute management',               color: C.green  },
+    { icon: '🛡️', title: 'Gate Management',        desc: 'Visitor log, student check-in/out, gate dashboard, security records',                  color: C.navy   },
+    { icon: '🎒', title: 'Bursary & Inventory',     desc: 'Bursary awards, beneficiary tracking, inventory, stock management, reorder alerts',    color: C.amber  },
+    { icon: '📋', title: 'NEMIS & Audit Log',       desc: 'NEMIS data export, validation, audit trail of all user actions, CSV export',           color: C.slate  },
+    { icon: '⚙️', title: 'Settings & Admin',        desc: 'School profile, user roles, logo branding, account management, multi-tenant admin',    color: C.slate  },
   ];
 
   let y = 36;
@@ -522,15 +535,17 @@ const MODULES: ModuleData[] = [
     ],
   },
   {
-    num: '9', title: 'Communication & Notifications', color: C.blue,
-    description: 'Multi-channel communication system for school-wide announcements, direct messaging, parent alerts, and PTM scheduling.',
+    num: '9', title: 'Communication, SMS & WhatsApp', color: C.blue,
+    description: 'Multi-channel communication system covering direct messaging, announcements, bulk SMS via Africa\'s Talking, device-native WhatsApp, two-way SMS keywords, and automatic parent alerts.',
     features: [
-      'Direct messaging between users',            'School-wide broadcast announcements',
-      'Role-based message targeting',              'Read receipts',
-      'Parent alert system (SMS-ready)',           'Automatic absent parent alerts',
-      'Discipline incident parent alerts',         'Fee reminder alerts',
-      'Results published parent notifications',   'PTM scheduling and booking',
-      'System notifications per user',             'Unread badge counts',
+      'Direct messaging between users',              'School-wide broadcast announcements',
+      'Bulk SMS — all parents or by class',          'Bulk SMS — all teachers or custom phones',
+      '8 pre-built SMS message templates',           'SMS delivery logs & statistics',
+      'Africa\'s Talking API integration',           'WhatsApp via wa.me (device-native)',
+      'WhatsApp Business API (optional)',            'Two-way SMS keyword auto-replies',
+      'Automatic absent parent SMS alerts',          'Discipline incident parent alerts',
+      'Fee reminder bulk SMS',                       'Results published notifications',
+      'PTM scheduling and booking',                  'Read receipts & unread badge counts',
     ],
   },
   {
@@ -545,12 +560,37 @@ const MODULES: ModuleData[] = [
     ],
   },
   {
-    num: '11', title: 'Transport Management', color: C.green,
-    description: 'School transport route management with student assignment and charges per route.',
+    num: '11', title: 'Transport Management & Driver Tracking', color: C.green,
+    description: 'Full transport lifecycle — route management, student assignment, and real-time driver pickup tracking with GPS coordinates. Parents see live pickup status on their dashboard.',
     features: [
-      'Create and manage transport routes',        'Define pickup and drop-off points',
-      'Assign students to routes',                 'Bulk student route assignment',
-      'Transport charges per route',               'Transport report per route',
+      'Create and manage transport routes',          'Define pickup and drop-off points',
+      'Assign students to routes',                   'Bulk student route assignment',
+      'Transport charges per route',                 'Driver role & dedicated dashboard',
+      'Driver marks picked / missed / absent',       'GPS coordinates per pickup event',
+      'Parent transport widget (live status)',        'Admin transport tracking page',
+      'Daily pickup logs & export',                  'Transport report per route',
+    ],
+  },
+  {
+    num: '11b', title: 'Gate Management & Security', color: C.navy,
+    description: 'Digital gate management for visitor registration, student entry/exit tracking, and security logs. Replaces paper-based visitor books.',
+    features: [
+      'Visitor registration & purpose logging',      'Student check-in / check-out tracking',
+      'Host assignment for visitors',                'Badge / pass number recording',
+      'Gate dashboard with live log',                'Visitor statistics by date/type',
+      'Search visitor history',                      'Export gate log to CSV',
+    ],
+  },
+  {
+    num: '11c', title: 'Hostel & Canteen Management', color: C.teal,
+    description: 'Full boarding school management — hostel rooms with occupancy tracking, student allocation, and canteen wallet system with top-up and purchase logs.',
+    features: [
+      'Create hostels and define rooms',             'Room capacity and occupancy tracking',
+      'Allocate students to rooms',                  'Hostel movement records',
+      'Hostel meal scheduling',                      'Canteen menu and item management',
+      'Student canteen wallet (pre-paid)',            'Top-up canteen balance',
+      'Purchase/transaction logs per student',       'Canteen balance reports',
+      'Admin canteen balance overview',              'Low balance alerts',
     ],
   },
   {
@@ -587,15 +627,64 @@ const MODULES: ModuleData[] = [
     ],
   },
   {
-    num: '15', title: 'Dashboards & Analytics', color: C.teal,
-    description: 'Six role-specific dashboards giving every stakeholder a personalised view of the metrics and actions most relevant to their responsibilities.',
+    num: '14b', title: 'Payroll, Appraisals & Substitutes', color: C.amber,
+    description: 'Complete staff HR module — run monthly payroll with allowances and deductions, performance appraisals for teachers, and substitute teacher assignment when staff are absent.',
     features: [
-      'Admin: full school metrics',                'Teacher: class and assignment view',
-      'Student: personal academic hub',            'Parent: children\'s progress hub',
-      'Finance Officer: financial overview',       'SuperAdmin: multi-school SaaS panel',
-      'Live attendance rates',                     'Fee collection rates',
-      'CBE analytics with broadsheet',            'Monthly income/expense trends',
-      'Exportable PDF reports',                    'Class rank computations',
+      'Staff payroll: basic salary + allowances',    'Deductions: NSSF, NHIF, PAYE, other',
+      'Run payroll per month',                       'Download individual payslips (PDF)',
+      'Staff payslip portal',                        'Payroll summary reports',
+      'Annual appraisal creation per teacher',       'Multi-criteria rating system',
+      'Admin reviews and finalises appraisals',      'Teacher views own appraisal result',
+      'Substitute assignment for absent teachers',   'Substitute records per class per day',
+    ],
+  },
+  {
+    num: '14c', title: 'Bursary & Inventory', color: C.green,
+    description: 'Bursary award management for needy students, and full inventory system for school assets and consumable stock with reorder alerts.',
+    features: [
+      'Create bursary programmes',                   'Award bursary to students',
+      'Sponsor tracking per award',                  'Bursary payment history',
+      'Beneficiary list & amounts',                  'Inventory item catalogue',
+      'Stock levels with reorder threshold',         'Stock-in and stock-out records',
+      'Low-stock alerts',                            'Inventory category management',
+      'Purchase order integration',                  'Inventory audit reports',
+    ],
+  },
+  {
+    num: '14d', title: 'Teacher Check-in & Counseling', color: C.purple,
+    description: 'Digital teacher attendance via daily check-in, and a dedicated counseling module for student welfare sessions with confidential notes.',
+    features: [
+      'Teacher daily check-in from dashboard',       'GPS location on check-in (optional)',
+      'Admin view of teacher attendance',            'Check-in history per teacher',
+      'Late check-in flagging',                      'Counseling session records',
+      'Counselor assigns sessions per student',      'Confidential session notes',
+      'Session types: academic / behavioural',       'Follow-up scheduling',
+      'Counseling statistics per term',              'Export counseling report',
+    ],
+  },
+  {
+    num: '14e', title: 'NEMIS Export & Audit Log', color: C.slate,
+    description: 'NEMIS compliance data export for the Kenya government school database, and a full audit trail of all user actions in the system.',
+    features: [
+      'NEMIS data validation per student',           'Identify missing NEMIS fields',
+      'Export NEMIS-compliant CSV/Excel',            'NEMIS number recording per student',
+      'Bulk NEMIS data update',                      'Validation report with issues list',
+      'Audit log: all mutations captured',           'Filter by user, action, date range',
+      'Most active user & common action metrics',    'Export audit log to CSV',
+      'Auto-audit middleware (non-invasive)',         'Login/logout events tracked',
+    ],
+  },
+  {
+    num: '15', title: 'Dashboards & Analytics', color: C.teal,
+    description: 'Seven role-specific dashboards giving every stakeholder a personalised view of the metrics and actions most relevant to their responsibilities.',
+    features: [
+      'Admin: full school metrics + quick actions',  'Teacher: class and check-in dashboard',
+      'Student: personal academic hub',              'Parent: children\'s progress & transport',
+      'Finance Officer: financial overview',         'Driver: route & pickup dashboard',
+      'SuperAdmin: multi-school SaaS panel',         'Live attendance rates',
+      'Fee collection rates & trends',               'CBE analytics with broadsheet',
+      'Monthly income/expense charts',               'Exam analytics & class rankings',
+      'Exportable PDF reports per role',             'User manual & blueprint downloads',
     ],
   },
 ];
@@ -621,23 +710,25 @@ function addRolesPage(doc: jsPDF, pageNum: { n: number }) {
     M, y, COL, 5);
   y += 6;
 
-  const roles   = ['Admin', 'Finance', 'Teacher', 'Student', 'Parent', 'SuperAdmin'];
+  const roles   = ['Admin', 'Finance', 'Teacher', 'Student', 'Parent', 'Driver'];
   const modules2 = [
-    { name: 'People Management',     perms: ['Full',  'View',  'View',  '–',     'Own',   '–'    ] },
-    { name: 'CBE Academics',          perms: ['Full',  '–',     'Full',  'View',  'View',  '–'    ] },
-    { name: 'Attendance',             perms: ['Full',  '–',     'Mark',  'Own',   'Own',   '–'    ] },
-    { name: 'Exams & Results',        perms: ['Full',  '–',     'Full',  'Own',   'Own',   '–'    ] },
-    { name: 'Fee Management',         perms: ['Full',  'Full',  '–',     'Own',   'Own',   '–'    ] },
-    { name: 'Finance Module',         perms: ['Full',  'Full',  '–',     '–',     '–',     '–'    ] },
-    { name: 'Library',                perms: ['Full',  '–',     'Full',  'Own',   '–',     '–'    ] },
-    { name: 'Communication',          perms: ['Full',  '–',     'Full',  'Own',   'Own',   '–'    ] },
-    { name: 'Transport',              perms: ['Full',  '–',     '–',     '–',     'View',  '–'    ] },
-    { name: 'Health & Welfare',       perms: ['Full',  '–',     'Log',   '–',     '–',     '–'    ] },
-    { name: 'Timetable',              perms: ['Full',  '–',     'View',  'Own',   '–',     '–'    ] },
-    { name: 'IGCSE Module',           perms: ['Full',  '–',     'Full',  'Own',   '–',     '–'    ] },
-    { name: 'Staff Leave',            perms: ['Full',  '–',     'Own',   '–',     '–',     '–'    ] },
-    { name: 'Dashboards',             perms: ['Full',  'Own',   'Own',   'Own',   'Own',   'Full' ] },
-    { name: 'Tenant Management',      perms: ['–',     '–',     '–',     '–',     '–',     'Full' ] },
+    { name: 'People Management',      perms: ['Full',  'View',  'View',  '–',     'Own',   '–'    ] },
+    { name: 'CBE Academics',           perms: ['Full',  '–',     'Full',  'View',  'View',  '–'    ] },
+    { name: 'Attendance',              perms: ['Full',  '–',     'Mark',  'Own',   'Own',   '–'    ] },
+    { name: 'Exams & Results',         perms: ['Full',  '–',     'Full',  'Own',   'Own',   '–'    ] },
+    { name: 'Fee Management',          perms: ['Full',  'Full',  '–',     'Own',   'Own',   '–'    ] },
+    { name: 'Finance Module',          perms: ['Full',  'Full',  '–',     '–',     '–',     '–'    ] },
+    { name: 'Library',                 perms: ['Full',  '–',     'Full',  'Own',   '–',     '–'    ] },
+    { name: 'SMS & WhatsApp',          perms: ['Full',  '–',     'View',  '–',     '–',     '–'    ] },
+    { name: 'Transport & Driver',      perms: ['Full',  '–',     '–',     '–',     'View',  'Full' ] },
+    { name: 'Gate Management',         perms: ['Full',  '–',     '–',     '–',     '–',     '–'    ] },
+    { name: 'Hostel & Canteen',        perms: ['Full',  '–',     '–',     'Own',   '–',     '–'    ] },
+    { name: 'Payroll & Appraisals',    perms: ['Full',  'Full',  'Own',   '–',     '–',     '–'    ] },
+    { name: 'Bursary & Inventory',     perms: ['Full',  'Full',  '–',     '–',     '–',     '–'    ] },
+    { name: 'Health & Welfare',        perms: ['Full',  '–',     'Log',   '–',     '–',     '–'    ] },
+    { name: 'IGCSE Module',            perms: ['Full',  '–',     'Full',  'Own',   '–',     '–'    ] },
+    { name: 'Dashboards',              perms: ['Full',  'Own',   'Own',   'Own',   'Own',   'Own'  ] },
+    { name: 'NEMIS & Audit Log',       perms: ['Full',  '–',     '–',     '–',     '–',     '–'    ] },
   ];
 
   const hdrH   = 8;
@@ -857,18 +948,21 @@ function addPaymentAndTech(doc: jsPDF, pageNum: { n: number }) {
   y += 4;
 
   const specs = [
-    ['Platform',         'Cloud SaaS — accessible via any modern web browser'],
-    ['Hosting',          'PostgreSQL (Neon) database, Node.js backend, React frontend'],
-    ['Architecture',     'Multi-tenant — each school is fully isolated with its own data schema'],
-    ['Authentication',   'JWT-based with role claims — sessions expire after inactivity'],
-    ['PDF Generation',   'Client-side PDF using jsPDF — report cards, receipts, timetables, analytics'],
-    ['CBE Grading',      'Server-side computation using education level context — EE/ME/AE/BE, A–E'],
-    ['Multi-Currency',   'KES (Kenya Shilling) default with configurable display format'],
-    ['Notifications',    'Real-time badge counts, in-app alerts, SMS-ready (SendGrid/SMS gateway)'],
-    ['Data Export',      'PDF downloads, WhatsApp receipt sharing for all financial documents'],
-    ['Browser Support',  'Chrome 90+, Firefox 88+, Edge 90+, Safari 14+ — responsive on mobile'],
-    ['Uptime',           '99.9% SLA target — hosted on enterprise cloud infrastructure'],
-    ['Data Security',    'All traffic over HTTPS/TLS, per-tenant row-level security in database'],
+    ['Platform',         'Cloud SaaS — Progressive Web App (PWA), installable on mobile devices'],
+    ['Hosting',          'PostgreSQL (Neon cloud DB), Node.js/Express backend, React 18 + Vite frontend'],
+    ['Architecture',     'Multi-tenant SaaS — each school fully isolated via tenant_id row-level security'],
+    ['Authentication',   'JWT-based with role claims (7 roles) — sessions expire after inactivity'],
+    ['PDF Generation',   'Client-side PDF (jsPDF) — report cards, receipts, timetables, manuals, blueprint'],
+    ['CBE Grading',      'Server-side: EE/ME/AE/BE (Grade 1–12), WD/D/B (Pre-Primary), 8-level JSS (KJSEA)'],
+    ['SMS Integration',  'Africa\'s Talking API — bulk SMS, templates, delivery logs, two-way SMS keywords'],
+    ['WhatsApp',         'wa.me device-native fallback + optional Meta WhatsApp Business API v18.0'],
+    ['Driver Tracking',  'Transport pickup events with GPS coordinates; parent live status widget'],
+    ['Audit & Security', 'Auto-audit middleware captures all mutations; login/logout events; CSV export'],
+    ['NEMIS',            'Kenya NEMIS validation, export, and compliance reporting for government returns'],
+    ['Data Export',      'CSV/Excel downloads for students, attendance, marks, finance, audit, NEMIS'],
+    ['Browser Support',  'Chrome 90+, Firefox 88+, Edge 90+, Safari 14+ — fully responsive on mobile'],
+    ['Uptime',           '99.9% SLA target — hosted on enterprise cloud infrastructure (Render + Neon)'],
+    ['Data Security',    'All traffic HTTPS/TLS, per-tenant isolation, safe storage wrappers for privacy'],
   ];
 
   specs.forEach((s, i) => {
@@ -952,13 +1046,16 @@ function addGettingStarted(doc: jsPDF, schoolName: string, pageNum: { n: number 
       ],
     },
     {
-      phase: 'Phase 5 — Communication & Welfare (Week 3)',
+      phase: 'Phase 5 — Communication, Welfare & HR (Week 3)',
       color: C.green,
       items: [
-        'Set up parent alerts: verify parents receive absence notifications',
-        'Upload learning materials: Academic → CBE Academics → Learning Materials',
-        'Configure transport routes if applicable: Welfare → Transport',
+        'Configure SMS: Messages → SMS Messaging → add Africa\'s Talking credentials',
+        'Set up parent alerts: verify parents receive absence SMS notifications',
+        'Configure transport routes and assign driver accounts: Welfare → Transport',
+        'Set up hostel rooms and assign boarding students: Welfare → Hostel Management',
+        'Set up payroll for staff: Finance → Payroll → add staff salary details',
         'Add library books if using library module: Library → Library Management',
+        'Configure Gate Manager for visitor logging: Security → Gate Manager',
         'Send first school announcement via Messages → Communication',
       ],
     },

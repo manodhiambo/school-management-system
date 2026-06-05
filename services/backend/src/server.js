@@ -70,6 +70,7 @@ import smsKeywordRoutes from './routes/smsKeywordRoutes.js';
 import portfolioRoutes from './routes/portfolioRoutes.js';
 import termReportsRoutes from './routes/termReportsRoutes.js';
 import preferencesRoutes from './routes/preferencesRoutes.js';
+import { autoAuditMiddleware } from './middleware/autoAuditMiddleware.js';
 
 dotenv.config();
 
@@ -102,6 +103,9 @@ app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
+
+// Auto-audit: log all successful mutations (POST/PUT/PATCH/DELETE) by authenticated users
+app.use('/api/v1', autoAuditMiddleware);
 
 // API routes
 app.use('/api/v1/auth', authRoutes);

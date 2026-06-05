@@ -20,16 +20,16 @@ interface NemisConfig {
 }
 
 interface ValidationResult {
-  total_students: number;
-  complete_records: number;
-  issues_count: number;
+  total: number;
+  complete: number;
+  incomplete: number;
   students_with_issues: StudentIssue[];
 }
 
 interface StudentIssue {
   id: string;
   name: string;
-  missing_fields: string[];
+  missing: string[];
 }
 
 const EMPTY_CONFIG: NemisConfig = {
@@ -92,7 +92,13 @@ export function NemisPage() {
     setValError(null);
     try {
       const res: any = await (api as any).api.get('/nemis/validate');
-      setValidation(res.data || res || null);
+      const d = res?.data ?? res ?? null;
+      if (d) {
+        setValidation({
+          ...d,
+          students_with_issues: Array.isArray(d.students_with_issues) ? d.students_with_issues : [],
+        });
+      }
     } catch (e: any) {
       setValError(e?.message || 'Failed to load validation data.');
     } finally {
@@ -271,24 +277,24 @@ export function NemisPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card>
                   <CardContent className="p-4 text-center">
-                    <p className="text-3xl font-bold text-gray-900">{validation.total_students}</p>
+                    <p className="text-3xl font-bold text-gray-900">{validation.total}</p>
                     <p className="text-sm text-gray-500 mt-1">Total Students</p>
                   </CardContent>
                 </Card>
                 <Card className="border-green-200">
                   <CardContent className="p-4 text-center">
-                    <p className="text-3xl font-bold text-green-700">{validation.complete_records}</p>
+                    <p className="text-3xl font-bold text-green-700">{validation.complete}</p>
                     <p className="text-sm text-gray-500 mt-1">Complete Records</p>
                     <p className="text-xs text-green-600 mt-0.5">
-                      {validation.total_students > 0
-                        ? `${Math.round((validation.complete_records / validation.total_students) * 100)}% complete`
+                      {validation.total > 0
+                        ? `${Math.round((validation.complete / validation.total) * 100)}% complete`
                         : ''}
                     </p>
                   </CardContent>
                 </Card>
                 <Card className="border-red-200">
                   <CardContent className="p-4 text-center">
-                    <p className="text-3xl font-bold text-red-700">{validation.issues_count}</p>
+                    <p className="text-3xl font-bold text-red-700">{validation.incomplete}</p>
                     <p className="text-sm text-gray-500 mt-1">Records with Issues</p>
                   </CardContent>
                 </Card>
@@ -325,7 +331,7 @@ export function NemisPage() {
                               <td className="px-4 py-3 font-medium text-gray-900">{s.name}</td>
                               <td className="px-4 py-3">
                                 <div className="flex flex-wrap gap-1">
-                                  {s.missing_fields.map((f) => (
+                                  {(s.missing || []).map((f) => (
                                     <span key={f} className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full capitalize">
                                       {f.replace(/_/g, ' ')}
                                     </span>

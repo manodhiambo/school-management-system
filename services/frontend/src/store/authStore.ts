@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { safeLocalStorage, safeSessionStorage, zustandSafeStorage } from './safeStorage';
 
 interface User {
   id: string;
@@ -29,45 +30,45 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       setAuth: (user, accessToken, rememberMe = true, refreshToken?: string) => {
         if (rememberMe) {
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('token', accessToken);
-          if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
-          sessionStorage.removeItem('accessToken');
-          sessionStorage.removeItem('token');
-          sessionStorage.removeItem('refreshToken');
+          safeLocalStorage.setItem('accessToken', accessToken);
+          safeLocalStorage.setItem('token', accessToken);
+          if (refreshToken) safeLocalStorage.setItem('refreshToken', refreshToken);
+          safeSessionStorage.removeItem('accessToken');
+          safeSessionStorage.removeItem('token');
+          safeSessionStorage.removeItem('refreshToken');
         } else {
-          sessionStorage.setItem('accessToken', accessToken);
-          sessionStorage.setItem('token', accessToken);
-          if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
+          safeSessionStorage.setItem('accessToken', accessToken);
+          safeSessionStorage.setItem('token', accessToken);
+          if (refreshToken) safeSessionStorage.setItem('refreshToken', refreshToken);
+          safeLocalStorage.removeItem('accessToken');
+          safeLocalStorage.removeItem('token');
+          safeLocalStorage.removeItem('refreshToken');
         }
         set({ user, accessToken, refreshToken: refreshToken || null, isAuthenticated: true });
       },
       clearAuth: () => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('refreshToken');
-        sessionStorage.removeItem('accessToken');
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('refreshToken');
+        safeLocalStorage.removeItem('accessToken');
+        safeLocalStorage.removeItem('token');
+        safeLocalStorage.removeItem('user');
+        safeLocalStorage.removeItem('refreshToken');
+        safeSessionStorage.removeItem('accessToken');
+        safeSessionStorage.removeItem('token');
+        safeSessionStorage.removeItem('refreshToken');
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },
     }),
     {
       name: 'auth-storage',
+      storage: createJSONStorage(() => zustandSafeStorage),
       onRehydrateStorage: () => (state) => {
-        // If token only lives in sessionStorage (no rememberMe), restore it
         if (state && !state.accessToken) {
-          const sessionToken = sessionStorage.getItem('accessToken');
+          const sessionToken = safeSessionStorage.getItem('accessToken');
           if (sessionToken) {
             state.accessToken = sessionToken;
             state.isAuthenticated = true;
           }
         }
-      }
+      },
     }
   )
 );

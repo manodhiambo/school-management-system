@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { zustandSafeStorage } from './safeStorage';
 
 type Lang = 'en' | 'sw';
 
@@ -199,6 +200,6 @@ export const useLanguageStore = create<LanguageStore>()(
         return translations[key]?.[lang] ?? key.replace(/_/g, ' ');
       },
     }),
-    { name: 'skulmanager-language' }
+    { name: 'skulmanager-language', storage: createJSONStorage(() => zustandSafeStorage) }
   )
 );

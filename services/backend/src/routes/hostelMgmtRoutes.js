@@ -42,14 +42,15 @@ router.post('/hostels', async (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
       return res.status(403).json({ success: false, message: 'Admin only' });
     }
-    const { name, gender, capacity, warden_id } = req.body;
-    if (!name || !gender || !capacity) {
-      return res.status(400).json({ success: false, message: 'name, gender and capacity are required' });
+    const { name, gender, hostel_type, capacity, warden_id } = req.body;
+    const type = hostel_type || gender;
+    if (!name || !type || !capacity) {
+      return res.status(400).json({ success: false, message: 'name, hostel_type and capacity are required' });
     }
     const rows = await query(
-      `INSERT INTO hostels (tenant_id, name, gender, capacity, warden_id)
+      `INSERT INTO hostels (tenant_id, name, hostel_type, capacity, warden_id)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [tid, name, gender, capacity, warden_id || null]
+      [tid, name, type, capacity, warden_id || null]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -65,15 +66,16 @@ router.put('/hostels/:id', async (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
       return res.status(403).json({ success: false, message: 'Admin only' });
     }
-    const { name, gender, capacity, warden_id } = req.body;
+    const { name, gender, hostel_type, capacity, warden_id } = req.body;
+    const type = hostel_type || gender || null;
     const rows = await query(
       `UPDATE hostels SET
          name = COALESCE($1, name),
-         gender = COALESCE($2, gender),
+         hostel_type = COALESCE($2, hostel_type),
          capacity = COALESCE($3, capacity),
          warden_id = COALESCE($4, warden_id)
        WHERE id = $5 AND tenant_id = $6 RETURNING *`,
-      [name, gender, capacity, warden_id, req.params.id, tid]
+      [name, type, capacity, warden_id, req.params.id, tid]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Hostel not found' });
     res.json({ success: true, data: rows[0] });
@@ -344,16 +346,21 @@ router.get('/occupancy', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
-      `SELECT h.id, h.name, h.gender, h.capacity AS hostel_capacity,
+      `SELECT h.id, h.name,
+              COALESCE(h.gender, h.hostel_type) AS gender,
+              h.capacity AS hostel_capacity,
               COALESCE(SUM(r.capacity) FILTER (WHERE r.is_active = TRUE), 0) AS room_capacity,
               COUNT(DISTINCT a.id) FILTER (WHERE a.is_active = TRUE) AS current_occupancy,
-              COALESCE(SUM(r.capacity) FILTER (WHERE r.is_active = TRUE), 0) -
-                COUNT(DISTINCT a.id) FILTER (WHERE a.is_active = TRUE) AS available_beds
+              GREATEST(
+                COALESCE(SUM(r.capacity) FILTER (WHERE r.is_active = TRUE), 0)::int -
+                COUNT(DISTINCT a.id) FILTER (WHERE a.is_active = TRUE)::int,
+                0
+              ) AS available_beds
        FROM hostels h
        LEFT JOIN hostel_rooms r ON r.hostel_id = h.id AND r.tenant_id = h.tenant_id
        LEFT JOIN hostel_allocations a ON a.room_id = r.id AND a.tenant_id = h.tenant_id AND a.is_active = TRUE
        WHERE h.tenant_id = $1
-       GROUP BY h.id
+       GROUP BY h.id, h.name, h.gender, h.hostel_type, h.capacity
        ORDER BY h.name`,
       [tid]
     );

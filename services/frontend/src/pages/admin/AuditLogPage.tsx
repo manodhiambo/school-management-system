@@ -97,10 +97,10 @@ export function AuditLogPage() {
 
   useEffect(() => {
     (api as any).api.get('/audit-log/summary').then((res: any) => {
-      setSummary(res.data || res || null);
+      setSummary(res?.data || res || null);
     }).catch(() => { /* silent */ });
     (api as any).api.get('/audit-log/actions').then((res: any) => {
-      setActions(res.data || res || []);
+      setActions(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);
     }).catch(() => { /* silent */ });
   }, []);
 

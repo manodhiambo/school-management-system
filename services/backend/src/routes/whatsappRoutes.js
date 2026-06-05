@@ -210,6 +210,41 @@ router.post('/send', adminOnly, async (req, res) => {
   }
 });
 
+// GET /phones — return phone numbers for a target without sending (for direct WhatsApp fallback)
+router.get('/phones', adminOnly, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { target, class_id } = req.query;
+
+    let rows = [];
+    if (target === 'all') {
+      rows = await query(
+        `SELECT u.phone, u.email, u.first_name, u.last_name
+         FROM users u
+         WHERE u.tenant_id = $1 AND u.role = 'parent'
+           AND u.phone IS NOT NULL AND u.phone != ''`,
+        [tid]
+      );
+    } else if (target === 'class' && class_id) {
+      rows = await query(
+        `SELECT DISTINCT u.phone, u.email, u.first_name, u.last_name
+         FROM users u
+         JOIN students s ON s.parent_id = u.id
+         WHERE s.class_id = $1 AND s.tenant_id = $2
+           AND u.phone IS NOT NULL AND u.phone != ''`,
+        [class_id, tid]
+      );
+    } else {
+      return res.status(400).json({ success: false, message: "target must be 'all' or 'class'" });
+    }
+
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('Get WhatsApp phones error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /log — list sent messages, paginated
 router.get('/log', adminOnly, async (req, res) => {
   try {

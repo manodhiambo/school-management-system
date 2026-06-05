@@ -4,11 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
-import { useAuthStore } from '@/store/authStore';
 import {
   MessageCircle, Settings, Send, List, Eye, EyeOff,
-  X, CheckCircle, XCircle, Clock, AlertTriangle, RefreshCw
+  X, CheckCircle, XCircle, Clock, AlertTriangle, RefreshCw, Smartphone, ExternalLink
 } from 'lucide-react';
+
+function waLink(phone: string, message: string) {
+  const cleaned = phone.replace(/[\s\-().]/g, '').replace(/^\+/, '');
+  return `https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`;
+}
 
 type Target = 'all_parents' | 'by_class' | 'custom';
 type MsgStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
@@ -30,8 +34,6 @@ function StatusBadge({ status }: { status: MsgStatus }) {
 }
 
 export function WhatsAppPage() {
-  const { user } = useAuthStore();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -60,6 +62,26 @@ export function WhatsAppPage() {
   // Log
   const [log, setLog] = useState<any[]>([]);
   const [logLoading, setLogLoading] = useState(false);
+
+  // Direct WhatsApp (no API) fallback
+  const [directPhones, setDirectPhones] = useState<any[]>([]);
+  const [directLoading, setDirectLoading] = useState(false);
+  const [directCustomPhone, setDirectCustomPhone] = useState('');
+  const [directMsg, setDirectMsg] = useState('');
+  const [directTarget, setDirectTarget] = useState<'custom' | 'all_parents' | 'by_class'>('custom');
+  const [directClassId, setDirectClassId] = useState('');
+
+  const fetchDirectPhones = async () => {
+    if (directTarget === 'custom') return;
+    setDirectLoading(true);
+    try {
+      const params: any = { target: directTarget === 'all_parents' ? 'all' : 'class' };
+      if (directTarget === 'by_class' && directClassId) params.class_id = directClassId;
+      const res: any = await (api as any).getWhatsAppPhones(params);
+      setDirectPhones(Array.isArray(res?.data) ? res.data : []);
+    } catch { setDirectPhones([]); }
+    setDirectLoading(false);
+  };
 
   useEffect(() => {
     loadConfig();
@@ -272,6 +294,110 @@ export function WhatsAppPage() {
           </Button>
           {!configForm.is_enabled && (
             <p className="text-xs text-red-500">WhatsApp is disabled. Enable it in Configuration above.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Direct WhatsApp (device app fallback — always available) */}
+      <Card className="border-green-200">
+        <CardHeader className="flex flex-row items-center gap-2 bg-green-50 rounded-t-lg">
+          <Smartphone className="h-5 w-5 text-green-600" />
+          <CardTitle className="text-green-800">Direct WhatsApp (Device App)</CardTitle>
+          <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">No API needed</span>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          <p className="text-sm text-gray-500">
+            Opens WhatsApp on your device with the recipient and message pre-filled. Works without any API configuration.
+          </p>
+          <div>
+            <Label>Mode</Label>
+            <div className="flex gap-2 mt-1 flex-wrap">
+              {[
+                { value: 'custom', label: 'Single Number' },
+                { value: 'all_parents', label: 'All Parents' },
+                { value: 'by_class', label: 'By Class' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setDirectTarget(opt.value as any); setDirectPhones([]); }}
+                  className={`px-3 py-1.5 rounded text-sm font-medium border transition-colors ${
+                    directTarget === opt.value ? 'bg-green-600 text-white border-green-600' : 'border-gray-300 text-gray-700 hover:border-green-400'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {directTarget === 'custom' && (
+            <div>
+              <Label>Phone Number (with country code)</Label>
+              <Input
+                value={directCustomPhone}
+                onChange={e => setDirectCustomPhone(e.target.value)}
+                placeholder="+254700000000"
+              />
+            </div>
+          )}
+          {directTarget === 'by_class' && (
+            <div>
+              <Label>Select Class</Label>
+              <select className="w-full border rounded px-3 py-2 text-sm mt-1" value={directClassId} onChange={e => setDirectClassId(e.target.value)}>
+                <option value="">Choose class...</option>
+                {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <Label>Message</Label>
+            <textarea
+              className="w-full border rounded px-3 py-2 text-sm mt-1 h-24 resize-none"
+              value={directMsg}
+              onChange={e => setDirectMsg(e.target.value)}
+              placeholder="Type your message..."
+            />
+          </div>
+
+          {directTarget === 'custom' ? (
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              disabled={!directCustomPhone.trim() || !directMsg.trim()}
+              onClick={() => window.open(waLink(directCustomPhone, directMsg), '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-1" /> Open WhatsApp
+            </Button>
+          ) : (
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="border-green-500 text-green-700"
+                disabled={directLoading || (directTarget === 'by_class' && !directClassId)}
+                onClick={fetchDirectPhones}
+              >
+                {directLoading ? 'Loading...' : 'Fetch Recipients'}
+              </Button>
+              {directPhones.length > 0 && (
+                <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                  {directPhones.map((p: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
+                      <span className="text-gray-700">
+                        {p.first_name || p.last_name ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : p.email || p.phone}
+                        <span className="text-gray-400 ml-2 font-mono text-xs">{p.phone}</span>
+                      </span>
+                      <a
+                        href={waLink(p.phone, directMsg)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-semibold ${!directMsg.trim() ? 'pointer-events-none opacity-50' : ''}`}
+                      >
+                        <ExternalLink className="h-3 w-3" /> Send
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

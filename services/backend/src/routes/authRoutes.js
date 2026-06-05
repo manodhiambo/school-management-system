@@ -9,6 +9,7 @@ import logger from '../utils/logger.js';
 import { sendEmail } from '../services/emailService.js';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
+import { logAction } from './auditLogRoutes.js';
 
 const router = express.Router();
 
@@ -104,6 +105,10 @@ router.post('/login', async (req, res) => {
     query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
       .catch(err => logger.warn('Failed to update last_login:', err.message));
 
+    // Audit log — fire and forget
+    req.user = { id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id };
+    logAction(req, 'login', 'user', user.id, { email: user.email });
+
     logger.info(`Login successful for: ${email}`);
 
     res.json({
@@ -153,13 +158,9 @@ router.get('/me', authenticate, async (req, res) => {
 // Logout
 router.post('/logout', authenticate, async (req, res) => {
   try {
-    // Delete session if exists
     await query('DELETE FROM user_sessions WHERE user_id = $1', [req.user.id]).catch(() => {});
-    
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
+    logAction(req, 'logout', 'user', req.user.id, { email: req.user.email });
+    res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
     logger.error('Logout error:', error);
     res.status(500).json({ success: false, message: 'Logout failed' });

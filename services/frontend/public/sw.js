@@ -30,7 +30,13 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => {
+        // For SPA navigation requests, fall back to index.html so React Router handles routing
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
+        return caches.match(event.request);
+      })
   );
 });
 

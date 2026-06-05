@@ -119,34 +119,42 @@ router.get('/actions', requireRole(['admin', 'superadmin']), async (req, res) =>
   }
 });
 
-// GET /summary — count by action for last 30 days (dashboard charts)
+// GET /summary — summary stats for dashboard cards
 router.get('/summary', requireRole(['admin', 'superadmin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const rows = await query(
-      `SELECT action,
-              COUNT(*)::int AS count,
-              DATE(created_at) AS date
-       FROM audit_log
-       WHERE tenant_id = $1
-         AND created_at >= NOW() - INTERVAL '30 days'
-       GROUP BY action, DATE(created_at)
-       ORDER BY date DESC, count DESC`,
-      [tid]
-    );
 
-    // Also produce a simple total-per-action rollup
-    const totals = await query(
-      `SELECT action, COUNT(*)::int AS total
-       FROM audit_log
-       WHERE tenant_id = $1
-         AND created_at >= NOW() - INTERVAL '30 days'
-       GROUP BY action
-       ORDER BY total DESC`,
-      [tid]
-    );
+    const [todayRows, activeUserRows, commonActionRows] = await Promise.all([
+      query(
+        `SELECT COUNT(*)::int AS total_today
+         FROM audit_log
+         WHERE tenant_id = $1 AND DATE(created_at) = CURRENT_DATE`,
+        [tid]
+      ),
+      query(
+        `SELECT user_email, COUNT(*)::int AS cnt
+         FROM audit_log
+         WHERE tenant_id = $1 AND created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY user_email ORDER BY cnt DESC LIMIT 1`,
+        [tid]
+      ),
+      query(
+        `SELECT action, COUNT(*)::int AS cnt
+         FROM audit_log
+         WHERE tenant_id = $1 AND created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY action ORDER BY cnt DESC LIMIT 1`,
+        [tid]
+      ),
+    ]);
 
-    res.json({ success: true, data: rows, totals });
+    res.json({
+      success: true,
+      data: {
+        total_today: todayRows[0]?.total_today ?? 0,
+        most_active_user: activeUserRows[0]?.user_email ?? null,
+        most_common_action: commonActionRows[0]?.action ?? null,
+      },
+    });
   } catch (err) {
     logger.error('Get audit summary error:', err);
     res.status(500).json({ success: false, message: err.message });

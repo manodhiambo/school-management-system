@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
+import { useLanguageStore } from '@/store/languageStore';
 import {
   LayoutDashboard,
   Users,
@@ -201,6 +202,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, setAuth } = useAuthStore();
+  const { t } = useLanguageStore();
   const userRole = user?.role || 'admin';
 
   const superadminReturnToken = sessionStorage.getItem('superadmin_return_token');
@@ -313,7 +315,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {showHeader && (
                   <div className="pt-5 pb-1.5 px-2">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                      {item.section}
+                      {t(item.section)}
                     </span>
                   </div>
                 )}
@@ -336,7 +338,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     )}
                     style={{ height: 18, width: 18 }}
                   />
-                  <span className="flex-1 leading-none">{item.name}</span>
+                  <span className="flex-1 leading-none">{t(item.name)}</span>
                   {item.badge && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold leading-none">
                       {item.badge}

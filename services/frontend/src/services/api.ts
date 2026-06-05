@@ -1568,6 +1568,7 @@ class ApiService {
   testWhatsApp(data: any) { return this.api.post('/whatsapp/test', data); }
   sendWhatsApp(data: any) { return this.api.post('/whatsapp/send', data); }
   getWhatsAppLog(params?: any) { return this.api.get('/whatsapp/log', { params }); }
+  getWhatsAppPhones(params: { target: string; class_id?: string }) { return this.api.get('/whatsapp/phones', { params }); }
 
   // ── SMS Keywords (Two-Way) ────────────────────────────────────────────────
   getSmsKeywords() { return this.api.get('/sms-keywords/keywords'); }

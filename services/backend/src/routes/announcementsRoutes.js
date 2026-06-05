@@ -34,11 +34,12 @@ router.use(authenticate);
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`, []).catch(() => {});
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal'`, []).catch(() => {});
 
+    // Use TEXT (not UUID) for announcement_id so it works with both old VARCHAR and new UUID schemas
     await query(`
       CREATE TABLE IF NOT EXISTS announcement_reads (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        announcement_id UUID NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        announcement_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
         read_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(announcement_id, user_id)
       )`, []);
@@ -66,11 +67,11 @@ router.get('/', async (req, res) => {
                c.name AS target_class_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
-                 WHERE ar.announcement_id = a.id AND ar.user_id = $2
+                 WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
                ) AS is_read
         FROM announcements a
-        LEFT JOIN users u ON u.id = a.created_by
-        LEFT JOIN classes c ON c.id = a.target_class_id
+        LEFT JOIN users u ON u.id::text = a.created_by::text
+        LEFT JOIN classes c ON c.id::text = a.target_class_id::text
         WHERE a.tenant_id = $1
         ORDER BY COALESCE(a.is_pinned, FALSE) DESC, a.created_at DESC
       `;
@@ -83,11 +84,11 @@ router.get('/', async (req, res) => {
                c.name AS target_class_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
-                 WHERE ar.announcement_id = a.id AND ar.user_id = $2
+                 WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
                ) AS is_read
         FROM announcements a
-        LEFT JOIN users u ON u.id = a.created_by
-        LEFT JOIN classes c ON c.id = a.target_class_id
+        LEFT JOIN users u ON u.id::text = a.created_by::text
+        LEFT JOIN classes c ON c.id::text = a.target_class_id::text
         WHERE a.tenant_id = $1
           AND (COALESCE(a.target_roles, ARRAY['admin','teacher','student','parent']::text[]) @> ARRAY[$3::text])
           AND (a.expires_at IS NULL OR a.expires_at > NOW())
@@ -117,11 +118,11 @@ router.get('/unread-count', async (req, res) => {
       SELECT COUNT(*) AS count
       FROM announcements a
       WHERE a.tenant_id = $1
-        ${isAdmin ? '' : `AND a.target_roles @> ARRAY[$3::text]
+        ${isAdmin ? '' : `AND (COALESCE(a.target_roles, ARRAY['admin','teacher','student','parent']::text[]) @> ARRAY[$3::text])
         AND (a.expires_at IS NULL OR a.expires_at > NOW())`}
         AND NOT EXISTS (
           SELECT 1 FROM announcement_reads ar
-          WHERE ar.announcement_id = a.id AND ar.user_id = $2
+          WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
         )
     `;
 
@@ -139,9 +140,10 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const {
-      title, body, target_roles, target_class_id,
+      title, target_roles, target_class_id,
       priority = 'normal', is_pinned = false, expires_at
     } = req.body;
+    const body = req.body.body || req.body.message || req.body.content || '';
 
     if (!title || !body) {
       return res.status(400).json({ success: false, message: 'title and body are required' });

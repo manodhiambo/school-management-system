@@ -6,6 +6,65 @@ import logger from '../utils/logger.js';
 const router = express.Router();
 router.use(authenticate);
 
+// Ensure hostel tables exist
+(async () => {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS hostels (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        hostel_type VARCHAR(10) CHECK (hostel_type IN ('boys','girls','mixed')),
+        capacity INTEGER DEFAULT 50,
+        warden_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`, []);
+    await query(`
+      CREATE TABLE IF NOT EXISTS hostel_rooms (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+        hostel_id UUID REFERENCES hostels(id) ON DELETE CASCADE,
+        room_number VARCHAR(20) NOT NULL,
+        capacity INTEGER NOT NULL DEFAULT 4,
+        room_type VARCHAR(20) DEFAULT 'dormitory',
+        floor INTEGER DEFAULT 1,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`, []);
+    await query(`
+      CREATE TABLE IF NOT EXISTS hostel_allocations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+        room_id UUID REFERENCES hostel_rooms(id) ON DELETE CASCADE,
+        student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+        bed_number VARCHAR(10),
+        check_in TIMESTAMPTZ DEFAULT NOW(),
+        check_out TIMESTAMPTZ,
+        is_active BOOLEAN DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`, []);
+    await query(`
+      CREATE TABLE IF NOT EXISTS hostel_movements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+        student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+        movement_type VARCHAR(30),
+        departure_at TIMESTAMPTZ,
+        return_at TIMESTAMPTZ,
+        reason TEXT,
+        guardian_name VARCHAR(100),
+        guardian_phone VARCHAR(20),
+        status VARCHAR(20) DEFAULT 'pending',
+        approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`, []);
+  } catch (err) {
+    logger.warn('Hostel tables setup warning:', err.message);
+  }
+})();
+
 // ─── HOSTELS ──────────────────────────────────────────────────────────────────
 
 // GET /hostels — list hostels with room/occupancy counts
@@ -347,7 +406,7 @@ router.get('/occupancy', async (req, res) => {
     const tid = req.user.tenant_id;
     const rows = await query(
       `SELECT h.id, h.name,
-              COALESCE(h.gender, h.hostel_type) AS gender,
+              h.hostel_type AS gender,
               h.capacity AS hostel_capacity,
               COALESCE(SUM(r.capacity) FILTER (WHERE r.is_active = TRUE), 0) AS room_capacity,
               COUNT(DISTINCT a.id) FILTER (WHERE a.is_active = TRUE) AS current_occupancy,
@@ -360,7 +419,7 @@ router.get('/occupancy', async (req, res) => {
        LEFT JOIN hostel_rooms r ON r.hostel_id = h.id AND r.tenant_id = h.tenant_id
        LEFT JOIN hostel_allocations a ON a.room_id = r.id AND a.tenant_id = h.tenant_id AND a.is_active = TRUE
        WHERE h.tenant_id = $1
-       GROUP BY h.id, h.name, h.gender, h.hostel_type, h.capacity
+       GROUP BY h.id, h.name, h.hostel_type, h.capacity
        ORDER BY h.name`,
       [tid]
     );

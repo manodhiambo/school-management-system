@@ -8,10 +8,10 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
-  BookOpen, Users, UserCheck, Shield, Wallet, Bus, ShieldCheck,
+  BookOpen, Users, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound,
 } from 'lucide-react';
 
-type View = 'role' | 'login' | 'forgot' | 'forgot-success';
+type View = 'role' | 'login' | '2fa' | 'forgot' | 'forgot-success';
 type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver' | 'security';
 
 const ROLES: { key: Role; label: string; description: string; icon: React.ElementType; color: string; bg: string; border: string }[] = [
@@ -83,6 +83,12 @@ export function LoginPage() {
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
+  // 2FA state
+  const [totpCode, setTotpCode] = useState('');
+  const [totpTempToken, setTotpTempToken] = useState('');
+  const [totpError, setTotpError] = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotError, setForgotError] = useState('');
@@ -106,6 +112,16 @@ export function LoginPage() {
 
     try {
       const response: any = await api.login(email, password);
+      // 2FA challenge for admins
+      if ((response as any).requires_2fa) {
+        setTotpTempToken((response as any).temp_token);
+        setTotpCode('');
+        setTotpError('');
+        setView('2fa');
+        setLoginLoading(false);
+        return;
+      }
+
       const { accessToken, refreshToken, user } = response.data;
 
       // Validate the logged-in user's role matches the selected tile
@@ -128,6 +144,22 @@ export function LoginPage() {
       setLoginError(err.message || 'Invalid email or password');
     } finally {
       setLoginLoading(false);
+    }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTotpError('');
+    setTotpLoading(true);
+    try {
+      const response: any = await api.validate2FA(totpTempToken, totpCode);
+      const { accessToken, refreshToken, user } = response.data;
+      setAuth(user, accessToken, rememberMe, refreshToken);
+      navigate('/app/dashboard');
+    } catch (err: any) {
+      setTotpError(err.message || 'Invalid code. Please try again.');
+    } finally {
+      setTotpLoading(false);
     }
   };
 
@@ -319,6 +351,61 @@ export function LoginPage() {
                   <Button type="submit" className="w-full" disabled={loginLoading}>
                     {loginLoading ? 'Signing in...' : 'Sign In'}
                   </Button>
+                </form>
+              </CardContent>
+            </>
+          )}
+
+          {/* ── 2FA CHALLENGE ── */}
+          {view === '2fa' && (
+            <>
+              <CardHeader className="pb-2 text-center">
+                <div className="flex justify-center mb-2">
+                  <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <KeyRound className="h-6 w-6 text-indigo-600" />
+                  </div>
+                </div>
+                <CardTitle className="text-xl">Two-Factor Authentication</CardTitle>
+                <CardDescription>Enter the 6-digit code from your authenticator app</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handle2FASubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="totpCode">Authentication Code</Label>
+                    <Input
+                      id="totpCode"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="000 000"
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value.replace(/[^0-9\-A-Z ]/gi, '').slice(0, 9))}
+                      required
+                      autoFocus
+                      className="text-center text-xl tracking-widest font-mono"
+                    />
+                    <p className="text-xs text-gray-400 text-center">
+                      Also accepts a backup code (format: XXXX-XXXX)
+                    </p>
+                  </div>
+
+                  {totpError && (
+                    <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                      {totpError}
+                    </div>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={totpLoading || totpCode.length < 6}>
+                    {totpLoading ? 'Verifying...' : 'Verify & Sign In'}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setView('login'); setTotpCode(''); setTotpError(''); }}
+                    className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mx-auto"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to login
+                  </button>
                 </form>
               </CardContent>
             </>

@@ -101,6 +101,13 @@ class ApiService {
     return this.api.get('/auth/me');
   }
 
+  // 2FA
+  get2FAStatus() { return this.api.get('/auth/2fa/status'); }
+  setup2FA() { return this.api.get('/auth/2fa/setup'); }
+  enable2FA(secret: string, code: string) { return this.api.post('/auth/2fa/enable', { secret, code }); }
+  disable2FA(password: string) { return this.api.post('/auth/2fa/disable', { password }); }
+  validate2FA(tempToken: string, code: string) { return this.api.post('/auth/2fa/validate', { temp_token: tempToken, code }); }
+
   // Dashboard
   getDashboardStats() {
     return this.api.get('/admin/dashboard');

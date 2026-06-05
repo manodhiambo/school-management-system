@@ -26,11 +26,11 @@ const roleBottomNav: Record<string, BottomNavItem[]> = {
     { name: 'Profile', href: '/app/profile',          icon: User            },
   ],
   teacher: [
-    { name: 'Home',     href: '/app/dashboard',   icon: LayoutDashboard },
-    { name: 'Students', href: '/app/students',    icon: Users           },
-    { name: 'Classes',  href: '/app/my-classes',  icon: BookOpen        },
-    { name: 'Schedule', href: '/app/my-timetable',icon: Calendar        },
-    { name: 'Profile',  href: '/app/profile',     icon: User            },
+    { name: 'Home',       href: '/app/dashboard',    icon: LayoutDashboard },
+    { name: 'Classes',    href: '/app/my-classes',   icon: BookOpen        },
+    { name: 'Timetable',  href: '/app/my-timetable', icon: Calendar        },
+    { name: 'Leave',      href: '/app/staff-leave',  icon: Award           },
+    { name: 'Profile',    href: '/app/profile',      icon: User            },
   ],
   student: [
     { name: 'Home',    href: '/app/dashboard', icon: LayoutDashboard },

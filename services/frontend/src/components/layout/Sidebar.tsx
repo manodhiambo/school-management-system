@@ -93,7 +93,7 @@ const navigationItems: NavItem[] = [
   { name: 'My Courses',        href: '/app/my-courses',    icon: BookOpen,  roles: ['student'], section: 'Academic' },
   { name: 'My Attendance',     href: '/app/my-attendance', icon: Calendar,  roles: ['student'], section: 'Academic' },
   { name: 'My Results',        href: '/app/my-results',    icon: Award,     roles: ['student'], section: 'Academic' },
-  { name: 'Learning Materials',href: '/app/academic',      icon: BookMarked,roles: ['student'], section: 'Academic' },
+  { name: 'Learning Materials',href: '/app/learning-materials', icon: BookMarked, roles: ['student'], section: 'Academic' },
   { name: 'IGCSE Results',     href: '/app/igcse',          icon: Globe,     roles: ['student'], section: 'Academic', badge: 'IGCSE' },
 
   // ── Finance ───────────────────────────────────────────────────────────────
@@ -131,6 +131,7 @@ const navigationItems: NavItem[] = [
   { name: 'Discipline',         href: '/app/discipline',         icon: AlertTriangle, roles: ['admin', 'teacher'],                   section: 'Welfare' },
   { name: 'Health',             href: '/app/health',             icon: Heart,         roles: ['admin', 'teacher'],                   section: 'Welfare' },
   { name: 'Staff Leave',        href: '/app/staff-leave',        icon: ClipboardList, roles: ['admin', 'teacher'],                   section: 'Welfare' },
+  { name: 'My Attendance',     href: '/app/my-checkin',         icon: CheckCircle,   roles: ['teacher'],                              section: 'Welfare' },
   { name: 'Transport',          href: '/app/transport',          icon: Bus,           roles: ['admin'],                              section: 'Welfare' },
   { name: 'Transport Tracking', href: '/app/transport-tracking', icon: Navigation,    roles: ['admin', 'teacher'],                   section: 'Welfare' },
   { name: 'My Route',           href: '/app/dashboard',          icon: Bus,           roles: ['driver'],                             section: 'Welfare' },

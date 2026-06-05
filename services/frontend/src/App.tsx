@@ -40,16 +40,19 @@ import { MessagesPage } from './pages/student/MessagesPage';
 import { NotificationsPage } from './pages/student/NotificationsPage';
 import { MyExamsPage } from './pages/student/MyExamsPage';
 import { TakeExamPage } from './pages/student/TakeExamPage';
+import { LearningMaterialsPage } from './pages/student/LearningMaterialsPage';
 
 // Parent Pages
 import { MyChildrenPage } from './pages/parent/MyChildrenPage';
 import { ChildrenProgressPage } from './pages/parent/ChildrenProgressPage';
 import { FeePaymentsPage } from './pages/parent/FeePaymentsPage';
+import { MyTransportPage } from './pages/parent/MyTransportPage';
 
 // Teacher Pages
 import { MyClassesPage } from './pages/teacher/MyClassesPage';
 import { GradeBookPage } from './pages/teacher/GradeBookPage';
 import { TeacherExamsPage } from './pages/teacher/TeacherExamsPage';
+import { TeacherMyAttendancePage } from './pages/teacher/TeacherMyAttendancePage';
 
 // Library Pages
 import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
@@ -190,16 +193,19 @@ function App() {
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="my-exams" element={<MyExamsPage />} />
               <Route path="take-exam/:examId" element={<TakeExamPage />} />
+              <Route path="learning-materials" element={<LearningMaterialsPage />} />
 
               {/* Parent Routes */}
               <Route path="my-children" element={<MyChildrenPage />} />
               <Route path="children-progress" element={<ChildrenProgressPage />} />
               <Route path="fee-payments" element={<FeePaymentsPage />} />
+              <Route path="my-transport" element={<MyTransportPage />} />
 
               {/* Teacher Routes */}
               <Route path="my-classes" element={<MyClassesPage />} />
               <Route path="gradebook" element={<GradeBookPage />} />
               <Route path="teacher-exams" element={<TeacherExamsPage />} />
+              <Route path="my-checkin" element={<TeacherMyAttendancePage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />
@@ -213,6 +219,7 @@ function App() {
 
               {/* CBE Routes */}
               <Route path="cbc-analytics" element={<CbcAnalyticsPage />} />
+              <Route path="cbe-analytics" element={<CbcAnalyticsPage />} />
               <Route path="curriculum" element={<CurriculumPage />} />
               <Route path="cbc-assessments" element={<CbcAssessmentPage />} />
               <Route path="cbc-report-cards" element={<CbcReportCardPage />} />

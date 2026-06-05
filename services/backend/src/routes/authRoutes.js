@@ -7,6 +7,8 @@ import { config } from '../config/env.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../services/emailService.js';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
 
 const router = express.Router();
 
@@ -18,7 +20,7 @@ router.post('/login', async (req, res) => {
     logger.info(`Login attempt for: ${email}`);
     
     const users = await query(
-      'SELECT id, email, password, role, is_active, is_verified, tenant_id FROM users WHERE email = $1',
+      'SELECT id, email, password, role, is_active, is_verified, tenant_id, totp_enabled FROM users WHERE email = $1',
       [email]
     );
 
@@ -73,6 +75,16 @@ router.post('/login', async (req, res) => {
           });
         }
       }
+    }
+
+    // If admin has 2FA enabled, issue a short-lived challenge token instead of full JWT
+    if (user.role === 'admin' && user.totp_enabled) {
+      const tempToken = jwt.sign(
+        { userId: user.id, purpose: '2fa-pending' },
+        config.jwt.secret,
+        { expiresIn: '5m' }
+      );
+      return res.json({ success: true, requires_2fa: true, temp_token: tempToken });
     }
 
     // Generate tokens — include tenant_id in JWT payload
@@ -317,6 +329,186 @@ router.post('/change-password', authenticate, async (req, res) => {
   } catch (error) {
     logger.error('Change password error:', error);
     res.status(500).json({ success: false, message: 'Error changing password' });
+  }
+});
+
+// ── 2FA ENDPOINTS ──────────────────────────────────────────────────────────────
+
+// Get 2FA status for current user
+router.get('/2fa/status', authenticate, async (req, res) => {
+  try {
+    const rows = await query('SELECT totp_enabled FROM users WHERE id = $1', [req.user.id]);
+    res.json({ success: true, data: { enabled: rows[0]?.totp_enabled || false } });
+  } catch (error) {
+    logger.error('2FA status error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching 2FA status' });
+  }
+});
+
+// Generate a new TOTP secret and QR code (admin only; does NOT save yet)
+router.get('/2fa/setup', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Only administrators can set up 2FA' });
+  }
+  try {
+    const secret = speakeasy.generateSecret({
+      name: `SkulManager (${req.user.email})`,
+      issuer: 'SkulManager',
+      length: 20,
+    });
+    const qrCode = await QRCode.toDataURL(secret.otpauth_url);
+    res.json({ success: true, data: { secret: secret.base32, qr_code: qrCode } });
+  } catch (error) {
+    logger.error('2FA setup error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate 2FA setup' });
+  }
+});
+
+// Verify code and enable 2FA — saves secret and returns backup codes
+router.post('/2fa/enable', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Only administrators can enable 2FA' });
+  }
+  const { secret, code } = req.body;
+  if (!secret || !code) {
+    return res.status(400).json({ success: false, message: 'Secret and verification code are required' });
+  }
+  try {
+    const valid = speakeasy.totp.verify({ secret, encoding: 'base32', token: code.replace(/\s/g, ''), window: 1 });
+    if (!valid) {
+      return res.status(400).json({ success: false, message: 'Invalid code. Make sure your authenticator app time is correct.' });
+    }
+
+    // Generate 8 one-time backup codes
+    const plainBackupCodes = Array.from({ length: 8 }, () =>
+      Math.random().toString(36).substring(2, 6).toUpperCase() + '-' +
+      Math.random().toString(36).substring(2, 6).toUpperCase()
+    );
+    const hashedBackupCodes = await Promise.all(
+      plainBackupCodes.map(async (c) => ({ code: await bcrypt.hash(c, 8), used: false }))
+    );
+
+    await query(
+      'UPDATE users SET totp_secret = $1, totp_enabled = true, totp_backup_codes = $2 WHERE id = $3',
+      [secret, JSON.stringify(hashedBackupCodes), req.user.id]
+    );
+
+    logger.info(`2FA enabled for user: ${req.user.email}`);
+    res.json({ success: true, message: '2FA enabled successfully', data: { backup_codes: plainBackupCodes } });
+  } catch (error) {
+    logger.error('2FA enable error:', error);
+    res.status(500).json({ success: false, message: 'Failed to enable 2FA' });
+  }
+});
+
+// Disable 2FA — requires current password
+router.post('/2fa/disable', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Only administrators can disable 2FA' });
+  }
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ success: false, message: 'Current password is required to disable 2FA' });
+  }
+  try {
+    const rows = await query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    if (!rows.length || !(await bcrypt.compare(password, rows[0].password))) {
+      return res.status(401).json({ success: false, message: 'Incorrect password' });
+    }
+    await query(
+      "UPDATE users SET totp_secret = NULL, totp_enabled = false, totp_backup_codes = '[]'::jsonb WHERE id = $1",
+      [req.user.id]
+    );
+    logger.info(`2FA disabled for user: ${req.user.email}`);
+    res.json({ success: true, message: '2FA has been disabled' });
+  } catch (error) {
+    logger.error('2FA disable error:', error);
+    res.status(500).json({ success: false, message: 'Failed to disable 2FA' });
+  }
+});
+
+// Validate TOTP code during login (accepts temp_token from login response)
+router.post('/2fa/validate', async (req, res) => {
+  const { temp_token, code } = req.body;
+  if (!temp_token || !code) {
+    return res.status(400).json({ success: false, message: 'Session token and code are required' });
+  }
+  try {
+    let decoded;
+    try {
+      decoded = jwt.verify(temp_token, config.jwt.secret);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Session expired. Please log in again.' });
+    }
+    if (decoded.purpose !== '2fa-pending') {
+      return res.status(401).json({ success: false, message: 'Invalid session token' });
+    }
+
+    const rows = await query(
+      'SELECT id, email, role, tenant_id, is_active, is_verified, totp_secret, totp_backup_codes FROM users WHERE id = $1 AND is_active = true',
+      [decoded.userId]
+    );
+    if (!rows.length) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+    const user = rows[0];
+    const trimmedCode = code.replace(/\s/g, '');
+
+    // Try TOTP first
+    const totpValid = speakeasy.totp.verify({
+      secret: user.totp_secret,
+      encoding: 'base32',
+      token: trimmedCode,
+      window: 1,
+    });
+
+    if (!totpValid) {
+      // Try backup codes
+      const backupCodes = Array.isArray(user.totp_backup_codes) ? user.totp_backup_codes : [];
+      let backupUsed = false;
+      const updatedCodes = [...backupCodes];
+
+      for (let i = 0; i < updatedCodes.length; i++) {
+        if (!updatedCodes[i].used && await bcrypt.compare(trimmedCode.toUpperCase(), updatedCodes[i].code)) {
+          updatedCodes[i] = { ...updatedCodes[i], used: true };
+          backupUsed = true;
+          break;
+        }
+      }
+
+      if (!backupUsed) {
+        return res.status(401).json({ success: false, message: 'Invalid authentication code' });
+      }
+
+      await query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2', [JSON.stringify(updatedCodes), user.id]);
+    }
+
+    // Issue full tokens
+    const accessToken = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id },
+      config.jwt.secret,
+      { expiresIn: config.jwt.accessExpiresIn }
+    );
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      config.jwt.refreshSecret,
+      { expiresIn: config.jwt.refreshExpiresIn }
+    );
+
+    query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]).catch(() => {});
+    logger.info(`2FA validated, login successful: ${user.email}`);
+
+    res.json({
+      success: true,
+      data: {
+        user: { id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id, isActive: user.is_active, isVerified: user.is_verified },
+        accessToken,
+        refreshToken,
+      },
+    });
+  } catch (error) {
+    logger.error('2FA validate error:', error);
+    res.status(500).json({ success: false, message: 'Authentication failed' });
   }
 });
 

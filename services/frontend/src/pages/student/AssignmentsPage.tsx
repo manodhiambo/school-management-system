@@ -35,6 +35,12 @@ export function AssignmentsPage() {
   const [gradeInputs, setGradeInputs] = useState<Record<string, { score: string; feedback: string }>>({});
   const [gradingSaving, setGradingSaving] = useState<Record<string, boolean>>({});
 
+  // Submission modal (student only)
+  const [submittingAssignment, setSubmittingAssignment] = useState<any | null>(null);
+  const [submissionText, setSubmissionText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
   /* ─── Load ─── */
   useEffect(() => {
     if (user?.id) {
@@ -103,15 +109,25 @@ export function AssignmentsPage() {
   };
 
   /* ─── Student Submit ─── */
-  const handleSubmit = async (assignmentId: string) => {
-    const submissionText = prompt('Enter your submission text (or leave blank):');
-    if (submissionText === null) return; // cancelled
+  const openSubmitModal = (assignment: any) => {
+    setSubmittingAssignment(assignment);
+    setSubmissionText('');
+    setSubmitError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!submittingAssignment) return;
+    setSubmitting(true);
+    setSubmitError('');
     try {
-      await api.submitAssignment(assignmentId, { submissionText });
-      alert('Assignment submitted successfully!');
+      await api.submitAssignment(submittingAssignment.id, { submissionText });
+      setSubmittingAssignment(null);
+      setSubmissionText('');
       loadAssignments();
     } catch (err: any) {
-      alert(err?.message || 'Failed to submit assignment');
+      setSubmitError(err?.message || 'Failed to submit assignment');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -433,7 +449,7 @@ export function AssignmentsPage() {
                         </div>
                       )}
                       {status === 'pending' && (
-                        <Button className="w-full" size="sm" onClick={() => handleSubmit(assignment.id)}>
+                        <Button className="w-full" size="sm" onClick={() => openSubmitModal(assignment)}>
                           <Upload className="h-4 w-4 mr-2" />
                           Submit Assignment
                         </Button>
@@ -475,6 +491,75 @@ export function AssignmentsPage() {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Student Submission Modal ── */}
+      {submittingAssignment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Upload className="h-5 w-5" />
+                Submit Assignment
+              </CardTitle>
+              <button
+                onClick={() => { setSubmittingAssignment(null); setSubmitError(''); }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">{submittingAssignment.title}</p>
+                {submittingAssignment.description && (
+                  <p className="text-xs text-gray-500 mt-1">{submittingAssignment.description}</p>
+                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  Due: {submittingAssignment.due_date
+                    ? new Date(submittingAssignment.due_date).toLocaleDateString()
+                    : '—'}
+                  {' '}· Max score: {submittingAssignment.max_score || 100}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">
+                  Your Answer / Work <span className="text-gray-400 font-normal">(required)</span>
+                </label>
+                <textarea
+                  rows={6}
+                  value={submissionText}
+                  onChange={e => setSubmissionText(e.target.value)}
+                  placeholder="Type your answer, working, or summary here..."
+                  className="mt-1 w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                  autoFocus
+                />
+              </div>
+              {submitError && (
+                <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+                  {submitError}
+                </div>
+              )}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => { setSubmittingAssignment(null); setSubmitError(''); }}
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleSubmit}
+                  disabled={submitting || !submissionText.trim()}
+                >
+                  {submitting ? 'Submitting...' : 'Submit'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

@@ -118,7 +118,7 @@ export function SubstitutePage() {
   };
 
   const filtered = dateFilter
-    ? substitutes.filter(s => s.date === dateFilter)
+    ? substitutes.filter(s => (s.assignment_date || s.date) === dateFilter)
     : substitutes;
 
   return (
@@ -152,7 +152,7 @@ export function SubstitutePage() {
                   value={form.absent_teacher_id}
                   onChange={e => setForm(f => ({ ...f, absent_teacher_id: e.target.value }))}>
                   <option value="">Select absent teacher</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.name || t.full_name}</option>)}
+                  {teachers.map(t => <option key={t.id} value={t.user_id || t.id}>{`${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email}</option>)}
                 </select>
               </div>
               <div>
@@ -166,11 +166,11 @@ export function SubstitutePage() {
                   onChange={e => setForm(f => ({ ...f, substitute_teacher_id: e.target.value }))}>
                   <option value="">Select substitute</option>
                   {teachers
-                    .filter(t => t.id !== form.absent_teacher_id)
+                    .filter(t => (t.user_id || t.id) !== form.absent_teacher_id)
                     .map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name || t.full_name}
-                        {available.find((a: any) => a.id === t.id) ? ' ✓ Available' : ''}
+                      <option key={t.id} value={t.user_id || t.id}>
+                        {`${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email}
+                        {available.find((a: any) => a.id === (t.user_id || t.id)) ? ' ✓ Available' : ''}
                       </option>
                     ))}
                 </select>
@@ -223,7 +223,7 @@ export function SubstitutePage() {
             ) : (
               <div className="flex flex-wrap gap-2">
                 {available.map((t: any) => (
-                  <Badge key={t.id} className="bg-green-100 text-green-800">{t.name || t.full_name}</Badge>
+                  <Badge key={t.id} className="bg-green-100 text-green-800">{t.full_name || `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email}</Badge>
                 ))}
               </div>
             )}
@@ -274,11 +274,11 @@ export function SubstitutePage() {
                 <tbody>
                   {filtered.map(s => (
                     <tr key={s.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 pr-4">{s.date}</td>
+                      <td className="py-3 pr-4">{s.assignment_date || s.date}</td>
                       <td className="py-3 pr-4">{s.absent_teacher_name || '—'}</td>
-                      <td className="py-3 pr-4">{s.substitute_teacher_name || '—'}</td>
+                      <td className="py-3 pr-4">{s.substitute_name || s.substitute_teacher_name || '—'}</td>
                       <td className="py-3 pr-4">{s.class_name || '—'}</td>
-                      <td className="py-3 pr-4">{s.subject || '—'}</td>
+                      <td className="py-3 pr-4">{s.subject_name || s.subject || '—'}</td>
                       <td className="py-3 pr-4">{s.period}</td>
                       <td className="py-3 pr-4">
                         <Badge className={STATUS_COLORS[s.status] || ''}>{s.status}</Badge>

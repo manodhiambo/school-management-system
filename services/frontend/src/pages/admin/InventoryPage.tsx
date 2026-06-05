@@ -103,6 +103,147 @@ export function InventoryPage() {
     setLoading(false);
   };
 
+  const downloadPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const now = new Date().toLocaleString();
+    const pageW = doc.internal.pageSize.getWidth();
+
+    const addHeader = (title: string) => {
+      doc.setFillColor(234, 88, 12); // orange-600
+      doc.rect(0, 0, pageW, 14, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SkulManager — Inventory', 10, 9);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(title, pageW / 2, 9, { align: 'center' });
+      doc.text(`Generated: ${now}`, pageW - 10, 9, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+    };
+
+    if (tab === 'items') {
+      addHeader('Inventory Items Report');
+      if (valuation) {
+        doc.setFontSize(10);
+        doc.text(`Total Stock Value: KES ${Number(valuation.total_value || 0).toLocaleString()}   |   Total Items: ${items.length}`, 10, 20);
+      }
+      autoTable(doc, {
+        startY: valuation ? 24 : 20,
+        head: [['Category', 'Name', 'SKU', 'Qty', 'Unit Cost (KES)', 'Location', 'Condition', 'Status']],
+        body: items.map(item => {
+          const isLow = Number(item.quantity) <= Number(item.reorder_level || 0);
+          return [
+            item.category_name || '-',
+            item.name,
+            item.sku || '-',
+            item.quantity,
+            Number(item.unit_cost || 0).toFixed(2),
+            item.location || '-',
+            (item.condition || '-'),
+            isLow ? 'LOW STOCK' : 'OK',
+          ];
+        }),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: 'bold' },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 7 && data.cell.raw === 'LOW STOCK') {
+            data.cell.styles.textColor = [185, 28, 28];
+            data.cell.styles.fontStyle = 'bold';
+          }
+          if (data.section === 'body' && data.column.index === 3) {
+            const row = items[data.row.index];
+            if (row && Number(row.quantity) <= Number(row.reorder_level || 0)) {
+              data.cell.styles.textColor = [185, 28, 28];
+            }
+          }
+        },
+        alternateRowStyles: { fillColor: [254, 243, 236] },
+      });
+      doc.save(`inventory-items-${Date.now()}.pdf`);
+
+    } else if (tab === 'categories') {
+      addHeader('Inventory Categories');
+      autoTable(doc, {
+        startY: 20,
+        head: [['Category Name', 'Description', 'Item Count']],
+        body: categories.map(c => [c.name, c.description || '-', c.item_count || 0]),
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [254, 243, 236] },
+      });
+      doc.save(`inventory-categories-${Date.now()}.pdf`);
+
+    } else if (tab === 'transactions') {
+      addHeader('Inventory Transaction Log');
+      autoTable(doc, {
+        startY: 20,
+        head: [['Item', 'Type', 'Quantity', 'Notes', 'Date', 'By']],
+        body: transactions.map(tx => [
+          tx.item_name || '-',
+          tx.type,
+          tx.quantity,
+          tx.notes || '-',
+          tx.created_at?.split('T')[0] || '-',
+          tx.user_name || '-',
+        ]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: 'bold' },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 1) {
+            const colors: Record<string, [number, number, number]> = {
+              stock_in: [22, 101, 52],
+              stock_out: [30, 64, 175],
+              damaged: [153, 27, 27],
+              adjustment: [133, 77, 14],
+            };
+            const c = colors[String(data.cell.raw)];
+            if (c) data.cell.styles.textColor = c;
+          }
+        },
+        alternateRowStyles: { fillColor: [254, 243, 236] },
+      });
+      doc.save(`inventory-transactions-${Date.now()}.pdf`);
+
+    } else if (tab === 'lowstock') {
+      addHeader('Low Stock Alert Report');
+      doc.setFontSize(10);
+      doc.setTextColor(153, 27, 27);
+      doc.text(`${lowStock.length} item(s) at or below reorder level`, 10, 20);
+      doc.setTextColor(0, 0, 0);
+      autoTable(doc, {
+        startY: 25,
+        head: [['Name', 'Category', 'Current Qty', 'Reorder Level', 'Shortage', 'Suggested Order']],
+        body: lowStock.map(item => {
+          const shortage = Math.max(0, Number(item.reorder_level || 0) - Number(item.quantity || 0));
+          const suggestion = Math.max(shortage, Number(item.reorder_level || 0) * 2);
+          return [
+            item.name,
+            item.category_name || '-',
+            item.quantity,
+            item.reorder_level,
+            shortage,
+            suggestion,
+          ];
+        }),
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: 'bold' },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            data.cell.styles.textColor = [185, 28, 28];
+            data.cell.styles.fontStyle = 'bold';
+          }
+          if (data.section === 'body' && data.column.index === 5) {
+            data.cell.styles.textColor = [194, 65, 12];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        },
+        alternateRowStyles: { fillColor: [254, 242, 242] },
+      });
+      doc.save(`low-stock-alert-${Date.now()}.pdf`);
+    }
+  };
+
   const saveCat = async () => {
     try {
       if (editCat) {
@@ -151,16 +292,21 @@ export function InventoryPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Package className="h-6 w-6 text-orange-600" /> Inventory Management
         </h1>
-        {valuation && (
-          <Card className="px-4 py-2">
-            <p className="text-xs text-gray-500">Total Stock Value</p>
-            <p className="text-lg font-bold text-orange-600">KES {Number(valuation.total_value || 0).toLocaleString()}</p>
-          </Card>
-        )}
+        <div className="flex items-center gap-3">
+          {valuation && (
+            <Card className="px-4 py-2">
+              <p className="text-xs text-gray-500">Total Stock Value</p>
+              <p className="text-lg font-bold text-orange-600">KES {Number(valuation.total_value || 0).toLocaleString()}</p>
+            </Card>
+          )}
+          <Button variant="outline" size="sm" onClick={downloadPDF} className="flex items-center gap-1.5 border-orange-300 text-orange-700 hover:bg-orange-50">
+            <Download className="h-4 w-4" /> Download PDF
+          </Button>
+        </div>
       </div>
 
       {error && (

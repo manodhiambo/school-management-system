@@ -153,10 +153,10 @@ router.post('/send-now', requireRole(['admin', 'superadmin']), async (req, res) 
 
     // Get school name for template substitution
     const tenantRows = await query(
-      'SELECT name FROM tenants WHERE id = $1',
+      'SELECT school_name FROM tenants WHERE id = $1',
       [tid]
     );
-    const schoolName = tenantRows[0]?.name || 'School';
+    const schoolName = tenantRows[0]?.school_name || 'School';
 
     // Find students with outstanding balance (sum of balance_amount on unpaid invoices)
     const students = await query(
@@ -181,13 +181,13 @@ router.post('/send-now', requireRole(['admin', 'superadmin']), async (req, res) 
     for (const student of students) {
       // Get parent phone via parent_students join
       const parentRows = await query(
-        `SELECT DISTINCT p.phone
+        `SELECT DISTINCT p.phone_primary AS phone
          FROM parents p
          JOIN parent_students ps ON ps.parent_id = p.id
          WHERE ps.student_id = $1
            AND p.tenant_id = $2
-           AND p.phone IS NOT NULL
-           AND p.phone != ''
+           AND p.phone_primary IS NOT NULL
+           AND p.phone_primary != ''
          LIMIT 1`,
         [student.student_id, tid]
       );

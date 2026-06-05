@@ -5,8 +5,10 @@ import { MessageSquare, Send, Inbox, Users, Bell, Plus } from 'lucide-react';
 import { SendMessageModal } from '@/components/modals/SendMessageModal';
 import { BroadcastAnnouncementModal } from '@/components/modals/BroadcastAnnouncementModal';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/languageStore';
 
 export function CommunicationPage() {
+  const { t } = useLanguageStore();
   const [messages, setMessages] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,17 +50,17 @@ export function CommunicationPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Communication</h2>
-          <p className="text-gray-500">Manage messages and announcements</p>
+          <h2 className="text-3xl font-bold">{t('Communication')}</h2>
+          <p className="text-gray-500">{t('Manage messages and announcements')}</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={() => setShowBroadcastModal(true)}>
             <Users className="mr-2 h-4 w-4" />
-            Broadcast
+            {t('Broadcast')}
           </Button>
           <Button onClick={() => setShowMessageModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            New Message
+            {t('New Message')}
           </Button>
         </div>
       </div>
@@ -67,7 +69,7 @@ export function CommunicationPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Inbox</span>
+              <span>{t('Inbox')}</span>
               <Inbox className="h-4 w-4 text-gray-500" />
             </CardTitle>
           </CardHeader>
@@ -79,7 +81,7 @@ export function CommunicationPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Unread</span>
+              <span>{t('Unread')}</span>
               <MessageSquare className="h-4 w-4 text-blue-500" />
             </CardTitle>
           </CardHeader>
@@ -93,7 +95,7 @@ export function CommunicationPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Notifications</span>
+              <span>{t('Notifications')}</span>
               <Bell className="h-4 w-4 text-yellow-500" />
             </CardTitle>
           </CardHeader>
@@ -105,13 +107,13 @@ export function CommunicationPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-sm">
-              <span>Quick Action</span>
+              <span>{t('Quick Action')}</span>
               <Users className="h-4 w-4 text-green-500" />
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Button className="w-full" size="sm" onClick={() => setShowBroadcastModal(true)}>
-              Send to All
+              {t('Send to All')}
             </Button>
           </CardContent>
         </Card>
@@ -120,7 +122,7 @@ export function CommunicationPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle className="text-sm">Mailbox</CardTitle>
+            <CardTitle className="text-sm">{t('Mailbox')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Button
@@ -129,7 +131,7 @@ export function CommunicationPage() {
               onClick={() => setActiveTab('inbox')}
             >
               <Inbox className="mr-2 h-4 w-4" />
-              Inbox ({messages.length})
+              {t('Inbox')} ({messages.length})
             </Button>
             <Button
               className="w-full justify-start"
@@ -137,7 +139,7 @@ export function CommunicationPage() {
               onClick={() => setActiveTab('sent')}
             >
               <Send className="mr-2 h-4 w-4" />
-              Sent
+              {t('Sent')}
             </Button>
             <Button
               className="w-full justify-start"
@@ -145,7 +147,7 @@ export function CommunicationPage() {
               onClick={() => setShowMessageModal(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Compose
+              {t('Compose')}
             </Button>
           </CardContent>
         </Card>
@@ -153,17 +155,17 @@ export function CommunicationPage() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>
-              {activeTab === 'inbox' ? 'Inbox Messages' : 'Sent Messages'}
+              {activeTab === 'inbox' ? t('Inbox Messages') : t('Sent Messages')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {messages.length === 0 ? (
               <div className="text-center py-12">
                 <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4">No messages yet</p>
+                <p className="text-gray-500 mb-4">{t('No messages yet')}</p>
                 <Button onClick={() => setShowMessageModal(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Send First Message
+                  {t('Send First Message')}
                 </Button>
               </div>
             ) : (
@@ -196,16 +198,16 @@ export function CommunicationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Notifications</CardTitle>
+          <CardTitle>{t('Recent Notifications')}</CardTitle>
         </CardHeader>
         <CardContent>
           {notifications.length === 0 ? (
             <div className="text-center py-8">
               <Bell className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">No notifications yet</p>
+              <p className="text-gray-500 mb-4">{t('No notifications yet')}</p>
               <Button onClick={() => setShowBroadcastModal(true)}>
                 <Users className="mr-2 h-4 w-4" />
-                Broadcast Announcement
+                {t('Broadcast Announcement')}
               </Button>
             </div>
           ) : (

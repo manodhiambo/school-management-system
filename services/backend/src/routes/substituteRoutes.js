@@ -70,10 +70,10 @@ router.post('/', async (req, res) => {
     }
 
     const { absent_teacher, substitute, class_id, subject_id, assignment_date, period, reason } = req.body;
-    if (!absent_teacher || !substitute || !class_id || !assignment_date) {
+    if (!absent_teacher || !substitute || !assignment_date) {
       return res.status(400).json({
         success: false,
-        message: 'absent_teacher, substitute, class_id and assignment_date are required'
+        message: 'absent_teacher, substitute and assignment_date are required'
       });
     }
     if (absent_teacher === substitute) {

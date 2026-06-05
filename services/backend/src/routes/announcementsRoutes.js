@@ -8,6 +8,45 @@ import logger from '../utils/logger.js';
 const router = express.Router();
 router.use(authenticate);
 
+// Ensure announcements table has the correct columns (handles old MySQL-era schema)
+(async () => {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        body TEXT NOT NULL DEFAULT '',
+        target_roles TEXT[] DEFAULT ARRAY['admin','teacher','student','parent'],
+        target_class_id UUID,
+        priority VARCHAR(20) DEFAULT 'normal',
+        is_pinned BOOLEAN DEFAULT FALSE,
+        expires_at TIMESTAMPTZ,
+        created_by UUID,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`, []);
+    // Add columns that may be missing on older schema
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS tenant_id UUID`, []).catch(() => {});
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT ''`, []).catch(() => {});
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS target_roles TEXT[] DEFAULT ARRAY['admin','teacher','student','parent']`, []).catch(() => {});
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE`, []).catch(() => {});
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`, []).catch(() => {});
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal'`, []).catch(() => {});
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS announcement_reads (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        announcement_id UUID NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        read_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(announcement_id, user_id)
+      )`, []);
+  } catch (err) {
+    logger.warn('Announcements table setup warning:', err.message);
+  }
+})();
+
 // GET / — list announcements visible to the current user's role
 // Admin sees all (including expired). Other roles see only active & role-targeted ones.
 router.get('/', async (req, res) => {
@@ -23,7 +62,7 @@ router.get('/', async (req, res) => {
       // Admin sees everything for their tenant
       sql = `
         SELECT a.*,
-               u.name AS created_by_name,
+               u.first_name || ' ' || u.last_name AS created_by_name,
                c.name AS target_class_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
@@ -33,14 +72,14 @@ router.get('/', async (req, res) => {
         LEFT JOIN users u ON u.id = a.created_by
         LEFT JOIN classes c ON c.id = a.target_class_id
         WHERE a.tenant_id = $1
-        ORDER BY a.is_pinned DESC, a.created_at DESC
+        ORDER BY COALESCE(a.is_pinned, FALSE) DESC, a.created_at DESC
       `;
       params = [tid, uid];
     } else {
       // Non-admin: only active announcements targeting their role
       sql = `
         SELECT a.*,
-               u.name AS created_by_name,
+               u.first_name || ' ' || u.last_name AS created_by_name,
                c.name AS target_class_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
@@ -50,9 +89,9 @@ router.get('/', async (req, res) => {
         LEFT JOIN users u ON u.id = a.created_by
         LEFT JOIN classes c ON c.id = a.target_class_id
         WHERE a.tenant_id = $1
-          AND a.target_roles @> ARRAY[$3::text]
+          AND (COALESCE(a.target_roles, ARRAY['admin','teacher','student','parent']::text[]) @> ARRAY[$3::text])
           AND (a.expires_at IS NULL OR a.expires_at > NOW())
-        ORDER BY a.is_pinned DESC, a.created_at DESC
+        ORDER BY COALESCE(a.is_pinned, FALSE) DESC, a.created_at DESC
       `;
       params = [tid, uid, role];
     }

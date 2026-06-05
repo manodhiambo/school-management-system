@@ -122,10 +122,10 @@ async function handleResults(from) {
     `SELECT DISTINCT ON (r.student_id, r.subject_id)
             s.first_name || ' ' || s.last_name AS student_name,
             subj.name AS subject_name,
-            r.marks,
-            r.grade,
+            r.marks_obtained AS marks,
+            r.cbc_grade AS grade,
             e.name AS exam_name
-     FROM offline_results r
+     FROM exam_results r
      JOIN students s ON s.id = r.student_id
      JOIN subjects subj ON subj.id = r.subject_id
      JOIN exams e ON e.id = r.exam_id

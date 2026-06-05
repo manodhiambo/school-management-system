@@ -245,13 +245,13 @@ export function FeeStructurePage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                       <tr>
-                        <th className="text-left px-4 py-3 font-medium">Name</th>
-                        <th className="text-left px-4 py-3 font-medium">Amount</th>
-                        <th className="text-left px-4 py-3 font-medium">Frequency</th>
-                        <th className="text-left px-4 py-3 font-medium">Applies To</th>
-                        <th className="text-left px-4 py-3 font-medium">Class</th>
-                        <th className="text-left px-4 py-3 font-medium">Type</th>
-                        <th className="text-center px-4 py-3 font-medium">Actions</th>
+                        <th className="text-left px-4 py-3 font-medium">{t('Name')}</th>
+                        <th className="text-left px-4 py-3 font-medium">{t('Amount')}</th>
+                        <th className="text-left px-4 py-3 font-medium">{t('Frequency')}</th>
+                        <th className="text-left px-4 py-3 font-medium">{t('Applies To')}</th>
+                        <th className="text-left px-4 py-3 font-medium">{t('Class')}</th>
+                        <th className="text-left px-4 py-3 font-medium">{t('Type')}</th>
+                        <th className="text-center px-4 py-3 font-medium">{t('Actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -273,7 +273,7 @@ export function FeeStructurePage() {
                               {STUDENT_TYPE_LABEL[s.student_type] || 'All Students'}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-gray-500">{s.class_name || 'All Classes'}</td>
+                          <td className="px-4 py-3 text-gray-500">{s.class_name || t('All Classes')}</td>
                           <td className="px-4 py-3 text-center">
                             {s.is_transport_fee && (
                               <Badge className="bg-orange-100 text-orange-700 mr-1">
@@ -288,9 +288,9 @@ export function FeeStructurePage() {
                           </td>
                           <td className="px-4 py-3">
                             {(s.is_transport_fee || s.extra_fee_id) ? (
-                              <p className="text-xs text-gray-400 text-center italic">Auto-managed</p>
+                              <p className="text-xs text-gray-400 text-center italic">{t('Auto-managed')}</p>
                             ) : isFinanceOfficer ? (
-                              <p className="text-xs text-gray-400 text-center italic">View only</p>
+                              <p className="text-xs text-gray-400 text-center italic">{t('View only')}</p>
                             ) : (
                               <div className="flex justify-center gap-2">
                                 <Button size="sm" variant="outline" onClick={() => handleEdit(s)}>
@@ -318,9 +318,9 @@ export function FeeStructurePage() {
           {/* Left: Configure */}
           <div className="lg:col-span-1 space-y-4">
             <Card>
-              <CardHeader><CardTitle className="text-base">1. Select Classes</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{t('1. Select Classes')}</CardTitle></CardHeader>
               <CardContent className="space-y-2 max-h-60 overflow-y-auto">
-                {classes.length === 0 && <p className="text-sm text-gray-400">No classes found</p>}
+                {classes.length === 0 && <p className="text-sm text-gray-400">{t('No classes found')}</p>}
                 {classes.map((c: any) => (
                   <label key={c.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                     <input type="checkbox" checked={bulkForm.class_ids.includes(c.id)} onChange={() => toggleBulkClass(c.id)} className="rounded" />
@@ -328,15 +328,15 @@ export function FeeStructurePage() {
                   </label>
                 ))}
                 <button className="text-xs text-blue-500 mt-1" onClick={() => setBulkForm(f => ({ ...f, class_ids: bulkForm.class_ids.length === classes.length ? [] : classes.map((c: any) => c.id) }))}>
-                  {bulkForm.class_ids.length === classes.length ? 'Deselect All' : 'Select All'}
+                  {bulkForm.class_ids.length === classes.length ? t('Deselect All') : t('Select All')}
                 </button>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base">2. Select Fee Structures</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{t('2. Select Fee Structures')}</CardTitle></CardHeader>
               <CardContent className="space-y-2 max-h-72 overflow-y-auto">
-                {structures.length === 0 && <p className="text-sm text-gray-400">No fee structures</p>}
+                {structures.length === 0 && <p className="text-sm text-gray-400">{t('No fee structure found')}</p>}
                 {structures.map((s: any) => (
                   <label key={s.id} className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
                     <input type="checkbox" checked={bulkForm.fee_structure_ids.includes(s.id)} onChange={() => toggleBulkStructure(s.id)} className="rounded mt-0.5" />
@@ -356,10 +356,10 @@ export function FeeStructurePage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base">3. Invoice Settings</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{t('3. Invoice Settings')}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <Label className="text-xs">Term</Label>
+                  <Label className="text-xs">{t('Term')}</Label>
                   <Select value={bulkForm.term} onChange={e => setBulkForm(f => ({ ...f, term: e.target.value }))}>
                     <option value="term1">Term 1</option>
                     <option value="term2">Term 2</option>
@@ -367,11 +367,11 @@ export function FeeStructurePage() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Academic Year</Label>
+                  <Label className="text-xs">{t('Academic Year')}</Label>
                   <Input value={bulkForm.academic_year} onChange={e => setBulkForm(f => ({ ...f, academic_year: e.target.value }))} />
                 </div>
                 <div>
-                  <Label className="text-xs">Due Date (optional)</Label>
+                  <Label className="text-xs">{t('Due Date (optional)')}</Label>
                   <Input type="date" value={bulkForm.due_date} onChange={e => setBulkForm(f => ({ ...f, due_date: e.target.value }))} />
                 </div>
               </CardContent>
@@ -380,11 +380,11 @@ export function FeeStructurePage() {
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => runBulk(true)} disabled={bulkPreviewing || bulkGenerating}>
                 {bulkPreviewing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
-                Preview
+                {t('Preview')}
               </Button>
               <Button className="flex-1" onClick={() => runBulk(false)} disabled={bulkGenerating || bulkPreviewing || !bulkPreview}>
                 {bulkGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
-                Generate
+                {t('Generate')}
               </Button>
             </div>
             {!bulkPreview && <p className="text-xs text-gray-400 text-center">Preview first to confirm which students will receive invoices, then click Generate.</p>}
@@ -396,7 +396,7 @@ export function FeeStructurePage() {
               <Card>
                 <CardContent className="p-10 text-center">
                   <Users className="h-12 w-12 text-gray-200 mx-auto mb-3" />
-                  <p className="text-gray-400">Configure options on the left and click Preview to see which students will be billed.</p>
+                  <p className="text-gray-400">{t('Configure options on the left and click Preview to see which students will be billed.')}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -406,13 +406,13 @@ export function FeeStructurePage() {
                   <Card className="border-green-200 bg-green-50">
                     <CardContent className="p-4 text-center">
                       <p className="text-2xl font-bold text-green-700">{bulkPreview.created?.length || 0}</p>
-                      <p className="text-xs text-green-600">Will be billed</p>
+                      <p className="text-xs text-green-600">{t('Will be billed')}</p>
                     </CardContent>
                   </Card>
                   <Card className="border-gray-200">
                     <CardContent className="p-4 text-center">
                       <p className="text-2xl font-bold text-gray-600">{bulkPreview.skipped?.length || 0}</p>
-                      <p className="text-xs text-gray-500">Skipped</p>
+                      <p className="text-xs text-gray-500">{t('Skipped')}</p>
                     </CardContent>
                   </Card>
                   <Card className="border-blue-200 bg-blue-50">
@@ -420,7 +420,7 @@ export function FeeStructurePage() {
                       <p className="text-2xl font-bold text-blue-700">
                         {fmt(bulkPreview.created?.reduce((s: number, i: any) => s + Number(i.amount || 0), 0) || 0)}
                       </p>
-                      <p className="text-xs text-blue-600">Total to generate</p>
+                      <p className="text-xs text-blue-600">{t('Total to generate')}</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -428,7 +428,7 @@ export function FeeStructurePage() {
                 {/* Will be billed */}
                 {bulkPreview.created?.length > 0 && (
                   <Card>
-                    <CardHeader><CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Students to be Billed</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> {t('Students to be Billed')}</CardTitle></CardHeader>
                     <CardContent className="p-0">
                       <div className="max-h-64 overflow-y-auto divide-y text-sm">
                         {bulkPreview.created.map((row: any, i: number) => (
@@ -477,7 +477,7 @@ export function FeeStructurePage() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingStructure ? 'Edit Fee Structure' : 'Add Fee Structure'}</DialogTitle>
+            <DialogTitle>{editingStructure ? t('Edit Fee Structure') : t('Add Fee Structure')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
@@ -485,18 +485,18 @@ export function FeeStructurePage() {
               {/* Name & Amount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Fee Name *</Label>
-                  <Input value={formData.name} onChange={e => handleChange('name', e.target.value)} placeholder="e.g., Tuition Fee" required />
+                  <Label>{t('Fee Name')} *</Label>
+                  <Input value={formData.name} onChange={e => handleChange('name', e.target.value)} placeholder={t('e.g., Tuition Fee')} required />
                 </div>
                 <div>
-                  <Label>Amount (KES) *</Label>
+                  <Label>{t('Amount (KES)')} *</Label>
                   <Input type="number" value={formData.amount} onChange={e => handleChange('amount', e.target.value)} placeholder="50000" required />
                 </div>
               </div>
 
               {/* Student Type */}
               <div>
-                <Label>Student Type</Label>
+                <Label>{t('Student Type')}</Label>
                 <div className="flex gap-2 mt-1">
                   {[
                     { value: 'all', label: 'All Students' },
@@ -521,7 +521,7 @@ export function FeeStructurePage() {
               {/* Frequency */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Frequency *</Label>
+                  <Label>{t('Frequency')} *</Label>
                   <Select value={formData.frequency} onChange={e => handleChange('frequency', e.target.value)}>
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly (Per Term)</option>
@@ -531,7 +531,7 @@ export function FeeStructurePage() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Academic Year</Label>
+                  <Label>{t('Academic Year')}</Label>
                   <Input value={formData.academicYear} onChange={e => handleChange('academicYear', e.target.value)} />
                 </div>
               </div>
@@ -542,13 +542,13 @@ export function FeeStructurePage() {
                   onChange={e => handleChange('is_transport_fee', e.target.checked)} className="rounded mt-0.5" />
                 <div className="flex-1">
                   <label htmlFor="is_transport_fee" className="text-sm font-medium cursor-pointer flex items-center gap-1">
-                    <Bus className="h-4 w-4 text-orange-500" /> This is a transport fee
+                    <Bus className="h-4 w-4 text-orange-500" /> {t('This is a transport fee')}
                   </label>
                   {formData.is_transport_fee && (
                     <div className="mt-2">
-                      <Label className="text-xs">Route (optional)</Label>
+                      <Label className="text-xs">{t('Route (optional)')}</Label>
                       <Select value={formData.route_id} onChange={e => handleChange('route_id', e.target.value)}>
-                        <option value="">All routes</option>
+                        <option value="">{t('All routes')}</option>
                         {routes.map((r: any) => (
                           <option key={r.id} value={r.id}>{r.route_name}{r.route_code ? ` (${r.route_code})` : ''} — KES {Number(r.term_fee || 0).toLocaleString()}/term</option>
                         ))}
@@ -560,34 +560,34 @@ export function FeeStructurePage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Apply to Class</Label>
+                  <Label>{t('Apply to Class')}</Label>
                   <Select value={formData.classId} onChange={e => handleChange('classId', e.target.value)}>
-                    <option value="">All Classes</option>
+                    <option value="">{t('All Classes')}</option>
                     {classes.map((cls: any) => (
                       <option key={cls.id} value={cls.id}>{cls.name} {cls.section || ''}</option>
                     ))}
                   </Select>
                 </div>
                 <div>
-                  <Label>Due Day of Month</Label>
+                  <Label>{t('Due Day of Month')}</Label>
                   <Input type="number" min="1" max="28" value={formData.dueDay} onChange={e => handleChange('dueDay', e.target.value)} />
                 </div>
               </div>
 
               <div>
-                <Label>Description</Label>
-                <Input value={formData.description} onChange={e => handleChange('description', e.target.value)} placeholder="Optional description" />
+                <Label>{t('Description')}</Label>
+                <Input value={formData.description} onChange={e => handleChange('description', e.target.value)} placeholder={t('Optional description')} />
               </div>
 
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={formData.isMandatory} onChange={e => handleChange('isMandatory', e.target.checked)} className="rounded" />
-                <span className="text-sm">Mandatory fee</span>
+                <span className="text-sm">{t('Mandatory fee')}</span>
               </label>
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button type="submit">{editingStructure ? 'Update' : 'Create'} Fee Structure</Button>
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>{t('Cancel')}</Button>
+              <Button type="submit">{editingStructure ? t('Update') : t('Create')} {t('Fee Structure')}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

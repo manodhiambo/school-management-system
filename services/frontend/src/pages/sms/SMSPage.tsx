@@ -8,6 +8,7 @@ import {
   MessageSquare, Send, Users, User, Search, CheckCircle2,
   XCircle, Clock, RefreshCw, Phone, BookOpen, AlertCircle
 } from 'lucide-react';
+import { useLanguageStore } from '@/store/languageStore';
 
 type Tab = 'compose' | 'logs' | 'templates';
 
@@ -36,6 +37,7 @@ function charCount(msg: string) {
 }
 
 export function SMSPage() {
+  const { t } = useLanguageStore();
   const [tab, setTab]             = useState<Tab>('compose');
   const [classes, setClasses]     = useState<any[]>([]);
   const [logs, setLogs]           = useState<any[]>([]);
@@ -114,18 +116,18 @@ export function SMSPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">SMS Messaging</h2>
-          <p className="text-gray-500">Send SMS notifications directly to parents and teachers</p>
+          <h2 className="text-3xl font-bold">{t('SMS Messaging')}</h2>
+          <p className="text-gray-500">{t('Send SMS notifications directly to parents and teachers')}</p>
         </div>
         {stats && (
           <div className="flex gap-3 text-sm">
             <div className="text-center px-4 py-2 bg-blue-50 rounded-xl">
               <p className="font-bold text-blue-700">{stats.last_30_days}</p>
-              <p className="text-xs text-gray-500">This month</p>
+              <p className="text-xs text-gray-500">{t('This Month')}</p>
             </div>
             <div className="text-center px-4 py-2 bg-green-50 rounded-xl">
               <p className="font-bold text-green-700">{stats.successful}</p>
-              <p className="text-xs text-gray-500">Delivered</p>
+              <p className="text-xs text-gray-500">{t('Delivered')}</p>
             </div>
           </div>
         )}
@@ -134,9 +136,9 @@ export function SMSPage() {
       {/* Tabs */}
       <div className="flex gap-1 border-b">
         {([
-          { key: 'compose', label: 'Compose', icon: Send },
-          { key: 'templates', label: 'Templates', icon: BookOpen },
-          { key: 'logs', label: 'SMS Logs', icon: Clock },
+          { key: 'compose', label: t('Compose'), icon: Send },
+          { key: 'templates', label: t('Templates'), icon: BookOpen },
+          { key: 'logs', label: t('SMS Logs'), icon: Clock },
         ] as { key: Tab; label: string; icon: any }[]).map(t => {
           const Icon = t.icon;
           return (
@@ -158,11 +160,11 @@ export function SMSPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-5">
             <Card>
-              <CardHeader><CardTitle>Compose Message</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('Compose Message')}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 {/* Target */}
                 <div>
-                  <Label>Send To</Label>
+                  <Label>{t('Send To')}</Label>
                   <div className="grid grid-cols-2 gap-2 mt-1">
                     {TARGET_OPTIONS.map(o => (
                       <button
@@ -181,7 +183,7 @@ export function SMSPage() {
                 {/* Class selector */}
                 {target === 'class_parents' && (
                   <div>
-                    <Label>Select Class</Label>
+                    <Label>{t('Select Class')}</Label>
                     <select
                       value={classId}
                       onChange={e => setClassId(e.target.value)}
@@ -198,7 +200,7 @@ export function SMSPage() {
                 {/* Custom phone */}
                 {target === 'custom' && (
                   <div>
-                    <Label>Phone Number</Label>
+                    <Label>{t('Phone Number')}</Label>
                     <div className="relative mt-1">
                       <Phone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                       <Input
@@ -213,7 +215,7 @@ export function SMSPage() {
 
                 {/* Category */}
                 <div>
-                  <Label>Category</Label>
+                  <Label>{t('Category')}</Label>
                   <select
                     value={category}
                     onChange={e => setCategory(e.target.value)}
@@ -228,9 +230,9 @@ export function SMSPage() {
                 {/* Message */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <Label>Message Text</Label>
+                    <Label>{t('Message Text')}</Label>
                     <span className={`text-xs ${len > 160 ? 'text-amber-600' : 'text-gray-400'}`}>
-                      {len} chars · {smss} SMS
+                      {len} {t('chars')} · {smss} SMS
                     </span>
                   </div>
                   <textarea
@@ -252,7 +254,7 @@ export function SMSPage() {
                   {loading ? (
                     <><div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> Sending…</>
                   ) : (
-                    <><Send className="h-4 w-4 mr-2" /> Send SMS</>
+                    <><Send className="h-4 w-4 mr-2" /> {t('Send SMS')}</>
                   )}
                 </Button>
               </CardContent>
@@ -285,7 +287,7 @@ export function SMSPage() {
           {/* Tips */}
           <div className="space-y-4">
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Quick Tips</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">{t('Quick Tips')}</CardTitle></CardHeader>
               <CardContent className="text-xs text-gray-500 space-y-2">
                 <p>• 160 characters = 1 SMS. Longer messages split automatically.</p>
                 <p>• Use the Templates tab for pre-written messages.</p>
@@ -298,14 +300,14 @@ export function SMSPage() {
 
             {stats && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">SMS Statistics</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">{t('SMS Statistics')}</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                   {[
-                    { label: 'Total sent (all time)', val: stats.total_sent },
-                    { label: 'Successful',            val: stats.successful },
-                    { label: 'Failed',                val: stats.failed    },
-                    { label: 'Last 7 days',           val: stats.last_7_days },
-                    { label: 'Last 30 days',          val: stats.last_30_days },
+                    { label: t('Total sent (all time)'), val: stats.total_sent },
+                    { label: t('Successful'),           val: stats.successful },
+                    { label: t('Failed'),               val: stats.failed    },
+                    { label: t('Last 7 days'),          val: stats.last_7_days },
+                    { label: t('Last 30 days'),         val: stats.last_30_days },
                   ].map(s => (
                     <div key={s.label} className="flex justify-between text-sm">
                       <span className="text-gray-500">{s.label}</span>
@@ -335,7 +337,7 @@ export function SMSPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">{tpl.category}</span>
                   <Button size="sm" variant="outline" onClick={() => applyTemplate(tpl)} className="text-xs">
-                    Use Template
+                    {t('Use Template')}
                   </Button>
                 </div>
               </CardContent>
@@ -349,9 +351,9 @@ export function SMSPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>SMS History</CardTitle>
+              <CardTitle>{t('SMS History')}</CardTitle>
               <Button variant="outline" size="sm" onClick={loadLogs}>
-                <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+                <RefreshCw className="h-4 w-4 mr-1" /> {t('Refresh')}
               </Button>
             </div>
           </CardHeader>
@@ -363,12 +365,12 @@ export function SMSPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-gray-500 text-xs">
-                      <th className="py-2 pr-3">Date</th>
-                      <th className="py-2 pr-3">Sent by</th>
-                      <th className="py-2 pr-3">To</th>
-                      <th className="py-2 pr-3">Category</th>
-                      <th className="py-2 pr-3">Message</th>
-                      <th className="py-2">Status</th>
+                      <th className="py-2 pr-3">{t('Date')}</th>
+                      <th className="py-2 pr-3">{t('Sent by')}</th>
+                      <th className="py-2 pr-3">{t('To')}</th>
+                      <th className="py-2 pr-3">{t('Category')}</th>
+                      <th className="py-2 pr-3">{t('Message')}</th>
+                      <th className="py-2">{t('Status')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -400,7 +402,7 @@ export function SMSPage() {
                       </tr>
                     ))}
                     {logs.length === 0 && (
-                      <tr><td colSpan={6} className="py-8 text-center text-gray-400">No SMS messages sent yet</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-gray-400">{t('No SMS messages sent yet')}</td></tr>
                     )}
                   </tbody>
                 </table>

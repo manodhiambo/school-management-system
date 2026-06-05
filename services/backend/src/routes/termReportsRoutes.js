@@ -47,7 +47,7 @@ router.get('/class/:classId', adminOrStaff, async (req, res) => {
     const classRows = await query(
       `SELECT c.*, u.first_name || ' ' || u.last_name AS teacher_name
        FROM classes c
-       LEFT JOIN users u ON u.id = c.teacher_id
+       LEFT JOIN users u ON u.id = c.class_teacher_id
        WHERE c.id = $1 AND c.tenant_id = $2`,
       [classId, tid]
     );
@@ -72,13 +72,11 @@ router.get('/class/:classId', adminOrStaff, async (req, res) => {
                 COUNT(*) AS total_days
          FROM attendance a
          WHERE a.student_id = s.id AND a.tenant_id = s.tenant_id
-           AND ($1::text IS NULL OR a.term = $1)
-           AND ($2::text IS NULL OR a.academic_year = $2)
        ) att_stats ON TRUE
        LEFT JOIN LATERAL (
-         SELECT ROUND(AVG(r.marks), 1) AS avg_marks,
+         SELECT ROUND(AVG(r.marks_obtained), 1) AS avg_marks,
                 COUNT(DISTINCT r.exam_id) AS exam_count
-         FROM offline_results r
+         FROM exam_results r
          JOIN exams e ON e.id = r.exam_id
          WHERE r.student_id = s.id AND r.tenant_id = s.tenant_id
            AND e.is_results_published = TRUE
@@ -140,7 +138,7 @@ router.get('/student/:studentId', async (req, res) => {
       `SELECT s.*,
               s.first_name || ' ' || s.last_name AS full_name,
               c.name AS class_name,
-              c.grade_level
+              c.education_level
        FROM students s
        LEFT JOIN classes c ON c.id = s.class_id
        WHERE s.id = $1 AND s.tenant_id = $2`,
@@ -156,10 +154,8 @@ router.get('/student/:studentId', async (req, res) => {
               COUNT(*) FILTER (WHERE status = 'late') AS late,
               COUNT(*) AS total
        FROM attendance
-       WHERE student_id = $1 AND tenant_id = $2
-         AND ($3::text IS NULL OR term = $3)
-         AND ($4::text IS NULL OR academic_year = $4)`,
-      [studentId, tid, term || null, academic_year || null]
+       WHERE student_id = $1 AND tenant_id = $2`,
+      [studentId, tid]
     );
     const att = attRows[0];
     const attendance = {
@@ -173,8 +169,8 @@ router.get('/student/:studentId', async (req, res) => {
     // Subject performance (latest marks per subject from published exams)
     const subjectRows = await query(
       `SELECT DISTINCT ON (r.subject_id)
-              sub.name AS subject, r.marks, r.grade, e.name AS exam_name, e.term
-       FROM offline_results r
+              sub.name AS subject, r.marks_obtained AS marks, r.cbc_grade AS grade, e.name AS exam_name, e.term
+       FROM exam_results r
        JOIN subjects sub ON sub.id = r.subject_id
        JOIN exams e ON e.id = r.exam_id
        WHERE r.student_id = $1 AND r.tenant_id = $2
@@ -262,10 +258,8 @@ router.get('/school-summary', adminOrStaff, async (req, res) => {
          COUNT(*) FILTER (WHERE a.status = 'present') * 100.0 / NULLIF(COUNT(*), 0), 1
        ) AS avg_attendance_pct
        FROM attendance a
-       WHERE a.tenant_id = $1
-         AND ($2::text IS NULL OR a.term = $2)
-         AND ($3::text IS NULL OR a.academic_year = $3)`,
-      [tid, term || null, academic_year || null]
+       WHERE a.tenant_id = $1`,
+      [tid]
     );
 
     // Fee collected vs outstanding
@@ -294,17 +288,17 @@ router.get('/school-summary', adminOrStaff, async (req, res) => {
 
     // Top performing classes
     const classRows = await query(
-      `SELECT c.name AS class_name, c.grade_level,
-              ROUND(AVG(r.marks), 1) AS avg_marks,
+      `SELECT c.name AS class_name, c.education_level,
+              ROUND(AVG(r.marks_obtained), 1) AS avg_marks,
               COUNT(DISTINCT r.student_id) AS student_count
-       FROM offline_results r
+       FROM exam_results r
        JOIN students s ON s.id = r.student_id
        JOIN classes c ON c.id = s.class_id
        JOIN exams e ON e.id = r.exam_id
        WHERE r.tenant_id = $1 AND e.is_results_published = TRUE
          AND ($2::text IS NULL OR e.term = $2)
          AND ($3::text IS NULL OR e.academic_year = $3)
-       GROUP BY c.id, c.name, c.grade_level
+       GROUP BY c.id, c.name, c.education_level
        ORDER BY avg_marks DESC
        LIMIT 10`,
       [tid, term || null, academic_year || null]
@@ -339,7 +333,7 @@ router.post('/generate-all', adminOrStaff, async (req, res) => {
 
     // Get all active classes
     const classes = await query(
-      `SELECT id, name, grade_level FROM classes WHERE tenant_id = $1 ORDER BY name`,
+      `SELECT id, name, education_level FROM classes WHERE tenant_id = $1 ORDER BY name`,
       [tid]
     );
 
@@ -364,12 +358,11 @@ router.post('/generate-all', adminOrStaff, async (req, res) => {
                     COUNT(*) AS total_days
              FROM attendance a
              WHERE a.student_id = s.id AND a.tenant_id = s.tenant_id
-               AND a.term = $1 AND a.academic_year = $2
            ) att_stats ON TRUE
            LEFT JOIN LATERAL (
-             SELECT ROUND(AVG(r.marks), 1) AS avg_marks,
+             SELECT ROUND(AVG(r.marks_obtained), 1) AS avg_marks,
                     COUNT(DISTINCT r.exam_id) AS exam_count
-             FROM offline_results r
+             FROM exam_results r
              JOIN exams e ON e.id = r.exam_id
              WHERE r.student_id = s.id AND r.tenant_id = s.tenant_id
                AND e.is_results_published = TRUE
@@ -383,7 +376,7 @@ router.post('/generate-all', adminOrStaff, async (req, res) => {
         const reportData = {
           class_id: cls.id,
           class_name: cls.name,
-          grade_level: cls.grade_level,
+          education_level: cls.education_level,
           term,
           academic_year,
           student_count: studentRows.length,

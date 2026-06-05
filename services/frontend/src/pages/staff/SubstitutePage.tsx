@@ -84,12 +84,19 @@ export function SubstitutePage() {
       setFormError('A teacher cannot substitute for themselves.');
       return;
     }
-    if (!form.absent_teacher_id || !form.substitute_teacher_id || !form.date || !form.period) {
+    if (!form.absent_teacher_id || !form.substitute_teacher_id || !form.date) {
       setFormError('Please fill in all required fields.');
       return;
     }
     try {
-      await (api as any).createSubstitute(form);
+      await (api as any).createSubstitute({
+        absent_teacher: form.absent_teacher_id,
+        substitute: form.substitute_teacher_id,
+        assignment_date: form.date,
+        class_id: form.class_id || null,
+        period: form.period || null,
+        reason: form.reason || null,
+      });
       toast({ title: 'Substitute assignment created' });
       setShowForm(false);
       setForm({ ...EMPTY_FORM });

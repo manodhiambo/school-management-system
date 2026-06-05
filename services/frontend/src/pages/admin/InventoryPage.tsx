@@ -7,8 +7,10 @@ import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import {
   Package, Tag, ArrowLeftRight, AlertTriangle,
-  Plus, Edit2, X, RefreshCw, TrendingDown
+  Plus, Edit2, X, RefreshCw, TrendingDown, Download
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type Tab = 'items' | 'categories' | 'transactions' | 'lowstock';
 type TxType = 'stock_in' | 'stock_out' | 'damaged' | 'adjustment';

@@ -57,13 +57,22 @@ import { TeacherMyAttendancePage } from './pages/teacher/TeacherMyAttendancePage
 // New Feature Pages (20 features)
 import { AnnouncementsPage } from './pages/announcements/AnnouncementsPage';
 import { AuditLogPage } from './pages/admin/AuditLogPage';
-import { ExamAnalyticsPage } from './pages/academic/ExamAnalyticsPage';
+import { FeeRemindersPage } from './pages/admin/FeeRemindersPage';
+import { InventoryPage } from './pages/admin/InventoryPage';
+import { TermReportsPage } from './pages/admin/TermReportsPage';
 import { NemisPage } from './pages/admin/NemisPage';
+import { ExamAnalyticsPage } from './pages/academic/ExamAnalyticsPage';
 import { MeetingsPage } from './pages/meetings/MeetingsPage';
 import { PayrollPage } from './pages/payroll/PayrollPage';
 import { AppraisalPage } from './pages/staff/AppraisalPage';
+import { SubstitutePage } from './pages/staff/SubstitutePage';
 import { BursaryPage } from './pages/finance/BursaryPage';
 import { CanteenPage } from './pages/welfare/CanteenPage';
+import { CounselingPage } from './pages/welfare/CounselingPage';
+import { HostelManagementPage } from './pages/welfare/HostelManagementPage';
+import { WhatsAppPage } from './pages/communication/WhatsAppPage';
+import { SmsKeywordsPage } from './pages/communication/SmsKeywordsPage';
+import { PortfolioPage } from './pages/student/PortfolioPage';
 
 // Library Pages
 import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
@@ -218,16 +227,25 @@ function App() {
               <Route path="teacher-exams" element={<TeacherExamsPage />} />
               <Route path="my-checkin" element={<TeacherMyAttendancePage />} />
 
-              {/* New Feature Routes — 20 features */}
+              {/* New Feature Routes — all 20 features */}
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
-              <Route path="exam-analytics" element={<ExamAnalyticsPage />} />
+              <Route path="fee-reminders" element={<FeeRemindersPage />} />
+              <Route path="inventory" element={<InventoryPage />} />
+              <Route path="term-reports" element={<TermReportsPage />} />
               <Route path="nemis" element={<NemisPage />} />
+              <Route path="exam-analytics" element={<ExamAnalyticsPage />} />
               <Route path="meetings" element={<MeetingsPage />} />
               <Route path="payroll" element={<PayrollPage />} />
               <Route path="appraisals" element={<AppraisalPage />} />
+              <Route path="substitutes" element={<SubstitutePage />} />
               <Route path="bursary" element={<BursaryPage />} />
               <Route path="canteen" element={<CanteenPage />} />
+              <Route path="counseling" element={<CounselingPage />} />
+              <Route path="hostel-management" element={<HostelManagementPage />} />
+              <Route path="whatsapp" element={<WhatsAppPage />} />
+              <Route path="sms-keywords" element={<SmsKeywordsPage />} />
+              <Route path="portfolio" element={<PortfolioPage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />

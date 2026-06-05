@@ -1,0 +1,20 @@
+{
+  "name": "SkulManager",
+  "short_name": "SkulManager",
+  "description": "Kenya CBE School Management System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#4f46e5",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "lang": "en",
+  "icons": [
+    { "src": "/vite.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable any" }
+  ],
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    { "name": "Dashboard",  "url": "/app/dashboard",   "description": "Go to dashboard"   },
+    { "name": "Attendance", "url": "/app/attendance",  "description": "Mark attendance"    },
+    { "name": "My Exams",   "url": "/app/my-exams",    "description": "View your exams"    }
+  ]
+}

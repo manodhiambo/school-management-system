@@ -7,6 +7,7 @@ import {
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import api from '@/services/api';
+import { LanguageToggle } from '@/components/LanguageToggle';
 
 const pageTitles: Record<string, string> = {
   '/app/dashboard':               'Dashboard',
@@ -208,6 +209,11 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* ── Right ── */}
       <div className="flex items-center gap-1">
+
+        {/* Language Toggle */}
+        <div className="hidden sm:block mr-1">
+          <LanguageToggle />
+        </div>
 
         {/* Bell */}
         <div className="relative" ref={notifRef}>

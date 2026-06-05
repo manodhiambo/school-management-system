@@ -143,6 +143,43 @@ const navigationItems: NavItem[] = [
   { name: 'SMS Messaging',      href: '/app/sms',                icon: MessageCircle, roles: ['admin', 'teacher'],                   section: 'Messages' },
   { name: 'My Transport',       href: '/app/my-transport',       icon: Bus,           roles: ['parent'],                             section: 'Family' },
 
+  // ── Announcements ─────────────────────────────────────────────────────────
+  { name: 'Announcements',      href: '/app/announcements',      icon: Bell,          roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer'], section: 'Messages' },
+
+  // ── Parent-Teacher Meetings ───────────────────────────────────────────────
+  { name: 'P-T Meetings',       href: '/app/meetings',           icon: CalendarDays,  roles: ['admin', 'teacher', 'parent'],         section: 'Schedule' },
+
+  // ── Welfare Extended ─────────────────────────────────────────────────────
+  { name: 'Counseling',         href: '/app/counseling',         icon: Heart,         roles: ['admin', 'teacher'],                   section: 'Welfare' },
+  { name: 'Hostel Management',  href: '/app/hostel-management',  icon: Building2,     roles: ['admin'],                              section: 'Welfare' },
+  { name: 'Canteen',            href: '/app/canteen',            icon: Star,          roles: ['admin', 'finance_officer'],           section: 'Welfare' },
+  { name: 'Canteen Balance',    href: '/app/canteen',            icon: DollarSign,    roles: ['student'],                            section: 'Welfare' },
+
+  // ── HR & Staff Extended ───────────────────────────────────────────────────
+  { name: 'Payroll',            href: '/app/payroll',            icon: Wallet,        roles: ['admin', 'finance_officer'],           section: 'Finance' },
+  { name: 'My Payslips',        href: '/app/payroll',            icon: Receipt,       roles: ['teacher'],                            section: 'Account' },
+  { name: 'Appraisals',         href: '/app/appraisals',         icon: Award,         roles: ['admin'],                              section: 'People' },
+  { name: 'My Appraisal',       href: '/app/appraisals',         icon: Award,         roles: ['teacher'],                            section: 'Account' },
+  { name: 'Substitutes',        href: '/app/substitutes',        icon: Users,         roles: ['admin', 'teacher'],                   section: 'People' },
+
+  // ── Finance Extended ──────────────────────────────────────────────────────
+  { name: 'Fee Reminders',      href: '/app/fee-reminders',      icon: Bell,          roles: ['admin', 'finance_officer'],           section: 'Finance' },
+  { name: 'Bursary',            href: '/app/bursary',            icon: Star,          roles: ['admin', 'finance_officer'],           section: 'Finance' },
+  { name: 'Inventory',          href: '/app/inventory',          icon: ListChecks,    roles: ['admin'],                              section: 'Finance' },
+
+  // ── Academics Extended ────────────────────────────────────────────────────
+  { name: 'Exam Analytics',     href: '/app/exam-analytics',     icon: BarChart2,     roles: ['admin', 'teacher'],                   section: 'Academic' },
+  { name: 'Term Reports',       href: '/app/term-reports',       icon: FileText,      roles: ['admin'],                              section: 'Academic' },
+  { name: 'NEMIS Export',       href: '/app/nemis',              icon: Globe,         roles: ['admin'],                              section: 'Academic' },
+  { name: 'My Portfolio',       href: '/app/portfolio',          icon: FolderOpen,    roles: ['student'],                            section: 'Academic' },
+
+  // ── Communication Extended ────────────────────────────────────────────────
+  { name: 'WhatsApp',           href: '/app/whatsapp',           icon: MessageCircle, roles: ['admin'],                              section: 'Messages' },
+  { name: 'Two-Way SMS',        href: '/app/sms-keywords',       icon: MessageSquare, roles: ['admin'],                              section: 'Messages' },
+
+  // ── Admin Tools ───────────────────────────────────────────────────────────
+  { name: 'Audit Log',          href: '/app/audit-log',          icon: ClipboardList, roles: ['admin'],                              section: 'Account' },
+
   // ── Library ───────────────────────────────────────────────────────────────
   { name: 'Library Catalog',    href: '/app/library',            icon: Library,  roles: ['admin', 'teacher', 'student', 'parent'], section: 'Library' },
   { name: 'My Borrowed Books',  href: '/app/my-books',           icon: BookOpen, roles: ['teacher', 'student'],                    section: 'Library' },

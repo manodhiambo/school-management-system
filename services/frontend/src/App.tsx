@@ -54,6 +54,17 @@ import { GradeBookPage } from './pages/teacher/GradeBookPage';
 import { TeacherExamsPage } from './pages/teacher/TeacherExamsPage';
 import { TeacherMyAttendancePage } from './pages/teacher/TeacherMyAttendancePage';
 
+// New Feature Pages (20 features)
+import { AnnouncementsPage } from './pages/announcements/AnnouncementsPage';
+import { AuditLogPage } from './pages/admin/AuditLogPage';
+import { ExamAnalyticsPage } from './pages/academic/ExamAnalyticsPage';
+import { NemisPage } from './pages/admin/NemisPage';
+import { MeetingsPage } from './pages/meetings/MeetingsPage';
+import { PayrollPage } from './pages/payroll/PayrollPage';
+import { AppraisalPage } from './pages/staff/AppraisalPage';
+import { BursaryPage } from './pages/finance/BursaryPage';
+import { CanteenPage } from './pages/welfare/CanteenPage';
+
 // Library Pages
 import { LibraryCatalogPage } from './pages/library/LibraryCatalogPage';
 import { MyBorrowingsPage } from './pages/library/MyBorrowingsPage';
@@ -206,6 +217,17 @@ function App() {
               <Route path="gradebook" element={<GradeBookPage />} />
               <Route path="teacher-exams" element={<TeacherExamsPage />} />
               <Route path="my-checkin" element={<TeacherMyAttendancePage />} />
+
+              {/* New Feature Routes — 20 features */}
+              <Route path="announcements" element={<AnnouncementsPage />} />
+              <Route path="audit-log" element={<AuditLogPage />} />
+              <Route path="exam-analytics" element={<ExamAnalyticsPage />} />
+              <Route path="nemis" element={<NemisPage />} />
+              <Route path="meetings" element={<MeetingsPage />} />
+              <Route path="payroll" element={<PayrollPage />} />
+              <Route path="appraisals" element={<AppraisalPage />} />
+              <Route path="bursary" element={<BursaryPage />} />
+              <Route path="canteen" element={<CanteenPage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />

@@ -51,6 +51,25 @@ import driverRoutes from './routes/driverRoutes.js';
 import teacherCheckinRoutes from './routes/teacherCheckinRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
 import gateRoutes from './routes/gateRoutes.js';
+import meetingsRoutes from './routes/meetingsRoutes.js';
+import payrollRoutes from './routes/payrollRoutes.js';
+import appraisalRoutes from './routes/appraisalRoutes.js';
+import substituteRoutes from './routes/substituteRoutes.js';
+import counselingRoutes from './routes/counselingRoutes.js';
+import announcementsRoutes from './routes/announcementsRoutes.js';
+import auditLogRoutes from './routes/auditLogRoutes.js';
+import feeReminderRoutes from './routes/feeReminderRoutes.js';
+import examAnalyticsRoutes from './routes/examAnalyticsRoutes.js';
+import nemisRoutes from './routes/nemisRoutes.js';
+import hostelMgmtRoutes from './routes/hostelMgmtRoutes.js';
+import canteenRoutes from './routes/canteenRoutes.js';
+import bursaryRoutes from './routes/bursaryRoutes.js';
+import inventoryRoutes from './routes/inventoryRoutes.js';
+import whatsappRoutes from './routes/whatsappRoutes.js';
+import smsKeywordRoutes from './routes/smsKeywordRoutes.js';
+import portfolioRoutes from './routes/portfolioRoutes.js';
+import termReportsRoutes from './routes/termReportsRoutes.js';
+import preferencesRoutes from './routes/preferencesRoutes.js';
 
 dotenv.config();
 
@@ -135,6 +154,33 @@ app.use('/api/v1/driver', driverRoutes);
 app.use('/api/v1/checkin', teacherCheckinRoutes);
 app.use('/api/v1/sms', smsRoutes);
 app.use('/api/v1/gate', gateRoutes);
+
+// Parent-Teacher Meetings, Payroll, Appraisals, Substitutes, Counseling
+app.use('/api/v1/meetings', meetingsRoutes);
+app.use('/api/v1/payroll', payrollRoutes);
+app.use('/api/v1/appraisals', appraisalRoutes);
+app.use('/api/v1/substitutes', substituteRoutes);
+app.use('/api/v1/counseling', counselingRoutes);
+
+// New features: Announcements, Audit Log, Fee Reminders, Exam Analytics, NEMIS
+app.use('/api/v1/announcements', announcementsRoutes);
+app.use('/api/v1/audit-log', auditLogRoutes);
+app.use('/api/v1/fee-reminders', feeReminderRoutes);
+app.use('/api/v1/exam-analytics', examAnalyticsRoutes);
+app.use('/api/v1/nemis', nemisRoutes);
+
+// Hostel Management, Canteen, Bursary, Inventory
+app.use('/api/v1/hostel-mgmt', hostelMgmtRoutes);
+app.use('/api/v1/canteen', canteenRoutes);
+app.use('/api/v1/bursary', bursaryRoutes);
+app.use('/api/v1/inventory', inventoryRoutes);
+
+// WhatsApp, Two-Way SMS, Portfolio, Term Reports, Preferences
+app.use('/api/v1/whatsapp', whatsappRoutes);
+app.use('/api/v1/sms-keywords', smsKeywordRoutes);
+app.use('/api/v1/portfolio', portfolioRoutes);
+app.use('/api/v1/term-reports', termReportsRoutes);
+app.use('/api/v1/preferences', preferencesRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', schoolRegistrationRoutes);

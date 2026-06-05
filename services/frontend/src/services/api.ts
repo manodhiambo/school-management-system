@@ -472,12 +472,12 @@ class ApiService {
     return this.api.post('/timetable/substitute', data);
   }
 
-  // Communication
-  getAnnouncements(params?: any) {
+  // Communication (legacy)
+  getCommunicationAnnouncements(params?: any) {
     return this.api.get('/communication/announcements', { params });
   }
 
-  createAnnouncement(data: any) {
+  createCommunicationAnnouncement(data: any) {
     return this.api.post('/communication/announcements', data);
   }
 
@@ -1423,6 +1423,175 @@ class ApiService {
   reviewStaffLeaveRequest(id: string, data: any) { return this.api.put('/staff-leave/' + id + '/review', data); }
   cancelStaffLeaveRequest(id: string) { return this.api.put('/staff-leave/' + id + '/cancel', {}); }
   deleteStaffLeaveRequest(id: string) { return this.api.delete('/staff-leave/' + id); }
+
+  // ── Announcements ──────────────────────────────────────────────────────────
+  getAnnouncements(params?: any) { return this.api.get('/announcements', { params }); }
+  createAnnouncement(data: any) { return this.api.post('/announcements', data); }
+  updateAnnouncement(id: string, data: any) { return this.api.put('/announcements/' + id, data); }
+  deleteAnnouncement(id: string) { return this.api.delete('/announcements/' + id); }
+  markAnnouncementRead(id: string) { return this.api.post('/announcements/' + id + '/read', {}); }
+  getUnreadAnnouncementCount() { return this.api.get('/announcements/unread-count'); }
+
+  // ── Audit Log ─────────────────────────────────────────────────────────────
+  getAuditLog(params?: any) { return this.api.get('/audit-log', { params }); }
+  getAuditActions() { return this.api.get('/audit-log/actions'); }
+  getAuditSummary() { return this.api.get('/audit-log/summary'); }
+
+  // ── Fee Reminders ─────────────────────────────────────────────────────────
+  getFeeReminderConfig() { return this.api.get('/fee-reminders/config'); }
+  saveFeeReminderConfig(data: any) { return this.api.put('/fee-reminders/config', data); }
+  sendFeeRemindersNow() { return this.api.post('/fee-reminders/send-now', {}); }
+  getFeeReminderLog(params?: any) { return this.api.get('/fee-reminders/log', { params }); }
+  getFeeReminderStats() { return this.api.get('/fee-reminders/stats'); }
+
+  // ── Exam Analytics ────────────────────────────────────────────────────────
+  getExamAnalyticsSummary(examId: string) { return this.api.get('/exam-analytics/exam/' + examId + '/summary'); }
+  getExamClassComparison(examId: string) { return this.api.get('/exam-analytics/exam/' + examId + '/class-comparison'); }
+  getStudentPerformance(studentId: string) { return this.api.get('/exam-analytics/student/' + studentId + '/performance'); }
+  getClassReport(classId: string) { return this.api.get('/exam-analytics/class/' + classId + '/report'); }
+  getSubjectTrends(subjectId: string) { return this.api.get('/exam-analytics/subject/' + subjectId + '/trends'); }
+
+  // ── NEMIS ─────────────────────────────────────────────────────────────────
+  getNemisConfig() { return this.api.get('/nemis/config'); }
+  saveNemisConfig(data: any) { return this.api.put('/nemis/config', data); }
+  getNemisValidation() { return this.api.get('/nemis/validate'); }
+  getNemisExport() { return this.api.get('/nemis/export/students'); }
+  getNemisExportCSV() { return this.api.get('/nemis/export/students/csv', { responseType: 'blob' }); }
+
+  // ── Parent-Teacher Meetings ───────────────────────────────────────────────
+  getPTMSlots(params?: any) { return this.api.get('/meetings/slots', { params }); }
+  createPTMSlot(data: any) { return this.api.post('/meetings/slots', data); }
+  deletePTMSlot(id: string) { return this.api.delete('/meetings/slots/' + id); }
+  bookPTMSlot(slotId: string, data: any) { return this.api.post('/meetings/book/' + slotId, data); }
+  getPTMBookings(params?: any) { return this.api.get('/meetings/bookings', { params }); }
+  updatePTMBooking(id: string, data: any) { return this.api.put('/meetings/bookings/' + id + '/status', data); }
+  cancelPTMBooking(id: string) { return this.api.delete('/meetings/bookings/' + id + '/cancel'); }
+
+  // ── Payroll ───────────────────────────────────────────────────────────────
+  getSalaryStructures() { return this.api.get('/payroll/structures'); }
+  createSalaryStructure(data: any) { return this.api.post('/payroll/structures', data); }
+  updateSalaryStructure(id: string, data: any) { return this.api.put('/payroll/structures/' + id, data); }
+  deleteSalaryStructure(id: string) { return this.api.delete('/payroll/structures/' + id); }
+  getStaffAssignments() { return this.api.get('/payroll/assignments'); }
+  assignSalaryStructure(userId: string, data: any) { return this.api.put('/payroll/assignments/' + userId, data); }
+  getPayrollRuns() { return this.api.get('/payroll/runs'); }
+  createPayrollRun(data: any) { return this.api.post('/payroll/runs', data); }
+  processPayrollRun(id: string) { return this.api.post('/payroll/runs/' + id + '/process', {}); }
+  approvePayrollRun(id: string) { return this.api.put('/payroll/runs/' + id + '/approve', {}); }
+  markPayrollPaid(id: string) { return this.api.put('/payroll/runs/' + id + '/mark-paid', {}); }
+  getRunPayslips(runId: string) { return this.api.get('/payroll/runs/' + runId + '/payslips'); }
+  getMyPayslips() { return this.api.get('/payroll/my-payslips'); }
+
+  // ── Staff Appraisals ──────────────────────────────────────────────────────
+  getAppraisalTemplates() { return this.api.get('/appraisals/templates'); }
+  createAppraisalTemplate(data: any) { return this.api.post('/appraisals/templates', data); }
+  updateAppraisalTemplate(id: string, data: any) { return this.api.put('/appraisals/templates/' + id, data); }
+  deleteAppraisalTemplate(id: string) { return this.api.delete('/appraisals/templates/' + id); }
+  getAppraisals(params?: any) { return this.api.get('/appraisals', { params }); }
+  createAppraisal(data: any) { return this.api.post('/appraisals', data); }
+  updateAppraisal(id: string, data: any) { return this.api.put('/appraisals/' + id, data); }
+  submitAppraisal(id: string) { return this.api.put('/appraisals/' + id + '/submit', {}); }
+  acknowledgeAppraisal(id: string) { return this.api.put('/appraisals/' + id + '/acknowledge', {}); }
+
+  // ── Substitute Teachers ───────────────────────────────────────────────────
+  getSubstitutes(params?: any) { return this.api.get('/substitutes', { params }); }
+  createSubstitute(data: any) { return this.api.post('/substitutes', data); }
+  updateSubstituteStatus(id: string, data: any) { return this.api.put('/substitutes/' + id + '/status', data); }
+  getAvailableTeachers(date: string) { return this.api.get('/substitutes/available-teachers', { params: { date } }); }
+
+  // ── Counseling ────────────────────────────────────────────────────────────
+  getCounselingSessions(params?: any) { return this.api.get('/counseling/sessions', { params }); }
+  createCounselingSession(data: any) { return this.api.post('/counseling/sessions', data); }
+  updateCounselingSession(id: string, data: any) { return this.api.put('/counseling/sessions/' + id, data); }
+  resolveCounselingSession(id: string, data: any) { return this.api.put('/counseling/sessions/' + id + '/resolve', data); }
+  getInterventions(params?: any) { return this.api.get('/counseling/interventions', { params }); }
+  createIntervention(data: any) { return this.api.post('/counseling/interventions', data); }
+  updateIntervention(id: string, data: any) { return this.api.put('/counseling/interventions/' + id, data); }
+  resolveIntervention(id: string, data: any) { return this.api.put('/counseling/interventions/' + id + '/resolve', data); }
+  getStudentCounselingHistory(studentId: string) { return this.api.get('/counseling/student/' + studentId); }
+  getCounselingDashboard() { return this.api.get('/counseling/dashboard'); }
+
+  // ── Hostel Management ─────────────────────────────────────────────────────
+  getHostels() { return this.api.get('/hostel-mgmt/hostels'); }
+  createHostel(data: any) { return this.api.post('/hostel-mgmt/hostels', data); }
+  getHostelRooms(hostelId: string) { return this.api.get('/hostel-mgmt/hostels/' + hostelId + '/rooms'); }
+  addHostelRoom(hostelId: string, data: any) { return this.api.post('/hostel-mgmt/hostels/' + hostelId + '/rooms', data); }
+  getAllocations(params?: any) { return this.api.get('/hostel-mgmt/allocations', { params }); }
+  allocateStudent(data: any) { return this.api.post('/hostel-mgmt/allocations', data); }
+  checkoutStudent(id: string) { return this.api.put('/hostel-mgmt/allocations/' + id + '/checkout', {}); }
+  getMovements(params?: any) { return this.api.get('/hostel-mgmt/movements', { params }); }
+  logMovement(data: any) { return this.api.post('/hostel-mgmt/movements', data); }
+  approveMovement(id: string) { return this.api.put('/hostel-mgmt/movements/' + id + '/approve', {}); }
+  returnMovement(id: string) { return this.api.put('/hostel-mgmt/movements/' + id + '/return', {}); }
+  getHostelOccupancy() { return this.api.get('/hostel-mgmt/occupancy'); }
+
+  // ── Canteen ───────────────────────────────────────────────────────────────
+  getMealPlans() { return this.api.get('/canteen/meal-plans'); }
+  createMealPlan(data: any) { return this.api.post('/canteen/meal-plans', data); }
+  updateMealPlan(id: string, data: any) { return this.api.put('/canteen/meal-plans/' + id, data); }
+  getCanteenAccounts() { return this.api.get('/canteen/accounts'); }
+  getStudentCanteenAccount(studentId: string) { return this.api.get('/canteen/accounts/student/' + studentId); }
+  topUpCanteen(data: any) { return this.api.post('/canteen/accounts/topup', data); }
+  canteenPurchase(data: any) { return this.api.post('/canteen/accounts/purchase', data); }
+  getCanteenStock() { return this.api.get('/canteen/stock'); }
+  addCanteenStock(data: any) { return this.api.post('/canteen/stock', data); }
+  adjustCanteenStock(id: string, data: any) { return this.api.post('/canteen/stock/' + id + '/adjust', data); }
+  getCanteenDailyReport(date?: string) { return this.api.get('/canteen/reports/daily', { params: { date } }); }
+
+  // ── Bursary ───────────────────────────────────────────────────────────────
+  getBursaryFunders() { return this.api.get('/bursary/funders'); }
+  createBursaryFunder(data: any) { return this.api.post('/bursary/funders', data); }
+  updateBursaryFunder(id: string, data: any) { return this.api.put('/bursary/funders/' + id, data); }
+  getBursaries(params?: any) { return this.api.get('/bursary/bursaries', { params }); }
+  createBursary(data: any) { return this.api.post('/bursary/bursaries', data); }
+  updateBursary(id: string, data: any) { return this.api.put('/bursary/bursaries/' + id, data); }
+  getBursaryApplications(params?: any) { return this.api.get('/bursary/applications', { params }); }
+  createBursaryApplication(data: any) { return this.api.post('/bursary/applications', data); }
+  reviewBursaryApplication(id: string, data: any) { return this.api.put('/bursary/applications/' + id + '/review', data); }
+  disburseBursary(id: string) { return this.api.put('/bursary/applications/' + id + '/disburse', {}); }
+  getBursaryStats() { return this.api.get('/bursary/stats'); }
+
+  // ── Inventory ─────────────────────────────────────────────────────────────
+  getInventoryCategories() { return this.api.get('/inventory/categories'); }
+  createInventoryCategory(data: any) { return this.api.post('/inventory/categories', data); }
+  updateInventoryCategory(id: string, data: any) { return this.api.put('/inventory/categories/' + id, data); }
+  getInventoryItems(params?: any) { return this.api.get('/inventory/items', { params }); }
+  createInventoryItem(data: any) { return this.api.post('/inventory/items', data); }
+  updateInventoryItem(id: string, data: any) { return this.api.put('/inventory/items/' + id, data); }
+  inventoryTransaction(id: string, data: any) { return this.api.post('/inventory/items/' + id + '/transaction', data); }
+  getLowStockItems() { return this.api.get('/inventory/low-stock'); }
+  getInventoryValuation() { return this.api.get('/inventory/valuation'); }
+
+  // ── WhatsApp ──────────────────────────────────────────────────────────────
+  getWhatsAppConfig() { return this.api.get('/whatsapp/config'); }
+  saveWhatsAppConfig(data: any) { return this.api.put('/whatsapp/config', data); }
+  testWhatsApp(data: any) { return this.api.post('/whatsapp/test', data); }
+  sendWhatsApp(data: any) { return this.api.post('/whatsapp/send', data); }
+  getWhatsAppLog(params?: any) { return this.api.get('/whatsapp/log', { params }); }
+
+  // ── SMS Keywords (Two-Way) ────────────────────────────────────────────────
+  getSmsKeywords() { return this.api.get('/sms-keywords/keywords'); }
+  createSmsKeyword(data: any) { return this.api.post('/sms-keywords/keywords', data); }
+  updateSmsKeyword(id: string, data: any) { return this.api.put('/sms-keywords/keywords/' + id, data); }
+  getInboundSmsLog() { return this.api.get('/sms-keywords/inbound-log'); }
+
+  // ── Portfolio ─────────────────────────────────────────────────────────────
+  getPortfolioItems(studentId: string) { return this.api.get('/portfolio/student/' + studentId); }
+  addPortfolioItem(studentId: string, data: any) { return this.api.post('/portfolio/student/' + studentId, data); }
+  updatePortfolioItem(id: string, data: any) { return this.api.put('/portfolio/' + id, data); }
+  deletePortfolioItem(id: string) { return this.api.delete('/portfolio/' + id); }
+  togglePortfolioFeature(id: string) { return this.api.put('/portfolio/' + id + '/feature', {}); }
+  getPortfolioSummary(studentId: string) { return this.api.get('/portfolio/student/' + studentId + '/summary'); }
+
+  // ── Term Reports ──────────────────────────────────────────────────────────
+  getTermReportClass(classId: string, params?: any) { return this.api.get('/term-reports/class/' + classId, { params }); }
+  getTermReportStudent(studentId: string, params?: any) { return this.api.get('/term-reports/student/' + studentId, { params }); }
+  getTermReportSummary(params?: any) { return this.api.get('/term-reports/school-summary', { params }); }
+  generateAllTermReports(data: any) { return this.api.post('/term-reports/generate-all', data); }
+
+  // ── User Preferences ──────────────────────────────────────────────────────
+  getUserPreference() { return this.api.get('/preferences'); }
+  saveUserPreference(data: any) { return this.api.put('/preferences', data); }
 
 }
 

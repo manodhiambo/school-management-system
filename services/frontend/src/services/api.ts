@@ -71,6 +71,10 @@ class ApiService {
             window.location.href = '/login';
           }
         }
+        if (error.response?.status === 403) {
+          const msg = error.response.data?.message || 'You do not have permission to access this resource.';
+          window.dispatchEvent(new CustomEvent('api:forbidden', { detail: { message: msg } }));
+        }
         throw error.response?.data || error;
       }
     );
@@ -1183,7 +1187,7 @@ class ApiService {
   teacherCheckout(data: any) { return this.api.post('/checkin/checkout', data); }
   getMyCheckinStatus(params?: any) { return this.api.get('/checkin/my-status', { params }); }
   getTeacherCheckins(params?: any) { return this.api.get('/checkin/today', { params }); }
-  getTeacherCheckinHistory(params?: any) { return this.api.get('/checkin/history', { params }); }
+  getTeacherCheckinHistory(params?: any) { return this.api.get('/checkin/my-history', { params }); }
   getCheckinSchoolHours() { return this.api.get('/checkin/school-hours'); }
 
   // SMS

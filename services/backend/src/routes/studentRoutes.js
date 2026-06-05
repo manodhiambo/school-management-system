@@ -90,10 +90,10 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
     const teacherClassFilter = isTeacher
       ? `AND id IN (
           SELECT t.class_id FROM teachers t
-          WHERE t.user_id = $2 AND t.tenant_id = $1 AND t.class_id IS NOT NULL
+          WHERE t.user_id = $2::uuid AND t.tenant_id = $1::uuid AND t.class_id IS NOT NULL
           UNION
           SELECT cs.class_id FROM class_subjects cs
-          WHERE cs.teacher_id = $2 AND cs.tenant_id = $1
+          WHERE cs.teacher_id = $2::uuid AND cs.tenant_id = $1::uuid
         )`
       : '';
 
@@ -106,11 +106,11 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
         SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as male_students,
         SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as female_students
       FROM students
-      WHERE tenant_id = $1
+      WHERE tenant_id = $1::uuid
       ${isTeacher ? `AND class_id IN (
-          SELECT t.class_id FROM teachers t WHERE t.user_id = $2 AND t.tenant_id = $1 AND t.class_id IS NOT NULL
+          SELECT t.class_id FROM teachers t WHERE t.user_id = $2::uuid AND t.tenant_id = $1::uuid AND t.class_id IS NOT NULL
           UNION
-          SELECT cs.class_id FROM class_subjects cs WHERE cs.teacher_id = $2 AND cs.tenant_id = $1
+          SELECT cs.class_id FROM class_subjects cs WHERE cs.teacher_id = $2::uuid AND cs.tenant_id = $1::uuid
         )` : ''}
     `, statsParams);
 
@@ -122,8 +122,8 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
         c.education_level,
         COUNT(s.id) as student_count
       FROM classes c
-      LEFT JOIN students s ON s.class_id = c.id AND s.status = 'active' AND s.tenant_id = $1
-      WHERE c.tenant_id = $1
+      LEFT JOIN students s ON s.class_id = c.id AND s.status = 'active' AND s.tenant_id = $1::uuid
+      WHERE c.tenant_id = $1::uuid
       ${teacherClassFilter}
       GROUP BY c.id, c.name, c.section, c.education_level
       ORDER BY c.name, c.section

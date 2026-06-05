@@ -256,6 +256,26 @@ router.get('/today', async (req, res) => {
   });
 });
 
+// ─── Teacher: get own check-in history ────────────────────────────────────────
+router.get('/my-history', async (req, res) => {
+  try {
+    const tid = req.tenantId;
+    const teacherId = req.user.id;
+    const { limit = 30 } = req.query;
+
+    const rows = await query(
+      `SELECT * FROM teacher_checkins
+       WHERE tenant_id = $1 AND teacher_id = $2
+       ORDER BY checkin_date DESC, checkin_time ASC
+       LIMIT $3`,
+      [tid, teacherId, parseInt(limit)]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ─── Admin: get check-in history / report ─────────────────────────────────────
 router.get('/history', async (req, res) => {
   try {

@@ -126,6 +126,10 @@ import { ProfilePage } from './pages/settings/ProfilePage';
 
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { RoleRoute } from './components/auth/RoleRoute';
+
+import { useEffect } from 'react';
+import { useToast } from '@/components/ui/use-toast';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -137,11 +141,25 @@ const queryClient = new QueryClient({
   },
 });
 
+function ForbiddenToast() {
+  const { toast } = useToast();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent).detail?.message || 'You do not have permission to perform this action.';
+      toast({ title: 'Access Denied', description: msg, variant: 'destructive' });
+    };
+    window.addEventListener('api:forbidden', handler);
+    return () => window.removeEventListener('api:forbidden', handler);
+  }, [toast]);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <ForbiddenToast />
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
@@ -179,28 +197,28 @@ function App() {
               {/* Admin & Teacher Routes */}
               <Route path="students" element={<StudentsPage />} />
               <Route path="student-report" element={<StudentReportPage />} />
-              <Route path="teachers" element={<TeachersPage />} />
+              <Route path="teachers" element={<RoleRoute allowedRoles={['admin']}><TeachersPage /></RoleRoute>} />
               <Route path="parents" element={<ParentsPage />} />
               <Route path="academic" element={<AcademicPage />} />
               <Route path="attendance" element={<AttendancePage />} />
-              <Route path="fee" element={<FeePage />} />
-              <Route path="fee-structure" element={<FeeStructurePage />} />
-              <Route path="extra-fees" element={<ExtraFeesPage />} />
+              <Route path="fee" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FeePage /></RoleRoute>} />
+              <Route path="fee-structure" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FeeStructurePage /></RoleRoute>} />
+              <Route path="extra-fees" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ExtraFeesPage /></RoleRoute>} />
               <Route path="timetable" element={<TimetablePage />} />
-              <Route path="communication" element={<CommunicationPage />} />
-              <Route path="users" element={<UsersPage />} />
-              <Route path="settings" element={<SettingsPage />} />
+              <Route path="communication" element={<RoleRoute allowedRoles={['admin']}><CommunicationPage /></RoleRoute>} />
+              <Route path="users" element={<RoleRoute allowedRoles={['admin']}><UsersPage /></RoleRoute>} />
+              <Route path="settings" element={<RoleRoute allowedRoles={['admin']}><SettingsPage /></RoleRoute>} />
 
               {/* Finance Routes - Admin & Finance Officer */}
-              <Route path="finance" element={<FinanceDashboard />} />
-              <Route path="finance/transactions" element={<Transactions />} />
-              <Route path="finance/budgets" element={<Budgets />} />
-              <Route path="finance/vendors" element={<Vendors />} />
-              <Route path="finance/bank-accounts" element={<BankAccounts />} />
-              <Route path="finance/petty-cash" element={<PettyCash />} />
-              <Route path="finance/assets" element={<Assets />} />
-              <Route path="finance/reports" element={<Reports />} />
-              <Route path="finance/financial-years" element={<FinancialYears />} />
+              <Route path="finance" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FinanceDashboard /></RoleRoute>} />
+              <Route path="finance/transactions" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Transactions /></RoleRoute>} />
+              <Route path="finance/budgets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Budgets /></RoleRoute>} />
+              <Route path="finance/vendors" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Vendors /></RoleRoute>} />
+              <Route path="finance/bank-accounts" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><BankAccounts /></RoleRoute>} />
+              <Route path="finance/petty-cash" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><PettyCash /></RoleRoute>} />
+              <Route path="finance/assets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Assets /></RoleRoute>} />
+              <Route path="finance/reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Reports /></RoleRoute>} />
+              <Route path="finance/financial-years" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FinancialYears /></RoleRoute>} />
 
               {/* Student Routes */}
               <Route path="my-courses" element={<MyCoursesPage />} />
@@ -227,32 +245,32 @@ function App() {
               <Route path="teacher-exams" element={<TeacherExamsPage />} />
               <Route path="my-checkin" element={<TeacherMyAttendancePage />} />
 
-              {/* New Feature Routes — all 20 features */}
+              {/* Shared & role-filtered feature routes */}
               <Route path="announcements" element={<AnnouncementsPage />} />
-              <Route path="audit-log" element={<AuditLogPage />} />
-              <Route path="fee-reminders" element={<FeeRemindersPage />} />
-              <Route path="inventory" element={<InventoryPage />} />
-              <Route path="term-reports" element={<TermReportsPage />} />
-              <Route path="nemis" element={<NemisPage />} />
+              <Route path="audit-log" element={<RoleRoute allowedRoles={['admin']}><AuditLogPage /></RoleRoute>} />
+              <Route path="fee-reminders" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FeeRemindersPage /></RoleRoute>} />
+              <Route path="inventory" element={<RoleRoute allowedRoles={['admin']}><InventoryPage /></RoleRoute>} />
+              <Route path="term-reports" element={<RoleRoute allowedRoles={['admin', 'teacher']}><TermReportsPage /></RoleRoute>} />
+              <Route path="nemis" element={<RoleRoute allowedRoles={['admin']}><NemisPage /></RoleRoute>} />
               <Route path="exam-analytics" element={<ExamAnalyticsPage />} />
               <Route path="meetings" element={<MeetingsPage />} />
-              <Route path="payroll" element={<PayrollPage />} />
+              <Route path="payroll" element={<RoleRoute allowedRoles={['admin', 'finance_officer', 'teacher']}><PayrollPage /></RoleRoute>} />
               <Route path="appraisals" element={<AppraisalPage />} />
-              <Route path="substitutes" element={<SubstitutePage />} />
-              <Route path="bursary" element={<BursaryPage />} />
+              <Route path="substitutes" element={<RoleRoute allowedRoles={['admin']}><SubstitutePage /></RoleRoute>} />
+              <Route path="bursary" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><BursaryPage /></RoleRoute>} />
               <Route path="canteen" element={<CanteenPage />} />
               <Route path="counseling" element={<CounselingPage />} />
-              <Route path="hostel-management" element={<HostelManagementPage />} />
-              <Route path="whatsapp" element={<WhatsAppPage />} />
-              <Route path="sms-keywords" element={<SmsKeywordsPage />} />
+              <Route path="hostel-management" element={<RoleRoute allowedRoles={['admin']}><HostelManagementPage /></RoleRoute>} />
+              <Route path="whatsapp" element={<RoleRoute allowedRoles={['admin']}><WhatsAppPage /></RoleRoute>} />
+              <Route path="sms-keywords" element={<RoleRoute allowedRoles={['admin']}><SmsKeywordsPage /></RoleRoute>} />
               <Route path="portfolio" element={<PortfolioPage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />
               <Route path="my-books" element={<MyBorrowingsPage />} />
-              <Route path="library-management" element={<LibraryManagementPage />} />
-              <Route path="library-borrowings" element={<BorrowingsPage />} />
-              <Route path="library-members" element={<LibraryMembersPage />} />
+              <Route path="library-management" element={<RoleRoute allowedRoles={['admin']}><LibraryManagementPage /></RoleRoute>} />
+              <Route path="library-borrowings" element={<RoleRoute allowedRoles={['admin']}><BorrowingsPage /></RoleRoute>} />
+              <Route path="library-members" element={<RoleRoute allowedRoles={['admin']}><LibraryMembersPage /></RoleRoute>} />
 
               {/* IGCSE Module */}
               <Route path="igcse" element={<IgcsePage />} />
@@ -260,26 +278,26 @@ function App() {
               {/* CBE Routes */}
               <Route path="cbc-analytics" element={<CbcAnalyticsPage />} />
               <Route path="cbe-analytics" element={<CbcAnalyticsPage />} />
-              <Route path="curriculum" element={<CurriculumPage />} />
+              <Route path="curriculum" element={<RoleRoute allowedRoles={['admin']}><CurriculumPage /></RoleRoute>} />
               <Route path="cbc-assessments" element={<CbcAssessmentPage />} />
               <Route path="cbc-report-cards" element={<CbcReportCardPage />} />
               <Route path="academic-calendar" element={<AcademicCalendarPage />} />
 
               {/* Discipline / Transport / Health */}
               <Route path="discipline" element={<DisciplinePage />} />
-              <Route path="transport" element={<TransportPage />} />
-              <Route path="transport-tracking" element={<TransportTrackingPage />} />
+              <Route path="transport" element={<RoleRoute allowedRoles={['admin']}><TransportPage /></RoleRoute>} />
+              <Route path="transport-tracking" element={<RoleRoute allowedRoles={['admin']}><TransportTrackingPage /></RoleRoute>} />
               <Route path="health" element={<HealthPage />} />
               <Route path="staff-leave" element={<StaffLeavePage />} />
 
               {/* Teacher Check-in Admin */}
-              <Route path="teacher-checkin" element={<TeacherCheckinAdminPage />} />
+              <Route path="teacher-checkin" element={<RoleRoute allowedRoles={['admin']}><TeacherCheckinAdminPage /></RoleRoute>} />
 
               {/* SMS Messaging */}
-              <Route path="sms" element={<SMSPage />} />
+              <Route path="sms" element={<RoleRoute allowedRoles={['admin', 'teacher']}><SMSPage /></RoleRoute>} />
 
               {/* Gate Management */}
-              <Route path="gate-manager" element={<GateManagerPage />} />
+              <Route path="gate-manager" element={<RoleRoute allowedRoles={['admin', 'security']}><GateManagerPage /></RoleRoute>} />
 
               {/* Parent Alerts */}
               <Route path="my-alerts" element={<ParentAlertsPage />} />

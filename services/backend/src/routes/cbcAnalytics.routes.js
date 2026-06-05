@@ -9,11 +9,11 @@ router.use(authenticate);
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
-// GET /cbc-analytics/overview  [admin]
+// GET /cbc-analytics/overview  [admin, teacher]
 router.get('/overview', async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Admin only' });
+    if (!['admin', 'teacher'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
     const tenantId = req.tenantId;
 

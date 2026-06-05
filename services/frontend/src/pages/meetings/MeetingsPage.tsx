@@ -59,7 +59,7 @@ export function MeetingsPage() {
       setSlots(sRes?.data || []);
       setBookings(bRes?.data || []);
 
-      if (tab === 'admin' || tab === 'teacher') {
+      if (tab === 'admin' || tab === 'teacher' || tab === 'parent') {
         const tRes: any = await api.getTeachers();
         setTeachers(tRes?.data || []);
       }
@@ -74,7 +74,12 @@ export function MeetingsPage() {
 
   const createSlot = async () => {
     try {
-      await (api as any).createPTMSlot(slotForm);
+      await (api as any).createPTMSlot({
+        teacher_id: slotForm.teacher_id || undefined,
+        slot_date: slotForm.date,
+        start_time: slotForm.start_time,
+        end_time: slotForm.end_time,
+      });
       toast({ title: 'Slot created' });
       setShowSlotForm(false);
       setSlotForm({ ...EMPTY_SLOT });
@@ -191,7 +196,11 @@ export function MeetingsPage() {
                   <select className="w-full mt-1 border rounded px-3 py-2 text-sm"
                     value={slotForm.teacher_id} onChange={e => setSlotForm(f => ({ ...f, teacher_id: e.target.value }))}>
                     <option value="">Select teacher</option>
-                    {teachers.map(t => <option key={t.id} value={t.id}>{t.name || t.full_name}</option>)}
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.user_id || t.id}>
+                        {`${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -425,7 +434,11 @@ export function MeetingsPage() {
               <select className="border rounded px-3 py-1.5 text-sm"
                 value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)}>
                 <option value="">All Teachers</option>
-                {teachers.map(t => <option key={t.id} value={t.id}>{t.name || t.full_name}</option>)}
+                {teachers.map(t => (
+                  <option key={t.id} value={t.user_id || t.id}>
+                    {`${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email}
+                  </option>
+                ))}
               </select>
             </div>
             {availSlots.length === 0 ? (

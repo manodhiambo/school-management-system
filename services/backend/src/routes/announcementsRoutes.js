@@ -72,7 +72,7 @@ router.get('/', async (req, res) => {
                ) AS is_read
         FROM announcements a
         LEFT JOIN users u ON u.id::text = a.created_by::text
-        WHERE a.tenant_id = $1
+        WHERE a.tenant_id = $1::uuid
         ORDER BY COALESCE(a.is_pinned, FALSE) DESC, a.created_at DESC
       `;
       params = [tid, uid];
@@ -87,7 +87,7 @@ router.get('/', async (req, res) => {
                ) AS is_read
         FROM announcements a
         LEFT JOIN users u ON u.id::text = a.created_by::text
-        WHERE a.tenant_id = $1
+        WHERE a.tenant_id = $1::uuid
           AND (COALESCE(a.target_roles, ARRAY['admin','teacher','student','parent']::text[]) @> ARRAY[$3::text])
           AND (a.expires_at IS NULL OR a.expires_at > NOW())
         ORDER BY COALESCE(a.is_pinned, FALSE) DESC, a.created_at DESC
@@ -115,7 +115,7 @@ router.get('/unread-count', async (req, res) => {
     const sql = `
       SELECT COUNT(*) AS count
       FROM announcements a
-      WHERE a.tenant_id = $1
+      WHERE a.tenant_id = $1::uuid
         ${isAdmin ? '' : `AND (COALESCE(a.target_roles, ARRAY['admin','teacher','student','parent']::text[]) @> ARRAY[$3::text])
         AND (a.expires_at IS NULL OR a.expires_at > NOW())`}
         AND NOT EXISTS (
@@ -185,7 +185,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     } = req.body;
 
     const existing = await query(
-      'SELECT id FROM announcements WHERE id = $1 AND tenant_id = $2',
+      'SELECT id FROM announcements WHERE id = $1::uuid AND tenant_id = $2::uuid',
       [id, tid]
     );
     if (existing.length === 0) {
@@ -202,7 +202,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
            is_pinned = COALESCE($6, is_pinned),
            expires_at = $7,
            updated_at = NOW()
-       WHERE id = $8 AND tenant_id = $9
+       WHERE id = $8::uuid AND tenant_id = $9::uuid
        RETURNING *`,
       [
         title || null, body || null,
@@ -228,7 +228,7 @@ router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => 
     const { id } = req.params;
 
     const rows = await query(
-      'DELETE FROM announcements WHERE id = $1 AND tenant_id = $2 RETURNING id',
+      'DELETE FROM announcements WHERE id = $1::uuid AND tenant_id = $2::uuid RETURNING id',
       [id, tid]
     );
     if (rows.length === 0) {

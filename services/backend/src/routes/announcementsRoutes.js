@@ -30,6 +30,8 @@ router.use(authenticate);
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS tenant_id UUID`, []).catch(() => {});
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT ''`, []).catch(() => {});
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS target_roles TEXT[] DEFAULT ARRAY['admin','teacher','student','parent']`, []).catch(() => {});
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS target_class_id UUID`, []).catch(() => {});
+    await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS created_by UUID`, []).catch(() => {});
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE`, []).catch(() => {});
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`, []).catch(() => {});
     await query(`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal'`, []).catch(() => {});
@@ -64,14 +66,12 @@ router.get('/', async (req, res) => {
       sql = `
         SELECT a.*,
                u.first_name || ' ' || u.last_name AS created_by_name,
-               c.name AS target_class_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
                  WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
                ) AS is_read
         FROM announcements a
         LEFT JOIN users u ON u.id::text = a.created_by::text
-        LEFT JOIN classes c ON c.id::text = a.target_class_id::text
         WHERE a.tenant_id = $1
         ORDER BY COALESCE(a.is_pinned, FALSE) DESC, a.created_at DESC
       `;
@@ -81,14 +81,12 @@ router.get('/', async (req, res) => {
       sql = `
         SELECT a.*,
                u.first_name || ' ' || u.last_name AS created_by_name,
-               c.name AS target_class_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
                  WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
                ) AS is_read
         FROM announcements a
         LEFT JOIN users u ON u.id::text = a.created_by::text
-        LEFT JOIN classes c ON c.id::text = a.target_class_id::text
         WHERE a.tenant_id = $1
           AND (COALESCE(a.target_roles, ARRAY['admin','teacher','student','parent']::text[]) @> ARRAY[$3::text])
           AND (a.expires_at IS NULL OR a.expires_at > NOW())

@@ -1,5 +1,15 @@
-const CACHE_NAME = 'skulmanager-v1';
+const CACHE_NAME = 'skulmanager-v2';
 const STATIC_ASSETS = ['/', '/index.html'];
+
+// Never cache requests to these external domains (avoids tracking-prevention warnings)
+const SKIP_CACHE_DOMAINS = [
+  'cdn.jsdelivr.net',
+  'cdnjs.cloudflare.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+  'unpkg.com',
+  'onrender.com',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -20,6 +30,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('/api/')) return;
+
+  // Skip caching for external CDN and API domains to avoid tracking-prevention issues
+  const url = event.request.url;
+  if (SKIP_CACHE_DOMAINS.some(domain => url.includes(domain))) return;
 
   event.respondWith(
     fetch(event.request)

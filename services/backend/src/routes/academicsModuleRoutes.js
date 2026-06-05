@@ -4,6 +4,7 @@
  *         Life Skills, Career Guidance, Learning Materials, Promotions
  */
 import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
@@ -1344,10 +1345,10 @@ router.post('/classes', requireRole(['admin']), async (req, res) => {
       room_id, class_teacher_id, academic_year, sort_order
     } = req.body;
     const result = await query(
-      `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, room_id, class_teacher_id, academic_year, sort_order, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE)
+      `INSERT INTO classes (id, tenant_id, name, section, education_level, grade_number, capacity, room_id, class_teacher_id, academic_year, sort_order, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)
        ON CONFLICT DO NOTHING RETURNING *`,
-      [tid(req), name, section || 'A', education_level || 'lower_primary', grade_number, capacity || 45,
+      [uuidv4(), tid(req), name, section || 'A', education_level || 'lower_primary', grade_number, capacity || 45,
        room_id || null, class_teacher_id || null, academic_year || new Date().getFullYear().toString(), sort_order || 0]
     );
     res.status(201).json({ data: result[0] });
@@ -1449,10 +1450,10 @@ router.post('/subjects', requireRole(['admin']), async (req, res) => {
   try {
     const { name, code, description, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order } = req.body;
     const result = await query(
-      `INSERT INTO subjects (tenant_id, name, code, description, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)
+      `INSERT INTO subjects (id, tenant_id, name, code, description, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,TRUE)
        ON CONFLICT DO NOTHING RETURNING *`,
-      [tid(req), name, code, description, education_level, category || 'core',
+      [uuidv4(), tid(req), name, code, description, education_level, category || 'core',
        subject_group, is_elective || false, weekly_periods || 5, color, sort_order || 0]
     );
     res.status(201).json({ data: result[0] });
@@ -1591,9 +1592,9 @@ router.post('/setup/seed-classes', requireRole(['admin']), async (req, res) => {
       if (existing.length > 0) { skipped++; continue; }
 
       await query(
-        `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE)`,
-        [tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
+        `INSERT INTO classes (id, tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)`,
+        [uuidv4(), tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
       );
       created++;
     }
@@ -1614,9 +1615,9 @@ router.post('/setup/seed-subjects', requireRole(['admin']), async (req, res) => 
       if (existing.length > 0) { skipped++; continue; }
 
       await query(
-        `INSERT INTO subjects (tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE)`,
-        [tid(req), sub.name, sub.code, sub.education_level, sub.category,
+        `INSERT INTO subjects (id, tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)`,
+        [uuidv4(), tid(req), sub.name, sub.code, sub.education_level, sub.category,
          sub.subject_group, sub.is_elective || false, sub.weekly_periods, sub.color, sub.sort_order]
       );
       created++;
@@ -1635,9 +1636,9 @@ router.post('/setup/seed-all', requireRole(['admin']), async (req, res) => {
       const existing = await query('SELECT id FROM classes WHERE tenant_id=$1 AND name=$2 AND section=$3', [tid(req), cls.name, cls.section]);
       if (existing.length === 0) {
         await query(
-          `INSERT INTO classes (tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE)`,
-          [tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
+          `INSERT INTO classes (id, tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)`,
+          [uuidv4(), tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
         );
         classesCreated++;
       }
@@ -1647,9 +1648,9 @@ router.post('/setup/seed-all', requireRole(['admin']), async (req, res) => {
       const existing = await query('SELECT id FROM subjects WHERE tenant_id=$1 AND code=$2', [tid(req), sub.code]);
       if (existing.length === 0) {
         await query(
-          `INSERT INTO subjects (tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE)`,
-          [tid(req), sub.name, sub.code, sub.education_level, sub.category,
+          `INSERT INTO subjects (id, tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)`,
+          [uuidv4(), tid(req), sub.name, sub.code, sub.education_level, sub.category,
            sub.subject_group, sub.is_elective || false, sub.weekly_periods, sub.color, sub.sort_order]
         );
         subjectsCreated++;

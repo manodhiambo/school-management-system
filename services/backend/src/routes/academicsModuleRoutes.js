@@ -1580,81 +1580,72 @@ const CBC_SUBJECTS = [
 
 // POST /setup/seed-classes
 router.post('/setup/seed-classes', requireRole(['admin']), async (req, res) => {
+  const currentYear = new Date().getFullYear().toString();
+  let created = 0, skipped = 0;
   try {
-    const currentYear = new Date().getFullYear().toString();
-    let created = 0, skipped = 0;
-
     for (const cls of CBC_CLASSES) {
-      const existing = await query(
-        'SELECT id FROM classes WHERE tenant_id=$1 AND name=$2 AND section=$3',
-        [tid(req), cls.name, cls.section]
-      );
-      if (existing.length > 0) { skipped++; continue; }
-
-      await query(
-        `INSERT INTO classes (id, tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)`,
-        [uuidv4(), tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
-      );
-      created++;
+      try {
+        await query(
+          `INSERT INTO classes (id, tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
+           VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8,$9,TRUE)
+           ON CONFLICT DO NOTHING`,
+          [uuidv4(), tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
+        );
+        created++;
+      } catch (_) { skipped++; }
     }
-    res.json({ message: `Classes seeded: ${created} created, ${skipped} already exist` });
+    res.json({ message: `Classes seeded: ${created} created, ${skipped} skipped` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /setup/seed-subjects
 router.post('/setup/seed-subjects', requireRole(['admin']), async (req, res) => {
+  let created = 0, skipped = 0;
   try {
-    let created = 0, skipped = 0;
-
     for (const sub of CBC_SUBJECTS) {
-      const existing = await query(
-        'SELECT id FROM subjects WHERE tenant_id=$1 AND code=$2',
-        [tid(req), sub.code]
-      );
-      if (existing.length > 0) { skipped++; continue; }
-
-      await query(
-        `INSERT INTO subjects (id, tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)`,
-        [uuidv4(), tid(req), sub.name, sub.code, sub.education_level, sub.category,
-         sub.subject_group, sub.is_elective || false, sub.weekly_periods, sub.color, sub.sort_order]
-      );
-      created++;
+      try {
+        await query(
+          `INSERT INTO subjects (id, tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
+           VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)
+           ON CONFLICT DO NOTHING`,
+          [uuidv4(), tid(req), sub.name, sub.code, sub.education_level, sub.category,
+           sub.subject_group, sub.is_elective || false, sub.weekly_periods, sub.color, sub.sort_order]
+        );
+        created++;
+      } catch (_) { skipped++; }
     }
-    res.json({ message: `Subjects seeded: ${created} created, ${skipped} already exist` });
+    res.json({ message: `Subjects seeded: ${created} created, ${skipped} skipped` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /setup/seed-all
 router.post('/setup/seed-all', requireRole(['admin']), async (req, res) => {
+  const currentYear = new Date().getFullYear().toString();
+  let classesCreated = 0, subjectsCreated = 0, classesSkipped = 0, subjectsSkipped = 0;
   try {
-    const currentYear = new Date().getFullYear().toString();
-    let classesCreated = 0, subjectsCreated = 0;
-
     for (const cls of CBC_CLASSES) {
-      const existing = await query('SELECT id FROM classes WHERE tenant_id=$1 AND name=$2 AND section=$3', [tid(req), cls.name, cls.section]);
-      if (existing.length === 0) {
+      try {
         await query(
           `INSERT INTO classes (id, tenant_id, name, section, education_level, grade_number, capacity, sort_order, academic_year, is_active)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)`,
+           VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8,$9,TRUE)
+           ON CONFLICT DO NOTHING`,
           [uuidv4(), tid(req), cls.name, cls.section, cls.education_level, cls.grade_number, cls.capacity, cls.sort, currentYear]
         );
         classesCreated++;
-      }
+      } catch (_) { classesSkipped++; }
     }
 
     for (const sub of CBC_SUBJECTS) {
-      const existing = await query('SELECT id FROM subjects WHERE tenant_id=$1 AND code=$2', [tid(req), sub.code]);
-      if (existing.length === 0) {
+      try {
         await query(
           `INSERT INTO subjects (id, tenant_id, name, code, education_level, category, subject_group, is_elective, weekly_periods, color, sort_order, is_active)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)`,
+           VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)
+           ON CONFLICT DO NOTHING`,
           [uuidv4(), tid(req), sub.name, sub.code, sub.education_level, sub.category,
            sub.subject_group, sub.is_elective || false, sub.weekly_periods, sub.color, sub.sort_order]
         );
         subjectsCreated++;
-      }
+      } catch (_) { subjectsSkipped++; }
     }
 
     res.json({
@@ -1669,8 +1660,8 @@ router.post('/setup/seed-all', requireRole(['admin']), async (req, res) => {
 router.get('/setup/status', requireRole(['admin']), async (req, res) => {
   try {
     const [cls, sub] = await Promise.all([
-      query('SELECT COUNT(*) FROM classes WHERE tenant_id=$1', [tid(req)]),
-      query('SELECT COUNT(*) FROM subjects WHERE tenant_id=$1', [tid(req)]),
+      query('SELECT COUNT(*) FROM classes WHERE tenant_id=$1::uuid', [tid(req)]),
+      query('SELECT COUNT(*) FROM subjects WHERE tenant_id=$1::uuid', [tid(req)]),
     ]);
     res.json({
       data: {

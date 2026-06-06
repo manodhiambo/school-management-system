@@ -369,6 +369,65 @@ router.post('/tenants/:id/extend', async (req, res) => {
 });
 
 // ============================================================
+// DELETE /tenants/:id/permanent — Permanently purge tenant + all data
+// ============================================================
+router.delete('/tenants/:id/permanent', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { confirm } = req.body;
+
+    const existing = await query('SELECT id, school_name, schema_name FROM tenants WHERE id = $1', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    const tenant = existing[0];
+
+    // Require explicit confirmation string
+    if (confirm !== tenant.school_name) {
+      return res.status(400).json({
+        success: false,
+        message: `Confirmation text must match the school name exactly: "${tenant.school_name}"`
+      });
+    }
+
+    // Delete tables without ON DELETE CASCADE first (migration 024)
+    const nonCascadeTables = [
+      'student_hostel', 'student_clubs', 'student_competency_summary',
+      'student_transport', 'student_health_records', 'student_portfolios',
+      'cbc_report_cards', 'parent_alerts', 'discipline_incidents',
+      'academic_terms', 'school_clubs', 'hostels', 'transport_routes',
+      'cbc_assessments', 'cbc_strands'
+    ];
+    for (const table of nonCascadeTables) {
+      await query(`DELETE FROM ${table} WHERE tenant_id = $1`, [id]);
+    }
+
+    // Delete the tenant row — CASCADE handles all other related tables
+    await query('DELETE FROM tenants WHERE id = $1', [id]);
+
+    // Drop tenant schema if it exists
+    if (tenant.schema_name) {
+      try {
+        await query(`DROP SCHEMA IF EXISTS "${tenant.schema_name}" CASCADE`);
+      } catch (schemaErr) {
+        logger.warn(`Could not drop schema ${tenant.schema_name}:`, schemaErr.message);
+      }
+    }
+
+    logger.warn(`Tenant PERMANENTLY DELETED by superadmin: ${id} (${tenant.school_name})`);
+
+    res.json({
+      success: true,
+      message: `School "${tenant.school_name}" and all its data have been permanently deleted.`
+    });
+  } catch (error) {
+    logger.error('Permanent delete tenant error:', error);
+    res.status(500).json({ success: false, message: 'Failed to permanently delete tenant', error: error.message });
+  }
+});
+
+// ============================================================
 // POST /tenants/:id/login-as — Generate short-lived token as tenant admin
 // ============================================================
 router.post('/tenants/:id/login-as', async (req, res) => {

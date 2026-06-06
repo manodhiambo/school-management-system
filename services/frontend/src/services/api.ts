@@ -1303,6 +1303,10 @@ class ApiService {
     return this.api.delete('/superadmin/tenants/' + id);
   }
 
+  permanentlyDeleteTenant(id: string, confirm: string) {
+    return this.api.delete('/superadmin/tenants/' + id + '/permanent', { data: { confirm } });
+  }
+
   activateTenant(id: string) {
     return this.api.post('/superadmin/tenants/' + id + '/activate');
   }

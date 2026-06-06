@@ -31,7 +31,7 @@ type Tenant = {
   teacher_count?: number;
 };
 
-type ModalType = 'create' | 'edit' | 'payments' | 'extend' | null;
+type ModalType = 'create' | 'edit' | 'payments' | 'extend' | 'permanent_delete' | null;
 
 const STATUS_COLORS: Record<string, string> = {
   active:    'bg-green-100 text-green-700 border-green-200',
@@ -54,6 +54,7 @@ export function TenantsPage() {
   const [actionLoading, setActionLoading] = useState('');
   const [extendMonths, setExtendMonths] = useState(12);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [formError, setFormError] = useState('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
@@ -157,9 +158,17 @@ export function TenantsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    const tenant = tenants.find(t => t.id === id);
+    if (!tenant) return;
+    if (deleteConfirmText !== tenant.school_name) return;
     setActionLoading('delete_' + id);
-    try { await api.deleteTenant(id); setConfirmDelete(null); await loadTenants(); }
-    catch (err: any) { alert(err?.message || 'Failed to delete'); }
+    try {
+      await api.permanentlyDeleteTenant(id, deleteConfirmText);
+      setConfirmDelete(null);
+      setDeleteConfirmText('');
+      setModal(null);
+      await loadTenants();
+    } catch (err: any) { alert(err?.message || 'Failed to permanently delete'); }
     finally { setActionLoading(''); }
   };
 
@@ -310,9 +319,9 @@ export function TenantsPage() {
                             Suspend
                           </button>
                         )}
-                        <button onClick={() => { setConfirmDelete(t.id); setOpenMenu(null); }}
+                        <button onClick={() => { setSelectedTenant(t); setDeleteConfirmText(''); setConfirmDelete(t.id); setModal('permanent_delete'); setOpenMenu(null); }}
                           className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete Permanently
                         </button>
                       </div>
                     )}
@@ -326,20 +335,48 @@ export function TenantsPage() {
 
       {openMenu && <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(null)} />}
 
-      {/* Delete Confirm */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
+      {/* Permanent Delete Modal */}
+      {modal === 'permanent_delete' && selectedTenant && confirmDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="bg-red-100 rounded-full p-2"><Trash2 className="h-5 w-5 text-red-600" /></div>
-              <h3 className="text-lg font-bold text-gray-900">Delete School?</h3>
+              <div className="bg-red-100 rounded-full p-3"><Trash2 className="h-6 w-6 text-red-600" /></div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Permanently Delete School</h3>
+                <p className="text-xs text-red-500 font-medium">This action cannot be undone</p>
+              </div>
             </div>
-            <p className="text-gray-600 text-sm mb-6">This will permanently delete the school and all its data.</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-5 space-y-1">
+              <p className="text-sm font-semibold text-red-700">The following will be permanently deleted:</p>
+              <ul className="text-sm text-red-600 list-disc list-inside space-y-0.5">
+                <li>All student, teacher, and staff records</li>
+                <li>All academic data, exams, and results</li>
+                <li>All financial records and payments</li>
+                <li>All user accounts for this school</li>
+                <li>The tenant subscription and settings</li>
+              </ul>
+            </div>
+            <p className="text-sm text-gray-700 mb-2">
+              Type <strong className="font-mono text-gray-900">{selectedTenant.school_name}</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              placeholder="Type school name here..."
+              className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-400 focus:border-transparent mb-5"
+              autoFocus
+            />
             <div className="flex space-x-3">
-              <Button variant="outline" className="flex-1" onClick={() => setConfirmDelete(null)}>Cancel</Button>
-              <Button onClick={() => handleDelete(confirmDelete)} disabled={!!actionLoading}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-                {actionLoading.startsWith('delete') ? <Loader2 className="animate-spin h-4 w-4" /> : 'Delete'}
+              <Button variant="outline" className="flex-1" onClick={() => { setModal(null); setConfirmDelete(null); setDeleteConfirmText(''); }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleDelete(confirmDelete)}
+                disabled={deleteConfirmText !== selectedTenant.school_name || !!actionLoading}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-40"
+              >
+                {actionLoading.startsWith('delete') ? <Loader2 className="animate-spin h-4 w-4" /> : 'Delete Permanently'}
               </Button>
             </div>
           </div>

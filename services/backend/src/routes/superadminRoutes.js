@@ -383,6 +383,13 @@ router.delete('/tenants/:id/permanent', async (req, res) => {
 
     const tenant = existing[0];
 
+    if (tenant.status === 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot permanently delete an active tenant. Suspend or deactivate the school first.'
+      });
+    }
+
     // Require explicit confirmation string
     if (confirm !== tenant.school_name) {
       return res.status(400).json({

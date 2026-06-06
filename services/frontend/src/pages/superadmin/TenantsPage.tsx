@@ -319,8 +319,11 @@ export function TenantsPage() {
                             Suspend
                           </button>
                         )}
-                        <button onClick={() => { setSelectedTenant(t); setDeleteConfirmText(''); setConfirmDelete(t.id); setModal('permanent_delete'); setOpenMenu(null); }}
-                          className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
+                        <button
+                          onClick={() => { setSelectedTenant(t); setDeleteConfirmText(''); setConfirmDelete(t.id); setModal('permanent_delete'); setOpenMenu(null); }}
+                          disabled={t.status === 'active'}
+                          title={t.status === 'active' ? 'Suspend or deactivate the school before deleting' : undefined}
+                          className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed">
                           <Trash2 className="h-4 w-4 mr-2" /> Delete Permanently
                         </button>
                       </div>
@@ -346,6 +349,12 @@ export function TenantsPage() {
                 <p className="text-xs text-red-500 font-medium">This action cannot be undone</p>
               </div>
             </div>
+            {selectedTenant.status === 'active' && (
+              <div className="flex items-start space-x-2 bg-orange-50 border border-orange-300 rounded-lg p-3 mb-4">
+                <AlertCircle className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-orange-700">This school is currently <strong>active</strong>. You must suspend or deactivate it before it can be permanently deleted.</p>
+              </div>
+            )}
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-5 space-y-1">
               <p className="text-sm font-semibold text-red-700">The following will be permanently deleted:</p>
               <ul className="text-sm text-red-600 list-disc list-inside space-y-0.5">

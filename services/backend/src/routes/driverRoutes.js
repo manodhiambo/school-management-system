@@ -1,12 +1,13 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireModule('transport'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

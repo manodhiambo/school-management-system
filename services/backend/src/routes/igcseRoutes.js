@@ -5,7 +5,7 @@
  */
 import express from 'express';
 import pool, { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 
@@ -152,6 +152,7 @@ pool.query(IGCSE_SCHEMA)
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireModule('academics'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

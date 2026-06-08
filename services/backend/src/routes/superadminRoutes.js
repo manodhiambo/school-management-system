@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { query } from '../config/database.js';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { MODULE_REGISTRY, MODULE_KEYS, isModuleKey } from '../config/moduleRegistry.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -241,6 +242,76 @@ router.put('/tenants/:id', async (req, res) => {
 });
 
 // ============================================================
+// GET /modules — List all toggleable feature modules
+// ============================================================
+router.get('/modules', (req, res) => {
+  res.json({ success: true, data: MODULE_REGISTRY });
+});
+
+// ============================================================
+// GET /tenants/:id/modules — Get a tenant's module access state
+// ============================================================
+router.get('/tenants/:id/modules', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenants = await query('SELECT id, disabled_modules FROM tenants WHERE id = $1', [id]);
+    if (tenants.length === 0) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    const disabled = Array.isArray(tenants[0].disabled_modules) ? tenants[0].disabled_modules : [];
+    const modules = MODULE_REGISTRY.map((m) => ({
+      ...m,
+      enabled: !disabled.includes(m.key)
+    }));
+
+    res.json({ success: true, data: modules });
+  } catch (error) {
+    logger.error('Get tenant modules error:', error);
+    res.status(500).json({ success: false, message: 'Failed to get tenant modules', error: error.message });
+  }
+});
+
+// ============================================================
+// PUT /tenants/:id/modules — Set which modules are enabled for a tenant
+// Body: { enabled_modules: ['academics', 'finance', ...] } — any module
+// key from MODULE_REGISTRY not present in this list is treated as disabled.
+// ============================================================
+router.put('/tenants/:id/modules', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { enabled_modules } = req.body;
+
+    if (!Array.isArray(enabled_modules)) {
+      return res.status(400).json({ success: false, message: 'enabled_modules must be an array of module keys' });
+    }
+
+    const existing = await query('SELECT id FROM tenants WHERE id = $1', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    const enabledSet = new Set(enabled_modules.filter(isModuleKey));
+    const disabledModules = MODULE_KEYS.filter((key) => !enabledSet.has(key));
+
+    const result = await query(
+      `UPDATE tenants SET disabled_modules = $1::jsonb, updated_at = NOW() WHERE id = $2 RETURNING id, disabled_modules`,
+      [JSON.stringify(disabledModules), id]
+    );
+
+    logger.info(`Tenant ${id} modules updated by superadmin. Disabled: [${disabledModules.join(', ')}]`);
+    res.json({
+      success: true,
+      data: MODULE_REGISTRY.map((m) => ({ ...m, enabled: !disabledModules.includes(m.key) })),
+      raw: result[0]
+    });
+  } catch (error) {
+    logger.error('Update tenant modules error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update tenant modules', error: error.message });
+  }
+});
+
+// ============================================================
 // DELETE /tenants/:id — Soft delete (suspend)
 // ============================================================
 router.delete('/tenants/:id', async (req, res) => {
@@ -441,7 +512,7 @@ router.post('/tenants/:id/login-as', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const tenants = await query('SELECT id, school_name, status FROM tenants WHERE id = $1', [id]);
+    const tenants = await query('SELECT id, school_name, status, disabled_modules FROM tenants WHERE id = $1', [id]);
     if (tenants.length === 0) {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
@@ -488,7 +559,8 @@ router.post('/tenants/:id/login-as', async (req, res) => {
           id: adminUser.id,
           email: adminUser.email,
           role: adminUser.role,
-          tenant_id: adminUser.tenant_id
+          tenant_id: adminUser.tenant_id,
+          disabled_modules: Array.isArray(tenants[0].disabled_modules) ? tenants[0].disabled_modules : []
         },
         tenant: tenants[0],
         loginAs: true,

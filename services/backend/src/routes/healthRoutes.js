@@ -1,12 +1,12 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
 // GET /api/v1/health/records?student_id=&record_type=&from=&to=
-router.get('/records', authenticate, async (req, res) => {
+router.get('/records', authenticate, requireModule('health'), async (req, res) => {
   try {
     const { student_id, record_type, from, to, is_emergency } = req.query;
     const tid = req.user.tenant_id;
@@ -32,7 +32,7 @@ router.get('/records', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/health/records
-router.post('/records', authenticate, async (req, res) => {
+router.post('/records', authenticate, requireModule('health'), async (req, res) => {
   try {
     const {
       student_id, record_date, record_type, description, symptoms, diagnosis,
@@ -78,7 +78,7 @@ router.post('/records', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/health/profile/:studentId
-router.get('/profile/:studentId', authenticate, async (req, res) => {
+router.get('/profile/:studentId', authenticate, requireModule('health'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
@@ -91,7 +91,7 @@ router.get('/profile/:studentId', authenticate, async (req, res) => {
 });
 
 // POST/PUT /api/v1/health/profile (upsert)
-router.post('/profile', authenticate, async (req, res) => {
+router.post('/profile', authenticate, requireModule('health'), async (req, res) => {
   try {
     const {
       student_id, allergies, chronic_conditions, current_medications,
@@ -123,7 +123,7 @@ router.post('/profile', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/health/records/:id
-router.delete('/records/:id', authenticate, async (req, res) => {
+router.delete('/records/:id', authenticate, requireModule('health'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('DELETE FROM student_health_records WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);

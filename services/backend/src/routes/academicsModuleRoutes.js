@@ -6,12 +6,13 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireModule('academics'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

@@ -1,10 +1,11 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireModule('staff'));
 
 function requireAdminOrTeacher(req, res, next) {
   const role = req.user.role;

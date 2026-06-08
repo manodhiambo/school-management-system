@@ -50,13 +50,15 @@ router.post('/login', async (req, res) => {
 
     // For non-superadmin users, check tenant status
     let tenantStatus = null;
+    let tenantDisabledModules = [];
     if (user.role !== 'superadmin' && user.tenant_id) {
       const tenantRows = await query(
-        'SELECT status FROM tenants WHERE id = $1',
+        'SELECT status, disabled_modules FROM tenants WHERE id = $1',
         [user.tenant_id]
       );
       if (tenantRows.length > 0) {
         tenantStatus = tenantRows[0].status;
+        tenantDisabledModules = Array.isArray(tenantRows[0].disabled_modules) ? tenantRows[0].disabled_modules : [];
         if (tenantStatus === 'suspended') {
           return res.status(403).json({
             success: false,
@@ -121,7 +123,8 @@ router.post('/login', async (req, res) => {
           role: user.role,
           tenant_id: user.tenant_id,
           isActive: user.is_active,
-          isVerified: user.is_verified
+          isVerified: user.is_verified,
+          disabled_modules: tenantDisabledModules
         },
         accessToken,
         refreshToken

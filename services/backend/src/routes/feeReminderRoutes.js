@@ -1,12 +1,13 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireModule('finance'));
 
 // ─── Mobitech SMS helper ──────────────────────────────────────────────────────
 const MOBITECH_URL = 'https://app.mobitechtechnologies.com//sms/sendsms';

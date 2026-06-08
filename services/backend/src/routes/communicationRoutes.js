@@ -1,6 +1,6 @@
 import express from 'express';
 import communicationController from '../controllers/communicationController.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { validateRequest, schemas } from '../utils/validators.js';
@@ -9,6 +9,7 @@ import Joi from 'joi';
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requireModule('communication'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

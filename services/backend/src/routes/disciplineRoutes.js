@@ -1,12 +1,12 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
 // GET /api/v1/discipline?student_id=&class_id=&from=&to=&severity=&is_resolved=
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireModule('discipline'), async (req, res) => {
   try {
     const { student_id, class_id, from, to, severity, is_resolved, limit = 50, offset = 0 } = req.query;
     const tid = req.user.tenant_id;
@@ -39,7 +39,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/discipline/stats — summary stats
-router.get('/stats', authenticate, async (req, res) => {
+router.get('/stats', authenticate, requireModule('discipline'), async (req, res) => {
   try {
     const { academic_year } = req.query;
     const tid = req.user.tenant_id;
@@ -57,7 +57,7 @@ router.get('/stats', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/discipline/:id
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, requireModule('discipline'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
@@ -76,7 +76,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/discipline
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireModule('discipline'), async (req, res) => {
   try {
     const {
       student_id, class_id, incident_date, incident_type, severity,
@@ -118,7 +118,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/discipline/:id
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireModule('discipline'), async (req, res) => {
   try {
     const {
       action_taken, action_details, suspension_days, suspension_start,
@@ -144,7 +144,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/discipline/:id
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireModule('discipline'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('DELETE FROM discipline_incidents WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);

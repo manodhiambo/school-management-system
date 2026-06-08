@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
@@ -32,7 +32,7 @@ async function syncTransportFeeStructure(route, tid) {
 const router = express.Router();
 
 // GET /api/v1/transport/routes
-router.get('/routes', authenticate, async (req, res) => {
+router.get('/routes', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     let rows;
@@ -76,7 +76,7 @@ router.get('/routes', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/transport/routes/:id
-router.get('/routes/:id', authenticate, async (req, res) => {
+router.get('/routes/:id', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     let rows;
@@ -112,7 +112,7 @@ router.get('/routes/:id', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/transport/routes
-router.post('/routes', authenticate, async (req, res) => {
+router.post('/routes', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const {
       route_name, route_code, description, vehicle_registration, vehicle_capacity,
@@ -146,7 +146,7 @@ router.post('/routes', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/transport/routes/:id
-router.put('/routes/:id', authenticate, async (req, res) => {
+router.put('/routes/:id', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const {
       route_name, route_code, description, vehicle_registration, vehicle_capacity,
@@ -190,7 +190,7 @@ router.put('/routes/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/transport/routes/:id
-router.delete('/routes/:id', authenticate, async (req, res) => {
+router.delete('/routes/:id', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     // Remove linked fee_structure first (route_id FK would block delete otherwise)
@@ -206,7 +206,7 @@ router.delete('/routes/:id', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/transport/students/report — full transport student list with payment status (PDF export)
-router.get('/students/report', authenticate, async (req, res) => {
+router.get('/students/report', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { route_id } = req.query;
@@ -252,7 +252,7 @@ router.get('/students/report', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/transport/students — all student transport assignments
-router.get('/students', authenticate, async (req, res) => {
+router.get('/students', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const { route_id, class_id, student_id } = req.query;
     const tid = req.user.tenant_id;
@@ -276,7 +276,7 @@ router.get('/students', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/transport/students — assign student to route
-router.post('/students', authenticate, async (req, res) => {
+router.post('/students', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const { student_id, route_id, pickup_stop, dropoff_stop } = req.body;
     const tid = req.user.tenant_id;
@@ -295,7 +295,7 @@ router.post('/students', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/transport/students/bulk — bulk assign students to a route
-router.post('/students/bulk', authenticate, async (req, res) => {
+router.post('/students/bulk', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const { route_id, student_ids, pickup_stop, dropoff_stop } = req.body;
     if (!route_id || !Array.isArray(student_ids) || !student_ids.length) {
@@ -321,7 +321,7 @@ router.post('/students/bulk', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/transport/students/:id — unassign student
-router.delete('/students/:id', authenticate, async (req, res) => {
+router.delete('/students/:id', authenticate, requireModule('transport'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('UPDATE student_transport SET is_active=FALSE WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);

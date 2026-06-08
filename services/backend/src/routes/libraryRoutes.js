@@ -1,12 +1,13 @@
 import express from 'express';
 import * as libraryController from '../controllers/libraryController.js';
-import { authenticate, authorize } from '../middleware/authMiddleware.js';
+import { authenticate, authorize, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 
 const router = express.Router();
 
 // Apply authentication to all routes
 router.use(authenticate);
+router.use(requireModule('library'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

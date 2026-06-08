@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -237,6 +237,7 @@ router.post('/inbound', async (req, res) => {
 
 // ─── Authenticated routes ─────────────────────────────────────────────────────
 router.use(authenticate);
+router.use(requireModule('communication'));
 
 function adminOnly(req, res, next) {
   if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {

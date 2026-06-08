@@ -1,11 +1,12 @@
 import express from 'express';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import { query } from '../config/database.js';
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requireModule('academics'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

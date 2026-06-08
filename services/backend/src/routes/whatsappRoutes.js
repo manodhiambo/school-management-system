@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 import axios from 'axios';
 
@@ -45,6 +45,7 @@ export async function sendWhatsAppToParent(tenantId, phone, message) {
 
 // ─── Routes (admin only) ─────────────────────────────────────────────────────
 router.use(authenticate);
+router.use(requireModule('communication'));
 
 function adminOnly(req, res, next) {
   if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {

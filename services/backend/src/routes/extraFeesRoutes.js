@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireModule('finance'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

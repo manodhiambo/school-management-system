@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -60,7 +60,7 @@ export { sendStudentAlert };
 // ============================================================
 
 // GET /api/v1/parent-alerts — parent sees their alerts
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireModule('communication'), async (req, res) => {
   try {
     const { student_id, alert_type, is_read, limit = 50, offset = 0 } = req.query;
     const tid = req.user.tenant_id;
@@ -97,7 +97,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET unread count
-router.get('/unread-count', authenticate, async (req, res) => {
+router.get('/unread-count', authenticate, requireModule('communication'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     let sql = `SELECT COUNT(*) as count FROM parent_alerts WHERE tenant_id=$1 AND is_read=FALSE`;
@@ -114,7 +114,7 @@ router.get('/unread-count', authenticate, async (req, res) => {
 });
 
 // PUT /:id/read — mark single alert as read
-router.put('/:id/read', authenticate, async (req, res) => {
+router.put('/:id/read', authenticate, requireModule('communication'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('UPDATE parent_alerts SET is_read=TRUE, read_at=NOW() WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
@@ -125,7 +125,7 @@ router.put('/:id/read', authenticate, async (req, res) => {
 });
 
 // PUT /mark-all-read
-router.put('/mark-all-read', authenticate, async (req, res) => {
+router.put('/mark-all-read', authenticate, requireModule('communication'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     let sql = `UPDATE parent_alerts SET is_read=TRUE, read_at=NOW() WHERE tenant_id=$1 AND is_read=FALSE`;
@@ -142,7 +142,7 @@ router.put('/mark-all-read', authenticate, async (req, res) => {
 });
 
 // POST /send — admin/teacher manually sends an alert
-router.post('/send', authenticate, async (req, res) => {
+router.post('/send', authenticate, requireModule('communication'), async (req, res) => {
   try {
     const { student_id, alert_type, title, message, reference_type, reference_id } = req.body;
     const tid = req.user.tenant_id;
@@ -155,7 +155,7 @@ router.post('/send', authenticate, async (req, res) => {
 });
 
 // POST /broadcast — send alert to all parents in a class or all
-router.post('/broadcast', authenticate, async (req, res) => {
+router.post('/broadcast', authenticate, requireModule('communication'), async (req, res) => {
   try {
     const { class_id, alert_type, title, message } = req.body;
     const tid = req.user.tenant_id;
@@ -180,7 +180,7 @@ router.post('/broadcast', authenticate, async (req, res) => {
 });
 
 // GET /student/:studentId — all alerts for a student (admin/teacher view)
-router.get('/student/:studentId', authenticate, async (req, res) => {
+router.get('/student/:studentId', authenticate, requireModule('communication'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(

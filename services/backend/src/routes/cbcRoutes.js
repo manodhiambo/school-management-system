@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../services/emailService.js';
 
@@ -71,7 +71,7 @@ function autoComment(grade) {
 // ============================================================
 
 // GET /api/v1/cbe/strands?subject_id=&education_level=
-router.get('/strands', authenticate, async (req, res) => {
+router.get('/strands', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { subject_id, education_level } = req.query;
     const tid = req.user.tenant_id;
@@ -91,7 +91,7 @@ router.get('/strands', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/strands
-router.post('/strands', authenticate, async (req, res) => {
+router.post('/strands', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { subject_id, name, code, education_level, order_index } = req.body;
     const tid = req.user.tenant_id;
@@ -108,7 +108,7 @@ router.post('/strands', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/cbe/strands/:id
-router.put('/strands/:id', authenticate, async (req, res) => {
+router.put('/strands/:id', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { name, code, education_level, order_index } = req.body;
     const tid = req.user.tenant_id;
@@ -124,7 +124,7 @@ router.put('/strands/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/cbe/strands/:id
-router.delete('/strands/:id', authenticate, async (req, res) => {
+router.delete('/strands/:id', authenticate, requireModule('academics'), async (req, res) => {
   try {
     await query('DELETE FROM cbc_strands WHERE id=$1 AND tenant_id=$2', [req.params.id, req.user.tenant_id]);
     res.json({ success: true, message: 'Strand deleted' });
@@ -138,7 +138,7 @@ router.delete('/strands/:id', authenticate, async (req, res) => {
 // ============================================================
 
 // GET /api/v1/cbe/sub-strands?strand_id=
-router.get('/sub-strands', authenticate, async (req, res) => {
+router.get('/sub-strands', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { strand_id } = req.query;
     const tid = req.user.tenant_id;
@@ -155,7 +155,7 @@ router.get('/sub-strands', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/sub-strands
-router.post('/sub-strands', authenticate, async (req, res) => {
+router.post('/sub-strands', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { strand_id, name, code, order_index } = req.body;
     const tid = req.user.tenant_id;
@@ -173,7 +173,7 @@ router.post('/sub-strands', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/cbe/sub-strands/:id
-router.put('/sub-strands/:id', authenticate, async (req, res) => {
+router.put('/sub-strands/:id', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { name, code, order_index } = req.body;
     const tid = req.user.tenant_id;
@@ -191,7 +191,7 @@ router.put('/sub-strands/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/cbe/sub-strands/:id
-router.delete('/sub-strands/:id', authenticate, async (req, res) => {
+router.delete('/sub-strands/:id', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query(
@@ -209,7 +209,7 @@ router.delete('/sub-strands/:id', authenticate, async (req, res) => {
 // ============================================================
 
 // GET /api/v1/cbe/assessments?student_id=&class_id=&subject_id=&term=&academic_year=
-router.get('/assessments', authenticate, async (req, res) => {
+router.get('/assessments', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { student_id, class_id, subject_id, term, academic_year } = req.query;
     const tid = req.user.tenant_id;
@@ -238,7 +238,7 @@ router.get('/assessments', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/assessments
-router.post('/assessments', authenticate, async (req, res) => {
+router.post('/assessments', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const {
       student_id, subject_id, strand_id, sub_strand_id, class_id,
@@ -285,7 +285,7 @@ router.post('/assessments', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/cbe/assessments/:id — admin or teacher who created it
-router.put('/assessments/:id', authenticate, async (req, res) => {
+router.put('/assessments/:id', authenticate, requireModule('academics'), async (req, res) => {
   if (!['admin', 'superadmin', 'teacher'].includes(req.user.role)) {
     return res.status(403).json({ success: false, message: 'Access denied' });
   }
@@ -327,7 +327,7 @@ router.put('/assessments/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/cbe/assessments/:id — admin or teacher who created it
-router.delete('/assessments/:id', authenticate, async (req, res) => {
+router.delete('/assessments/:id', authenticate, requireModule('academics'), async (req, res) => {
   if (!['admin', 'superadmin', 'teacher'].includes(req.user.role)) {
     return res.status(403).json({ success: false, message: 'Access denied' });
   }
@@ -350,7 +350,7 @@ router.delete('/assessments/:id', authenticate, async (req, res) => {
 // ============================================================
 
 // GET /api/v1/cbe/competency-summary?student_id=&term=&academic_year=
-router.get('/competency-summary', authenticate, async (req, res) => {
+router.get('/competency-summary', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { student_id, class_id, term, academic_year } = req.query;
     const tid = req.user.tenant_id;
@@ -374,7 +374,7 @@ router.get('/competency-summary', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/competency-summary (upsert)
-router.post('/competency-summary', authenticate, async (req, res) => {
+router.post('/competency-summary', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const {
       student_id, subject_id, class_id, term, academic_year,
@@ -412,7 +412,7 @@ router.post('/competency-summary', authenticate, async (req, res) => {
 // GET /api/v1/cbe/report-cards?student_id=&term=&academic_year=&class_id=
 // When class_id is provided, returns ALL students in that class (LEFT JOIN) so students without
 // a report card yet still appear in the list.
-router.get('/report-cards', authenticate, async (req, res) => {
+router.get('/report-cards', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { student_id, term, academic_year, class_id, status } = req.query;
     const tid = req.user.tenant_id;
@@ -473,7 +473,7 @@ router.get('/report-cards', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/report-cards/generate — bulk-create draft report cards for all students in a class
-router.post('/report-cards/generate', authenticate, async (req, res) => {
+router.post('/report-cards/generate', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { class_id, term, academic_year, closing_date, opening_date } = req.body;
     if (!class_id || !term || !academic_year) {
@@ -526,7 +526,7 @@ router.post('/report-cards/generate', authenticate, async (req, res) => {
 });
 
 // GET single report card with full details + parent/guardian contact info
-router.get('/report-cards/:id', authenticate, async (req, res) => {
+router.get('/report-cards/:id', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const rows = await query(
       `SELECT rc.*,
@@ -878,7 +878,7 @@ router.get('/report-cards/:id', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/report-cards/:id/share — send report card to parent via email and/or WhatsApp
-router.post('/report-cards/:id/share', authenticate, async (req, res) => {
+router.post('/report-cards/:id/share', authenticate, requireModule('academics'), async (req, res) => {
   try {
     // channels: ['email', 'whatsapp']
     // override_email / override_phone / override_name let the sender specify a custom recipient
@@ -993,7 +993,7 @@ router.post('/report-cards/:id/share', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/report-cards (create or upsert)
-router.post('/report-cards', authenticate, async (req, res) => {
+router.post('/report-cards', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const {
       student_id, class_id, term, academic_year,
@@ -1034,7 +1034,7 @@ router.post('/report-cards', authenticate, async (req, res) => {
 
 // PUT /api/v1/cbe/report-cards/bulk-publish — publish multiple cards at once
 // Must come before /:id routes so Express doesn't treat "bulk-publish" as an :id
-router.put('/report-cards/bulk-publish', authenticate, async (req, res) => {
+router.put('/report-cards/bulk-publish', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { ids, class_id, term, academic_year } = req.body;
     const tid = req.user.tenant_id;
@@ -1067,7 +1067,7 @@ router.put('/report-cards/bulk-publish', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/cbe/report-cards/:id/publish
-router.put('/report-cards/:id/publish', authenticate, async (req, res) => {
+router.put('/report-cards/:id/publish', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const rows = await query(
       `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
@@ -1082,7 +1082,7 @@ router.put('/report-cards/:id/publish', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/cbe/report-cards/:id/acknowledge (parent acknowledges)
-router.put('/report-cards/:id/acknowledge', authenticate, async (req, res) => {
+router.put('/report-cards/:id/acknowledge', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { comment } = req.body;
     const rows = await query(
@@ -1101,7 +1101,7 @@ router.put('/report-cards/:id/acknowledge', authenticate, async (req, res) => {
 // ============================================================
 
 // GET /api/v1/cbe/portfolios?student_id=&subject_id=&term=&academic_year=
-router.get('/portfolios', authenticate, async (req, res) => {
+router.get('/portfolios', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { student_id, subject_id, term, academic_year } = req.query;
     const tid = req.user.tenant_id;
@@ -1125,7 +1125,7 @@ router.get('/portfolios', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/portfolios
-router.post('/portfolios', authenticate, async (req, res) => {
+router.post('/portfolios', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { student_id, subject_id, strand_id, title, description, evidence_type, file_url, term, academic_year } = req.body;
     const tid = req.user.tenant_id;
@@ -1142,7 +1142,7 @@ router.post('/portfolios', authenticate, async (req, res) => {
 });
 
 // DELETE /api/v1/cbe/portfolios/:id
-router.delete('/portfolios/:id', authenticate, async (req, res) => {
+router.delete('/portfolios/:id', authenticate, requireModule('academics'), async (req, res) => {
   try {
     await query('DELETE FROM student_portfolios WHERE id=$1', [req.params.id]);
     res.json({ success: true, message: 'Portfolio item deleted' });
@@ -1156,7 +1156,7 @@ router.delete('/portfolios/:id', authenticate, async (req, res) => {
 // ============================================================
 
 // GET /api/v1/cbe/terms
-router.get('/terms', authenticate, async (req, res) => {
+router.get('/terms', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
@@ -1170,7 +1170,7 @@ router.get('/terms', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/cbe/terms/current
-router.get('/terms/current', authenticate, async (req, res) => {
+router.get('/terms/current', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
@@ -1184,7 +1184,7 @@ router.get('/terms/current', authenticate, async (req, res) => {
 });
 
 // POST /api/v1/cbe/terms
-router.post('/terms', authenticate, async (req, res) => {
+router.post('/terms', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const {
       academic_year, term, term_name, start_date, end_date,
@@ -1221,7 +1221,7 @@ router.post('/terms', authenticate, async (req, res) => {
 });
 
 // PUT /api/v1/cbe/terms/:id/set-current
-router.put('/terms/:id/set-current', authenticate, async (req, res) => {
+router.put('/terms/:id/set-current', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('UPDATE academic_terms SET is_current=FALSE WHERE tenant_id=$1', [tid]);
@@ -1239,7 +1239,7 @@ router.put('/terms/:id/set-current', authenticate, async (req, res) => {
 // ============================================================
 
 // GET /api/v1/cbe/class-summary/:classId?term=&academic_year=
-router.get('/class-summary/:classId', authenticate, async (req, res) => {
+router.get('/class-summary/:classId', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const { classId } = req.params;
     const { term, academic_year } = req.query;
@@ -1277,7 +1277,7 @@ router.get('/class-summary/:classId', authenticate, async (req, res) => {
 // ── BROADSHEET ─────────────────────────────────────────────────────────────
 // GET /api/v1/cbe/broadsheet?class_id=&term=&academic_year=
 // Returns a class-wide performance grid: students (rows) × subjects (columns)
-router.get('/broadsheet', authenticate, async (req, res) => {
+router.get('/broadsheet', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { class_id, term, academic_year } = req.query;

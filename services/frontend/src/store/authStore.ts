@@ -10,6 +10,7 @@ interface User {
   tenant_id?: string | null;
   tenant_name?: string;
   tenant_status?: string;
+  disabled_modules?: string[];
 }
 
 interface AuthState {

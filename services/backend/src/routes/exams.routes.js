@@ -1,12 +1,12 @@
 import express from 'express';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
 // GET /exams — role-aware filtering, always scoped to tenant
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireModule('exams'), async (req, res) => {
   try {
     const { class_id, mode } = req.query;
     const role = req.user.role;
@@ -70,7 +70,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET /exams/:id
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, requireModule('exams'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const exams = await query(`
@@ -116,7 +116,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // POST /exams — create exam
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireModule('exams'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const {
@@ -171,7 +171,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // PUT /exams/:id — update exam
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireModule('exams'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const {
@@ -207,7 +207,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /exams/:id
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireModule('exams'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('DELETE FROM exams WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);

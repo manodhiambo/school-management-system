@@ -1327,6 +1327,18 @@ class ApiService {
     return this.api.get('/superadmin/tenants/' + id + '/payments');
   }
 
+  getModuleRegistry() {
+    return this.api.get('/superadmin/modules');
+  }
+
+  getTenantModules(id: string) {
+    return this.api.get('/superadmin/tenants/' + id + '/modules');
+  }
+
+  updateTenantModules(id: string, enabledModules: string[]) {
+    return this.api.put('/superadmin/tenants/' + id + '/modules', { enabled_modules: enabledModules });
+  }
+
   updateSuperAdminProfile(data: { name?: string; phone?: string; currentPassword?: string; newPassword?: string }) {
     return this.api.put('/superadmin/profile', data);
   }

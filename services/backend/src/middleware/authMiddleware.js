@@ -19,7 +19,10 @@ export const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, config.jwt.secret);
     
     const result = await pool.query(
-      'SELECT id, email, role, tenant_id, is_active, is_verified FROM users WHERE id = $1',
+      `SELECT u.id, u.email, u.role, u.tenant_id, u.is_active, u.is_verified, t.disabled_modules
+       FROM users u
+       LEFT JOIN tenants t ON t.id = u.tenant_id
+       WHERE u.id = $1`,
       [decoded.userId]
     );
 
@@ -39,7 +42,8 @@ export const authenticate = async (req, res, next) => {
       role: user.role,
       tenant_id: user.tenant_id || null,
       isActive: user.is_active,
-      isVerified: user.is_verified
+      isVerified: user.is_verified,
+      disabled_modules: user.disabled_modules || []
     };
 
     next();
@@ -103,4 +107,26 @@ export const authorize = (roles = []) => {
   };
 };
 
-export default { authenticate, optionalAuth, authorize };
+/**
+ * PER-TENANT MODULE GATING
+ * requireModule('transport') — blocks access if the tenant has disabled
+ * that module. Superadmins always pass through (they manage the toggle,
+ * not consume it). Users with no tenant (e.g. superadmin) are unaffected.
+ */
+export const requireModule = (moduleKey) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return next(new ApiError(401, 'Authentication required'));
+    }
+    if (req.user.role === 'superadmin' || !req.user.tenant_id) {
+      return next();
+    }
+    const disabled = Array.isArray(req.user.disabled_modules) ? req.user.disabled_modules : [];
+    if (disabled.includes(moduleKey)) {
+      return next(new ApiError(403, 'This module is not enabled for your school. Please contact your administrator.'));
+    }
+    next();
+  };
+};
+
+export default { authenticate, optionalAuth, authorize, requireModule };

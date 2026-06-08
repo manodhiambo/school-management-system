@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Search, Plus, CheckCircle, XCircle, LogIn, Trash2, Edit2,
   X, Loader2, AlertCircle, DollarSign, Calendar, Phone, Mail, Clock,
-  RefreshCw, MoreVertical
+  RefreshCw, MoreVertical, ToggleLeft, ToggleRight, SlidersHorizontal
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,9 @@ type Tenant = {
   teacher_count?: number;
 };
 
-type ModalType = 'create' | 'edit' | 'payments' | 'extend' | 'permanent_delete' | null;
+type ModalType = 'create' | 'edit' | 'payments' | 'extend' | 'permanent_delete' | 'modules' | null;
+
+type TenantModule = { key: string; label: string; enabled: boolean };
 
 const STATUS_COLORS: Record<string, string> = {
   active:    'bg-green-100 text-green-700 border-green-200',
@@ -57,6 +59,8 @@ export function TenantsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [formError, setFormError] = useState('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [modules, setModules] = useState<TenantModule[]>([]);
+  const [modulesLoading, setModulesLoading] = useState(false);
 
   const [form, setForm] = useState({
     school_name: '', email: '', phone: '', address: '',
@@ -188,6 +192,42 @@ export function TenantsPage() {
     finally { setActionLoading(''); setOpenMenu(null); }
   };
 
+  const openModules = async (t: Tenant) => {
+    setSelectedTenant(t);
+    setModal('modules');
+    setOpenMenu(null);
+    setModules([]);
+    setModulesLoading(true);
+    try {
+      const res: any = await api.getTenantModules(t.id);
+      setModules(res?.data ?? []);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to load modules');
+      setModal(null);
+    } finally {
+      setModulesLoading(false);
+    }
+  };
+
+  const toggleModule = (key: string) => {
+    setModules(prev => prev.map(m => m.key === key ? { ...m, enabled: !m.enabled } : m));
+  };
+
+  const handleSaveModules = async () => {
+    if (!selectedTenant) return;
+    setActionLoading('modules');
+    try {
+      const enabledKeys = modules.filter(m => m.enabled).map(m => m.key);
+      const res: any = await api.updateTenantModules(selectedTenant.id, enabledKeys);
+      setModules(res?.data ?? modules);
+      setModal(null);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update modules');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   const getExpiryDate = (t: Tenant) => t.subscription_ends_at || t.trial_ends_at;
   const getStartDate = (t: Tenant) => t.subscription_starts_at;
 
@@ -296,6 +336,10 @@ export function TenantsPage() {
                         <button onClick={() => openEdit(t)}
                           className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                           <Edit2 className="h-4 w-4 mr-2" /> Edit Details
+                        </button>
+                        <button onClick={() => openModules(t)}
+                          className="w-full flex items-center px-4 py-2.5 text-sm text-indigo-600 hover:bg-indigo-50">
+                          <SlidersHorizontal className="h-4 w-4 mr-2" /> Manage Modules
                         </button>
                         <button onClick={() => openPayments(t)}
                           className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
@@ -524,6 +568,55 @@ export function TenantsPage() {
               <Button onClick={handleExtend} disabled={actionLoading === 'extend'}
                 className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold">
                 {actionLoading === 'extend' ? <Loader2 className="animate-spin h-4 w-4" /> : 'Extend'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Modules Modal */}
+      {modal === 'modules' && selectedTenant && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Manage Modules</h2>
+                <p className="text-sm text-gray-500">{selectedTenant.school_name}</p>
+              </div>
+              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-6">
+              <p className="text-sm text-gray-500 mb-4">
+                Switch off any module this school should not have access to. Disabled modules
+                disappear from their dashboard and their API requests to those features are blocked.
+              </p>
+              {modulesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-yellow-500" />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {modules.map(m => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => toggleModule(m.key)}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-left"
+                    >
+                      <span className={`text-sm ${m.enabled ? 'text-gray-900' : 'text-gray-400'}`}>{m.label}</span>
+                      {m.enabled
+                        ? <ToggleRight className="h-7 w-7 text-green-500 flex-shrink-0" />
+                        : <ToggleLeft className="h-7 w-7 text-gray-300 flex-shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex space-x-3 p-6 border-t flex-shrink-0">
+              <Button variant="outline" className="flex-1" onClick={() => setModal(null)}>Cancel</Button>
+              <Button onClick={handleSaveModules} disabled={actionLoading === 'modules' || modulesLoading}
+                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold">
+                {actionLoading === 'modules' ? <><Loader2 className="animate-spin h-4 w-4 mr-2" />Saving...</> : 'Save Changes'}
               </Button>
             </div>
           </div>

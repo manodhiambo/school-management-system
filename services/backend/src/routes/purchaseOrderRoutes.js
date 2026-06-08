@@ -1,11 +1,12 @@
 import express from 'express';
 import purchaseOrderController from '../controllers/purchaseOrderController.js';
-import { authenticate, authorize } from '../middleware/authMiddleware.js';
+import { authenticate, authorize, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requireModule('finance'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 router.use(authorize(['admin', 'finance_officer']));

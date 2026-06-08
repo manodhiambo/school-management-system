@@ -1,6 +1,6 @@
 import express from 'express';
 import academicController from '../controllers/academicController.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { validateRequest, schemas } from '../utils/validators.js';
@@ -10,6 +10,7 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(authenticate);
+router.use(requireModule('academics'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 

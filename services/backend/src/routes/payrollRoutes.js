@@ -237,7 +237,11 @@ router.put('/assignments/:userId', requireFinance, async (req, res) => {
 router.get('/runs', requireFinance, async (req, res) => {
   try {
     const rows = await query(
-      `SELECT * FROM payroll_runs WHERE tenant_id = $1 ORDER BY period_year DESC, period_month DESC`,
+      `SELECT pr.*,
+              (SELECT COUNT(*) FROM payslips p WHERE p.payroll_run_id = pr.id AND p.tenant_id = pr.tenant_id)::int AS payslips_count
+       FROM payroll_runs pr
+       WHERE pr.tenant_id = $1
+       ORDER BY pr.period_year DESC, pr.period_month DESC`,
       [req.user.tenant_id]
     );
     res.json({ success: true, data: rows });
@@ -351,7 +355,7 @@ router.post('/runs/:id/process', requireFinance, async (req, res) => {
       [Math.round(totalGross), Math.round(totalNet), run.id, tid]
     );
 
-    res.json({ success: true, data: updated[0], payslips_created: staff.length });
+    res.json({ success: true, data: { ...updated[0], payslips_count: staff.length }, payslips_created: staff.length });
   } catch (err) {
     logger.error('Process payroll run error:', err);
     res.status(500).json({ success: false, message: err.message });

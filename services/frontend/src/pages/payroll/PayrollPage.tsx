@@ -16,10 +16,12 @@ import { jsPDF } from 'jspdf';
 type Tab = 'structures' | 'assignments' | 'runs' | 'payslips' | 'p9';
 
 const RUN_STATUS_COLORS: Record<string, string> = {
-  draft:    'bg-gray-100 text-gray-700',
+  draft:    'bg-yellow-100 text-yellow-800',
   approved: 'bg-blue-100 text-blue-800',
   paid:     'bg-green-100 text-green-800',
 };
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const EMPTY_STRUCTURE = {
   name: '', basic_salary: '', house_allowance: '', transport_allow: '',
@@ -148,15 +150,27 @@ export function PayrollPage() {
   };
 
   const runAction = async (id: string, action: 'process' | 'approve' | 'paid') => {
+    setLoading(true);
     try {
-      if (action === 'process') await (api as any).processPayrollRun(id);
-      if (action === 'approve') await (api as any).approvePayrollRun(id);
-      if (action === 'paid')    await (api as any).markPayrollPaid(id);
-      toast({ title: 'Done' });
-      loadTab();
+      if (action === 'process') {
+        const res: any = await (api as any).processPayrollRun(id);
+        const count = res?.payslips_created || res?.data?.payslips_count || 0;
+        toast({ title: 'Payroll processed', description: `${count} payslip(s) generated. Click "Approve" to continue.` });
+      }
+      if (action === 'approve') {
+        await (api as any).approvePayrollRun(id);
+        toast({ title: 'Payroll approved', description: 'Click "Mark Paid" once salaries are disbursed.' });
+      }
+      if (action === 'paid') {
+        await (api as any).markPayrollPaid(id);
+        toast({ title: 'Payroll marked as paid' });
+      }
+      // Reload runs to get updated payslips_count and status
+      const res: any = await (api as any).getPayrollRuns();
+      setRuns(res?.data || []);
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
-    }
+    } finally { setLoading(false); }
   };
 
   const viewPayslips = async (run: any) => {
@@ -533,44 +547,73 @@ export function PayrollPage() {
             <div className="text-center py-12 text-gray-400">No payroll runs yet</div>
           ) : (
             <div className="space-y-3">
-              {runs.map(r => (
-                <Card key={r.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="font-semibold text-lg">
-                          {new Date(r.period_year, r.period_month - 1).toLocaleString('default', { month: 'long' })} {r.period_year}
+              {runs.map(r => {
+                const isProcessed = (r.payslips_count > 0) || (Number(r.total_gross) > 0);
+                const month = MONTHS[(r.period_month - 1)] || r.period_month;
+                return (
+                  <Card key={r.id}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between flex-wrap gap-2">
+                        <div>
+                          <div className="font-semibold text-lg">{month} {r.period_year}</div>
+                          {isProcessed ? (
+                            <div className="text-sm text-gray-500 mt-1">
+                              <span className="text-green-700 font-medium">{r.payslips_count} staff</span>
+                              {' '}· Gross: KES {Number(r.total_gross||0).toLocaleString()}
+                              {' '}· Net: KES {Number(r.total_net||0).toLocaleString()}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-orange-600 mt-1 flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> Not yet processed — click Process to generate payslips
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          Gross: KES {Number(r.total_gross||0).toLocaleString()} &nbsp;|&nbsp;
-                          Net: KES {Number(r.total_net||0).toLocaleString()}
+                        <div className="flex items-center gap-2">
+                          {isProcessed && r.status === 'draft' && (
+                            <Badge className="bg-orange-100 text-orange-800">Ready to Approve</Badge>
+                          )}
+                          <Badge className={RUN_STATUS_COLORS[r.status] || ''}>{r.status}</Badge>
                         </div>
                       </div>
-                      <Badge className={RUN_STATUS_COLORS[r.status] || ''}>{r.status}</Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      {r.status === 'draft' && (
-                        <Button size="sm" variant="outline" onClick={() => runAction(r.id, 'process')}>
-                          Process
+
+                      {/* Workflow steps */}
+                      <div className="flex items-center gap-1 mt-3 text-xs text-gray-400">
+                        <span className={`px-2 py-0.5 rounded-full ${true ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>1. Created</span>
+                        <span>→</span>
+                        <span className={`px-2 py-0.5 rounded-full ${isProcessed ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>2. Process</span>
+                        <span>→</span>
+                        <span className={`px-2 py-0.5 rounded-full ${r.status === 'approved' || r.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>3. Approve</span>
+                        <span>→</span>
+                        <span className={`px-2 py-0.5 rounded-full ${r.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>4. Paid</span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {r.status === 'draft' && (
+                          <Button size="sm" variant="outline" onClick={() => runAction(r.id, 'process')}>
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            {isProcessed ? 'Re-process' : 'Process'}
+                          </Button>
+                        )}
+                        {r.status === 'draft' && isProcessed && (
+                          <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => runAction(r.id, 'approve')}>
+                            <CheckCircle className="h-3 w-3 mr-1" /> Approve
+                          </Button>
+                        )}
+                        {r.status === 'approved' && (
+                          <Button size="sm" className="bg-green-600 text-white hover:bg-green-700" onClick={() => runAction(r.id, 'paid')}>
+                            <CreditCard className="h-3 w-3 mr-1" /> Mark Paid
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => viewPayslips(r)}
+                          disabled={!isProcessed}>
+                          <FileText className="h-3 w-3 mr-1" /> View Payslips
+                          {r.payslips_count > 0 && <span className="ml-1 bg-gray-200 text-gray-700 rounded-full px-1.5 text-xs">{r.payslips_count}</span>}
                         </Button>
-                      )}
-                      {r.status === 'draft' && (
-                        <Button size="sm" variant="outline" onClick={() => runAction(r.id, 'approve')}>
-                          Approve
-                        </Button>
-                      )}
-                      {r.status === 'approved' && (
-                        <Button size="sm" variant="outline" onClick={() => runAction(r.id, 'paid')}>
-                          <CreditCard className="h-3 w-3 mr-1" /> Mark Paid
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => viewPayslips(r)}>
-                        <FileText className="h-3 w-3 mr-1" /> View Payslips
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
@@ -708,7 +751,14 @@ export function PayrollPage() {
           {loading ? (
             <div className="flex justify-center py-12"><RefreshCw className="h-6 w-6 animate-spin text-blue-500" /></div>
           ) : payslips.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">No payslips for this run</div>
+            <div className="text-center py-12 text-gray-400">
+              <FileText className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p className="font-medium text-gray-500">No payslips found for this run</p>
+              <p className="text-sm mt-2">Go back to Payroll Runs and click <strong>Process</strong> to generate payslips for this period.</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => { setTab('runs'); setSelectedRun(null); }}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back to Runs
+              </Button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

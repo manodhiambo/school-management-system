@@ -162,18 +162,24 @@ router.get('/assignments', requireFinance, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
-      `SELECT u.id AS user_id, u.first_name || ' ' || u.last_name AS full_name,
+      `SELECT u.id AS user_id,
+              COALESCE(
+                CASE WHEN u.role = 'teacher' THEN t.first_name || ' ' || t.last_name END,
+                NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
+                u.email
+              ) AS full_name,
               u.email, u.role,
               ssa.salary_structure_id, ssa.basic_override, ssa.effective_from,
               ss.name AS structure_name, ss.basic_salary,
               ss.house_allowance, ss.transport_allow, ss.medical_allow,
               ss.other_allowance, ss.nssf_rate, ss.nhif_amount
        FROM users u
-       LEFT JOIN staff_salary_assignments ssa ON ssa.user_id = u.id
+       LEFT JOIN teachers t ON t.user_id = u.id AND u.role = 'teacher'
+       LEFT JOIN staff_salary_assignments ssa ON ssa.user_id = u.id AND ssa.tenant_id = $1
        LEFT JOIN salary_structures ss ON ss.id = ssa.salary_structure_id
        WHERE u.tenant_id = $1
          AND u.role IN ('teacher', 'admin', 'finance_officer')
-       ORDER BY u.first_name`,
+       ORDER BY full_name`,
       [tid]
     );
     res.json({ success: true, data: rows });
@@ -294,7 +300,7 @@ router.post('/runs/:id/process', requireFinance, async (req, res) => {
               ss.house_allowance, ss.transport_allow, ss.medical_allow,
               ss.other_allowance, ss.nssf_rate, ss.nhif_amount
        FROM users u
-       JOIN staff_salary_assignments ssa ON ssa.user_id = u.id
+       JOIN staff_salary_assignments ssa ON ssa.user_id = u.id AND ssa.tenant_id = $1
        JOIN salary_structures ss ON ss.id = ssa.salary_structure_id
        WHERE u.tenant_id = $1 AND u.role IN ('teacher','admin','finance_officer')`,
       [tid]
@@ -390,12 +396,17 @@ router.get('/runs/:id/payslips', requireFinance, async (req, res) => {
     const tid = req.user.tenant_id;
     const rows = await query(
       `SELECT p.*,
-              u.first_name || ' ' || u.last_name AS full_name,
+              COALESCE(
+                CASE WHEN u.role = 'teacher' THEN t.first_name || ' ' || t.last_name END,
+                NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
+                u.email
+              ) AS full_name,
               u.email, u.role
        FROM payslips p
        JOIN users u ON u.id = p.user_id
+       LEFT JOIN teachers t ON t.user_id = u.id AND u.role = 'teacher'
        WHERE p.payroll_run_id = $1 AND p.tenant_id = $2
-       ORDER BY u.first_name`,
+       ORDER BY full_name`,
       [req.params.id, tid]
     );
     res.json({ success: true, data: rows });
@@ -413,11 +424,16 @@ router.get('/payslip/:id', async (req, res) => {
 
     const rows = await query(
       `SELECT p.*,
-              u.first_name || ' ' || u.last_name AS full_name,
+              COALESCE(
+                CASE WHEN u.role = 'teacher' THEN t.first_name || ' ' || t.last_name END,
+                NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
+                u.email
+              ) AS full_name,
               u.email, u.role,
               pr.period_year, pr.period_month, pr.status AS run_status
        FROM payslips p
        JOIN users u ON u.id = p.user_id
+       LEFT JOIN teachers t ON t.user_id = u.id AND u.role = 'teacher'
        JOIN payroll_runs pr ON pr.id = p.payroll_run_id
        WHERE p.id = $1 AND p.tenant_id = $2`,
       [req.params.id, tid]
@@ -465,10 +481,17 @@ router.get('/p9-employees', requireFinance, async (req, res) => {
     const tid  = req.user.tenant_id;
     const year = req.query.year || new Date().getFullYear();
     const rows = await query(
-      `SELECT DISTINCT u.id, u.first_name || ' ' || u.last_name AS full_name, u.email, u.role
+      `SELECT DISTINCT u.id,
+              COALESCE(
+                CASE WHEN u.role = 'teacher' THEN t.first_name || ' ' || t.last_name END,
+                NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
+                u.email
+              ) AS full_name,
+              u.email, u.role
        FROM payslips p
        JOIN payroll_runs pr ON pr.id = p.payroll_run_id
        JOIN users u ON u.id = p.user_id
+       LEFT JOIN teachers t ON t.user_id = u.id AND u.role = 'teacher'
        WHERE p.tenant_id = $1 AND pr.period_year = $2 AND pr.status = 'paid'
        ORDER BY full_name`,
       [tid, year]
@@ -490,7 +513,16 @@ router.get('/p9', requireFinance, async (req, res) => {
     }
 
     const userRows = await query(
-      `SELECT id, first_name || ' ' || last_name AS full_name, email, role FROM users WHERE id = $1 AND tenant_id = $2`,
+      `SELECT u.id,
+              COALESCE(
+                CASE WHEN u.role = 'teacher' THEN t.first_name || ' ' || t.last_name END,
+                NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
+                u.email
+              ) AS full_name,
+              u.email, u.role
+       FROM users u
+       LEFT JOIN teachers t ON t.user_id = u.id AND u.role = 'teacher'
+       WHERE u.id = $1 AND u.tenant_id = $2`,
       [userId, tid]
     );
     if (!userRows.length) return res.status(404).json({ success: false, message: 'Employee not found' });

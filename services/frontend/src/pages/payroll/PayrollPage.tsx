@@ -22,8 +22,8 @@ const RUN_STATUS_COLORS: Record<string, string> = {
 };
 
 const EMPTY_STRUCTURE = {
-  name: '', basic_salary: '', house_allowance: '', transport_allowance: '',
-  medical_allowance: '', other_allowances: '', nssf_rate: '6', nhif_amount: '500',
+  name: '', basic_salary: '', house_allowance: '', transport_allow: '',
+  medical_allow: '', other_allowance: '', nssf_rate: '6', nhif_amount: '500',
 };
 
 export function PayrollPage() {
@@ -93,7 +93,7 @@ export function PayrollPage() {
         const staffList = sRes?.data || [];
         setStaff(staffList);
         const map: Record<string, string> = {};
-        staffList.forEach((s: any) => { map[s.id] = s.salary_structure_id || ''; });
+        staffList.forEach((s: any) => { map[s.user_id] = s.salary_structure_id || ''; });
         setAssignMap(map);
         setStructures(structRes?.data || []);
       }
@@ -135,7 +135,7 @@ export function PayrollPage() {
 
   const createRun = async () => {
     try {
-      await (api as any).createPayrollRun(runForm);
+      await (api as any).createPayrollRun({ period_year: runForm.year, period_month: runForm.month });
       toast({ title: 'Payroll run created' });
       setShowRunForm(false);
       loadTab();
@@ -177,19 +177,19 @@ export function PayrollPage() {
       h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}
       td,th{padding:8px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5}
       .total{font-weight:bold}</style></head><body>
-      <h2>PAYSLIP — ${selectedRun?.month}/${selectedRun?.year}</h2>
-      <p><strong>Employee:</strong> ${p.employee_name || p.name}</p>
-      <p><strong>Period:</strong> ${selectedRun?.month}/${selectedRun?.year}</p>
+      <h2>PAYSLIP — ${selectedRun?.period_month}/${selectedRun?.period_year}</h2>
+      <p><strong>Employee:</strong> ${p.full_name}</p>
+      <p><strong>Period:</strong> ${selectedRun?.period_month}/${selectedRun?.period_year}</p>
       <table>
         <tr><th>Item</th><th>Amount (KES)</th></tr>
         <tr><td>Basic Salary</td><td>${Number(p.basic_salary||0).toLocaleString()}</td></tr>
-        <tr><td>Allowances</td><td>${Number(p.total_allowances||0).toLocaleString()}</td></tr>
-        <tr class="total"><td>Gross Pay</td><td>${Number(p.gross_pay||0).toLocaleString()}</td></tr>
+        <tr><td>Allowances</td><td>${(Number(p.house_allowance||0)+Number(p.transport_allow||0)+Number(p.medical_allow||0)+Number(p.other_allowance||0)).toLocaleString()}</td></tr>
+        <tr class="total"><td>Gross Pay</td><td>${Number(p.gross_salary||0).toLocaleString()}</td></tr>
         <tr><td>NSSF</td><td>${Number(p.nssf_deduction||0).toLocaleString()}</td></tr>
         <tr><td>NHIF</td><td>${Number(p.nhif_deduction||0).toLocaleString()}</td></tr>
-        <tr><td>PAYE</td><td>${Number(p.paye||0).toLocaleString()}</td></tr>
-        <tr class="total"><td>Total Deductions</td><td>${Number(p.total_deductions||0).toLocaleString()}</td></tr>
-        <tr class="total"><td>Net Pay</td><td>${Number(p.net_pay||0).toLocaleString()}</td></tr>
+        <tr><td>PAYE</td><td>${Number(p.paye_tax||0).toLocaleString()}</td></tr>
+        <tr class="total"><td>Total Deductions</td><td>${(Number(p.paye_tax||0)+Number(p.nssf_deduction||0)+Number(p.nhif_deduction||0)+Number(p.other_deductions||0)).toLocaleString()}</td></tr>
+        <tr class="total"><td>Net Pay</td><td>${Number(p.net_salary||0).toLocaleString()}</td></tr>
       </table>
       <p style="margin-top:40px;text-align:center">Generated ${new Date().toLocaleDateString()}</p>
       </body></html>
@@ -376,18 +376,18 @@ export function PayrollPage() {
                 </div>
                 <div>
                   <Label>Transport Allowance (KES)</Label>
-                  <Input type="number" className="mt-1" value={structForm.transport_allowance}
-                    onChange={e => setStructForm(f => ({ ...f, transport_allowance: e.target.value }))} />
+                  <Input type="number" className="mt-1" value={structForm.transport_allow}
+                    onChange={e => setStructForm(f => ({ ...f, transport_allow: e.target.value }))} />
                 </div>
                 <div>
                   <Label>Medical Allowance (KES)</Label>
-                  <Input type="number" className="mt-1" value={structForm.medical_allowance}
-                    onChange={e => setStructForm(f => ({ ...f, medical_allowance: e.target.value }))} />
+                  <Input type="number" className="mt-1" value={structForm.medical_allow}
+                    onChange={e => setStructForm(f => ({ ...f, medical_allow: e.target.value }))} />
                 </div>
                 <div>
                   <Label>Other Allowances (KES)</Label>
-                  <Input type="number" className="mt-1" value={structForm.other_allowances}
-                    onChange={e => setStructForm(f => ({ ...f, other_allowances: e.target.value }))} />
+                  <Input type="number" className="mt-1" value={structForm.other_allowance}
+                    onChange={e => setStructForm(f => ({ ...f, other_allowance: e.target.value }))} />
                 </div>
                 <div>
                   <Label>NSSF Rate (%)</Label>
@@ -428,8 +428,8 @@ export function PayrollPage() {
                       <td className="py-3 pr-4 font-medium">{s.name}</td>
                       <td className="py-3 pr-4 text-right">{Number(s.basic_salary||0).toLocaleString()}</td>
                       <td className="py-3 pr-4 text-right">
-                        {(Number(s.house_allowance||0)+Number(s.transport_allowance||0)+
-                          Number(s.medical_allowance||0)+Number(s.other_allowances||0)).toLocaleString()}
+                        {(Number(s.house_allowance||0)+Number(s.transport_allow||0)+
+                          Number(s.medical_allow||0)+Number(s.other_allowance||0)).toLocaleString()}
                       </td>
                       <td className="py-3 pr-4 text-right">{s.nssf_rate}%</td>
                       <td className="py-3 pr-4 text-right">{Number(s.nhif_amount||0).toLocaleString()}</td>
@@ -470,20 +470,20 @@ export function PayrollPage() {
                 </thead>
                 <tbody>
                   {staff.map(s => (
-                    <tr key={s.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 pr-4 font-medium">{s.name || s.full_name}</td>
+                    <tr key={s.user_id} className="border-b hover:bg-gray-50">
+                      <td className="py-3 pr-4 font-medium">{s.full_name}</td>
                       <td className="py-3 pr-4 capitalize">{s.role}</td>
                       <td className="py-3 pr-4 text-gray-500">{s.structure_name || '—'}</td>
                       <td className="py-3 pr-4">
                         <select className="border rounded px-2 py-1 text-sm"
-                          value={assignMap[s.id] || ''}
-                          onChange={e => setAssignMap(m => ({ ...m, [s.id]: e.target.value }))}>
+                          value={assignMap[s.user_id] || ''}
+                          onChange={e => setAssignMap(m => ({ ...m, [s.user_id]: e.target.value }))}>
                           <option value="">None</option>
                           {structures.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
                         </select>
                       </td>
                       <td className="py-3">
-                        <Button size="sm" onClick={() => assignStructure(s.id)}>Save</Button>
+                        <Button size="sm" onClick={() => assignStructure(s.user_id)}>Save</Button>
                       </td>
                     </tr>
                   ))}
@@ -535,7 +535,7 @@ export function PayrollPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="font-semibold text-lg">
-                          {new Date(r.year, r.month - 1).toLocaleString('default', { month: 'long' })} {r.year}
+                          {new Date(r.period_year, r.period_month - 1).toLocaleString('default', { month: 'long' })} {r.period_year}
                         </div>
                         <div className="text-sm text-gray-500 mt-1">
                           Gross: KES {Number(r.total_gross||0).toLocaleString()} &nbsp;|&nbsp;
@@ -697,7 +697,7 @@ export function PayrollPage() {
               <ChevronLeft className="h-4 w-4 mr-1" /> Back to Runs
             </Button>
             <h2 className="text-lg font-semibold">
-              Payslips — {selectedRun && `${new Date(selectedRun.year, selectedRun.month - 1).toLocaleString('default', { month: 'long' })} ${selectedRun.year}`}
+              Payslips — {selectedRun && `${new Date(selectedRun.period_year, selectedRun.period_month - 1).toLocaleString('default', { month: 'long' })} ${selectedRun.period_year}`}
             </h2>
           </div>
 
@@ -721,12 +721,12 @@ export function PayrollPage() {
                 <tbody>
                   {payslips.map(p => (
                     <tr key={p.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 pr-4 font-medium">{p.employee_name || p.name}</td>
+                      <td className="py-3 pr-4 font-medium">{p.full_name}</td>
                       <td className="py-3 pr-4 text-right">{Number(p.basic_salary||0).toLocaleString()}</td>
-                      <td className="py-3 pr-4 text-right">{Number(p.gross_pay||0).toLocaleString()}</td>
-                      <td className="py-3 pr-4 text-right">{Number(p.total_deductions||0).toLocaleString()}</td>
+                      <td className="py-3 pr-4 text-right">{Number(p.gross_salary||0).toLocaleString()}</td>
+                      <td className="py-3 pr-4 text-right">{(Number(p.paye_tax||0)+Number(p.nssf_deduction||0)+Number(p.nhif_deduction||0)+Number(p.other_deductions||0)).toLocaleString()}</td>
                       <td className="py-3 pr-4 text-right font-semibold text-green-700">
-                        {Number(p.net_pay||0).toLocaleString()}
+                        {Number(p.net_salary||0).toLocaleString()}
                       </td>
                       <td className="py-3">
                         <Button size="sm" variant="outline" onClick={() => printPayslip(p)}>
@@ -743,13 +743,13 @@ export function PayrollPage() {
                       {payslips.reduce((s,p) => s + Number(p.basic_salary||0), 0).toLocaleString()}
                     </td>
                     <td className="py-3 pr-4 text-right">
-                      {payslips.reduce((s,p) => s + Number(p.gross_pay||0), 0).toLocaleString()}
+                      {payslips.reduce((s,p) => s + Number(p.gross_salary||0), 0).toLocaleString()}
                     </td>
                     <td className="py-3 pr-4 text-right">
-                      {payslips.reduce((s,p) => s + Number(p.total_deductions||0), 0).toLocaleString()}
+                      {payslips.reduce((s,p) => s + Number(p.paye_tax||0)+Number(p.nssf_deduction||0)+Number(p.nhif_deduction||0)+Number(p.other_deductions||0), 0).toLocaleString()}
                     </td>
                     <td className="py-3 pr-4 text-right text-green-700">
-                      {payslips.reduce((s,p) => s + Number(p.net_pay||0), 0).toLocaleString()}
+                      {payslips.reduce((s,p) => s + Number(p.net_salary||0), 0).toLocaleString()}
                     </td>
                     <td></td>
                   </tr>

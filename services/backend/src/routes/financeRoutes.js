@@ -140,8 +140,8 @@ router.get('/reports/trial-balance', async (req, res) => {
     // Petty cash
     const pcRows = await query(`
       SELECT
-        COALESCE(SUM(CASE WHEN transaction_type='receipt' THEN amount ELSE -amount END), 0) AS balance
-      FROM petty_cash_transactions
+        COALESCE(SUM(CASE WHEN transaction_type IN ('replenishment','refund') THEN amount ELSE -amount END), 0) AS balance
+      FROM petty_cash
       WHERE tenant_id = $1
         AND transaction_date BETWEEN $2 AND $3
     `, [tid, from, to]);
@@ -179,7 +179,7 @@ router.get('/reports/balance-sheet', async (req, res) => {
 
     // Assets: fixed assets
     const fixedAssets = await query(`
-      SELECT asset_name, COALESCE(current_value, purchase_price, 0) AS value, asset_category
+      SELECT asset_name, COALESCE(current_value, purchase_cost, 0) AS value, asset_category
       FROM assets
       WHERE tenant_id = $1 AND status != 'disposed'
       ORDER BY asset_name
@@ -187,8 +187,8 @@ router.get('/reports/balance-sheet', async (req, res) => {
 
     // Assets: petty cash balance
     const pcRes = await query(`
-      SELECT COALESCE(SUM(CASE WHEN transaction_type='receipt' THEN amount ELSE -amount END), 0) AS balance
-      FROM petty_cash_transactions WHERE tenant_id = $1 AND transaction_date <= $2
+      SELECT COALESCE(SUM(CASE WHEN transaction_type IN ('replenishment','refund') THEN amount ELSE -amount END), 0) AS balance
+      FROM petty_cash WHERE tenant_id = $1 AND transaction_date <= $2
     `, [tid, asOf]);
     const pettyCash = Math.max(Number(pcRes[0]?.balance || 0), 0);
 

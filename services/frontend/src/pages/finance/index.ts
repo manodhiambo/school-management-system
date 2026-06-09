@@ -7,3 +7,4 @@ export { default as PettyCash } from './PettyCash';
 export { default as Assets } from './Assets';
 export { default as Reports } from './Reports';
 export { default as FinancialYears } from './FinancialYears';
+export { default as AdvancedReports } from './AdvancedReports';

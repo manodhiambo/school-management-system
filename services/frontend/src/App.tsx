@@ -91,6 +91,7 @@ import {
   PettyCash,
   Assets,
   Reports,
+  AdvancedReports,
 } from './pages/finance';
 import FinancialYears from "./pages/finance/FinancialYears";
 
@@ -219,6 +220,7 @@ function App() {
               <Route path="finance/assets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Assets /></RoleRoute>} />
               <Route path="finance/reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Reports /></RoleRoute>} />
               <Route path="finance/financial-years" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FinancialYears /></RoleRoute>} />
+              <Route path="finance/advanced-reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><AdvancedReports /></RoleRoute>} />
 
               {/* Student Routes */}
               <Route path="my-courses" element={<MyCoursesPage />} />

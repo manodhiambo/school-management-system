@@ -1501,6 +1501,16 @@ class ApiService {
   markPayrollPaid(id: string) { return this.api.put('/payroll/runs/' + id + '/mark-paid', {}); }
   getRunPayslips(runId: string) { return this.api.get('/payroll/runs/' + runId + '/payslips'); }
   getMyPayslips() { return this.api.get('/payroll/my-payslips'); }
+  getP9Employees(params?: any) { return this.api.get('/payroll/p9-employees', { params }); }
+  getP9Form(params: any) { return this.api.get('/payroll/p9', { params }); }
+
+  // ── Advanced Accounting Reports ────────────────────────────────────────
+  getTrialBalance(params?: any) { return this.api.get('/finance/reports/trial-balance', { params }); }
+  getBalanceSheet(params?: any) { return this.api.get('/finance/reports/balance-sheet', { params }); }
+  getGeneralLedger(params?: any) { return this.api.get('/finance/reports/general-ledger', { params }); }
+  getJournals(params?: any) { return this.api.get('/finance/journals', { params }); }
+  getJournalDetail(id: string) { return this.api.get('/finance/journals/' + id); }
+  createJournal(data: any) { return this.api.post('/finance/journals', data); }
 
   // ── Staff Appraisals ──────────────────────────────────────────────────────
   getAppraisalTemplates() { return this.api.get('/appraisals/templates'); }

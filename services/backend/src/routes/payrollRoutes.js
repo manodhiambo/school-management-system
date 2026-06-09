@@ -438,4 +438,98 @@ router.get('/my-payslips', async (req, res) => {
   }
 });
 
+// ── P9 Form (KRA Annual Tax Deduction Card) ────────────────────────────────
+
+// GET /api/v1/payroll/p9-employees?year= — list employees who have payslips for a year
+router.get('/p9-employees', requireFinance, async (req, res) => {
+  try {
+    const tid  = req.user.tenant_id;
+    const year = req.query.year || new Date().getFullYear();
+    const rows = await query(
+      `SELECT DISTINCT u.id, u.first_name || ' ' || u.last_name AS full_name, u.email, u.role
+       FROM payslips p
+       JOIN payroll_runs pr ON pr.id = p.payroll_run_id
+       JOIN users u ON u.id = p.user_id
+       WHERE p.tenant_id = $1 AND pr.period_year = $2 AND pr.status = 'paid'
+       ORDER BY full_name`,
+      [tid, year]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('P9 employees error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/v1/payroll/p9?year=&userId= — P9 data for one employee
+router.get('/p9', requireFinance, async (req, res) => {
+  try {
+    const tid    = req.user.tenant_id;
+    const { year, userId } = req.query;
+    if (!year || !userId) {
+      return res.status(400).json({ success: false, message: 'year and userId are required' });
+    }
+
+    const userRows = await query(
+      `SELECT id, first_name || ' ' || last_name AS full_name, email, role FROM users WHERE id = $1 AND tenant_id = $2`,
+      [userId, tid]
+    );
+    if (!userRows.length) return res.status(404).json({ success: false, message: 'Employee not found' });
+
+    // Monthly payslip data for the year
+    const months = await query(
+      `SELECT pr.period_month, pr.period_year,
+              p.basic_salary, p.house_allowance, p.transport_allow, p.medical_allow, p.other_allowance,
+              p.gross_salary, p.nssf_deduction, p.nhif_deduction, p.paye_tax, p.net_salary
+       FROM payslips p
+       JOIN payroll_runs pr ON pr.id = p.payroll_run_id
+       WHERE p.user_id = $1 AND p.tenant_id = $2 AND pr.period_year = $3 AND pr.status = 'paid'
+       ORDER BY pr.period_month`,
+      [userId, tid, year]
+    );
+
+    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    const p9Lines = Array.from({ length: 12 }, (_, i) => {
+      const m = months.find(r => Number(r.period_month) === i + 1);
+      if (!m) return { month: MONTH_NAMES[i], monthNum: i + 1, gross: 0, nssf: 0, chargeablePay: 0, paye: 0, nhif: 0, net: 0 };
+      const gross        = Number(m.gross_salary);
+      const nssf         = Number(m.nssf_deduction);
+      const chargeablePay = Math.max(0, gross - nssf);
+      return {
+        month:        MONTH_NAMES[i],
+        monthNum:     i + 1,
+        gross,
+        nssf,
+        chargeablePay,
+        paye:         Number(m.paye_tax),
+        nhif:         Number(m.nhif_deduction),
+        net:          Number(m.net_salary),
+      };
+    });
+
+    const totals = p9Lines.reduce((acc, l) => ({
+      gross:         acc.gross         + l.gross,
+      nssf:          acc.nssf          + l.nssf,
+      chargeablePay: acc.chargeablePay + l.chargeablePay,
+      paye:          acc.paye          + l.paye,
+      nhif:          acc.nhif          + l.nhif,
+      net:           acc.net           + l.net,
+    }), { gross: 0, nssf: 0, chargeablePay: 0, paye: 0, nhif: 0, net: 0 });
+
+    res.json({
+      success: true,
+      data: {
+        employee: userRows[0],
+        year,
+        lines: p9Lines,
+        totals,
+      },
+    });
+  } catch (err) {
+    logger.error('P9 form error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 export default router;

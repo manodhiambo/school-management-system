@@ -109,6 +109,7 @@ const navigationItems: NavItem[] = [
   { name: 'Petty Cash',        href: '/app/finance/petty-cash',       icon: DollarSign,roles: ['admin', 'finance_officer'], section: 'Finance', module: 'finance' },
   { name: 'Assets',            href: '/app/finance/assets',           icon: Building2, roles: ['admin', 'finance_officer'], section: 'Finance', module: 'finance' },
   { name: 'Financial Reports', href: '/app/finance/reports',          icon: FileText,  roles: ['admin', 'finance_officer'], section: 'Finance', module: 'finance' },
+  { name: 'Advanced Reports',  href: '/app/finance/advanced-reports', icon: BarChart2, roles: ['admin', 'finance_officer'], section: 'Finance', module: 'finance', badge: 'New' },
   { name: 'Financial Years',   href: '/app/finance/financial-years',  icon: Calendar,  roles: ['admin', 'finance_officer'], section: 'Finance', module: 'finance' },
   { name: 'Fee Management',    href: '/app/fee',                      icon: DollarSign,roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
   { name: 'Fee Structure',     href: '/app/fee-structure',            icon: DollarSign,roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },

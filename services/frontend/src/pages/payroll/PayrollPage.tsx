@@ -79,6 +79,8 @@ export function PayrollPage() {
   }, [p9Year, tab]);
 
   const loadTab = async () => {
+    // payslips tab is loaded by viewPayslips(), not here
+    if (tab === 'payslips' || tab === 'p9') return;
     setLoading(true);
     try {
       if (tab === 'structures') {
@@ -159,6 +161,7 @@ export function PayrollPage() {
 
   const viewPayslips = async (run: any) => {
     setSelectedRun(run);
+    setPayslips([]);
     setTab('payslips');
     setLoading(true);
     try {

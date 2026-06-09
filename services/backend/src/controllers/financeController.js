@@ -98,8 +98,9 @@ class FinanceController {
       const tenantId = req.tenantId;
       const result = await pool.query(`
         SELECT * FROM chart_of_accounts
-        WHERE tenant_id = $1
-        ORDER BY account_type, account_code
+        WHERE (tenant_id = $1 OR tenant_id IS NULL)
+          AND is_active = true
+        ORDER BY account_code
       `, [tenantId]);
       res.json(result.rows);
     } catch (error) {

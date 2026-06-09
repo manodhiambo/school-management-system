@@ -271,7 +271,7 @@ router.get('/reports/general-ledger', async (req, res) => {
     // Get all accounts for the selector
     const accounts = await query(`
       SELECT id, account_code, account_name, account_type
-      FROM chart_of_accounts WHERE tenant_id = $1 AND is_active = true ORDER BY account_code
+      FROM chart_of_accounts WHERE (tenant_id = $1 OR tenant_id IS NULL) AND is_active = true ORDER BY account_code
     `, [tid]);
 
     if (!accountId) {

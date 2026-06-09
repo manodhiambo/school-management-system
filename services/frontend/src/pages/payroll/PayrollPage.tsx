@@ -126,8 +126,9 @@ export function PayrollPage() {
 
   const assignStructure = async (userId: string) => {
     try {
-      await (api as any).assignSalaryStructure(userId, { salary_structure_id: assignMap[userId] });
+      await (api as any).assignSalaryStructure(userId, { salary_structure_id: assignMap[userId] || null });
       toast({ title: 'Structure assigned' });
+      loadTab();
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }

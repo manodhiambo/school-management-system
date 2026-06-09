@@ -475,26 +475,25 @@ router.get('/my-payslips', async (req, res) => {
 
 // ── P9 Form (KRA Annual Tax Deduction Card) ────────────────────────────────
 
-// GET /api/v1/payroll/p9-employees?year= — list employees who have payslips for a year
+// GET /api/v1/payroll/p9-employees?year= — list all staff with salary assignments
 router.get('/p9-employees', requireFinance, async (req, res) => {
   try {
-    const tid  = req.user.tenant_id;
-    const year = req.query.year || new Date().getFullYear();
+    const tid = req.user.tenant_id;
     const rows = await query(
-      `SELECT DISTINCT u.id,
+      `SELECT u.id,
               COALESCE(
                 CASE WHEN u.role = 'teacher' THEN t.first_name || ' ' || t.last_name END,
                 NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
                 u.email
               ) AS full_name,
               u.email, u.role
-       FROM payslips p
-       JOIN payroll_runs pr ON pr.id = p.payroll_run_id
-       JOIN users u ON u.id = p.user_id
+       FROM users u
+       JOIN staff_salary_assignments ssa ON ssa.user_id = u.id AND ssa.tenant_id = $1
        LEFT JOIN teachers t ON t.user_id = u.id AND u.role = 'teacher'
-       WHERE p.tenant_id = $1 AND pr.period_year = $2 AND pr.status = 'paid'
+       WHERE u.tenant_id = $1
+         AND u.role IN ('teacher', 'admin', 'finance_officer')
        ORDER BY full_name`,
-      [tid, year]
+      [tid]
     );
     res.json({ success: true, data: rows });
   } catch (err) {

@@ -68,15 +68,15 @@ export function PayrollPage() {
     (api as any).getSettings?.().then((r: any) => setSchoolName(r?.data?.school_name || 'School')).catch(() => {});
   }, []);
 
-  // Load P9 employees whenever p9Year changes (and tab is p9)
+  // Load P9 employees when p9 tab opens (all assigned staff, not filtered by year)
   useEffect(() => {
     if (tab !== 'p9') return;
     setP9Loading(true);
-    (api as any).getP9Employees({ year: p9Year })
+    (api as any).getP9Employees()
       .then((r: any) => setP9Employees(r?.data || []))
       .catch(() => {})
       .finally(() => setP9Loading(false));
-  }, [p9Year, tab]);
+  }, [tab]);
 
   const loadTab = async () => {
     // payslips tab is loaded by viewPayslips(), not here
@@ -620,8 +620,8 @@ export function PayrollPage() {
           {p9Employees.length === 0 && !p9Loading && (
             <div className="text-center py-12 text-gray-400">
               <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-40" />
-              <p>No employees with paid payroll runs for {p9Year}.</p>
-              <p className="text-sm mt-1">Process and mark payroll runs as paid to generate P9 forms.</p>
+              <p>No staff with salary assignments found.</p>
+              <p className="text-sm mt-1">Assign salary structures to staff under the Staff Assignments tab first.</p>
             </div>
           )}
 

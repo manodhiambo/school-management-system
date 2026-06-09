@@ -68,11 +68,9 @@ router.get('/structures', requireFinance, async (req, res) => {
 router.post('/structures', requireFinance, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const {
-      name, basic_salary, house_allowance = 0, transport_allow = 0,
-      medical_allow = 0, other_allowance = 0, nssf_rate = 0.06, nhif_amount = 500
-    } = req.body;
+    const n = (v, def = 0) => (v === '' || v === null || v === undefined) ? def : Number(v);
 
+    const { name, basic_salary } = req.body;
     if (!name || !basic_salary) {
       return res.status(400).json({ success: false, message: 'name and basic_salary are required' });
     }
@@ -82,7 +80,16 @@ router.post('/structures', requireFinance, async (req, res) => {
          (tenant_id, name, basic_salary, house_allowance, transport_allow, medical_allow, other_allowance, nssf_rate, nhif_amount)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
-      [tid, name, basic_salary, house_allowance, transport_allow, medical_allow, other_allowance, nssf_rate, nhif_amount]
+      [
+        tid, name,
+        n(basic_salary),
+        n(req.body.house_allowance),
+        n(req.body.transport_allow),
+        n(req.body.medical_allow),
+        n(req.body.other_allowance),
+        n(req.body.nssf_rate, 0.06),
+        n(req.body.nhif_amount, 500),
+      ]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -95,10 +102,8 @@ router.post('/structures', requireFinance, async (req, res) => {
 router.put('/structures/:id', requireFinance, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const {
-      name, basic_salary, house_allowance, transport_allow,
-      medical_allow, other_allowance, nssf_rate, nhif_amount
-    } = req.body;
+    const n = (v) => (v === '' || v === null || v === undefined) ? null : Number(v);
+    const { name } = req.body;
 
     const rows = await query(
       `UPDATE salary_structures
@@ -112,8 +117,17 @@ router.put('/structures/:id', requireFinance, async (req, res) => {
            nhif_amount     = COALESCE($8, nhif_amount)
        WHERE id = $9 AND tenant_id = $10
        RETURNING *`,
-      [name, basic_salary, house_allowance, transport_allow, medical_allow,
-       other_allowance, nssf_rate, nhif_amount, req.params.id, tid]
+      [
+        name || null,
+        n(req.body.basic_salary),
+        n(req.body.house_allowance),
+        n(req.body.transport_allow),
+        n(req.body.medical_allow),
+        n(req.body.other_allowance),
+        n(req.body.nssf_rate),
+        n(req.body.nhif_amount),
+        req.params.id, tid,
+      ]
     );
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'Structure not found' });
     res.json({ success: true, data: rows[0] });

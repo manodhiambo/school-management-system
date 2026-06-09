@@ -62,12 +62,17 @@ export function PayrollPage() {
   const [p9Data, setP9Data]           = useState<any>(null);
   const [p9Loading, setP9Loading]     = useState(false);
   const [schoolName, setSchoolName]   = useState('School');
+  const [schoolSettings, setSchoolSettings] = useState<any>({});
 
   useEffect(() => { loadTab(); }, [tab]);
 
-  // Load school name once
+  // Load school settings once
   useEffect(() => {
-    (api as any).getSettings?.().then((r: any) => setSchoolName(r?.data?.school_name || 'School')).catch(() => {});
+    (api as any).getSettings?.().then((r: any) => {
+      const s = r?.data || {};
+      setSchoolName(s.school_name || 'School');
+      setSchoolSettings(s);
+    }).catch(() => {});
   }, []);
 
   // Load P9 employees when p9 tab opens (all assigned staff, not filtered by year)
@@ -186,34 +191,239 @@ export function PayrollPage() {
     } finally { setLoading(false); }
   };
 
-  const printPayslip = (p: any) => {
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`
-      <html><head><title>Payslip</title>
-      <style>body{font-family:Arial,sans-serif;padding:40px;max-width:600px;margin:auto}
-      h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}
-      td,th{padding:8px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5}
-      .total{font-weight:bold}</style></head><body>
-      <h2>PAYSLIP — ${selectedRun?.period_month}/${selectedRun?.period_year}</h2>
-      <p><strong>Employee:</strong> ${p.full_name}</p>
-      <p><strong>Period:</strong> ${selectedRun?.period_month}/${selectedRun?.period_year}</p>
-      <table>
-        <tr><th>Item</th><th>Amount (KES)</th></tr>
-        <tr><td>Basic Salary</td><td>${Number(p.basic_salary||0).toLocaleString()}</td></tr>
-        <tr><td>Allowances</td><td>${(Number(p.house_allowance||0)+Number(p.transport_allow||0)+Number(p.medical_allow||0)+Number(p.other_allowance||0)).toLocaleString()}</td></tr>
-        <tr class="total"><td>Gross Pay</td><td>${Number(p.gross_salary||0).toLocaleString()}</td></tr>
-        <tr><td>NSSF</td><td>${Number(p.nssf_deduction||0).toLocaleString()}</td></tr>
-        <tr><td>NHIF</td><td>${Number(p.nhif_deduction||0).toLocaleString()}</td></tr>
-        <tr><td>PAYE</td><td>${Number(p.paye_tax||0).toLocaleString()}</td></tr>
-        <tr class="total"><td>Total Deductions</td><td>${(Number(p.paye_tax||0)+Number(p.nssf_deduction||0)+Number(p.nhif_deduction||0)+Number(p.other_deductions||0)).toLocaleString()}</td></tr>
-        <tr class="total"><td>Net Pay</td><td>${Number(p.net_salary||0).toLocaleString()}</td></tr>
-      </table>
-      <p style="margin-top:40px;text-align:center">Generated ${new Date().toLocaleDateString()}</p>
-      </body></html>
-    `);
-    win.document.close();
-    win.print();
+  const printPayslip = async (p: any) => {
+    const doc   = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pw    = doc.internal.pageSize.getWidth();
+    const ph    = doc.internal.pageSize.getHeight();
+    const s     = schoolSettings;
+    const name  = s.school_name || schoolName || 'School';
+    const addr  = [s.address, s.city, s.state].filter(Boolean).join(', ');
+    const month = MONTHS[(selectedRun?.period_month - 1)] || selectedRun?.period_month;
+    const year  = selectedRun?.period_year;
+    const fmt   = (v: any) => Number(v || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 });
+    const BLUE  = [30, 58, 138] as [number, number, number];
+    const LBLUE = [219, 234, 254] as [number, number, number];
+
+    // ── Watermark (draw first, behind content) ─────────────────────────────
+    doc.saveGraphicsState();
+    doc.setTextColor(235, 235, 235);
+    doc.setFontSize(52);
+    doc.setFont('helvetica', 'bold');
+    // Diagonal watermark across page
+    doc.text(name.toUpperCase(), pw / 2, ph / 2, { align: 'center', angle: 45 });
+    doc.setFontSize(28);
+    doc.text('OFFICIAL PAYSLIP', pw / 2, ph / 2 + 30, { align: 'center', angle: 45 });
+    doc.restoreGraphicsState();
+
+    // ── Header band ────────────────────────────────────────────────────────
+    doc.setFillColor(...BLUE);
+    doc.rect(0, 0, pw, 32, 'F');
+
+    // School logo (if available)
+    let logoLoaded = false;
+    if (s.school_logo_url) {
+      try {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width  = img.width;
+              canvas.height = img.height;
+              canvas.getContext('2d')!.drawImage(img, 0, 0);
+              const b64 = canvas.toDataURL('image/png');
+              doc.addImage(b64, 'PNG', 8, 3, 26, 26);
+              logoLoaded = true;
+            } catch (_) {}
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = s.school_logo_url;
+        });
+      } catch (_) {}
+    }
+
+    // School name & motto in header
+    const textX = logoLoaded ? pw / 2 + 5 : pw / 2;
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    doc.text(name.toUpperCase(), textX, 13, { align: 'center' });
+    if (s.motto) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text(`"${s.motto}"`, textX, 20, { align: 'center' });
+    }
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    const contactParts = [addr, s.phone, s.email].filter(Boolean).join('  |  ');
+    if (contactParts) doc.text(contactParts, textX, 27, { align: 'center' });
+
+    let y = 38;
+
+    // ── PAYSLIP title banner ───────────────────────────────────────────────
+    doc.setFillColor(...LBLUE);
+    doc.rect(0, y, pw, 10, 'F');
+    doc.setTextColor(...BLUE);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('OFFICIAL PAYSLIP', pw / 2, y + 7, { align: 'center' });
+    y += 15;
+
+    // ── Employee info box ──────────────────────────────────────────────────
+    doc.setDrawColor(200, 210, 240);
+    doc.setFillColor(248, 250, 255);
+    doc.roundedRect(10, y, pw - 20, 22, 2, 2, 'FD');
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Employee Name:', 14, y + 7);
+    doc.text('Pay Period:', 14, y + 14);
+    doc.text('Role:', pw / 2 + 5, y + 7);
+    doc.text('Pay Date:', pw / 2 + 5, y + 14);
+    doc.setFont('helvetica', 'normal');
+    doc.text(p.full_name || '—', 48, y + 7);
+    doc.text(`${month} ${year}`, 40, y + 14);
+    doc.text((p.role || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()), pw / 2 + 23, y + 7);
+    doc.text(new Date().toLocaleDateString('en-KE'), pw / 2 + 28, y + 14);
+    y += 28;
+
+    // ── Two-column table: Earnings | Deductions ────────────────────────────
+    const colW  = (pw - 20) / 2 - 2;
+    const lx    = 10;
+    const rx    = pw / 2 + 2;
+    const rowH  = 8;
+
+    const earnings = [
+      ['Basic Salary',       fmt(p.basic_salary)],
+      ['House Allowance',    fmt(p.house_allowance)],
+      ['Transport Allowance',fmt(p.transport_allow)],
+      ['Medical Allowance',  fmt(p.medical_allow)],
+      ['Other Allowances',   fmt(p.other_allowance)],
+    ];
+    const deductions = [
+      ['PAYE Tax',       fmt(p.paye_tax)],
+      ['NSSF',           fmt(p.nssf_deduction)],
+      ['NHIF/SHA',       fmt(p.nhif_deduction)],
+      ['Other Deductions',fmt(p.other_deductions)],
+    ];
+
+    // Column headers
+    doc.setFillColor(...BLUE);
+    doc.rect(lx, y, colW, 8, 'F');
+    doc.rect(rx, y, colW, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EARNINGS', lx + colW / 2, y + 5.5, { align: 'center' });
+    doc.text('DEDUCTIONS', rx + colW / 2, y + 5.5, { align: 'center' });
+    y += 8;
+
+    // Sub-headers
+    doc.setFillColor(219, 234, 254);
+    doc.rect(lx, y, colW, 6, 'F');
+    doc.rect(rx, y, colW, 6, 'F');
+    doc.setTextColor(30, 58, 138);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description', lx + 3, y + 4);
+    doc.text('Amount (KES)', lx + colW - 3, y + 4, { align: 'right' });
+    doc.text('Description', rx + 3, y + 4);
+    doc.text('Amount (KES)', rx + colW - 3, y + 4, { align: 'right' });
+    y += 6;
+
+    // Rows
+    const maxRows = Math.max(earnings.length, deductions.length);
+    for (let i = 0; i < maxRows; i++) {
+      const bg: [number,number,number] = i % 2 === 0 ? [255,255,255] : [247,249,255];
+      doc.setFillColor(...bg);
+      doc.rect(lx, y, colW, rowH, 'F');
+      doc.rect(rx, y, colW, rowH, 'F');
+      doc.setDrawColor(220, 230, 250);
+      doc.rect(lx, y, colW, rowH);
+      doc.rect(rx, y, colW, rowH);
+
+      doc.setTextColor(40, 40, 40);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+
+      if (earnings[i]) {
+        doc.text(earnings[i][0], lx + 3, y + 5.5);
+        doc.text(earnings[i][1], lx + colW - 3, y + 5.5, { align: 'right' });
+      }
+      if (deductions[i]) {
+        doc.text(deductions[i][0], rx + 3, y + 5.5);
+        doc.text(deductions[i][1], rx + colW - 3, y + 5.5, { align: 'right' });
+      }
+      y += rowH;
+    }
+
+    // Sub-totals row
+    const totalDeductions = Number(p.paye_tax||0)+Number(p.nssf_deduction||0)+Number(p.nhif_deduction||0)+Number(p.other_deductions||0);
+    doc.setFillColor(219, 234, 254);
+    doc.rect(lx, y, colW, rowH, 'F');
+    doc.rect(rx, y, colW, rowH, 'F');
+    doc.setTextColor(30, 58, 138);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Gross Pay', lx + 3, y + 5.5);
+    doc.text(fmt(p.gross_salary), lx + colW - 3, y + 5.5, { align: 'right' });
+    doc.text('Total Deductions', rx + 3, y + 5.5);
+    doc.text(fmt(totalDeductions), rx + colW - 3, y + 5.5, { align: 'right' });
+    y += rowH + 5;
+
+    // ── Net Pay highlight ──────────────────────────────────────────────────
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(pw / 2 - 40, y, 80, 14, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('NET PAY', pw / 2, y + 5.5, { align: 'center' });
+    doc.setFontSize(11);
+    doc.text(`KES ${fmt(p.net_salary)}`, pw / 2, y + 11.5, { align: 'center' });
+    y += 20;
+
+    // ── Statutory note ─────────────────────────────────────────────────────
+    doc.setFillColor(254, 252, 232);
+    doc.rect(10, y, pw - 20, 8, 'F');
+    doc.setTextColor(133, 77, 14);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Deductions computed per Kenya Revenue Authority PAYE 2024 bands, NSSF Act and NHIF/SHA regulations.', pw / 2, y + 5, { align: 'center' });
+    y += 14;
+
+    // ── Signature section ──────────────────────────────────────────────────
+    doc.setDrawColor(180, 180, 180);
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+
+    // Left signature
+    doc.line(14, y + 10, 70, y + 10);
+    doc.text('Prepared By', 14, y + 14);
+    doc.text('Finance Officer', 14, y + 19);
+    // Right signature
+    doc.line(pw - 70, y + 10, pw - 14, y + 10);
+    doc.text('Authorised By', pw - 70, y + 14);
+    doc.text('Head Teacher / Principal', pw - 70, y + 19);
+    y += 28;
+
+    // ── Footer ─────────────────────────────────────────────────────────────
+    doc.setFillColor(...BLUE);
+    doc.rect(0, ph - 14, pw, 14, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${name}  ·  Confidential — For Recipient Only`, pw / 2, ph - 8, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleString('en-KE')}`, pw / 2, ph - 4, { align: 'center' });
+
+    // ── Border ─────────────────────────────────────────────────────────────
+    doc.setDrawColor(...BLUE);
+    doc.setLineWidth(0.7);
+    doc.rect(2, 2, pw - 4, ph - 4);
+
+    doc.save(`Payslip-${(p.full_name||'employee').replace(/\s+/g,'-')}-${month}-${year}.pdf`);
   };
 
   const loadP9 = async () => {
@@ -784,7 +994,7 @@ export function PayrollPage() {
                       </td>
                       <td className="py-3">
                         <Button size="sm" variant="outline" onClick={() => printPayslip(p)}>
-                          <Printer className="h-3 w-3 mr-1" /> Print
+                          <Download className="h-3 w-3 mr-1" /> Download PDF
                         </Button>
                       </td>
                     </tr>

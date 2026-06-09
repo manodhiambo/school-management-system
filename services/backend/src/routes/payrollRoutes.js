@@ -1,11 +1,10 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate, requireModule } from '../middleware/authMiddleware.js';
+import { authenticate } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 router.use(authenticate);
-router.use(requireModule('staff'));
 
 // ── Kenya PAYE 2024 helper ──────────────────────────────────────────────────
 function computePAYE(grossMonthly) {
@@ -176,9 +175,6 @@ router.put('/assignments/:userId', requireFinance, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { salary_structure_id, basic_override, effective_from } = req.body;
-    if (!salary_structure_id) {
-      return res.status(400).json({ success: false, message: 'salary_structure_id is required' });
-    }
 
     // verify user belongs to tenant
     const userCheck = await query(
@@ -187,15 +183,24 @@ router.put('/assignments/:userId', requireFinance, async (req, res) => {
     );
     if (userCheck.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
+    if (!salary_structure_id) {
+      // Remove assignment (unassign)
+      await query(
+        `DELETE FROM staff_salary_assignments WHERE user_id = $1 AND tenant_id = $2`,
+        [req.params.userId, tid]
+      );
+      return res.json({ success: true, data: null, message: 'Assignment removed' });
+    }
+
     const rows = await query(
-      `INSERT INTO staff_salary_assignments (user_id, salary_structure_id, basic_override, effective_from)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (user_id) DO UPDATE
+      `INSERT INTO staff_salary_assignments (tenant_id, user_id, salary_structure_id, basic_override, effective_from)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (tenant_id, user_id) DO UPDATE
          SET salary_structure_id = EXCLUDED.salary_structure_id,
              basic_override      = EXCLUDED.basic_override,
              effective_from      = EXCLUDED.effective_from
        RETURNING *`,
-      [req.params.userId, salary_structure_id, basic_override || null, effective_from || new Date()]
+      [tid, req.params.userId, salary_structure_id, basic_override || null, effective_from || new Date()]
     );
     res.json({ success: true, data: rows[0] });
   } catch (err) {

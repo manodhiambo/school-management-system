@@ -1,7 +1,7 @@
 import express from 'express';
 import { authenticate, authorize, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
-import { pool } from '../config/database.js';
+import pool from '../config/database.js';
 
 const router = express.Router();
 

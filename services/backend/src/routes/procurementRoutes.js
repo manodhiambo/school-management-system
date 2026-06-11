@@ -5,6 +5,16 @@ import pool from '../config/database.js';
 
 const router = express.Router();
 
+// Auto-wrap all route handlers so async errors go to Express error handler
+// instead of crashing Node.js 20 as unhandled rejections
+['get', 'post', 'put', 'delete', 'patch'].forEach(method => {
+  const orig = router[method].bind(router);
+  router[method] = (path, ...fns) =>
+    orig(path, ...fns.map(fn => (req, res, next) =>
+      Promise.resolve(fn(req, res, next)).catch(next)
+    ));
+});
+
 const PROC_ROLES = ['admin', 'finance_officer'];
 
 router.use(authenticate);
@@ -863,6 +873,12 @@ router.get('/audit', async (req, res) => {
   q += ' ORDER BY a.created_at DESC LIMIT 200';
   const { rows } = await pool.query(q, params);
   res.json(rows);
+});
+
+// Catch-all error handler — converts any unhandled route error to a JSON 500
+router.use((err, req, res, next) => {
+  console.error('[Procurement]', err.message);
+  res.status(500).json({ error: err.message });
 });
 
 export default router;

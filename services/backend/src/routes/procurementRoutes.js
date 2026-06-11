@@ -150,7 +150,7 @@ router.delete('/suppliers/:id', async (req, res) => {
 // ── Prequalification ──────────────────────────────────────────────────────────
 router.get('/suppliers/:sid/prequalification', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT p.*, u.full_name approver_name FROM proc_supplier_prequalification p
+    `SELECT p.*, CONCAT(u.first_name,' ',u.last_name) approver_name FROM proc_supplier_prequalification p
      LEFT JOIN users u ON u.id=p.approved_by
      WHERE p.tenant_id=$1 AND p.supplier_id=$2 ORDER BY p.application_date DESC`,
     [tid(req), req.params.sid]
@@ -171,7 +171,7 @@ router.post('/suppliers/:sid/prequalification', async (req, res) => {
 // ── Purchase Requisitions ─────────────────────────────────────────────────────
 router.get('/requisitions', async (req, res) => {
   const { status, department } = req.query;
-  let q = `SELECT r.*, u.full_name requester_name FROM proc_purchase_requisitions r
+  let q = `SELECT r.*, CONCAT(u.first_name,' ',u.last_name) requester_name FROM proc_purchase_requisitions r
            LEFT JOIN users u ON u.id=r.requested_by WHERE r.tenant_id=$1`;
   const params = [tid(req)];
   if (status) { params.push(status); q += ` AND r.status=$${params.length}`; }
@@ -183,11 +183,11 @@ router.get('/requisitions', async (req, res) => {
 
 router.get('/requisitions/:id', async (req, res) => {
   const [pr, items, steps] = await Promise.all([
-    pool.query(`SELECT r.*, u.full_name requester_name FROM proc_purchase_requisitions r
+    pool.query(`SELECT r.*, CONCAT(u.first_name,' ',u.last_name) requester_name FROM proc_purchase_requisitions r
                 LEFT JOIN users u ON u.id=r.requested_by WHERE r.id=$1 AND r.tenant_id=$2`,
                [req.params.id, tid(req)]),
     pool.query(`SELECT * FROM proc_pr_items WHERE pr_id=$1`, [req.params.id]),
-    pool.query(`SELECT s.*, u.full_name approver_name FROM proc_approval_steps s
+    pool.query(`SELECT s.*, CONCAT(u.first_name,' ',u.last_name) approver_name FROM proc_approval_steps s
                 LEFT JOIN users u ON u.id=s.approver_id
                 WHERE s.reference_type='pr' AND s.reference_id=$1 ORDER BY s.step_number`,
                [req.params.id]),
@@ -866,7 +866,7 @@ router.get('/reports/summary', async (req, res) => {
 // ── Audit Trail ───────────────────────────────────────────────────────────────
 router.get('/audit', async (req, res) => {
   const { reference_type } = req.query;
-  let q = `SELECT a.*, u.full_name approver_name FROM proc_approval_steps a
+  let q = `SELECT a.*, CONCAT(u.first_name,' ',u.last_name) approver_name FROM proc_approval_steps a
            LEFT JOIN users u ON u.id=a.approver_id WHERE a.tenant_id=$1`;
   const params = [tid(req)];
   if (reference_type) { params.push(reference_type); q += ` AND a.reference_type=$${params.length}`; }

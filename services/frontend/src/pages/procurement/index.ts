@@ -1,0 +1,14 @@
+export { ProcurementDashboard } from './ProcurementDashboard';
+export { SupplierManagement } from './SupplierManagement';
+export { PurchaseRequisitions } from './PurchaseRequisitions';
+export { RFQManagement } from './RFQManagement';
+export { QuotationManagement } from './QuotationManagement';
+export { ProcurementOrders } from './ProcurementOrders';
+export { ContractManagement } from './ContractManagement';
+export { GoodsReceiptManagement } from './GoodsReceiptManagement';
+export { InvoiceManagement } from './InvoiceManagement';
+export { SupplierPayments } from './SupplierPayments';
+export { ProcurementPlanning } from './ProcurementPlanning';
+export { ProcurementReports } from './ProcurementReports';
+export { ProcurementAuditPage } from './ProcurementAuditPage';
+export { AssetManagement } from './AssetManagement';

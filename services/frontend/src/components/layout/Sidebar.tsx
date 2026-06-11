@@ -46,6 +46,13 @@ import {
   MessageCircle,
   ShieldCheck,
   UserCog,
+  ShoppingCart,
+  Truck,
+  Banknote,
+  LayoutGrid,
+  Boxes,
+  ClipboardCheck,
+  FileSearch,
 } from 'lucide-react';
 
 type NavItem = {
@@ -115,6 +122,22 @@ const navigationItems: NavItem[] = [
   { name: 'Fee Structure',     href: '/app/fee-structure',            icon: DollarSign,roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
   { name: 'Extra Fees',        href: '/app/extra-fees',               icon: DollarSign,roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
   { name: 'My Fees',           href: '/app/my-fees',                  icon: DollarSign,roles: ['student'],                  section: 'Finance', module: 'finance' },
+
+  // ── Procurement ───────────────────────────────────────────────────────────
+  { name: 'Procurement',       href: '/app/procurement',                    icon: ShoppingCart,  roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance', badge: 'New' },
+  { name: 'Requisitions',      href: '/app/procurement/requisitions',       icon: ClipboardList, roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Suppliers',         href: '/app/procurement/suppliers',          icon: Building2,     roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'RFQs',              href: '/app/procurement/rfqs',              icon: FileSearch,    roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Quotations',        href: '/app/procurement/quotations',         icon: FileText,      roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Purchase Orders',   href: '/app/procurement/orders',             icon: ClipboardCheck,roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Contracts',         href: '/app/procurement/contracts',          icon: FileText,      roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Goods Receipt',     href: '/app/procurement/grn',                icon: Truck,         roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Invoices',          href: '/app/procurement/invoices',           icon: Receipt,       roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Supplier Payments', href: '/app/procurement/payments',           icon: Banknote,      roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Proc. Planning',    href: '/app/procurement/planning',           icon: LayoutGrid,    roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Proc. Reports',     href: '/app/procurement/reports',            icon: BarChart2,     roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Audit Trail',       href: '/app/procurement/audit',              icon: ShieldCheck,   roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Asset Management',  href: '/app/procurement/assets',             icon: Boxes,         roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
 
   // ── Family (parent) ───────────────────────────────────────────────────────
   { name: 'My Children',       href: '/app/my-children',       icon: Users,         roles: ['parent'], section: 'Family' },

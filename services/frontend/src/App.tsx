@@ -122,6 +122,24 @@ import { SMSPage } from './pages/sms/SMSPage';
 // Gate Management
 import { GateManagerPage } from './pages/gate/GateManagerPage';
 
+// Procurement Module
+import {
+  ProcurementDashboard,
+  SupplierManagement,
+  PurchaseRequisitions,
+  RFQManagement,
+  QuotationManagement,
+  ProcurementOrders,
+  ContractManagement,
+  GoodsReceiptManagement,
+  InvoiceManagement,
+  SupplierPayments,
+  ProcurementPlanning,
+  ProcurementReports,
+  ProcurementAuditPage,
+  AssetManagement,
+} from './pages/procurement';
+
 // Shared Pages
 import { ProfilePage } from './pages/settings/ProfilePage';
 
@@ -300,6 +318,22 @@ function App() {
 
               {/* Gate Management */}
               <Route path="gate-manager" element={<RoleRoute allowedRoles={['admin', 'security']}><GateManagerPage /></RoleRoute>} />
+
+              {/* Procurement Module */}
+              <Route path="procurement" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementDashboard /></RoleRoute>} />
+              <Route path="procurement/suppliers" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><SupplierManagement /></RoleRoute>} />
+              <Route path="procurement/requisitions" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><PurchaseRequisitions /></RoleRoute>} />
+              <Route path="procurement/rfqs" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><RFQManagement /></RoleRoute>} />
+              <Route path="procurement/quotations" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><QuotationManagement /></RoleRoute>} />
+              <Route path="procurement/orders" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementOrders /></RoleRoute>} />
+              <Route path="procurement/contracts" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ContractManagement /></RoleRoute>} />
+              <Route path="procurement/grn" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><GoodsReceiptManagement /></RoleRoute>} />
+              <Route path="procurement/invoices" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><InvoiceManagement /></RoleRoute>} />
+              <Route path="procurement/payments" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><SupplierPayments /></RoleRoute>} />
+              <Route path="procurement/planning" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementPlanning /></RoleRoute>} />
+              <Route path="procurement/reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementReports /></RoleRoute>} />
+              <Route path="procurement/audit" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementAuditPage /></RoleRoute>} />
+              <Route path="procurement/assets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><AssetManagement /></RoleRoute>} />
 
               {/* Parent Alerts */}
               <Route path="my-alerts" element={<ParentAlertsPage />} />

@@ -231,7 +231,7 @@ export function GradeBookPage() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600">{error}</p>
-            <Button onClick={loadClasses} className="mt-4">Retry</Button>
+            <Button onClick={loadClassesAndAssignments} className="mt-4">Retry</Button>
           </CardContent>
         </Card>
       </div>

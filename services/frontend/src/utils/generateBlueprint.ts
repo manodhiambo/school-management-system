@@ -117,8 +117,8 @@ function addCoverPage(doc: jsPDF, schoolName: string) {
 
   // Stats row
   const stats = [
-    { val: '25+', lbl: 'Modules' },
-    { val: '600+', lbl: 'Features' },
+    { val: '30+', lbl: 'Modules' },
+    { val: '700+', lbl: 'Features' },
     { val: '7', lbl: 'User Roles' },
     { val: '100%', lbl: 'CBE Ready' },
   ];
@@ -423,6 +423,7 @@ function addModuleOverview(doc: jsPDF, pageNum: { n: number }) {
     { icon: '🎒', title: 'Bursary & Inventory',     desc: 'Bursary awards, beneficiary tracking, inventory, stock management, reorder alerts',    color: C.amber  },
     { icon: '📋', title: 'NEMIS & Audit Log',       desc: 'NEMIS data export, validation, audit trail of all user actions, CSV export',           color: C.slate  },
     { icon: '⚙️', title: 'Settings & Admin',        desc: 'School profile, user roles, logo branding, account management, multi-tenant admin',    color: C.slate  },
+    { icon: '🛒', title: 'Procurement',             desc: 'Full procurement lifecycle: PR→RFQ→Quotation→PO→GRN→Invoice→Payment, asset management', color: C.green  },
   ];
 
   let y = 36;
@@ -687,6 +688,22 @@ const MODULES: ModuleData[] = [
       'Exportable PDF reports per role',             'User manual & blueprint downloads',
     ],
   },
+  {
+    num: '16', title: 'Procurement & Asset Management', color: C.green,
+    description: 'Full Kenya public procurement compliance workflow — from supplier prequalification through requisition, RFQ, quotation evaluation, purchase orders, 3-way matching, and contract management to asset depreciation tracking.',
+    features: [
+      'Supplier register & prequalification',        'Annual procurement planning',
+      'Purchase requisitions with approval',         'Auto-numbering: PR / RFQ / PO / GRN',
+      'Request for Quotation (3-quote rule)',         'Quotation evaluation & recommendation',
+      'Purchase order creation & approval',          'Goods Receipt Note (GRN) with qty tracking',
+      '3-way match: PO ↔ GRN ↔ Invoice',            'Supplier invoice approval workflow',
+      'Supplier payment recording & approval',       'Contract management with expiry alerts',
+      'Procurement budgets vs. actuals',             'Supplier spend analysis reports',
+      'Immutable procurement audit trail',           'Asset register with depreciation',
+      'Asset disposal recording',                    'Procurement dashboard overview',
+      'Export reports to CSV',                       'Admin + Finance Officer access control',
+    ],
+  },
 ];
 
 // ─── User Roles & Permissions table ──────────────────────────────────────────
@@ -706,7 +723,7 @@ function addRolesPage(doc: jsPDF, pageNum: { n: number }) {
   setTxt(doc, C.slate);
   y = wrapText(doc,
     'SkulManager enforces strict role-based access control. Each user sees only the modules and data relevant to their role. ' +
-    'Below is a complete permissions matrix across all 15 system modules.',
+    'Below is a complete permissions matrix across all 18 system modules.',
     M, y, COL, 5);
   y += 6;
 
@@ -729,6 +746,7 @@ function addRolesPage(doc: jsPDF, pageNum: { n: number }) {
     { name: 'IGCSE Module',            perms: ['Full',  '–',     'Full',  'Own',   '–',     '–'    ] },
     { name: 'Dashboards',              perms: ['Full',  'Own',   'Own',   'Own',   'Own',   'Own'  ] },
     { name: 'NEMIS & Audit Log',       perms: ['Full',  '–',     '–',     '–',     '–',     '–'    ] },
+    { name: 'Procurement',             perms: ['Full',  'Full',  '–',     '–',     '–',     '–'    ] },
   ];
 
   const hdrH   = 8;

@@ -8,8 +8,8 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
     label: 'Administrator Manual',
     color: 'text-blue-700',
     bg: 'from-blue-600 to-indigo-600',
-    chapters: 13,
-    description: 'Full system guide: students, teachers, fees, CBE academics, IGCSE Cambridge module, welfare, library and settings.',
+    chapters: 24,
+    description: 'Full system guide: students, teachers, fees, CBE academics, IGCSE, welfare, procurement module, library and settings.',
   },
   teacher: {
     label: 'Teacher Manual',
@@ -36,8 +36,15 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; chap
     label: 'Finance Officer Manual',
     color: 'text-red-700',
     bg: 'from-red-600 to-rose-600',
-    chapters: 8,
-    description: 'Fee structures, payments, budgets, expenses, reports, assets and bank accounts.',
+    chapters: 12,
+    description: 'Fee structures, payments, budgets, expenses, reports, procurement invoices/payments, assets and bank accounts.',
+  },
+  driver: {
+    label: 'Transport Driver Manual',
+    color: 'text-teal-700',
+    bg: 'from-teal-600 to-cyan-600',
+    chapters: 5,
+    description: 'Log in, view your assigned route, mark student pickups (Picked Up / Missed / Absent) and review the daily pickup log.',
   },
 };
 
@@ -46,7 +53,8 @@ const HIGHLIGHTS: Record<string, string[]> = {
   teacher: ['Mark attendance & grade book', 'CBE SBA, lesson plans & schemes', 'IGCSE mark entry & grade calculation', 'Assignments, projects & leave requests'],
   student: ['View CBE & IGCSE grades', 'Submit assignments & online exams', 'Check fee balance & timetable', 'Library, messages & notifications'],
   parent: ['Track children\'s progress', 'View fee statements', 'Receive school alerts', 'Message teachers'],
-  finance_officer: ['Record fee payments', 'Student payments & defaulters report', 'Budget management', 'Vendor & purchase orders'],
+  finance_officer: ['Record fee payments', 'Student payments & defaulters report', 'Procurement invoices & supplier payments', 'Budget management & reports'],
+  driver: ['View assigned route & students', 'Mark pickups: Picked Up / Missed / Absent', 'GPS recorded per pickup event', 'View pickup log & history'],
 };
 
 export function UserManualCard() {

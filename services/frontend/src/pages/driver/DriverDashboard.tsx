@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import { UserManualCard } from '@/components/UserManualCard';
 import {
   Bus, MapPin, CheckCircle2, XCircle, AlertTriangle,
   User, Phone, Navigation, RefreshCw, Clock, Users
@@ -329,6 +330,10 @@ export function DriverDashboard() {
             </CardContent>
           </Card>
         )}
+      </div>
+
+      <div className="mt-6">
+        <UserManualCard />
       </div>
     </div>
   );

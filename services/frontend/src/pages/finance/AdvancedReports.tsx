@@ -176,7 +176,8 @@ export const AdvancedReports: React.FC = () => {
         setJournals(res?.data || []);
         // also fetch accounts for create form
         const acctRes: any = await api.getChartOfAccounts();
-        setJAccounts(acctRes?.data || []);
+        // backend returns the array directly (not wrapped in {data:[...]})
+        setJAccounts(Array.isArray(acctRes) ? acctRes : (acctRes?.data || []));
       }
     } catch (e) {
       console.error(e);

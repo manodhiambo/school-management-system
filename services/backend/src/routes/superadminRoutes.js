@@ -5,6 +5,8 @@ import { query } from '../config/database.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { MODULE_REGISTRY, MODULE_KEYS, isModuleKey } from '../config/moduleRegistry.js';
 import logger from '../utils/logger.js';
+import { config } from '../config/env.js';
+import { logAction } from './auditLogRoutes.js';
 
 const router = express.Router();
 
@@ -543,11 +545,16 @@ router.post('/tenants/:id/login-as', async (req, res) => {
         loginAs: true,
         originalSuperadmin: req.user.id
       },
-      process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET,
+      config.jwt.secret,
       { expiresIn: '4h' }
     );
 
     logger.warn(`Superadmin ${req.user.email} logged in as tenant admin ${adminUser.email} (tenant: ${id})`);
+    logAction(req, 'SUPERADMIN_IMPERSONATE', 'tenant', id, {
+      impersonated_admin: adminUser.email,
+      impersonated_admin_id: adminUser.id,
+      tenant_id: id,
+    });
 
     res.json({
       success: true,

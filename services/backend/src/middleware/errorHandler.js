@@ -14,7 +14,6 @@ export const errorHandler = (err, req, res, next) => {
     success: false,
     statusCode,
     message,
-    ...(config.env === 'development' && { stack: err.stack })
   };
 
   logger.error(`Error: ${message}`, { statusCode, stack: err.stack });

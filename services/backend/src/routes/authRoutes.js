@@ -10,6 +10,7 @@ import { sendEmail } from '../services/emailService.js';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { logAction } from './auditLogRoutes.js';
+import { passwordResetLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -206,7 +207,7 @@ router.post('/refresh-token', async (req, res) => {
 });
 
 // Forgot password — sends a reset link by email
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -257,7 +258,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Reset password — validates the JWT token and sets the new password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', passwordResetLimiter, async (req, res) => {
   try {
     const { token, newPassword } = req.body;
 
@@ -265,8 +266,8 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Token and new password are required' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters and contain letters and numbers' });
     }
 
     // Verify the JWT reset token
@@ -290,7 +291,7 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ success: false, message: 'User not found or account is deactivated' });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
     await query(
       'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
       [hashedPassword, decoded.userId]
@@ -309,21 +310,29 @@ router.post('/reset-password', async (req, res) => {
 router.post('/change-password', authenticate, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    
-    const users = await query('SELECT * FROM users WHERE id = $1', [req.user.id]);
-    
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current and new password are required' });
+    }
+
+    if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters and contain letters and numbers' });
+    }
+
+    const users = await query('SELECT id, password FROM users WHERE id = $1', [req.user.id]);
+
     if (users.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+
     const user = users[0];
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-    
+
     if (!isPasswordValid) {
       return res.status(401).json({ success: false, message: 'Current password is incorrect' });
     }
-    
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
     await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hashedPassword, req.user.id]);
     
     res.json({
@@ -389,7 +398,7 @@ router.post('/2fa/enable', authenticate, async (req, res) => {
       Math.random().toString(36).substring(2, 6).toUpperCase()
     );
     const hashedBackupCodes = await Promise.all(
-      plainBackupCodes.map(async (c) => ({ code: await bcrypt.hash(c, 8), used: false }))
+      plainBackupCodes.map(async (c) => ({ code: await bcrypt.hash(c, 12), used: false }))
     );
 
     await query(

@@ -1,8 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { testConnection } from './config/database.js';
 import { runMigrations } from './database/runMigrations.js';
+import { authLimiter, apiLimiter, registrationLimiter } from './middleware/rateLimiter.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -103,8 +105,18 @@ const corsOptions = {
 // Handle preflight OPTIONS requests for all routes
 app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // managed by frontend
+  crossOriginEmbedderPolicy: false,
+}));
+
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
+
+// Global API rate limiter
+app.use('/api/', apiLimiter);
 
 // Test database connection, then await migrations before the server listens
 // (Neon DDL via direct connection can take a few seconds — don't race requests against it)
@@ -117,8 +129,8 @@ app.get('/health', (req, res) => {
 // Auto-audit: log all successful mutations (POST/PUT/PATCH/DELETE) by authenticated users
 app.use('/api/v1', autoAuditMiddleware);
 
-// API routes
-app.use('/api/v1/auth', authRoutes);
+// API routes — auth gets a strict rate limiter (10 reqs / 15 min per IP)
+app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/students', studentRoutes);
 app.use('/api/v1/teachers', teacherRoutes);
 app.use('/api/v1/parents', parentRoutes);
@@ -200,7 +212,7 @@ app.use('/api/v1/preferences', preferencesRoutes);
 app.use('/api/v1/procurement', procurementRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
-app.use('/api/v1/registration', schoolRegistrationRoutes);
+app.use('/api/v1/registration', registrationLimiter, schoolRegistrationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

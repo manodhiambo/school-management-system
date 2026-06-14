@@ -8,12 +8,12 @@ import ApiError from '../utils/ApiError.js';
 // STANDALONE NAMED EXPORTS — used by school registration flow
 // ============================================================
 
-const _CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY || 'W1mgwbLviwQ9nA7Vbhwsebd4tf9chHEigsqqoOUsT9PKR9Vw';
-const _CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET || 'V2RZusymMw0OXZs2TtIl61n9BZtBMO9tcV9wAD8WAAfHHIxG9BrtctpX0t23oRdq';
+const _CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY || '';
+const _CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET || '';
 const _BASE_URL = process.env.MPESA_BASE_URL || 'https://sandbox.safaricom.co.ke';
-const _SHORTCODE = process.env.MPESA_SHORTCODE || '174379';
-const _PASSKEY = process.env.MPESA_PASSKEY || 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-const _CALLBACK_URL = process.env.MPESA_CALLBACK_URL || 'https://skulmanager.org/api/v1/registration/mpesa/callback';
+const _SHORTCODE = process.env.MPESA_SHORTCODE || '';
+const _PASSKEY = process.env.MPESA_PASSKEY || '';
+const _CALLBACK_URL = process.env.MPESA_CALLBACK_URL || '';
 
 /**
  * Format phone number to 254XXXXXXXXX format.

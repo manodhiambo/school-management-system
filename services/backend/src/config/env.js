@@ -8,11 +8,30 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+const INSECURE_JWT_DEFAULT = 'your-super-secret-jwt-key-change-in-production';
+const INSECURE_REFRESH_DEFAULT = 'your-refresh-secret-key-change-in-production';
+
+const jwtSecret = process.env.JWT_SECRET || INSECURE_JWT_DEFAULT;
+const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || INSECURE_REFRESH_DEFAULT;
+
+const nodeEnv = process.env.NODE_ENV || 'development';
+
+if (nodeEnv === 'production') {
+  if (jwtSecret === INSECURE_JWT_DEFAULT || jwtRefreshSecret === INSECURE_REFRESH_DEFAULT) {
+    console.error('FATAL: JWT_SECRET and JWT_REFRESH_SECRET must be set in production. Exiting.');
+    process.exit(1);
+  }
+  if (jwtSecret.length < 32 || jwtRefreshSecret.length < 32) {
+    console.error('FATAL: JWT secrets must be at least 32 characters in production. Exiting.');
+    process.exit(1);
+  }
+}
+
 export const config = {
-  env: process.env.NODE_ENV || 'development',
+  env: nodeEnv,
   port: parseInt(process.env.PORT, 10) || 5000,
   apiVersion: process.env.API_VERSION || 'v1',
-  
+
   // Database - support both DATABASE_URL and individual config
   databaseUrl: process.env.DATABASE_URL || null,
   db: {
@@ -22,11 +41,11 @@ export const config = {
     password: process.env.DB_PASSWORD || '',
     name: process.env.DB_NAME || 'school_management'
   },
-  
+
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production',
+    secret: jwtSecret,
+    refreshSecret: jwtRefreshSecret,
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '8h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d'
   },

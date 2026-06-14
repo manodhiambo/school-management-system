@@ -58,10 +58,10 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    if (adminPassword.length < 6) {
+    if (adminPassword.length < 8 || !/[A-Za-z]/.test(adminPassword) || !/[0-9]/.test(adminPassword)) {
       return res.status(400).json({
         success: false,
-        message: 'Admin password must be at least 6 characters'
+        message: 'Admin password must be at least 8 characters and contain letters and numbers'
       });
     }
 
@@ -123,7 +123,7 @@ router.post('/register', async (req, res) => {
     const tenant = tenantResult[0];
 
     // Create admin user immediately (no payment needed for trial)
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
     const newUserId = uuidv4();
 
     await query(`

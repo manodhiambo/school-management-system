@@ -4,16 +4,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const rawUrl = process.env.DATABASE_URL || 'postgresql://REDACTED:REDACTED@REDACTED/neondb?sslmode=require';
+if (!process.env.DATABASE_URL) {
+  console.error('FATAL: DATABASE_URL environment variable is not set. Exiting.');
+  process.exit(1);
+}
+
+const rawUrl = process.env.DATABASE_URL;
 const connectionString = rawUrl
-  .replace('sslmode=require', 'sslmode=verify-full')
-  .replace('sslmode=prefer', 'sslmode=verify-full')
-  .replace('sslmode=verify-ca', 'sslmode=verify-full');
+  .replace('sslmode=require', 'sslmode=require')
+  .replace('sslmode=prefer', 'sslmode=require')
+  .replace('sslmode=disable', 'sslmode=require');
 
 const pool = new Pool({
   connectionString,
   ssl: {
-    rejectUnauthorized: false
+    rejectUnauthorized: true
   },
   max: 10,
   connectionTimeoutMillis: 10000,

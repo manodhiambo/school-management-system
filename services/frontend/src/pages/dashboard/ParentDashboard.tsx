@@ -90,7 +90,7 @@ export function ParentDashboard() {
       <div className="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{getGreeting()}, {t('Parent')}!</h1>
+            <h1 className="text-2xl font-bold">{getGreeting()}, {[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.name || user?.email?.split('@')[0] || 'Parent'}!</h1>
             <p className="text-teal-100 mt-1">{t('Stay connected with your child\'s education.')}</p>
           </div>
           <div className="hidden md:flex items-center space-x-2 bg-white/20 rounded-lg px-4 py-2">

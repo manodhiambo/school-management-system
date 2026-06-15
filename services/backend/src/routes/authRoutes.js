@@ -22,7 +22,7 @@ router.post('/login', async (req, res) => {
     logger.info(`Login attempt for: ${email}`);
     
     const users = await query(
-      'SELECT id, email, password, role, is_active, is_verified, tenant_id, totp_enabled FROM users WHERE email = $1',
+      'SELECT id, email, password, role, is_active, is_verified, tenant_id, totp_enabled, first_name, last_name FROM users WHERE email = $1',
       [email]
     );
 
@@ -64,6 +64,26 @@ router.post('/login', async (req, res) => {
         query('UPDATE users SET tenant_id = $1 WHERE id = $2', [backfillTid, user.id])
           .catch(err => logger.warn('Failed to back-fill tenant_id for ' + user.role + ':', err.message));
       }
+    }
+
+    // Resolve first_name / last_name for roles whose names live in profile tables
+    if (!user.first_name) {
+      try {
+        let nameRow = null;
+        if (user.role === 'parent') {
+          const rows = await query('SELECT first_name, last_name FROM parents WHERE user_id = $1 LIMIT 1', [user.id]);
+          if (rows.length) nameRow = rows[0];
+        } else if (user.role === 'student') {
+          const rows = await query('SELECT first_name, last_name FROM students WHERE user_id = $1 LIMIT 1', [user.id]);
+          if (rows.length) nameRow = rows[0];
+        }
+        if (nameRow) {
+          user.first_name = nameRow.first_name;
+          user.last_name  = nameRow.last_name;
+          // Persist to users table so future logins skip this lookup
+          query('UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3', [nameRow.first_name, nameRow.last_name, user.id]).catch(() => {});
+        }
+      } catch { /* non-critical */ }
     }
 
     // For non-superadmin users, check tenant status
@@ -140,6 +160,8 @@ router.post('/login', async (req, res) => {
           email: user.email,
           role: user.role,
           tenant_id: user.tenant_id,
+          first_name: user.first_name || null,
+          last_name: user.last_name || null,
           isActive: user.is_active,
           isVerified: user.is_verified,
           disabled_modules: tenantDisabledModules
@@ -475,7 +497,7 @@ router.post('/2fa/validate', async (req, res) => {
     }
 
     const rows = await query(
-      'SELECT id, email, role, tenant_id, is_active, is_verified, totp_secret, totp_backup_codes FROM users WHERE id = $1 AND is_active = true',
+      'SELECT id, email, role, tenant_id, is_active, is_verified, totp_secret, totp_backup_codes, first_name, last_name FROM users WHERE id = $1 AND is_active = true',
       [decoded.userId]
     );
     if (!rows.length) {
@@ -531,7 +553,7 @@ router.post('/2fa/validate', async (req, res) => {
     res.json({
       success: true,
       data: {
-        user: { id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id, isActive: user.is_active, isVerified: user.is_verified },
+        user: { id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id, first_name: user.first_name || null, last_name: user.last_name || null, isActive: user.is_active, isVerified: user.is_verified },
         accessToken,
         refreshToken,
       },

@@ -99,7 +99,7 @@ export function FinanceOfficerDashboard() {
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-bold">{getGreeting()}, {t('Finance Officer')}!</h1>
+            <h1 className="text-2xl font-bold">{getGreeting()}, {[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.name || user?.email?.split('@')[0] || 'Finance Officer'}!</h1>
             <p className="text-amber-100 mt-1">{t('Here is your financial overview for today.')}</p>
           </div>
           <div className="flex items-center gap-2 bg-white/20 rounded-lg px-4 py-2">

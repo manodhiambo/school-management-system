@@ -73,7 +73,7 @@ export function AdminDashboard() {
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{getGreeting()}, {t('Dashboard') === 'Dashibodi' ? 'Msimamizi' : 'Admin'}!</h1>
+            <h1 className="text-2xl font-bold">{getGreeting()}, {[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
             <p className="text-blue-100 mt-1">{t('School Overview')}</p>
           </div>
           <div className="hidden md:flex items-center space-x-2 bg-white/20 rounded-lg px-4 py-2">

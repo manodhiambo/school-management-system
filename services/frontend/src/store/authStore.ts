@@ -7,6 +7,8 @@ interface User {
   email: string;
   role: string;
   name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
   tenant_id?: string | null;
   tenant_name?: string;
   tenant_status?: string;

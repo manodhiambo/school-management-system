@@ -212,14 +212,32 @@ router.get('/today', async (req, res) => {
   const { date } = req.query;
   const d = date || eatDateStr();
 
+  // Background sync: copy names from teachers table → users table for any teacher whose
+  // users.first_name is still null (created before the fix that writes names to both tables)
+  query(`
+    UPDATE users u
+    SET first_name = t.first_name, last_name = t.last_name
+    FROM teachers t
+    WHERE t.user_id = u.id
+      AND u.role = 'teacher'
+      AND u.tenant_id = $1
+      AND (u.first_name IS NULL OR u.first_name = '')
+      AND t.first_name IS NOT NULL
+  `, [tid]).catch(() => {});
+
   // Each query is independently wrapped — a missing column or table never 500s
   let allTeachers = [];
   try {
+    // JOIN teachers as name fallback for legacy users with null first_name in users table
     allTeachers = await query(
-      `SELECT id, first_name, last_name, email
-       FROM users
-       WHERE role = 'teacher' AND tenant_id = $1 AND is_active = TRUE
-       ORDER BY first_name`,
+      `SELECT u.id,
+              COALESCE(NULLIF(TRIM(u.first_name), ''), t.first_name)  AS first_name,
+              COALESCE(NULLIF(TRIM(u.last_name),  ''), t.last_name)   AS last_name,
+              u.email
+       FROM users u
+       LEFT JOIN teachers t ON t.user_id = u.id
+       WHERE u.role = 'teacher' AND u.tenant_id = $1 AND u.is_active = TRUE
+       ORDER BY COALESCE(NULLIF(TRIM(u.first_name), ''), t.first_name, u.email)`,
       [tid]
     );
   } catch (e) {
@@ -229,9 +247,13 @@ router.get('/today', async (req, res) => {
   let rows = [];
   try {
     rows = await query(
-      `SELECT tc.*, u.first_name, u.last_name, u.email
+      `SELECT tc.*,
+              COALESCE(NULLIF(TRIM(u.first_name), ''), t.first_name) AS first_name,
+              COALESCE(NULLIF(TRIM(u.last_name),  ''), t.last_name)  AS last_name,
+              u.email
        FROM teacher_checkins tc
        LEFT JOIN users u ON u.id = tc.teacher_id
+       LEFT JOIN teachers t ON t.user_id = tc.teacher_id
        WHERE tc.checkin_date = $1 AND tc.tenant_id = $2
        ORDER BY tc.checkin_time ASC`,
       [d, tid]
@@ -294,9 +316,13 @@ router.get('/history', async (req, res) => {
     const to   = to_date   || new Date().toISOString().split('T')[0];
 
     let sql = `
-      SELECT tc.*, u.first_name, u.last_name
+      SELECT tc.*,
+             COALESCE(NULLIF(TRIM(u.first_name), ''), t.first_name) AS first_name,
+             COALESCE(NULLIF(TRIM(u.last_name),  ''), t.last_name)  AS last_name,
+             u.email
       FROM teacher_checkins tc
-      JOIN users u ON u.id = tc.teacher_id
+      LEFT JOIN users u ON u.id = tc.teacher_id
+      LEFT JOIN teachers t ON t.user_id = tc.teacher_id
       WHERE tc.tenant_id = $1 AND tc.checkin_date BETWEEN $2 AND $3`;
     const params = [tid, from, to];
 

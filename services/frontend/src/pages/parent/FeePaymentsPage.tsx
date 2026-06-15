@@ -1,84 +1,64 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  DollarSign, CheckCircle, AlertCircle, Clock, Phone, Loader2,
-  Printer, Building2, Send, XCircle, Info, CreditCard
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import {
-  Dialog, DialogContent, DialogDescription,
-  DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+  DollarSign, CheckCircle, AlertCircle, Clock, Loader2,
+  Printer, Building2, Send, XCircle, Phone, CreditCard,
+  ChevronRight, Info, RefreshCw
+} from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
 
-function printPaymentReceipt(payment: any, studentName: string, schoolName = 'School') {
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(n: any) { return parseFloat(n || 0).toLocaleString('en-KE'); }
+
+function printReceipt(payment: any, studentName: string, schoolName: string) {
   const doc = new jsPDF({ unit: 'mm', format: 'a5' });
-  const margin = 15;
-  const pageW = 148;
-  let y = margin;
-
-  doc.setFillColor(37, 99, 235);
-  doc.rect(0, 0, pageW, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-  doc.text(schoolName, pageW / 2, 10, { align: 'center' });
+  const W = 148, m = 15; let y = m;
+  doc.setFillColor(37, 99, 235); doc.rect(0, 0, W, 22, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+  doc.text(schoolName, W / 2, 10, { align: 'center' });
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-  doc.text('PAYMENT RECEIPT', pageW / 2, 17, { align: 'center' });
-
-  y = 30;
-  doc.setTextColor(30, 30, 30);
-  doc.setDrawColor(180, 180, 180);
-  doc.line(margin, y, pageW - margin, y);
-  y += 7;
-
-  const addRow = (label: string, value: string) => {
-    doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-    doc.text(label + ':', margin, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(value, margin + 42, y);
-    y += 6;
+  doc.text('PAYMENT RECEIPT', W / 2, 17, { align: 'center' });
+  y = 30; doc.setTextColor(30, 30, 30); doc.setDrawColor(180, 180, 180);
+  doc.line(m, y, W - m, y); y += 7;
+  const row = (label: string, val: string) => {
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.text(label + ':', m, y);
+    doc.setFont('helvetica', 'normal'); doc.text(val, m + 44, y); y += 6;
   };
-
-  addRow('Receipt No', payment.transaction_id || payment.receipt_number || `RCP-${Date.now()}`);
-  addRow('Date', new Date(payment.payment_date || payment.created_at).toLocaleDateString('en-KE'));
-  addRow('Student', studentName);
-  if (payment.description || payment.invoice_description) addRow('Description', payment.description || payment.invoice_description);
-  y += 2;
-  doc.line(margin, y, pageW - margin, y);
-  y += 7;
-
+  row('Receipt', payment.transaction_id || payment.receipt_number || `RCP-${Date.now()}`);
+  row('Date', new Date(payment.payment_date || payment.created_at).toLocaleDateString('en-KE'));
+  row('Student', studentName);
+  if (payment.invoice_description || payment.description) row('Fee', payment.invoice_description || payment.description);
+  y += 2; doc.line(m, y, W - m, y); y += 7;
   doc.setFontSize(13); doc.setFont('helvetica', 'bold');
-  doc.text(`Amount Paid: KES ${Number(payment.amount || 0).toLocaleString()}`, margin, y);
-  y += 7;
-
+  doc.text(`KES ${fmt(payment.amount)} Paid`, m, y); y += 7;
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-  addRow('Payment Method', (payment.payment_method || '').replace(/_/g, ' ').toUpperCase() || 'N/A');
-  if (payment.transaction_id) addRow('Reference', payment.transaction_id);
-
-  y += 2;
-  doc.line(margin, y, pageW - margin, y);
-  y += 8;
-
-  doc.setFontSize(7); doc.setFont('helvetica', 'italic');
-  doc.setTextColor(120, 120, 120);
-  doc.text('This is a computer-generated receipt. No signature required.', pageW / 2, y, { align: 'center' });
-
-  doc.save(`receipt-${studentName.replace(/\s+/g, '-')}-${payment.transaction_id || Date.now()}.pdf`);
+  row('Method', (payment.payment_method || '').replace(/_/g, ' ').toUpperCase());
+  if (payment.transaction_id) row('Reference', payment.transaction_id);
+  y += 2; doc.line(m, y, W - m, y); y += 8;
+  doc.setFontSize(7); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 120, 120);
+  doc.text('Computer-generated receipt. No signature required.', W / 2, y, { align: 'center' });
+  doc.save(`receipt-${studentName.replace(/\s+/g, '-')}-${Date.now()}.pdf`);
 }
 
-const PAYMENT_METHODS = [
-  { value: 'mpesa', label: 'M-Pesa (Paybill/Till)' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'cheque', label: 'Cheque' },
-  { value: 'coop_bus_bank', label: 'Co-op Bank' },
-  { value: 'other', label: 'Other' },
+// ── payment method config ────────────────────────────────────────────────────
+
+const METHODS = [
+  { value: 'mpesa_paybill',  label: 'M-Pesa Paybill',   icon: '📱', hint: 'M-Pesa confirmation code (e.g. QJK8XXXXXXX)' },
+  { value: 'mpesa_stk',      label: 'M-Pesa STK Push',  icon: '📲', hint: 'Automated prompt sent to your phone' },
+  { value: 'bank_transfer',  label: 'Bank Transfer',     icon: '🏦', hint: 'Bank reference / deposit slip number' },
+  { value: 'mpesa',          label: 'M-Pesa (Other)',    icon: '💚', hint: 'M-Pesa confirmation code' },
+  { value: 'cash',           label: 'Cash',              icon: '💵', hint: 'Receipt number from accounts office' },
+  { value: 'cheque',         label: 'Cheque',            icon: '📄', hint: 'Cheque number' },
+  { value: 'other',          label: 'Other',             icon: '💳', hint: 'Reference / proof of payment' },
 ];
+
+// ── main component ───────────────────────────────────────────────────────────
 
 export function FeePaymentsPage() {
   const { user } = useAuthStore();
@@ -87,641 +67,733 @@ export function FeePaymentsPage() {
   const [feeDetails, setFeeDetails] = useState<any>(null);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [schoolSettings, setSchoolSettings] = useState<any>(null);
+  const [settings, setSettings] = useState<any>(null);
 
-  // M-Pesa state
-  const [mpesaModalOpen, setMpesaModalOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [mpesaPhone, setMpesaPhone] = useState('');
-  const [mpesaAmount, setMpesaAmount] = useState('');
-  const [mpesaLoading, setMpesaLoading] = useState(false);
-  const [mpesaStatus, setMpesaStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
-  const [mpesaMessage, setMpesaMessage] = useState('');
+  // modal state
+  const [modal, setModal] = useState<'closed' | 'pay'>('closed');
+  const [activeInvoice, setActiveInvoice] = useState<any>(null);
+  const [step, setStep] = useState<'method' | 'details' | 'stk' | 'done'>('method');
 
-  // Submit payment request state
-  const [submitModalOpen, setSubmitModalOpen] = useState(false);
-  const [submitInvoice, setSubmitInvoice] = useState<any>(null);
-  const [submitMethod, setSubmitMethod] = useState('mpesa');
-  const [submitRef, setSubmitRef] = useState('');
-  const [submitAmount, setSubmitAmount] = useState('');
-  const [submitMessage, setSubmitMessage] = useState('');
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  // form fields
+  const [method, setMethod] = useState('mpesa_paybill');
+  const [amount, setAmount] = useState('');
+  const [ref, setRef] = useState('');
+  const [msg, setMsg] = useState('');
+  const [stkPhone, setStkPhone] = useState('');
 
-  const mpesaStkEnabled = !!(schoolSettings?.mpesa_paybill || schoolSettings?.mpesa_till);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [stkStatus, setStkStatus] = useState<'idle'|'processing'|'sent'|'failed'>('idle');
+  const [stkMsg, setStkMsg] = useState('');
+
+  // ── derived ──────────────────────────────────────────────────────────────
+
+  const hasMpesaStk = !!(settings?.mpesa_paybill || settings?.mpesa_till);
+  const hasPayInfo = settings && (
+    settings.bank_account_number || settings.mpesa_paybill ||
+    settings.mpesa_till || settings.payment_instructions
+  );
+
+  const invoices: any[]  = feeDetails?.invoices  || [];
+  const payments: any[]  = feeDetails?.payments   || [];
+  const summary          = feeDetails?.summary    || {};
+  const unpaidInvoices   = invoices.filter(i => i.status !== 'paid' && parseFloat(i.balance_amount || 0) > 0);
+
+  const pendingByInvoice: Record<string, any> = {};
+  for (const r of pendingRequests) if (r.invoice_id) pendingByInvoice[r.invoice_id] = r;
+
+  const availableMethods = METHODS.filter(m =>
+    m.value !== 'mpesa_stk' || hasMpesaStk
+  );
+  const activeMethod = METHODS.find(m => m.value === method) || METHODS[0];
+
+  // ── data loading ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (user?.id) {
-      loadChildren();
-      api.getSettings()
-        .then((r: any) => setSchoolSettings(r?.data || r || null))
-        .catch(() => {});
+      loadAll();
+      api.getSettings().then((r: any) => setSettings(r?.data || r || null)).catch(() => {});
     }
   }, [user]);
 
   useEffect(() => {
-    if (selectedChild) {
-      const sid = selectedChild.id || selectedChild.student_id;
-      loadFeeDetails(sid);
-      loadPendingRequests(sid);
-    }
+    const sid = selectedChild?.id || selectedChild?.student_id;
+    if (sid) { loadFees(sid); loadPending(sid); }
   }, [selectedChild]);
 
-  const loadChildren = async () => {
+  const loadAll = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const response: any = await api.getParentByUserId(user?.id || '');
-      const parentData = response.data || response;
-      const childrenData = parentData.children || [];
-      setChildren(childrenData);
-      if (childrenData.length > 0) setSelectedChild(childrenData[0]);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load children');
+      const r: any = await api.getParentByUserId(user?.id || '');
+      const data = r?.data || r;
+      const kids = data?.children || [];
+      setChildren(kids);
+      if (kids.length) setSelectedChild(kids[0]);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadFeeDetails = async (studentId: string) => {
-    if (!studentId) return;
+  const loadFees = async (sid: string) => {
     try {
-      const response: any = await api.getStudentFeeAccount(studentId);
-      setFeeDetails(response.data || response);
-    } catch {
-      setFeeDetails(null);
-    }
+      const r: any = await api.getStudentFeeAccount(sid);
+      setFeeDetails(r?.data || r);
+    } catch { setFeeDetails(null); }
   };
 
-  const loadPendingRequests = async (studentId: string) => {
-    if (!studentId) return;
+  const loadPending = async (sid: string) => {
     try {
-      const response: any = await api.getMyPaymentRequests(studentId);
-      setPendingRequests(response.data || response || []);
-    } catch {
-      setPendingRequests([]);
-    }
+      const r: any = await api.getMyPaymentRequests(sid);
+      setPendingRequests(r?.data || r || []);
+    } catch { setPendingRequests([]); }
   };
 
-  const refresh = () => {
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
     const sid = selectedChild?.id || selectedChild?.student_id;
-    if (sid) { loadFeeDetails(sid); loadPendingRequests(sid); }
+    if (sid) await Promise.all([loadFees(sid), loadPending(sid)]);
+    setRefreshing(false);
+  }, [selectedChild]);
+
+  // ── modal helpers ─────────────────────────────────────────────────────────
+
+  const openPayModal = (invoice: any) => {
+    setActiveInvoice(invoice);
+    setMethod('mpesa_paybill');
+    setAmount(fmt(invoice.balance_amount || invoice.net_amount).replace(/,/g, ''));
+    setRef(''); setMsg(''); setStkPhone('');
+    setFormError(''); setStkStatus('idle'); setStkMsg('');
+    setStep('method');
+    setModal('pay');
   };
 
-  // M-Pesa STK push
-  const openMpesaModal = (invoice: any) => {
-    setSelectedInvoice(invoice);
-    setMpesaAmount(parseFloat(invoice.balance_amount || invoice.net_amount || 0).toString());
-    setMpesaPhone('');
-    setMpesaStatus('idle');
-    setMpesaMessage('');
-    setMpesaModalOpen(true);
+  const closeModal = () => {
+    setModal('closed');
+    setStep('method');
+    setStkStatus('idle');
+    setFormError('');
   };
 
-  const handleMpesaPayment = async () => {
-    if (!mpesaPhone || !mpesaAmount) { setMpesaMessage('Please fill in all fields'); return; }
-    const amount = parseFloat(mpesaAmount);
-    if (isNaN(amount) || amount <= 0) { setMpesaMessage('Enter a valid amount'); return; }
-    const maxBalance = parseFloat(selectedInvoice?.balance_amount || selectedInvoice?.net_amount || 0);
-    if (amount > maxBalance) { setMpesaMessage(`Amount exceeds balance (KES ${maxBalance.toLocaleString()})`); return; }
-    if (!/^(\+?254|0)?[17]\d{8}$/.test(mpesaPhone.replace(/\s/g, ''))) {
-      setMpesaMessage('Enter a valid Kenyan phone number e.g. 0712345678'); return;
-    }
-    try {
-      setMpesaLoading(true);
-      setMpesaStatus('processing');
-      setMpesaMessage('Sending request to your phone...');
-      const res: any = await api.initiateMpesaPayment(selectedInvoice.id, mpesaPhone.replace(/\s/g, ''), amount);
-      if (res.success || res.data?.success) {
-        setMpesaStatus('success');
-        setMpesaMessage(res.message || res.data?.message || 'Check your phone and enter your M-Pesa PIN.');
-        setTimeout(refresh, 6000);
-      } else {
-        setMpesaStatus('failed');
-        setMpesaMessage(res.message || res.data?.message || 'Failed to initiate payment');
-      }
-    } catch (err: any) {
-      setMpesaStatus('failed');
-      setMpesaMessage(err?.message || 'Failed to initiate M-Pesa payment');
-    } finally {
-      setMpesaLoading(false);
-    }
-  };
+  // ── submit manual payment ─────────────────────────────────────────────────
 
-  // Submit payment request
-  const openSubmitModal = (invoice: any) => {
-    setSubmitInvoice(invoice);
-    setSubmitMethod('mpesa');
-    setSubmitRef('');
-    setSubmitAmount(parseFloat(invoice.balance_amount || invoice.net_amount || 0).toString());
-    setSubmitMessage('');
-    setSubmitError('');
-    setSubmitSuccess(false);
-    setSubmitModalOpen(true);
-  };
+  const handleSubmit = async () => {
+    setFormError('');
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) { setFormError('Enter a valid amount'); return; }
+    const maxBal = parseFloat(activeInvoice?.balance_amount || 0);
+    if (amt > maxBal + 0.01) { setFormError(`Amount exceeds balance due (KES ${fmt(maxBal)})`); return; }
 
-  const handleSubmitRequest = async () => {
-    setSubmitError('');
-    const amount = parseFloat(submitAmount);
-    if (isNaN(amount) || amount <= 0) { setSubmitError('Enter a valid amount'); return; }
-    const maxBalance = parseFloat(submitInvoice?.balance_amount || submitInvoice?.net_amount || 0);
-    if (amount > maxBalance + 0.01) { setSubmitError(`Amount exceeds balance (KES ${maxBalance.toLocaleString()})`); return; }
-    if (!submitMethod) { setSubmitError('Select a payment method'); return; }
+    const dbMethod = method === 'mpesa_paybill' ? 'mpesa' : method;
 
     try {
-      setSubmitLoading(true);
+      setSubmitting(true);
       const res: any = await api.submitPaymentRequest({
-        invoiceId: submitInvoice.id,
-        amount,
-        paymentMethod: submitMethod,
-        transactionRef: submitRef || undefined,
-        parentMessage: submitMessage || undefined,
+        invoiceId: activeInvoice.id,
+        amount: amt,
+        paymentMethod: dbMethod,
+        transactionRef: ref.trim() || undefined,
+        parentMessage: msg.trim() || undefined,
       });
       if (res.success || res.data?.success) {
-        setSubmitSuccess(true);
-        setTimeout(() => {
-          setSubmitModalOpen(false);
-          setSubmitSuccess(false);
-          refresh();
-        }, 2500);
+        setStep('done');
+        refresh();
       } else {
-        setSubmitError(res.message || res.data?.message || 'Failed to submit request');
+        setFormError(res.message || res.data?.message || 'Failed to submit');
       }
-    } catch (err: any) {
-      setSubmitError(err?.message || 'Failed to submit payment request');
+    } catch (e: any) {
+      setFormError(e?.message || 'Failed to submit payment request');
     } finally {
-      setSubmitLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Build a map: invoiceId → pending request (if any)
-  const pendingByInvoice: Record<string, any> = {};
-  for (const r of pendingRequests) {
-    if (r.invoice_id) pendingByInvoice[r.invoice_id] = r;
-  }
+  // ── STK push ─────────────────────────────────────────────────────────────
 
-  const summary = feeDetails?.summary || {};
-  const invoices: any[] = feeDetails?.invoices || [];
-  const payments: any[] = feeDetails?.payments || [];
-  const hasPaymentInfo = schoolSettings && (
-    schoolSettings.bank_account_number || schoolSettings.mpesa_paybill ||
-    schoolSettings.mpesa_till || schoolSettings.payment_instructions
+  const handleStkPush = async () => {
+    setFormError('');
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) { setFormError('Enter a valid amount'); return; }
+    if (!/^(\+?254|0)?[17]\d{8}$/.test(stkPhone.replace(/\s/g, ''))) {
+      setFormError('Enter a valid Kenyan phone number e.g. 0712345678'); return;
+    }
+    try {
+      setStkStatus('processing'); setStkMsg('Sending prompt to your phone...');
+      const res: any = await api.initiateMpesaPayment(activeInvoice.id, stkPhone.replace(/\s/g, ''), amt);
+      if (res.success || res.data?.success) {
+        setStkStatus('sent');
+        setStkMsg(res.message || res.data?.message || 'Check your phone and enter your PIN to complete payment.');
+        setTimeout(refresh, 8000);
+      } else {
+        setStkStatus('failed');
+        setStkMsg(res.message || res.data?.message || 'STK push failed. Try manual payment.');
+      }
+    } catch (e: any) {
+      setStkStatus('failed');
+      setStkMsg(e?.message || 'Failed to send STK push');
+    }
+  };
+
+  // ── render ────────────────────────────────────────────────────────────────
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+    </div>
   );
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-full"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
-  }
+  if (error) return (
+    <div className="flex items-center justify-center h-64">
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-6">
+          <p className="text-red-600 font-medium">{error}</p>
+          <Button onClick={loadAll} className="mt-4">Retry</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Card className="w-full max-w-md">
-          <CardHeader><CardTitle className="text-red-600">Error Loading Fee Information</CardTitle></CardHeader>
-          <CardContent><p className="text-gray-600">{error}</p><Button onClick={loadChildren} className="mt-4">Retry</Button></CardContent>
-        </Card>
-      </div>
-    );
-  }
+  if (!children.length) return (
+    <div className="flex items-center justify-center h-64">
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-6 text-center text-gray-500">
+          No children linked to your account
+        </CardContent>
+      </Card>
+    </div>
+  );
 
-  if (children.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Card className="w-full max-w-md"><CardContent className="pt-6">
-          <p className="text-center text-gray-500">No children linked to your account</p>
-        </CardContent></Card>
-      </div>
-    );
-  }
+  const studentName = `${selectedChild?.first_name || ''} ${selectedChild?.last_name || ''}`.trim();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold">Fee Payments</h2>
-        <p className="text-gray-500">View invoices, submit payments, and track confirmations</p>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Fee Payments</h2>
+          <p className="text-gray-500 text-sm">View outstanding fees and submit payments for confirmation</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      {/* Child Selector */}
-      <div className="flex gap-2 flex-wrap">
-        {children.map((child) => (
-          <Button
-            key={child.id || child.student_id}
-            variant={(selectedChild?.id || selectedChild?.student_id) === (child.id || child.student_id) ? 'default' : 'outline'}
-            onClick={() => setSelectedChild(child)}
-          >
-            {child.first_name} {child.last_name}
-          </Button>
-        ))}
+      {/* Child selector */}
+      {children.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          {children.map((child) => {
+            const cid = child.id || child.student_id;
+            const sel = selectedChild?.id || selectedChild?.student_id;
+            return (
+              <button
+                key={cid}
+                onClick={() => setSelectedChild(child)}
+                className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                  cid === sel
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:text-primary'
+                }`}
+              >
+                {child.first_name} {child.last_name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="border-0 shadow-sm bg-blue-50">
+          <CardContent className="p-4">
+            <p className="text-xs text-blue-500 font-medium uppercase tracking-wide">Total Billed</p>
+            <p className="text-xl font-bold text-blue-800 mt-1">KES {fmt(summary.total_invoiced)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm bg-green-50">
+          <CardContent className="p-4">
+            <p className="text-xs text-green-500 font-medium uppercase tracking-wide">Confirmed Paid</p>
+            <p className="text-xl font-bold text-green-800 mt-1">KES {fmt(summary.total_paid)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-xs text-red-500 font-medium uppercase tracking-wide">Balance Due</p>
+            <p className="text-xl font-bold text-red-800 mt-1">KES {fmt(summary.total_balance)}</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* School Payment Details */}
-      {hasPaymentInfo && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-800 flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              School Payment Details
+      {/* Outstanding invoices */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-red-500" />
+            Outstanding Fees — {studentName}
+            {unpaidInvoices.length > 0 && (
+              <span className="ml-auto text-xs font-normal bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                {unpaidInvoices.length} unpaid
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {unpaidInvoices.length === 0 ? (
+            <div className="py-12 text-center text-gray-400">
+              <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-400" />
+              <p className="font-medium text-green-600">All fees are paid up!</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {unpaidInvoices.map((inv: any) => {
+                const balance = parseFloat(inv.balance_amount || 0);
+                const paid    = parseFloat(inv.paid_amount   || 0);
+                const total   = parseFloat(inv.net_amount    || inv.total_amount || 0);
+                const pct     = total > 0 ? Math.round((paid / total) * 100) : 0;
+                const pending = pendingByInvoice[inv.id];
+                const isRejected = pending?.status === 'rejected';
+                const isPending  = pending?.status === 'pending_confirmation';
+
+                return (
+                  <div key={inv.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <p className="font-semibold text-gray-800 truncate">
+                            {inv.description || inv.structure_name || 'School Fees'}
+                          </p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            inv.status === 'overdue' ? 'bg-red-100 text-red-700'
+                            : inv.status === 'partial' ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {inv.status}
+                          </span>
+                          {isPending && (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700 flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> Awaiting confirmation
+                            </span>
+                          )}
+                          {isRejected && (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-600 flex items-center gap-1">
+                              <XCircle className="h-3 w-3" /> Rejected — resubmit
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-gray-400">
+                          {inv.invoice_number}
+                          {inv.term ? ` · ${inv.term}` : ''}
+                          {inv.academic_year ? ` · ${inv.academic_year}` : ''}
+                          {inv.due_date ? ` · Due ${new Date(inv.due_date).toLocaleDateString('en-KE')}` : ''}
+                        </p>
+
+                        {/* progress bar */}
+                        {paid > 0 && (
+                          <div className="mt-2">
+                            <div className="flex justify-between text-xs text-gray-400 mb-1">
+                              <span>KES {fmt(paid)} paid</span>
+                              <span>{pct}%</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full bg-green-500 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        )}
+
+                        {isPending && (
+                          <p className="text-xs text-orange-600 mt-1">
+                            Submitted {new Date(pending.payment_date).toLocaleDateString('en-KE')} ·{' '}
+                            {(pending.payment_method || '').replace(/_/g, ' ')}
+                            {pending.transaction_id ? ` · Ref: ${pending.transaction_id}` : ''}
+                          </p>
+                        )}
+                        {isRejected && pending.confirmation_note && (
+                          <p className="text-xs text-red-500 mt-1">Reason: {pending.confirmation_note}</p>
+                        )}
+                      </div>
+
+                      {/* Amount + Pay button */}
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-gray-400">Balance</p>
+                        <p className="text-lg font-bold text-red-700">KES {fmt(balance)}</p>
+                        {!isPending ? (
+                          <Button
+                            size="sm"
+                            onClick={() => openPayModal(inv)}
+                            className="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            {isRejected ? 'Resubmit' : 'Pay Fee'}
+                            <ChevronRight className="h-3 w-3 ml-1" />
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-orange-500 mt-2 text-right">Pending...</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* All invoices (paid too) */}
+      {invoices.filter(i => i.status === 'paid').length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              Paid Invoices
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-blue-900 space-y-1">
-            {schoolSettings.bank_name && <p><span className="font-medium">Bank:</span> {schoolSettings.bank_name}</p>}
-            {schoolSettings.bank_account_number && <p><span className="font-medium">Account No:</span> {schoolSettings.bank_account_number}</p>}
-            {schoolSettings.mpesa_paybill && (
-              <p>
-                <span className="font-medium">M-Pesa Paybill:</span> {schoolSettings.mpesa_paybill}
-                {schoolSettings.mpesa_account_ref && <span className="ml-2 text-xs">(Account: {schoolSettings.mpesa_account_ref})</span>}
-              </p>
-            )}
-            {schoolSettings.mpesa_till && <p><span className="font-medium">M-Pesa Till No:</span> {schoolSettings.mpesa_till}</p>}
-            {schoolSettings.payment_instructions && (
-              <p className="mt-2 text-xs italic border-t border-blue-200 pt-2">{schoolSettings.payment_instructions}</p>
-            )}
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {invoices.filter(i => i.status === 'paid').map((inv: any) => (
+                <div key={inv.id} className="p-4 flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium text-gray-700">{inv.description || inv.invoice_number}</p>
+                    <p className="text-xs text-gray-400">{inv.invoice_number}{inv.term ? ` · ${inv.term}` : ''}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Paid</span>
+                    <p className="text-sm font-bold text-gray-700 mt-1">KES {fmt(inv.net_amount)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {selectedChild && (
-        <>
-          {/* Summary */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Invoiced</CardTitle>
-                <DollarSign className="h-4 w-4 text-gray-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">KES {parseFloat(summary.total_invoiced || '0').toLocaleString()}</div>
-                <p className="text-xs text-gray-500">This academic year</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Amount Paid</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">KES {parseFloat(summary.total_paid || '0').toLocaleString()}</div>
-                <p className="text-xs text-gray-500">Confirmed payments</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Balance Due</CardTitle>
-                <AlertCircle className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">KES {parseFloat(summary.total_balance || '0').toLocaleString()}</div>
-                <p className="text-xs text-gray-500">Outstanding amount</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Invoices */}
-          <Card>
-            <CardHeader><CardTitle>Fee Invoices</CardTitle></CardHeader>
-            <CardContent>
-              {invoices.length > 0 ? (
-                <div className="space-y-4">
-                  {invoices.map((invoice: any) => {
-                    const balance = parseFloat(invoice.balance_amount || 0);
-                    const total = parseFloat(invoice.net_amount || invoice.total_amount || 0);
-                    const pending = pendingByInvoice[invoice.id];
-                    const isPaid = invoice.status === 'paid';
-                    const canPay = !isPaid && balance > 0 && !pending;
-
-                    return (
-                      <div key={invoice.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <h4 className="font-semibold">
-                                {invoice.description || invoice.structure_name || invoice.invoice_number || 'School Fees'}
-                              </h4>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                isPaid ? 'bg-green-100 text-green-700'
-                                : invoice.status === 'overdue' ? 'bg-red-100 text-red-700'
-                                : invoice.status === 'partial' ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-gray-100 text-gray-700'
-                              }`}>
-                                {invoice.status}
-                              </span>
-                              {pending && (
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  pending.status === 'pending_confirmation'
-                                    ? 'bg-orange-100 text-orange-700'
-                                    : 'bg-red-100 text-red-600'
-                                }`}>
-                                  {pending.status === 'pending_confirmation' ? 'Pending confirmation' : 'Submission rejected'}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-400">Inv: {invoice.invoice_number}</p>
-                            {invoice.due_date && (
-                              <p className="text-sm text-gray-500 flex items-center mt-1">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Due: {new Date(invoice.due_date).toLocaleDateString('en-KE')}
-                              </p>
-                            )}
-                            {invoice.term && (
-                              <p className="text-xs text-gray-400">{invoice.term} — {invoice.academic_year}</p>
-                            )}
-                            {pending?.status === 'rejected' && pending.confirmation_note && (
-                              <p className="text-xs text-red-500 mt-1">Reason: {pending.confirmation_note}</p>
-                            )}
-                            {pending?.status === 'pending_confirmation' && (
-                              <p className="text-xs text-orange-600 mt-1">
-                                Submitted {new Date(pending.payment_date).toLocaleDateString('en-KE')} via {(pending.payment_method || '').replace(/_/g, ' ')}
-                                {pending.transaction_id ? ` · Ref: ${pending.transaction_id}` : ''}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
-                            <div className="text-left md:text-right">
-                              <p className="text-lg font-bold">KES {total.toLocaleString()}</p>
-                              {balance > 0 && (
-                                <p className="text-sm text-red-600">Balance: KES {balance.toLocaleString()}</p>
-                              )}
-                              {parseFloat(invoice.paid_amount || 0) > 0 && (
-                                <p className="text-xs text-green-600">Paid: KES {parseFloat(invoice.paid_amount).toLocaleString()}</p>
-                              )}
-                            </div>
-
-                            {canPay && (
-                              <div className="flex flex-col gap-2">
-                                {mpesaStkEnabled && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => openMpesaModal(invoice)}
-                                    className="bg-green-600 hover:bg-green-700 text-white"
-                                  >
-                                    <Phone className="h-3 w-3 mr-1" />
-                                    M-Pesa STK
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openSubmitModal(invoice)}
-                                  className="border-blue-400 text-blue-700 hover:bg-blue-50"
-                                >
-                                  <Send className="h-3 w-3 mr-1" />
-                                  Submit Payment
-                                </Button>
-                              </div>
-                            )}
-
-                            {pending?.status === 'rejected' && canPay === false && !isPaid && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openSubmitModal(invoice)}
-                                className="border-blue-400 text-blue-700 hover:bg-blue-50"
-                              >
-                                <Send className="h-3 w-3 mr-1" />
-                                Resubmit
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+      {/* Payment history */}
+      {payments.filter(p => p.status === 'success').length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Payment History</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {payments.filter(p => p.status === 'success').map((p: any) => (
+                <div key={p.id} className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm">{p.invoice_number || 'Payment'}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(p.payment_date || p.created_at).toLocaleDateString('en-KE')}
+                      {p.transaction_id && <span className="ml-2 font-mono">{p.transaction_id}</span>}
+                    </p>
+                    <p className="text-xs text-gray-400 capitalize">{(p.payment_method || '').replace(/_/g, ' ')}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="font-bold text-green-700">KES {fmt(p.amount)}</p>
+                    <button
+                      onClick={() => printReceipt(p, studentName, settings?.school_name || 'School')}
+                      className="text-gray-400 hover:text-gray-700 p-1"
+                      title="Print receipt"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Info className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                  <p>No invoices found</p>
-                  <p className="text-xs mt-1">Contact the school if you believe fees are owed</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Payment History */}
-          <Card>
-            <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-            <CardContent>
-              {payments.filter((p: any) => p.status === 'success').length > 0 ? (
-                <div className="space-y-2">
-                  {payments
-                    .filter((p: any) => p.status === 'success')
-                    .map((payment: any, index: number) => (
-                      <div key={payment.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium">{payment.invoice_number || 'Fee Payment'}</p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(payment.payment_date || payment.created_at).toLocaleDateString('en-KE')}
-                            {payment.transaction_id && (
-                              <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                {payment.transaction_id}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="font-bold text-green-600">KES {parseFloat(payment.amount).toLocaleString()}</p>
-                            <p className="text-xs text-gray-500 capitalize">{(payment.payment_method || 'N/A').replace(/_/g, ' ')}</p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            title="Print receipt"
-                            onClick={() => printPaymentReceipt(
-                              payment,
-                              `${selectedChild?.first_name || ''} ${selectedChild?.last_name || ''}`.trim(),
-                              schoolSettings?.school_name || 'School'
-                            )}
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <p className="text-center text-gray-500 py-8">No confirmed payments yet</p>
-              )}
-            </CardContent>
-          </Card>
-        </>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* ── M-Pesa STK Modal ── */}
-      <Dialog open={mpesaModalOpen} onOpenChange={setMpesaModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-green-600" />
-              Pay with M-Pesa STK Push
-            </DialogTitle>
-            <DialogDescription>Receive a prompt on your phone to enter your PIN</DialogDescription>
-          </DialogHeader>
+      {/* ══════════════════════ PAY FEE MODAL ══════════════════════ */}
+      {modal === 'pay' && activeInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto">
 
-          {mpesaStatus === 'idle' && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Invoice</Label>
-                <Input value={selectedInvoice?.description || selectedInvoice?.invoice_number || 'School Fees'} disabled className="bg-gray-50" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mpesa-amount">Amount (KES)</Label>
-                <Input
-                  id="mpesa-amount"
-                  type="number"
-                  value={mpesaAmount}
-                  onChange={(e) => setMpesaAmount(e.target.value)}
-                  max={parseFloat(selectedInvoice?.balance_amount || selectedInvoice?.net_amount || 0)}
-                />
-                <p className="text-xs text-gray-500">Max: KES {parseFloat(selectedInvoice?.balance_amount || selectedInvoice?.net_amount || 0).toLocaleString()}</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
-                <Input id="mpesa-phone" type="tel" value={mpesaPhone} onChange={(e) => setMpesaPhone(e.target.value)} placeholder="0712345678" />
-              </div>
-              {mpesaMessage && <p className="text-sm text-red-600">{mpesaMessage}</p>}
-            </div>
-          )}
-          {mpesaStatus === 'processing' && (
-            <div className="py-8 text-center">
-              <Loader2 className="h-12 w-12 animate-spin mx-auto text-green-600 mb-4" />
-              <p className="text-lg font-medium">Processing...</p>
-              <p className="text-gray-500">{mpesaMessage}</p>
-            </div>
-          )}
-          {mpesaStatus === 'success' && (
-            <div className="py-8 text-center">
-              <CheckCircle className="h-12 w-12 mx-auto text-green-600 mb-4" />
-              <p className="text-lg font-medium text-green-600">Request Sent!</p>
-              <p className="text-gray-500 mt-2">{mpesaMessage}</p>
-            </div>
-          )}
-          {mpesaStatus === 'failed' && (
-            <div className="py-8 text-center">
-              <AlertCircle className="h-12 w-12 mx-auto text-red-600 mb-4" />
-              <p className="text-lg font-medium text-red-600">Payment Failed</p>
-              <p className="text-gray-500 mt-2">{mpesaMessage}</p>
-            </div>
-          )}
-
-          <DialogFooter>
-            {mpesaStatus === 'idle' && (
-              <>
-                <Button variant="outline" onClick={() => setMpesaModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleMpesaPayment} disabled={mpesaLoading} className="bg-green-600 hover:bg-green-700">
-                  {mpesaLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Phone className="h-4 w-4 mr-2" />}
-                  Send Request
-                </Button>
-              </>
-            )}
-            {(mpesaStatus === 'success' || mpesaStatus === 'failed') && (
-              <Button onClick={() => { setMpesaModalOpen(false); refresh(); }}>Close</Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Submit Payment Request Modal ── */}
-      <Dialog open={submitModalOpen} onOpenChange={(open) => { setSubmitModalOpen(open); if (!open) refresh(); }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5 text-blue-600" />
-              Submit Payment for Confirmation
-            </DialogTitle>
-            <DialogDescription>
-              Fill in how and how much you paid. The school will verify and confirm your payment.
-            </DialogDescription>
-          </DialogHeader>
-
-          {submitSuccess ? (
-            <div className="py-10 text-center">
-              <CheckCircle className="h-14 w-14 mx-auto text-green-600 mb-4" />
-              <p className="text-xl font-semibold text-green-700">Payment Submitted!</p>
-              <p className="text-gray-500 mt-2">The school admin will verify and confirm your payment shortly.</p>
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
-              <div className="p-3 bg-gray-50 rounded-lg text-sm">
-                <p className="font-medium">{submitInvoice?.description || submitInvoice?.invoice_number || 'School Fees'}</p>
-                <p className="text-gray-500">Balance: KES {parseFloat(submitInvoice?.balance_amount || submitInvoice?.net_amount || 0).toLocaleString()}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="submit-method">Payment Method *</Label>
-                  <Select
-                    id="submit-method"
-                    value={submitMethod}
-                    onChange={(e) => setSubmitMethod(e.target.value)}
-                  >
-                    {PAYMENT_METHODS.map(m => (
-                      <option key={m.value} value={m.value}>{m.label}</option>
-                    ))}
-                  </Select>
+            {/* modal header */}
+            <div className="bg-blue-600 text-white px-6 py-4 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">Pay School Fee</h2>
+                  <p className="text-blue-200 text-sm mt-0.5">{studentName}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="submit-amount">Amount Paid (KES) *</Label>
+                <button onClick={closeModal} className="text-blue-200 hover:text-white p-1 rounded-lg">
+                  <XCircle className="h-6 w-6" />
+                </button>
+              </div>
+              {/* invoice summary */}
+              <div className="mt-3 bg-blue-700/50 rounded-xl px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-blue-200">Paying for</p>
+                  <p className="font-semibold">{activeInvoice.description || activeInvoice.structure_name || 'School Fees'}</p>
+                  <p className="text-blue-200 text-xs">{activeInvoice.invoice_number}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-blue-200">Balance Due</p>
+                  <p className="text-xl font-bold">KES {fmt(activeInvoice.balance_amount)}</p>
+                  {parseFloat(activeInvoice.paid_amount || 0) > 0 && (
+                    <p className="text-xs text-green-300">KES {fmt(activeInvoice.paid_amount)} already paid</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* STEP: DONE */}
+            {step === 'done' && (
+              <div className="p-8 text-center">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-green-700">Payment Submitted!</h3>
+                <p className="text-gray-500 mt-2">
+                  Your payment has been sent to the school admin for confirmation. You will see an update once they verify it.
+                </p>
+                <Button onClick={closeModal} className="mt-6 w-full">Done</Button>
+              </div>
+            )}
+
+            {/* STEP: CHOOSE METHOD */}
+            {step === 'method' && (
+              <div className="p-6 space-y-4">
+                <p className="font-semibold text-gray-700">How would you like to pay?</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {availableMethods.map(m => (
+                    <button
+                      key={m.value}
+                      onClick={() => setMethod(m.value)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all text-center ${
+                        method === m.value
+                          ? 'border-blue-600 bg-blue-50 text-blue-800'
+                          : 'border-gray-200 hover:border-blue-300 text-gray-700'
+                      }`}
+                    >
+                      <span className="text-2xl mb-1">{m.icon}</span>
+                      <span className="text-sm font-medium">{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700 mt-2"
+                  onClick={() => setStep(method === 'mpesa_stk' ? 'stk' : 'details')}
+                >
+                  Continue with {activeMethod.label}
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
+
+            {/* STEP: MANUAL PAYMENT DETAILS */}
+            {step === 'details' && (
+              <div className="p-6 space-y-5">
+                {/* School payment details box */}
+                {hasPayInfo && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide flex items-center gap-1 mb-2">
+                      <Building2 className="h-3.5 w-3.5" /> Pay to the school using:
+                    </p>
+                    <div className="space-y-1 text-sm text-blue-900">
+                      {settings.mpesa_paybill && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">📱</span>
+                          <div>
+                            <p className="font-semibold">M-Pesa Paybill: <span className="text-blue-700 text-base">{settings.mpesa_paybill}</span></p>
+                            {settings.mpesa_account_ref && (
+                              <p className="text-xs text-blue-600">Account No: {settings.mpesa_account_ref}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {settings.mpesa_till && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">💚</span>
+                          <p><span className="font-semibold">M-Pesa Till:</span> <span className="text-blue-700 text-base">{settings.mpesa_till}</span></p>
+                        </div>
+                      )}
+                      {settings.bank_name && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">🏦</span>
+                          <div>
+                            <p className="font-semibold">{settings.bank_name}</p>
+                            {settings.bank_account_number && (
+                              <p className="text-xs text-blue-600">Account: {settings.bank_account_number}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {settings.payment_instructions && (
+                        <p className="text-xs text-blue-700 border-t border-blue-200 pt-2 mt-2 italic">
+                          {settings.payment_instructions}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Instructions */}
+                <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600 space-y-1">
+                  <p className="font-medium text-gray-700">How to complete payment:</p>
+                  <p>1. Pay using the details above</p>
+                  <p>2. Copy your confirmation code / reference</p>
+                  <p>3. Fill in the form below and click <strong>Submit</strong></p>
+                </div>
+
+                {/* Form */}
+                <div className="space-y-4">
+                  <div>
+                    <Label>Amount Paying (KES) *</Label>
+                    <Input
+                      type="number"
+                      value={amount}
+                      onChange={e => setAmount(e.target.value)}
+                      className="text-lg font-semibold mt-1"
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      You can pay a partial amount. Balance due: KES {fmt(activeInvoice.balance_amount)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>{activeMethod.hint.split('(')[0].trim()} *</Label>
+                    <Input
+                      value={ref}
+                      onChange={e => setRef(e.target.value)}
+                      placeholder={activeMethod.hint}
+                      className="mt-1 font-mono"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">e.g. {activeMethod.hint}</p>
+                  </div>
+
+                  <div>
+                    <Label>Message to Admin <span className="text-gray-400 text-xs">(optional)</span></Label>
+                    <textarea
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                      rows={2}
+                      value={msg}
+                      onChange={e => setMsg(e.target.value)}
+                      placeholder="e.g. Paid via paybill 400200 on 15/06/2026, name John Doe"
+                    />
+                  </div>
+
+                  {formError && (
+                    <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      {formError}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" onClick={() => setStep('method')} className="flex-1">Back</Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                    Submit to Admin
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP: M-PESA STK PUSH */}
+            {step === 'stk' && (
+              <div className="p-6 space-y-5">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                  <span className="text-4xl">📲</span>
+                  <p className="font-semibold text-green-800 mt-2">M-Pesa STK Push</p>
+                  <p className="text-sm text-green-600 mt-1">
+                    Enter your phone number and we'll send a payment prompt directly to it.
+                    Enter your PIN to complete.
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Amount (KES)</Label>
                   <Input
-                    id="submit-amount"
                     type="number"
-                    value={submitAmount}
-                    onChange={(e) => setSubmitAmount(e.target.value)}
-                    placeholder="0"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    className="text-lg font-semibold mt-1"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Balance due: KES {fmt(activeInvoice.balance_amount)}</p>
+                </div>
+
+                <div>
+                  <Label>M-Pesa Phone Number</Label>
+                  <Input
+                    type="tel"
+                    value={stkPhone}
+                    onChange={e => setStkPhone(e.target.value)}
+                    placeholder="0712345678"
+                    className="mt-1"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="submit-ref">
-                  Transaction Reference / Code
-                  <span className="text-gray-400 text-xs ml-1">(e.g. M-Pesa code, Bank ref)</span>
-                </Label>
-                <Input
-                  id="submit-ref"
-                  value={submitRef}
-                  onChange={(e) => setSubmitRef(e.target.value)}
-                  placeholder="e.g. QJK8XXXXXXX"
-                />
-              </div>
+                {stkStatus === 'idle' && formError && (
+                  <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />{formError}
+                  </div>
+                )}
 
-              <div className="space-y-2">
-                <Label htmlFor="submit-msg">
-                  Message to Admin
-                  <span className="text-gray-400 text-xs ml-1">(optional)</span>
-                </Label>
-                <textarea
-                  id="submit-msg"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                  value={submitMessage}
-                  onChange={(e) => setSubmitMessage(e.target.value)}
-                  placeholder="e.g. Paid via M-Pesa paybill 400200 on 15/06/2026..."
-                />
-              </div>
+                {stkStatus === 'processing' && (
+                  <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    <p className="text-blue-700">{stkMsg}</p>
+                  </div>
+                )}
 
-              {submitError && (
-                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded">
-                  <XCircle className="h-4 w-4 flex-shrink-0" />
-                  {submitError}
+                {stkStatus === 'sent' && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                    <Phone className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <p className="font-semibold text-green-700">Prompt Sent!</p>
+                    <p className="text-sm text-green-600 mt-1">{stkMsg}</p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Payment will be auto-confirmed once you enter your PIN. This may take 1–2 minutes.
+                    </p>
+                  </div>
+                )}
+
+                {stkStatus === 'failed' && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                    <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                    <p className="font-semibold text-red-600">STK Push Failed</p>
+                    <p className="text-sm text-red-500 mt-1">{stkMsg}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => { setMethod('mpesa_paybill'); setStep('details'); setStkStatus('idle'); }}
+                    >
+                      Use Manual Payment Instead
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={() => setStep('method')} className="flex-1">Back</Button>
+                  {stkStatus !== 'sent' && (
+                    <Button
+                      onClick={handleStkPush}
+                      disabled={stkStatus === 'processing'}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                    >
+                      {stkStatus === 'processing'
+                        ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        : <Phone className="h-4 w-4 mr-2" />}
+                      Send Prompt
+                    </Button>
+                  )}
+                  {stkStatus === 'sent' && (
+                    <Button onClick={closeModal} className="flex-1">Done</Button>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-
-          {!submitSuccess && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSubmitModalOpen(false)}>Cancel</Button>
-              <Button onClick={handleSubmitRequest} disabled={submitLoading} className="bg-blue-600 hover:bg-blue-700">
-                {submitLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                Submit to Admin
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

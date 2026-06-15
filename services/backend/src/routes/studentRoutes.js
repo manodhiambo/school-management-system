@@ -12,11 +12,26 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get all students
-router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer']), async (req, res) => {
+router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer', 'student']), async (req, res) => {
   try {
     const { classId, status, search } = req.query;
     const tid = req.user.tenant_id;
-    const isTeacher = req.user.role === 'teacher';
+    const { role } = req.user;
+    const isTeacher = role === 'teacher';
+
+    // Students can only retrieve their own record
+    if (role === 'student') {
+      const rows = await query(
+        `SELECT s.*, u.email, u.is_active, c.name as class_name
+         FROM students s
+         JOIN users u ON s.user_id = u.id
+         LEFT JOIN classes c ON s.class_id = c.id
+         WHERE s.user_id = $1 AND s.tenant_id = $2
+         LIMIT 1`,
+        [req.user.id, tid]
+      );
+      return res.json({ success: true, data: rows });
+    }
 
     let sql = `
       SELECT
@@ -49,7 +64,7 @@ router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer']), 
     }
 
     // Parents only see their own children
-    if (req.user.role === 'parent') {
+    if (role === 'parent') {
       sql += ` AND s.id IN (
         SELECT ps.student_id FROM parent_students ps
         JOIN parents p ON p.id = ps.parent_id

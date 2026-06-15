@@ -7,6 +7,15 @@ const router = express.Router();
 router.use(authenticate);
 router.use(requireModule('academics'));
 
+// Resolve to canonical students.id (handles both students.id and users.id as input)
+async function resolveStudentId(studentIdOrUserId, tid) {
+  const rows = await query(
+    `SELECT id FROM students WHERE (id = $1 OR user_id = $1) AND tenant_id = $2 LIMIT 1`,
+    [studentIdOrUserId, tid]
+  );
+  return rows.length > 0 ? rows[0].id : studentIdOrUserId;
+}
+
 // ─── Access control helper ─────────────────────────────────────────────────────
 /**
  * Check whether the current user can access a student's portfolio.
@@ -18,8 +27,9 @@ async function canAccessStudent(req, studentId) {
   const { role, id: userId, tenant_id: tid } = req.user;
   if (role === 'admin' || role === 'superadmin' || role === 'teacher') return true;
   if (role === 'student') {
+    // studentId may be students.id OR users.id — match either
     const rows = await query(
-      `SELECT id FROM students WHERE user_id = $1 AND id = $2 AND tenant_id = $3`,
+      `SELECT id FROM students WHERE user_id = $1 AND (id = $2 OR user_id = $2) AND tenant_id = $3`,
       [userId, studentId, tid]
     );
     return rows.length > 0;
@@ -27,8 +37,9 @@ async function canAccessStudent(req, studentId) {
   if (role === 'parent') {
     const rows = await query(
       `SELECT s.id FROM students s
-       WHERE s.parent_id = (SELECT id FROM users WHERE id = $1 LIMIT 1)
-         AND s.id = $2 AND s.tenant_id = $3`,
+       JOIN parent_students ps ON ps.student_id = s.id
+       JOIN parents p ON p.id = ps.parent_id
+       WHERE p.user_id = $1 AND (s.id = $2 OR s.user_id = $2) AND s.tenant_id = $3`,
       [userId, studentId, tid]
     );
     return rows.length > 0;
@@ -40,11 +51,12 @@ async function canAccessStudent(req, studentId) {
 router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { studentId } = req.params;
     const { item_type, term, academic_year } = req.query;
 
-    const allowed = await canAccessStudent(req, studentId);
+    const allowed = await canAccessStudent(req, req.params.studentId);
     if (!allowed) return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const studentId = await resolveStudentId(req.params.studentId, tid);
 
     let sql = `SELECT pi.*,
                       s.name AS subject_name
@@ -68,10 +80,11 @@ router.get('/student/:studentId', async (req, res) => {
 router.post('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { studentId } = req.params;
 
-    const allowed = await canAccessStudent(req, studentId);
+    const allowed = await canAccessStudent(req, req.params.studentId);
     if (!allowed) return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const studentId = await resolveStudentId(req.params.studentId, tid);
 
     const {
       title, description, item_type, file_url, subject_id,
@@ -203,10 +216,11 @@ router.put('/:id/feature', async (req, res) => {
 router.get('/student/:studentId/summary', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { studentId } = req.params;
 
-    const allowed = await canAccessStudent(req, studentId);
+    const allowed = await canAccessStudent(req, req.params.studentId);
     if (!allowed) return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const studentId = await resolveStudentId(req.params.studentId, tid);
 
     // Counts by type
     const countRows = await query(

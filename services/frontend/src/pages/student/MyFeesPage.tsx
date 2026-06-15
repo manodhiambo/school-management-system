@@ -120,11 +120,12 @@ export function MyFeesPage() {
     );
   }
 
-  const totalFees = parseFloat(fees?.total_fees || '0');
-  const paidAmount = parseFloat(fees?.paid || '0');
-  const pendingAmount = parseFloat(fees?.pending || '0');
+  const summary = fees?.summary || {};
+  const totalFees = parseFloat(summary.total_invoiced || fees?.total_fees || '0');
+  const paidAmount = parseFloat(summary.total_paid || fees?.paid || '0');
+  const pendingAmount = parseFloat(summary.total_balance || fees?.pending || '0');
   const invoices = fees?.invoices || [];
-  const payments = fees?.payments || [];
+  const payments = (fees?.payments || []).filter((p: any) => p.status === 'success');
 
   return (
     <div className="space-y-6">
@@ -216,10 +217,15 @@ export function MyFeesPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold">{formatCurrency(invoice.amount)}</p>
+                    <p className="font-bold">{formatCurrency(invoice.net_amount || invoice.amount)}</p>
                     <p className="text-sm text-gray-500">
-                      Paid: {formatCurrency(invoice.paid)}
+                      Paid: {formatCurrency(invoice.paid_amount || invoice.paid || 0)}
                     </p>
+                    {parseFloat(invoice.balance_amount || 0) > 0 && (
+                      <p className="text-xs text-red-600 font-medium">
+                        Balance: {formatCurrency(invoice.balance_amount)}
+                      </p>
+                    )}
                     <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${
                       invoice.status === 'paid' 
                         ? 'bg-green-100 text-green-700'

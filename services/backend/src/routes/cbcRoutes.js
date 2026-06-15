@@ -409,6 +409,37 @@ router.post('/competency-summary', authenticate, requireModule('academics'), asy
 // REPORT CARDS
 // ============================================================
 
+// GET /api/v1/cbe/report-cards/my — student fetches their own published report cards
+router.get('/report-cards/my', authenticate, requireModule('academics'), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    // Resolve user_id → students.id
+    const studentRows = await query(
+      'SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2 LIMIT 1',
+      [req.user.id, tid]
+    );
+    if (!studentRows.length) return res.json({ success: true, data: [] });
+    const studentId = studentRows[0].id;
+
+    const rows = await query(
+      `SELECT rc.*,
+              s.first_name||' '||s.last_name AS student_name,
+              s.admission_number, c.name AS class_name
+       FROM cbc_report_cards rc
+       JOIN students s ON s.id = rc.student_id
+       JOIN classes c ON c.id = rc.class_id
+       WHERE rc.student_id = $1 AND rc.tenant_id = $2
+         AND rc.status IN ('published','acknowledged')
+       ORDER BY rc.academic_year DESC, rc.term`,
+      [studentId, tid]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('Get my report cards error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/v1/cbe/report-cards?student_id=&term=&academic_year=&class_id=
 // When class_id is provided, returns ALL students in that class (LEFT JOIN) so students without
 // a report card yet still appear in the list.
@@ -546,6 +577,18 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
        WHERE rc.id = $1 AND rc.tenant_id = $2`, [req.params.id, req.user.tenant_id]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
+
+    // Students may only view their own published/acknowledged report cards
+    if (req.user.role === 'student') {
+      const studentRows = await query(
+        'SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2 LIMIT 1',
+        [req.user.id, req.user.tenant_id]
+      );
+      const studentId = studentRows[0]?.id;
+      if (rows[0].student_id !== studentId || !['published','acknowledged'].includes(rows[0].status)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
     const rc = rows[0];
     const competencies = await query(
       `SELECT cs.*, sub.name as subject_name,

@@ -41,7 +41,7 @@ function cell(doc: jsPDF, x: number, y: number, w: number, h: number, fill?: [nu
 }
 
 // ── Generate a single report card page (Kenya CBE format) ────────────────────
-async function renderReportCardPage(
+export async function renderReportCardPage(
   doc: jsPDF,
   detail: any,
   school: any,
@@ -559,7 +559,7 @@ async function renderReportCardPage(
 }
 
 // ── Build and save PDF (one or many students) ────────────────────────────────
-async function downloadReportCardsPDF(
+export async function downloadReportCardsPDF(
   cardsToDownload: any[],
   school: any,
   term: string,

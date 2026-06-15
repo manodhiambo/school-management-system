@@ -34,6 +34,7 @@ import { MyCoursesPage } from './pages/student/MyCoursesPage';
 import { MyAttendancePage } from './pages/student/MyAttendancePage';
 import { MyResultsPage } from './pages/student/MyResultsPage';
 import { MyFeesPage } from './pages/student/MyFeesPage';
+import { MyReportCardPage } from './pages/student/MyReportCardPage';
 import { MyTimetablePage } from './pages/student/MyTimetablePage';
 import { AssignmentsPage } from './pages/student/AssignmentsPage';
 import { MessagesPage } from './pages/student/MessagesPage';
@@ -247,6 +248,7 @@ function App() {
               <Route path="my-attendance" element={<MyAttendancePage />} />
               <Route path="my-results" element={<MyResultsPage />} />
               <Route path="my-fees" element={<MyFeesPage />} />
+              <Route path="my-report-card" element={<RoleRoute allowedRoles={['student']}><MyReportCardPage /></RoleRoute>} />
               <Route path="my-timetable" element={<MyTimetablePage />} />
               <Route path="assignments" element={<AssignmentsPage />} />
               <Route path="messages" element={<MessagesPage />} />

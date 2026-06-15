@@ -100,12 +100,13 @@ const navigationItems: NavItem[] = [
   { name: 'IGCSE',         href: '/app/igcse',         icon: Globe,     roles: ['teacher'], section: 'Academic', badge: 'IGCSE', module: 'academics' },
 
   // ── Academic (student) ────────────────────────────────────────────────────
-  { name: 'My Exams',          href: '/app/my-exams',      icon: Monitor,   roles: ['student'], section: 'Academic', module: 'exams' },
-  { name: 'My Courses',        href: '/app/my-courses',    icon: BookOpen,  roles: ['student'], section: 'Academic' },
-  { name: 'My Attendance',     href: '/app/my-attendance', icon: Calendar,  roles: ['student'], section: 'Academic' },
-  { name: 'My Results',        href: '/app/my-results',    icon: Award,     roles: ['student'], section: 'Academic', module: 'exams' },
+  { name: 'My Exams',          href: '/app/my-exams',        icon: Monitor,   roles: ['student'], section: 'Academic', module: 'exams' },
+  { name: 'My Courses',        href: '/app/my-courses',      icon: BookOpen,  roles: ['student'], section: 'Academic' },
+  { name: 'My Attendance',     href: '/app/my-attendance',   icon: Calendar,  roles: ['student'], section: 'Academic' },
+  { name: 'My Results',        href: '/app/my-results',      icon: Award,     roles: ['student'], section: 'Academic', module: 'exams' },
+  { name: 'My Report Card',    href: '/app/my-report-card',  icon: FileText,  roles: ['student'], section: 'Academic', module: 'academics' },
   { name: 'Learning Materials',href: '/app/learning-materials', icon: BookMarked, roles: ['student'], section: 'Academic', module: 'academics' },
-  { name: 'IGCSE Results',     href: '/app/igcse',          icon: Globe,     roles: ['student'], section: 'Academic', badge: 'IGCSE', module: 'academics' },
+  { name: 'IGCSE Results',     href: '/app/igcse',           icon: Globe,     roles: ['student'], section: 'Academic', badge: 'IGCSE', module: 'academics' },
 
   // ── Finance ───────────────────────────────────────────────────────────────
   { name: 'Finance Overview',  href: '/app/finance',                  icon: Wallet,    roles: ['admin', 'finance_officer'], section: 'Finance', badge: 'New', module: 'finance' },

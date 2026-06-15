@@ -907,6 +907,223 @@ router.get('/receipt/:paymentId', async (req, res) => {
   }
 });
 
+// ============== PARENT PAYMENT REQUESTS ==============
+// Parents submit payment proof → admin confirms or rejects → balance updated on confirm
+
+// POST /fee/payment-request — parent submits payment proof for an invoice
+router.post('/payment-request', async (req, res) => {
+  try {
+    const { role, id: callerId } = req.user;
+    if (!['parent', 'student'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Only parents can submit payment requests' });
+    }
+
+    const { invoiceId, amount, paymentMethod, transactionRef, parentMessage } = req.body;
+    if (!invoiceId || !amount || !paymentMethod) {
+      return res.status(400).json({ success: false, message: 'invoiceId, amount, and paymentMethod are required' });
+    }
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid amount' });
+    }
+
+    // Verify invoice exists and parent owns it (via parent-student link)
+    const invRows = await query(
+      `SELECT fi.*, s.tenant_id AS student_tenant_id, p.tenant_id AS parent_tenant_id
+       FROM fee_invoices fi
+       JOIN students s ON s.id = fi.student_id
+       JOIN parent_students ps ON ps.student_id = s.id
+       JOIN parents p ON p.id = ps.parent_id
+       WHERE fi.id = $1 AND p.user_id = $2 AND fi.status != 'paid'`,
+      [invoiceId, callerId]
+    );
+    if (!invRows.length) {
+      return res.status(404).json({ success: false, message: 'Invoice not found or already paid' });
+    }
+    const inv = invRows[0];
+    const tid = inv.parent_tenant_id || inv.student_tenant_id;
+
+    // Check no other pending_confirmation exists for the same invoice
+    const existingPending = await query(
+      `SELECT id FROM fee_payments WHERE invoice_id = $1 AND status = 'pending_confirmation' AND tenant_id = $2`,
+      [invoiceId, tid]
+    );
+    if (existingPending.length) {
+      return res.status(409).json({ success: false, message: 'A payment request is already pending for this invoice. Please wait for admin confirmation.' });
+    }
+
+    const paymentId = uuidv4();
+    const receiptNumber = 'REQ-' + Date.now().toString(36).toUpperCase();
+    await query(
+      `INSERT INTO fee_payments
+         (id, invoice_id, student_id, amount, payment_method, transaction_id,
+          remarks, status, payment_date, receipt_number, tenant_id,
+          submitted_by, parent_message)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending_confirmation', NOW(), $8, $9, $10, $11)`,
+      [paymentId, invoiceId, inv.student_id, parsedAmount,
+       paymentMethod, transactionRef || null,
+       parentMessage || null, receiptNumber, tid, callerId, parentMessage || null]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Payment request submitted. Admin will verify and confirm your payment.',
+      data: { id: paymentId, receipt_number: receiptNumber }
+    });
+  } catch (error) {
+    logger.error('Submit payment request error:', error);
+    res.status(500).json({ success: false, message: 'Error submitting payment request' });
+  }
+});
+
+// GET /fee/payment-requests — admin sees all pending payment confirmations
+router.get('/payment-requests', requireRole(['admin', 'finance_officer']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { status = 'pending_confirmation' } = req.query;
+    const rows = await query(
+      `SELECT fp.*,
+              fi.invoice_number, fi.description AS invoice_description,
+              fi.net_amount AS invoice_amount, fi.balance_amount AS invoice_balance,
+              fi.term, fi.academic_year,
+              s.first_name, s.last_name, s.admission_number,
+              c.name AS class_name,
+              NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS parent_name,
+              u.email AS parent_email
+       FROM fee_payments fp
+       JOIN fee_invoices fi ON fi.id = fp.invoice_id
+       JOIN students s ON s.id = fi.student_id
+       LEFT JOIN classes c ON c.id = s.class_id
+       LEFT JOIN users u ON u.id = fp.submitted_by
+       WHERE fp.tenant_id = $1 AND fp.status = $2
+       ORDER BY fp.payment_date DESC`,
+      [tid, status]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Get payment requests error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching payment requests' });
+  }
+});
+
+// GET /fee/payment-requests/count — badge count for admin dashboard
+router.get('/payment-requests/count', requireRole(['admin', 'finance_officer']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const rows = await query(
+      `SELECT COUNT(*) AS count FROM fee_payments WHERE tenant_id = $1 AND status = 'pending_confirmation'`,
+      [tid]
+    );
+    res.json({ success: true, data: { count: parseInt(rows[0].count, 10) } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error' });
+  }
+});
+
+// PUT /fee/payment-requests/:id/confirm — admin confirms payment and updates invoice
+router.put('/payment-requests/:id/confirm', requireRole(['admin', 'finance_officer']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { confirmationNote } = req.body;
+
+    const payments = await query(
+      `SELECT fp.*, fi.net_amount, fi.paid_amount AS inv_paid, fi.balance_amount AS inv_balance
+       FROM fee_payments fp
+       JOIN fee_invoices fi ON fi.id = fp.invoice_id
+       WHERE fp.id = $1 AND fp.tenant_id = $2 AND fp.status = 'pending_confirmation'`,
+      [req.params.id, tid]
+    );
+    if (!payments.length) {
+      return res.status(404).json({ success: false, message: 'Payment request not found or already processed' });
+    }
+    const p = payments[0];
+
+    // Confirm the payment
+    await query(
+      `UPDATE fee_payments
+       SET status = 'success', confirmed_by = $1, confirmation_note = $2, updated_at = NOW()
+       WHERE id = $3`,
+      [req.user.id, confirmationNote || null, p.id]
+    );
+
+    // Update invoice balance
+    const newPaid = parseFloat(p.inv_paid || 0) + parseFloat(p.amount);
+    const newBalance = parseFloat(p.net_amount) - newPaid;
+    const newStatus = newBalance <= 0 ? 'paid' : 'partial';
+    await query(
+      `UPDATE fee_invoices
+       SET paid_amount = $1, balance_amount = $2, status = $3, updated_at = NOW()
+       WHERE id = $4 AND tenant_id = $5`,
+      [newPaid, Math.max(0, newBalance), newStatus, p.invoice_id, tid]
+    );
+
+    res.json({ success: true, message: 'Payment confirmed and invoice updated' });
+  } catch (error) {
+    logger.error('Confirm payment request error:', error);
+    res.status(500).json({ success: false, message: 'Error confirming payment' });
+  }
+});
+
+// PUT /fee/payment-requests/:id/reject — admin rejects with reason
+router.put('/payment-requests/:id/reject', requireRole(['admin', 'finance_officer']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { confirmationNote } = req.body;
+
+    const payments = await query(
+      `SELECT id FROM fee_payments WHERE id = $1 AND tenant_id = $2 AND status = 'pending_confirmation'`,
+      [req.params.id, tid]
+    );
+    if (!payments.length) {
+      return res.status(404).json({ success: false, message: 'Payment request not found or already processed' });
+    }
+
+    await query(
+      `UPDATE fee_payments
+       SET status = 'rejected', confirmed_by = $1, confirmation_note = $2, updated_at = NOW()
+       WHERE id = $3`,
+      [req.user.id, confirmationNote || 'Rejected by admin', req.params.id]
+    );
+
+    res.json({ success: true, message: 'Payment request rejected' });
+  } catch (error) {
+    logger.error('Reject payment request error:', error);
+    res.status(500).json({ success: false, message: 'Error rejecting payment request' });
+  }
+});
+
+// GET /fee/my-payment-requests/:studentId — parent sees their own submissions for a student
+router.get('/my-payment-requests/:studentId', async (req, res) => {
+  try {
+    const { role, id: callerId } = req.user;
+    if (role !== 'parent') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    // Verify parent owns this student
+    const access = await query(
+      `SELECT p.tenant_id FROM parent_students ps JOIN parents p ON p.id = ps.parent_id
+       WHERE ps.student_id = $1 AND p.user_id = $2`,
+      [req.params.studentId, callerId]
+    );
+    if (!access.length) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const tid = access[0].tenant_id;
+    const rows = await query(
+      `SELECT fp.*, fi.invoice_number, fi.description AS invoice_description
+       FROM fee_payments fp
+       JOIN fee_invoices fi ON fi.id = fp.invoice_id
+       WHERE fp.student_id = $1 AND fp.tenant_id = $2
+         AND fp.status IN ('pending_confirmation', 'rejected')
+       ORDER BY fp.payment_date DESC`,
+      [req.params.studentId, tid]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error' });
+  }
+});
+
 // ============== DELETE INVOICE ==============
 
 router.delete('/invoice/:id', requireRole(['admin']), async (req, res) => {

@@ -418,6 +418,31 @@ class ApiService {
     return this.api.get('/fee/mpesa/student/' + studentId);
   }
 
+  // Parent payment requests
+  submitPaymentRequest(data: { invoiceId: string; amount: number; paymentMethod: string; transactionRef?: string; parentMessage?: string }) {
+    return this.api.post('/fee/payment-request', data);
+  }
+
+  getPaymentRequests(status?: string) {
+    return this.api.get('/fee/payment-requests', { params: status ? { status } : {} });
+  }
+
+  getPaymentRequestsCount() {
+    return this.api.get('/fee/payment-requests/count');
+  }
+
+  confirmPaymentRequest(id: string, confirmationNote?: string) {
+    return this.api.put('/fee/payment-requests/' + id + '/confirm', { confirmationNote });
+  }
+
+  rejectPaymentRequest(id: string, confirmationNote: string) {
+    return this.api.put('/fee/payment-requests/' + id + '/reject', { confirmationNote });
+  }
+
+  getMyPaymentRequests(studentId: string) {
+    return this.api.get('/fee/my-payment-requests/' + studentId);
+  }
+
   // Exams
   getExams(params?: any) {
     return this.api.get('/exams', { params });

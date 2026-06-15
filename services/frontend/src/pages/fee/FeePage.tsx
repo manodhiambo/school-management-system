@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   DollarSign, TrendingUp, AlertCircle, FileText, Plus, Users,
-  Search, Download, Trash2, Eye, RefreshCw, X, CheckCircle, Printer
+  Search, Download, Trash2, Eye, RefreshCw, X, CheckCircle, Printer,
+  Send, XCircle
 } from 'lucide-react';
 import { RecordPaymentModal } from '@/components/modals/RecordPaymentModal';
 import { GenerateInvoicesModal } from '@/components/modals/GenerateInvoicesModal';
@@ -575,7 +576,14 @@ export function FeePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterClass, setFilterClass] = useState('');
-  const [activeTab, setActiveTab] = useState<'students' | 'invoices' | 'payments'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'invoices' | 'payments' | 'requests'>('students');
+  const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsCount, setRequestsCount] = useState(0);
+  const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<any>(null);
+  const [rejectNote, setRejectNote] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentSummary | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -628,11 +636,63 @@ export function FeePage() {
     }
   }, []);
 
+  const loadPaymentRequests = useCallback(async () => {
+    setRequestsLoading(true);
+    try {
+      const res: any = await api.getPaymentRequests('pending_confirmation');
+      setPaymentRequests(res?.data || []);
+      setRequestsCount((res?.data || []).length);
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, []);
+
+  const handleConfirmRequest = async (id: string) => {
+    setProcessingRequest(id);
+    try {
+      await api.confirmPaymentRequest(id);
+      await loadPaymentRequests();
+      loadSummary();
+    } catch (e: any) {
+      alert(e?.message || 'Failed to confirm payment');
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
+  const openRejectModal = (req: any) => {
+    setRejectTarget(req);
+    setRejectNote('');
+    setRejectModalOpen(true);
+  };
+
+  const handleRejectRequest = async () => {
+    if (!rejectTarget) return;
+    if (!rejectNote.trim()) { alert('Please enter a reason for rejection'); return; }
+    setProcessingRequest(rejectTarget.id);
+    try {
+      await api.rejectPaymentRequest(rejectTarget.id, rejectNote);
+      setRejectModalOpen(false);
+      await loadPaymentRequests();
+    } catch (e: any) {
+      alert(e?.message || 'Failed to reject payment');
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
   useEffect(() => { loadSummary(); }, [loadSummary]);
   useEffect(() => {
     if (activeTab === 'invoices') loadInvoices();
     if (activeTab === 'payments') loadPayments();
-  }, [activeTab, loadInvoices, loadPayments]);
+    if (activeTab === 'requests') loadPaymentRequests();
+  }, [activeTab, loadInvoices, loadPayments, loadPaymentRequests]);
+  // Load request count on mount for badge
+  useEffect(() => {
+    api.getPaymentRequestsCount()
+      .then((r: any) => setRequestsCount(r?.data?.count || 0))
+      .catch(() => {});
+  }, []);
 
   const handleDeleteInvoice = async (id: string) => {
     if (!confirm('Delete this invoice and all its payments? This cannot be undone.')) return;
@@ -682,6 +742,7 @@ export function FeePage() {
     { id: 'students', label: t('Students & Expected Fees') },
     { id: 'invoices', label: t('Invoices') },
     { id: 'payments', label: t('Payment History') },
+    { id: 'requests', label: `Payment Requests${requestsCount > 0 ? ` (${requestsCount})` : ''}` },
   ] as const;
 
   return (
@@ -981,6 +1042,150 @@ export function FeePage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Tab: Payment Requests ── */}
+      {activeTab === 'requests' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-blue-600" />
+              Parent Payment Requests
+              {requestsCount > 0 && (
+                <span className="ml-2 bg-orange-100 text-orange-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                  {requestsCount} pending
+                </span>
+              )}
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Parents have submitted these payment proofs. Verify and confirm or reject each one.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {requestsLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            ) : paymentRequests.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <CheckCircle className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                <p>No pending payment requests</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {paymentRequests.map((req: any) => (
+                  <div key={req.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="font-semibold">
+                            {req.first_name} {req.last_name}
+                          </span>
+                          <span className="text-xs text-gray-500">{req.admission_number}</span>
+                          {req.class_name && (
+                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{req.class_name}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Invoice:</span> {req.invoice_number}
+                          {req.invoice_description && <span className="ml-1 text-gray-400">— {req.invoice_description}</span>}
+                        </p>
+                        {req.term && (
+                          <p className="text-xs text-gray-400">{req.term} · {req.academic_year}</p>
+                        )}
+                        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-400 text-xs">Method</span>
+                            <p className="font-medium capitalize">{(req.payment_method || '').replace(/_/g, ' ')}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 text-xs">Amount</span>
+                            <p className="font-bold text-green-700">KES {parseFloat(req.amount).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 text-xs">Invoice Balance</span>
+                            <p className="font-medium text-red-600">KES {parseFloat(req.invoice_balance || 0).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 text-xs">Submitted</span>
+                            <p className="font-medium">{new Date(req.payment_date).toLocaleDateString('en-KE')}</p>
+                          </div>
+                        </div>
+                        {req.transaction_id && (
+                          <p className="mt-2 text-sm">
+                            <span className="text-gray-400 text-xs">Reference:</span>
+                            <span className="ml-1 font-mono bg-gray-100 px-2 py-0.5 rounded text-xs">{req.transaction_id}</span>
+                          </p>
+                        )}
+                        {req.parent_message && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded text-sm text-blue-800">
+                            <span className="text-xs font-medium text-blue-500">Parent message: </span>
+                            {req.parent_message}
+                          </div>
+                        )}
+                        {req.parent_name && (
+                          <p className="mt-1 text-xs text-gray-400">By: {req.parent_name} ({req.parent_email})</p>
+                        )}
+                      </div>
+                      <div className="flex flex-row md:flex-col gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          disabled={processingRequest === req.id}
+                          onClick={() => handleConfirmRequest(req.id)}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Confirm
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          disabled={processingRequest === req.id}
+                          onClick={() => openRejectModal(req)}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Reject modal */}
+      {rejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-1">Reject Payment Request</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {rejectTarget?.first_name} {rejectTarget?.last_name} — KES {parseFloat(rejectTarget?.amount || 0).toLocaleString()}
+            </p>
+            <label className="block text-sm font-medium mb-1">Reason for rejection *</label>
+            <textarea
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-4"
+              rows={3}
+              value={rejectNote}
+              onChange={e => setRejectNote(e.target.value)}
+              placeholder="e.g. Reference code not found, please send M-Pesa screenshot to accounts office..."
+            />
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setRejectModalOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={!!processingRequest}
+                onClick={handleRejectRequest}
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                Reject Payment
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Fee Statement modal */}

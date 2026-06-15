@@ -114,7 +114,7 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
 
     // Teacher class subquery — classes the teacher is assigned to
     const teacherClassFilter = isTeacher
-      ? `AND id IN (
+      ? `AND c.id IN (
           SELECT t.class_id FROM teachers t
           WHERE t.user_id = $2::uuid AND t.tenant_id = $1::uuid AND t.class_id IS NOT NULL
           UNION

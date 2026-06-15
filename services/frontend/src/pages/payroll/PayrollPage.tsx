@@ -33,7 +33,7 @@ export function PayrollPage() {
   const user = useAuthStore((s: any) => s.user);
   const isAdmin = ['admin', 'superadmin', 'finance_officer'].includes(user?.role);
 
-  const [tab, setTab] = useState<Tab>('structures');
+  const [tab, setTab] = useState<Tab>(isAdmin ? 'structures' : 'payslips');
   const [loading, setLoading] = useState(false);
 
   // Structures
@@ -88,6 +88,8 @@ export function PayrollPage() {
   const loadTab = async () => {
     // payslips tab is loaded by viewPayslips(), not here
     if (tab === 'payslips' || tab === 'p9') return;
+    // non-admin roles have no data to load on admin-only tabs
+    if (!isAdmin) return;
     setLoading(true);
     try {
       if (tab === 'structures') {

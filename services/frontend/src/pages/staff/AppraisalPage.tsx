@@ -41,7 +41,7 @@ export function AppraisalPage() {
   const isAdmin = ['admin', 'superadmin'].includes(user?.role);
   const isTeacher = user?.role === 'teacher';
 
-  const [tab, setTab] = useState<Tab>('templates');
+  const [tab, setTab] = useState<Tab>(isAdmin ? 'templates' : 'appraisals');
   const [loading, setLoading] = useState(false);
 
   // Templates
@@ -64,7 +64,7 @@ export function AppraisalPage() {
   const loadTab = async () => {
     setLoading(true);
     try {
-      if (tab === 'templates' || tab === 'appraisals') {
+      if ((tab === 'templates' || tab === 'appraisals') && isAdmin) {
         const tRes: any = await (api as any).getAppraisalTemplates();
         setTemplates(tRes?.data || []);
       }

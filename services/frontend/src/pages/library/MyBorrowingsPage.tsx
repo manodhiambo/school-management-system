@@ -18,16 +18,22 @@ export function MyBorrowingsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [borrowingsRes, memberRes] = await Promise.all([
+      // Run both requests independently — a 404 on getMember (no membership yet) is not an error
+      const [borrowingsRes, memberRes] = await Promise.allSettled([
         libraryAPI.getMyBorrowings(),
         libraryAPI.getMember()
       ]);
 
-      const borrowingsData = borrowingsRes?.data?.data || borrowingsRes?.data || [];
-      const memberData = memberRes?.data?.data || memberRes?.data || null;
+      if (borrowingsRes.status === 'fulfilled') {
+        const borrowingsData = borrowingsRes.value?.data?.data || borrowingsRes.value?.data || [];
+        setBorrowings(Array.isArray(borrowingsData) ? borrowingsData : []);
+      }
 
-      setBorrowings(Array.isArray(borrowingsData) ? borrowingsData : []);
-      setMember(memberData);
+      if (memberRes.status === 'fulfilled') {
+        const memberData = memberRes.value?.data?.data || memberRes.value?.data || null;
+        setMember(memberData);
+      }
+      // memberRes.status === 'rejected' means no membership — leave member as null (handled in render)
     } catch (error: any) {
       console.error('Error loading borrowings:', error);
     } finally {
@@ -243,7 +249,17 @@ export function MyBorrowingsPage() {
         </div>
       )}
 
-      {borrowings.length === 0 && (
+      {!member && (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Book className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-600 font-medium">You are not yet registered as a library member</p>
+            <p className="text-sm text-gray-400 mt-1">Contact your librarian to get a membership and start borrowing books</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {member && borrowings.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Book className="h-16 w-16 text-gray-300 mx-auto mb-4" />

@@ -70,11 +70,17 @@ export function AddTeacherModal({ open, onOpenChange, onSuccess }: AddTeacherMod
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.firstName.trim()) { alert('First name is required'); return; }
+    if (!formData.lastName.trim())  { alert('Last name is required');  return; }
+    if (!formData.email.trim())     { alert('Email is required');      return; }
     setLoading(true);
 
     try {
       const submitData: Record<string, any> = {
         ...formData,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
         experienceYears: formData.experienceYears ? Number(formData.experienceYears) : undefined,
       };
 

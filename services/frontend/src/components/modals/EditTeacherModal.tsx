@@ -124,13 +124,15 @@ export function EditTeacherModal({ open, onOpenChange, onSuccess, teacherId }: E
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.first_name.trim()) { alert('First name is required'); return; }
+    if (!formData.last_name.trim())  { alert('Last name is required');  return; }
     setLoading(true);
 
     try {
       // Backend schema expects camelCase; strip unknown/read-only fields
       const payload: Record<string, any> = {
-        firstName: formData.first_name,
-        lastName: formData.last_name,
+        firstName: formData.first_name.trim(),
+        lastName: formData.last_name.trim(),
         gender: formData.gender,
         designation: formData.designation,
         specialization: formData.specialization,

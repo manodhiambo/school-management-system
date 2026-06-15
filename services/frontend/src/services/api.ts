@@ -526,6 +526,10 @@ class ApiService {
     return this.api.get('/messages/recipients');
   }
 
+  getUnreadMessageCount() {
+    return this.api.get('/messages/unread-count');
+  }
+
   // Notifications
   getNotifications() {
     return this.api.get('/notifications');

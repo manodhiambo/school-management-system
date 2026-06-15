@@ -146,6 +146,7 @@ import { ProfilePage } from './pages/settings/ProfilePage';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { RoleRoute } from './components/auth/RoleRoute';
+import { SoundNotificationProvider } from './components/notifications/SoundNotificationProvider';
 
 import { useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
@@ -178,6 +179,7 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <SoundNotificationProvider>
           <ForbiddenToast />
           <Routes>
             {/* Public routes */}
@@ -344,6 +346,7 @@ function App() {
               <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
             </Route>
           </Routes>
+          </SoundNotificationProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

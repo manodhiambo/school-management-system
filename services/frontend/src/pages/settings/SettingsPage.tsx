@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard } from 'lucide-react';
+import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard, Volume2, VolumeX, Bell, MessageSquare, DollarSign, Play } from 'lucide-react';
+import { useSoundSettings } from '@/components/notifications/SoundNotificationProvider';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/languageStore';
 
@@ -40,7 +41,8 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance' | 'security' | 'payments'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance' | 'security' | 'payments' | 'sounds'>('general');
+  const sound = useSoundSettings();
   const [logoUploading, setLogoUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -247,6 +249,15 @@ export function SettingsPage() {
         >
           <CreditCard className="h-4 w-4 inline mr-2" />
           Payments
+        </button>
+        <button
+          onClick={() => setActiveTab('sounds')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'sounds' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Volume2 className="h-4 w-4 inline mr-2" />
+          Sounds
         </button>
       </div>
 
@@ -818,6 +829,162 @@ export function SettingsPage() {
               </div>
               <p className="text-xs text-gray-400">
                 These details appear as a blue info box on the parent fee payments page. Leave blank to hide that section.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Sounds Tab ───────────────────────────────────────────────── */}
+      {activeTab === 'sounds' && (
+        <div className="space-y-6 max-w-2xl">
+          {/* Master toggle */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {sound.enabled ? <Volume2 className="h-5 w-5 text-blue-600" /> : <VolumeX className="h-5 w-5 text-gray-400" />}
+                Sound Notifications
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Master on/off */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="font-semibold">Enable Sound Notifications</p>
+                  <p className="text-sm text-gray-500">Play audio alerts when new events arrive in the app</p>
+                </div>
+                <button
+                  onClick={() => sound.setEnabled(!sound.enabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    sound.enabled ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    sound.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+
+              {/* Volume slider */}
+              <div className={`space-y-2 ${!sound.enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <Label>Volume</Label>
+                  <span className="text-sm text-gray-500">{Math.round(sound.volume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={sound.volume}
+                  onChange={e => sound.setVolume(parseFloat(e.target.value))}
+                  className="w-full accent-blue-600"
+                />
+              </div>
+
+              {/* Per-type toggles */}
+              <div className={`space-y-3 ${!sound.enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+                <p className="text-sm font-semibold text-gray-700">Notification Types</p>
+
+                {/* Messages */}
+                <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <MessageSquare className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Messages</p>
+                      <p className="text-xs text-gray-500">New incoming messages</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => sound.preview('message')}
+                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      title="Preview sound"
+                    >
+                      <Play className="h-3 w-3" /> Test
+                    </button>
+                    <button
+                      onClick={() => sound.setMessagesEnabled(!sound.messagesEnabled)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        sound.messagesEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                        sound.messagesEnabled ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fee alerts */}
+                <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center">
+                      <DollarSign className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Fee Reminders</p>
+                      <p className="text-xs text-gray-500">Fee alerts and payment reminders (parents)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => sound.preview('fee')}
+                      className="text-xs text-orange-600 hover:text-orange-800 flex items-center gap-1"
+                      title="Preview sound"
+                    >
+                      <Play className="h-3 w-3" /> Test
+                    </button>
+                    <button
+                      onClick={() => sound.setFeeEnabled(!sound.feeEnabled)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        sound.feeEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                        sound.feeEnabled ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* General alerts */}
+                <div className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <Bell className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">General Alerts</p>
+                      <p className="text-xs text-gray-500">System notifications and announcements</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => sound.preview('alert')}
+                      className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                      title="Preview sound"
+                    >
+                      <Play className="h-3 w-3" /> Test
+                    </button>
+                    <button
+                      onClick={() => sound.setAlertsEnabled(!sound.alertsEnabled)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        sound.alertsEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                        sound.alertsEnabled ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
+                <span className="font-semibold">Note:</span> Your browser may ask for permission to play audio the first time. Sound settings are saved locally on this device. The mute/unmute button (🔊) in the bottom-right corner is a quick toggle.
               </p>
             </CardContent>
           </Card>

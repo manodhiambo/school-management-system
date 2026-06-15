@@ -146,7 +146,7 @@ router.post(
 
 router.get(
   '/',
-  requireRole(['admin', 'teacher']),
+  requireRole(['admin', 'teacher', 'parent']),
   teacherController.getTeachers
 );
 

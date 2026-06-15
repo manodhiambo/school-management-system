@@ -69,10 +69,10 @@ router.get('/', async (req, res) => {
                u.first_name || ' ' || u.last_name AS created_by_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
-                 WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
+                 WHERE ar.announcement_id = a.id AND ar.user_id = $2::uuid
                ) AS is_read
         FROM announcements a
-        LEFT JOIN users u ON u.id::text = a.created_by::text
+        LEFT JOIN users u ON u.id = a.created_by
         WHERE a.tenant_id = $1::uuid
         ORDER BY COALESCE(a.is_pinned, FALSE) DESC, a.created_at DESC
       `;
@@ -84,10 +84,10 @@ router.get('/', async (req, res) => {
                u.first_name || ' ' || u.last_name AS created_by_name,
                EXISTS (
                  SELECT 1 FROM announcement_reads ar
-                 WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
+                 WHERE ar.announcement_id = a.id AND ar.user_id = $2::uuid
                ) AS is_read
         FROM announcements a
-        LEFT JOIN users u ON u.id::text = a.created_by::text
+        LEFT JOIN users u ON u.id = a.created_by
         WHERE a.tenant_id = $1::uuid
           AND (COALESCE(a.target_roles, ARRAY['admin','teacher','student','parent']::text[]) @> ARRAY[$3::text])
           AND (a.expires_at IS NULL OR a.expires_at > NOW())
@@ -121,7 +121,7 @@ router.get('/unread-count', async (req, res) => {
         AND (a.expires_at IS NULL OR a.expires_at > NOW())`}
         AND NOT EXISTS (
           SELECT 1 FROM announcement_reads ar
-          WHERE ar.announcement_id = a.id::text AND ar.user_id = $2::text
+          WHERE ar.announcement_id = a.id AND ar.user_id = $2::uuid
         )
     `;
 

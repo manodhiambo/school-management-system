@@ -17,7 +17,7 @@ router.get('/my-route', async (req, res) => {
     if (!['driver', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    const tid = req.tenantId;
+    const tid = req.user.tenant_id;
     const driverId = req.user.role === 'driver' ? req.user.id : req.query.driver_id;
 
     let routes = [];
@@ -91,7 +91,7 @@ router.get('/session', async (req, res) => {
     if (!['driver', 'admin', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    const tid = req.tenantId;
+    const tid = req.user.tenant_id;
     const { route_id, date, trip_type = 'morning' } = req.query;
     const sessionDate = date || new Date().toISOString().split('T')[0];
 
@@ -169,7 +169,7 @@ router.post('/pickup', async (req, res) => {
     if (!['driver', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    const tid = req.tenantId;
+    const tid = req.user.tenant_id;
     const { student_id, route_id, trip_type = 'morning', status, latitude, longitude, notes } = req.body;
 
     if (!student_id || !route_id || !['picked', 'dropped', 'missed', 'absent'].includes(status)) {
@@ -215,7 +215,7 @@ router.post('/pickup', async (req, res) => {
                 p.phone AS parent_phone,
                 r.route_name
          FROM students s
-         LEFT JOIN parent_students ps ON ps.student_id = s.id AND ps.tenant_id = $3
+         LEFT JOIN parent_students ps ON ps.student_id = s.id
          LEFT JOIN parents p ON p.id = ps.parent_id AND p.tenant_id = $3
          JOIN transport_routes r ON r.id = $2 AND r.tenant_id = $3
          WHERE s.id = $1 AND s.tenant_id = $3
@@ -343,7 +343,7 @@ router.put('/routes/:id/driver', async (req, res) => {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin only' });
     }
-    const tid = req.tenantId;
+    const tid = req.user.tenant_id;
     const { driver_user_id } = req.body;
     const rows = await query(
       `UPDATE transport_routes SET driver_user_id=$1, updated_at=NOW()
@@ -363,7 +363,7 @@ router.get('/tracking-overview', async (req, res) => {
     if (!['admin', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    const tid = req.tenantId;
+    const tid = req.user.tenant_id;
     const { date, trip_type = 'morning' } = req.query;
     const d = date || new Date().toISOString().split('T')[0];
 
@@ -414,7 +414,7 @@ router.get('/my-child-status', async (req, res) => {
     if (!['parent', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    const tid = req.tenantId;
+    const tid = req.user.tenant_id;
     const { date } = req.query;
     const d = date || new Date().toISOString().split('T')[0];
 
@@ -423,7 +423,7 @@ router.get('/my-child-status', async (req, res) => {
     if (req.user.role === 'parent') {
       const children = await query(
         `SELECT s.id FROM students s
-         JOIN parent_students ps ON ps.student_id = s.id AND ps.tenant_id = $2
+         JOIN parent_students ps ON ps.student_id = s.id
          JOIN parents p ON p.id = ps.parent_id AND p.tenant_id = $2
          WHERE p.user_id = $1 AND s.tenant_id = $2`,
         [req.user.id, tid]

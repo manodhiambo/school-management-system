@@ -1376,4 +1376,173 @@ router.get('/report/defaulters', async (req, res) => {
   }
 });
 
+// ─── M-Pesa STK Push ─────────────────────────────────────────────────────────
+
+async function getMpesaToken() {
+  const key = process.env.MPESA_CONSUMER_KEY;
+  const secret = process.env.MPESA_CONSUMER_SECRET;
+  if (!key || !secret) throw new Error('M-Pesa credentials not configured');
+  const credentials = Buffer.from(`${key}:${secret}`).toString('base64');
+  const resp = await fetch(
+    'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+    { headers: { Authorization: `Basic ${credentials}` } }
+  );
+  if (!resp.ok) throw new Error(`M-Pesa auth failed: ${resp.status}`);
+  const json = await resp.json();
+  return json.access_token;
+}
+
+function normalizeMpesaPhone(raw) {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('0') && digits.length === 10) return '254' + digits.slice(1);
+  if (digits.startsWith('254') && digits.length === 12) return digits;
+  if (digits.length === 9) return '254' + digits;
+  throw new Error('Invalid phone number format. Use 07XXXXXXXX or 254XXXXXXXXX');
+}
+
+// POST /api/v1/fee/mpesa/pay — initiate STK push for a fee invoice
+router.post('/mpesa/pay', async (req, res) => {
+  try {
+    if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const { invoiceId, phoneNumber, amount } = req.body;
+    if (!invoiceId || !phoneNumber || !amount) {
+      return res.status(400).json({ success: false, message: 'invoiceId, phoneNumber, and amount are required' });
+    }
+    const parsedAmount = Math.ceil(parseFloat(amount));
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid amount' });
+    }
+
+    const shortcode = process.env.MPESA_SHORTCODE;
+    const passkey = process.env.MPESA_PASSKEY;
+    const callbackUrl = process.env.MPESA_CALLBACK_URL || `${process.env.BACKEND_URL || ''}/api/v1/fee/mpesa/callback`;
+
+    if (!shortcode || !passkey) {
+      return res.status(503).json({ success: false, message: 'M-Pesa is not configured on this server. Please contact the school administrator.' });
+    }
+
+    // Verify the invoice belongs to this tenant and is payable
+    const tid = req.user.tenant_id;
+    const invoiceRows = await query(
+      `SELECT fi.*, s.first_name || ' ' || s.last_name AS student_name
+       FROM fee_invoices fi
+       JOIN students s ON s.id = fi.student_id
+       WHERE fi.id = $1 AND fi.tenant_id = $2 AND fi.status != 'paid'`,
+      [invoiceId, tid]
+    );
+    if (!invoiceRows.length) {
+      return res.status(404).json({ success: false, message: 'Invoice not found or already paid' });
+    }
+    const invoice = invoiceRows[0];
+    const balance = parseFloat(invoice.balance_amount || invoice.net_amount || invoice.amount || 0);
+    if (parsedAmount > balance) {
+      return res.status(400).json({ success: false, message: `Amount exceeds balance due (KES ${balance.toLocaleString()})` });
+    }
+
+    const phone = normalizeMpesaPhone(String(phoneNumber));
+    const token = await getMpesaToken();
+
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+
+    const stkBody = {
+      BusinessShortCode: shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: parsedAmount,
+      PartyA: phone,
+      PartyB: shortcode,
+      PhoneNumber: phone,
+      CallBackURL: callbackUrl,
+      AccountReference: invoice.invoice_number || invoiceId.slice(0, 12),
+      TransactionDesc: `School fees - ${invoice.student_name || 'Student'}`,
+    };
+
+    const stkResp = await fetch(
+      'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(stkBody),
+      }
+    );
+    const stkJson = await stkResp.json();
+
+    if (stkJson.ResponseCode === '0') {
+      // Store pending transaction reference
+      await query(
+        `UPDATE fee_invoices SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+           jsonb_build_object('mpesa_checkout_id', $1::text, 'mpesa_initiated_at', NOW()::text)
+         WHERE id = $2`,
+        [stkJson.CheckoutRequestID, invoiceId]
+      ).catch(() => {}); // non-fatal
+      return res.json({
+        success: true,
+        message: 'Payment request sent to your phone. Enter your M-Pesa PIN to complete.',
+        checkout_request_id: stkJson.CheckoutRequestID,
+      });
+    }
+
+    logger.warn('M-Pesa STK push rejected:', stkJson);
+    res.status(502).json({
+      success: false,
+      message: stkJson.errorMessage || stkJson.CustomerMessage || 'M-Pesa request failed. Please try again.',
+    });
+  } catch (err) {
+    logger.error('M-Pesa pay error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to initiate M-Pesa payment' });
+  }
+});
+
+// GET /api/v1/fee/mpesa/status/:checkoutRequestId — poll STK status
+router.get('/mpesa/status/:checkoutRequestId', async (req, res) => {
+  try {
+    if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const shortcode = process.env.MPESA_SHORTCODE;
+    const passkey = process.env.MPESA_PASSKEY;
+    if (!shortcode || !passkey) {
+      return res.status(503).json({ success: false, message: 'M-Pesa not configured' });
+    }
+    const token = await getMpesaToken();
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+    const qResp = await fetch(
+      'https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ BusinessShortCode: shortcode, Password: password, Timestamp: timestamp, CheckoutRequestID: req.params.checkoutRequestId }),
+      }
+    );
+    const json = await qResp.json();
+    res.json({ success: true, data: json });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/v1/fee/mpesa/student/:studentId — M-Pesa transaction history for a student
+router.get('/mpesa/student/:studentId', async (req, res) => {
+  try {
+    if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const tid = req.user.tenant_id;
+    const rows = await query(
+      `SELECT fp.* FROM fee_payments fp
+       WHERE fp.student_id = $1 AND fp.tenant_id = $2 AND fp.payment_method = 'mpesa'
+       ORDER BY fp.payment_date DESC`,
+      [req.params.studentId, tid]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 export default router;

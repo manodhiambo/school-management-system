@@ -57,6 +57,7 @@ import meetingsRoutes from './routes/meetingsRoutes.js';
 import payrollRoutes from './routes/payrollRoutes.js';
 import appraisalRoutes from './routes/appraisalRoutes.js';
 import substituteRoutes from './routes/substituteRoutes.js';
+import mpesaCallbackRouter from './routes/mpesaCallbackRoutes.js';
 import counselingRoutes from './routes/counselingRoutes.js';
 import announcementsRoutes from './routes/announcementsRoutes.js';
 import auditLogRoutes from './routes/auditLogRoutes.js';
@@ -128,6 +129,9 @@ app.get('/health', (req, res) => {
 
 // Auto-audit: log all successful mutations (POST/PUT/PATCH/DELETE) by authenticated users
 app.use('/api/v1', autoAuditMiddleware);
+
+// M-Pesa callback — must be registered BEFORE authenticate middleware (Safaricom sends no Bearer token)
+app.use('/api/v1/fee/mpesa', mpesaCallbackRouter);
 
 // API routes — auth gets a strict rate limiter (10 reqs / 15 min per IP)
 app.use('/api/v1/auth', authLimiter, authRoutes);

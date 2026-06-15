@@ -763,6 +763,7 @@ router.get('/defaulters', async (req, res) => {
 router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    const { role, id: callerId } = req.user;
     const { academic_year, term } = req.query;
     const year = academic_year || new Date().getFullYear().toString();
 
@@ -778,6 +779,19 @@ router.get('/student/:studentId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
     const std = studentRows[0];
+
+    // Parents may only view fee accounts for their own children
+    if (role === 'parent') {
+      const access = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [std.id, callerId]
+      );
+      if (!access.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
 
     // Full invoice list — exclude cancelled invoices so they never appear in statements or PDFs
     const invoices = await query(`
@@ -1434,6 +1448,19 @@ router.post('/mpesa/pay', async (req, res) => {
     );
     if (!invoiceRows.length) {
       return res.status(404).json({ success: false, message: 'Invoice not found or already paid' });
+    }
+
+    // Parents may only pay for their own children's invoices
+    if (req.user.role === 'parent') {
+      const access = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [invoiceRows[0].student_id, req.user.id]
+      );
+      if (!access.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
     }
     const invoice = invoiceRows[0];
     const balance = parseFloat(invoice.balance_amount || invoice.net_amount || invoice.amount || 0);

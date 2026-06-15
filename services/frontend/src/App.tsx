@@ -254,10 +254,10 @@ function App() {
               <Route path="learning-materials" element={<LearningMaterialsPage />} />
 
               {/* Parent Routes */}
-              <Route path="my-children" element={<MyChildrenPage />} />
-              <Route path="children-progress" element={<ChildrenProgressPage />} />
-              <Route path="fee-payments" element={<FeePaymentsPage />} />
-              <Route path="my-transport" element={<MyTransportPage />} />
+              <Route path="my-children" element={<RoleRoute allowedRoles={['parent']}><MyChildrenPage /></RoleRoute>} />
+              <Route path="children-progress" element={<RoleRoute allowedRoles={['parent']}><ChildrenProgressPage /></RoleRoute>} />
+              <Route path="fee-payments" element={<RoleRoute allowedRoles={['parent']}><FeePaymentsPage /></RoleRoute>} />
+              <Route path="my-transport" element={<RoleRoute allowedRoles={['parent']}><MyTransportPage /></RoleRoute>} />
 
               {/* Teacher Routes */}
               <Route path="my-classes" element={<MyClassesPage />} />
@@ -336,7 +336,7 @@ function App() {
               <Route path="procurement/assets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><AssetManagement /></RoleRoute>} />
 
               {/* Parent Alerts */}
-              <Route path="my-alerts" element={<ParentAlertsPage />} />
+              <Route path="my-alerts" element={<RoleRoute allowedRoles={['parent']}><ParentAlertsPage /></RoleRoute>} />
 
               {/* Shared Routes */}
               <Route path="profile" element={<ProfilePage />} />

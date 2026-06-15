@@ -48,6 +48,17 @@ router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer']), 
       paramIndex++;
     }
 
+    // Parents only see their own children
+    if (req.user.role === 'parent') {
+      sql += ` AND s.id IN (
+        SELECT ps.student_id FROM parent_students ps
+        JOIN parents p ON p.id = ps.parent_id
+        WHERE p.user_id = $${paramIndex}
+      )`;
+      params.push(req.user.id);
+      paramIndex++;
+    }
+
     if (classId) {
       sql += ` AND s.class_id = $${paramIndex}`;
       params.push(classId);
@@ -404,6 +415,7 @@ router.post('/:id/link-parent', requireRole(['admin']), async (req, res) => {
 router.get("/:id/exam-results", async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    const { role, id: callerId } = req.user;
     const studentId = req.params.id;
 
     const student = await query(
@@ -412,6 +424,19 @@ router.get("/:id/exam-results", async (req, res) => {
     );
 
     const actualStudentId = student.length > 0 ? student[0].id : studentId;
+
+    // Parents may only view results for their own children
+    if (role === 'parent') {
+      const access = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [actualStudentId, callerId]
+      );
+      if (!access.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
 
     const results = await query(`
       SELECT

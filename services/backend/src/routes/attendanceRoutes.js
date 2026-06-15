@@ -101,6 +101,7 @@ router.get('/class/:classId', async (req, res) => {
 router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    const { role, id: callerId } = req.user;
     const studentId = req.params.studentId;
 
     const student = await query(
@@ -109,6 +110,19 @@ router.get('/student/:studentId', async (req, res) => {
     );
 
     const actualStudentId = student.length > 0 ? student[0].id : studentId;
+
+    // Parents may only view attendance for their own children
+    if (role === 'parent') {
+      const access = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [actualStudentId, callerId]
+      );
+      if (!access.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
 
     const attendance = await query(`
       SELECT a.* FROM attendance a

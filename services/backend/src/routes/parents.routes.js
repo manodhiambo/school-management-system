@@ -8,71 +8,82 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Get all parents - returns array directly
-router.get('/', authenticate, async (req, res) => {
+// Get all parents — admin/finance_officer only, scoped to tenant
+router.get('/', authenticate, requireRole(['admin', 'finance_officer', 'superadmin']), async (req, res) => {
   try {
+    const tid = req.user.tenant_id;
     const parents = await query(`
       SELECT p.*, u.email, u.is_active,
         (SELECT COUNT(*) FROM parent_students ps WHERE ps.parent_id = p.id) as children_count
       FROM parents p
       LEFT JOIN users u ON p.user_id = u.id
+      WHERE p.tenant_id = $1
       ORDER BY p.first_name, p.last_name
-    `);
-    res.json({
-      success: true,
-      data: parents
-    });
+    `, [tid]);
+    res.json({ success: true, data: parents });
   } catch (error) {
     logger.error('Get parents error:', error);
     res.status(500).json({ success: false, message: 'Error fetching parents' });
   }
 });
 
-// Get parent by user ID
+// Get parent by user ID — parents can only fetch their own record
 router.get('/by-user/:userId', authenticate, async (req, res) => {
   try {
+    const { role, id: callerId, tenant_id: tid } = req.user;
+    // Parents may only look up themselves
+    if (role === 'parent' && req.params.userId !== callerId) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    // Non-admin, non-parent roles have no business here
+    if (!['admin', 'superadmin', 'finance_officer', 'parent'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     const parents = await query(`
       SELECT p.*, u.email
       FROM parents p
       LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.user_id = $1
-    `, [req.params.userId]);
-    
+      WHERE p.user_id = $1 AND p.tenant_id = $2
+    `, [req.params.userId, tid]);
+
     if (parents.length === 0) {
       return res.status(404).json({ success: false, message: 'Parent not found' });
     }
 
-    // Get children
+    // Get children scoped to same tenant
     const children = await query(`
       SELECT s.*, c.name as class_name
       FROM students s
       LEFT JOIN classes c ON s.class_id = c.id
       JOIN parent_students ps ON s.id = ps.student_id
-      WHERE ps.parent_id = $1
-    `, [parents[0].id]);
+      WHERE ps.parent_id = $1 AND s.tenant_id = $2
+    `, [parents[0].id, tid]);
 
-    res.json({ 
-      success: true, 
-      data: { ...parents[0], children } 
-    });
+    res.json({ success: true, data: { ...parents[0], children } });
   } catch (error) {
-    logger.error('Get parent error:', error);
+    logger.error('Get parent by user error:', error);
     res.status(500).json({ success: false, message: 'Error fetching parent' });
   }
 });
 
-// Get single parent
+// Get single parent — admin or the parent themselves
 router.get('/:id', authenticate, async (req, res) => {
   try {
+    const { role, tenant_id: tid } = req.user;
     const parents = await query(`
       SELECT p.*, u.email
       FROM parents p
       LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.id = $1
-    `, [req.params.id]);
-    
+      WHERE p.id = $1 AND p.tenant_id = $2
+    `, [req.params.id, tid]);
+
     if (parents.length === 0) {
       return res.status(404).json({ success: false, message: 'Parent not found' });
+    }
+    // Parents can only see their own record
+    if (role === 'parent' && parents[0].user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
     res.json({ success: true, data: parents[0] });
   } catch (error) {

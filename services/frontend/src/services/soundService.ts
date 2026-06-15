@@ -1,5 +1,3 @@
-// Sound notification service — uses Web Audio API (no audio files required)
-
 const LS_ENABLED  = 'skulmanager_sound_enabled';
 const LS_MESSAGES = 'skulmanager_sound_messages';
 const LS_FEE      = 'skulmanager_sound_fee';
@@ -20,12 +18,13 @@ export type SoundType = 'message' | 'fee' | 'alert' | 'success';
 class SoundService {
   private ctx: AudioContext | null = null;
 
-  private getCtx(): AudioContext {
+  private async getReadyCtx(): Promise<AudioContext> {
     if (!this.ctx || this.ctx.state === 'closed') {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-    // Resume if suspended (browser autoplay policy)
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    if (this.ctx.state === 'suspended') {
+      await this.ctx.resume();
+    }
     return this.ctx;
   }
 
@@ -45,9 +44,8 @@ class SoundService {
 
   // ── tone generation ───────────────────────────────────────────────────────
 
-  private tone(freq: number, dur: number, startAt: number, vol: number, type: OscillatorType = 'sine') {
-    const ctx = this.getCtx();
-    const osc = ctx.createOscillator();
+  private tone(ctx: AudioContext, freq: number, dur: number, startAt: number, vol: number, type: OscillatorType = 'sine') {
+    const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -62,59 +60,56 @@ class SoundService {
 
   // ── sounds ────────────────────────────────────────────────────────────────
 
-  /** Soft two-note ding — for new messages */
-  private playMessageTone(vol: number) {
-    this.tone(880, 0.18, 0,    vol);
-    this.tone(660, 0.28, 0.18, vol * 0.7);
+  private playMessageTone(ctx: AudioContext, vol: number) {
+    this.tone(ctx, 880, 0.18, 0,    vol);
+    this.tone(ctx, 660, 0.28, 0.18, vol * 0.7);
   }
 
-  /** Three-note rising alert — for fee reminders */
-  private playFeeTone(vol: number) {
-    this.tone(523, 0.14, 0,    vol, 'triangle');
-    this.tone(659, 0.14, 0.16, vol, 'triangle');
-    this.tone(784, 0.24, 0.32, vol, 'triangle');
+  private playFeeTone(ctx: AudioContext, vol: number) {
+    this.tone(ctx, 523, 0.14, 0,    vol, 'triangle');
+    this.tone(ctx, 659, 0.14, 0.16, vol, 'triangle');
+    this.tone(ctx, 784, 0.24, 0.32, vol, 'triangle');
   }
 
-  /** Two quick beeps — for general alerts */
-  private playAlertTone(vol: number) {
-    this.tone(880, 0.12, 0,    vol, 'square');
-    this.tone(880, 0.12, 0.20, vol, 'square');
+  private playAlertTone(ctx: AudioContext, vol: number) {
+    this.tone(ctx, 880, 0.12, 0,    vol, 'square');
+    this.tone(ctx, 880, 0.12, 0.20, vol, 'square');
   }
 
-  /** Rising chime — for success/confirmation */
-  private playSuccessTone(vol: number) {
-    this.tone(523, 0.12, 0,    vol * 0.8);
-    this.tone(659, 0.12, 0.13, vol * 0.8);
-    this.tone(784, 0.22, 0.26, vol);
+  private playSuccessTone(ctx: AudioContext, vol: number) {
+    this.tone(ctx, 523, 0.12, 0,    vol * 0.8);
+    this.tone(ctx, 659, 0.12, 0.13, vol * 0.8);
+    this.tone(ctx, 784, 0.22, 0.26, vol);
   }
 
   // ── public API ────────────────────────────────────────────────────────────
 
-  play(type: SoundType) {
+  async play(type: SoundType): Promise<void> {
     if (!this.enabled) return;
     if (type === 'message' && !this.messagesEnabled) return;
     if (type === 'fee'     && !this.feeEnabled)      return;
     if (type === 'alert'   && !this.alertsEnabled)   return;
 
     try {
+      const ctx = await this.getReadyCtx();
       const vol = Math.max(0.05, Math.min(1, this.volume));
-      if (type === 'message') this.playMessageTone(vol);
-      if (type === 'fee')     this.playFeeTone(vol);
-      if (type === 'alert')   this.playAlertTone(vol);
-      if (type === 'success') this.playSuccessTone(vol);
+      if (type === 'message') this.playMessageTone(ctx, vol);
+      if (type === 'fee')     this.playFeeTone(ctx, vol);
+      if (type === 'alert')   this.playAlertTone(ctx, vol);
+      if (type === 'success') this.playSuccessTone(ctx, vol);
     } catch {
-      // Silently ignore — AudioContext not available in some contexts
+      // AudioContext not available in this environment
     }
   }
 
-  /** Preview a sound from the settings panel (always plays regardless of toggles) */
-  preview(type: SoundType) {
+  async preview(type: SoundType): Promise<void> {
     try {
+      const ctx = await this.getReadyCtx();
       const vol = Math.max(0.05, Math.min(1, this.volume));
-      if (type === 'message') this.playMessageTone(vol);
-      if (type === 'fee')     this.playFeeTone(vol);
-      if (type === 'alert')   this.playAlertTone(vol);
-      if (type === 'success') this.playSuccessTone(vol);
+      if (type === 'message') this.playMessageTone(ctx, vol);
+      if (type === 'fee')     this.playFeeTone(ctx, vol);
+      if (type === 'alert')   this.playAlertTone(ctx, vol);
+      if (type === 'success') this.playSuccessTone(ctx, vol);
     } catch {}
   }
 }

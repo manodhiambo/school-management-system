@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, MessageSquare, DollarSign, X, Volume2, VolumeX } from 'lucide-react';
 import { soundService, SoundType } from '@/services/soundService';
 import { useAuthStore } from '@/store/authStore';
@@ -43,7 +44,7 @@ export function useSoundSettings() { return useContext(Ctx); }
 
 // ── helper: small toggle that syncs soundService + forces re-render ───────
 
-function useSoundPref<K extends keyof typeof soundService>(
+function useSoundPref(
   getter: () => boolean,
   setter: (v: boolean) => void,
 ): [boolean, (v: boolean) => void] {
@@ -55,112 +56,135 @@ function useSoundPref<K extends keyof typeof soundService>(
 
 export function SoundNotificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
+  const navigate  = useNavigate();
 
   // settings state (mirrors soundService localStorage)
-  const [enabled,         setEnabledState]   = useSoundPref(() => soundService.enabled, v => (soundService.enabled = v));
-  const [messagesEnabled, setMsgState]       = useSoundPref(() => soundService.messagesEnabled, v => (soundService.messagesEnabled = v));
-  const [feeEnabled,      setFeeState]       = useSoundPref(() => soundService.feeEnabled, v => (soundService.feeEnabled = v));
-  const [alertsEnabled,   setAlertsState]    = useSoundPref(() => soundService.alertsEnabled, v => (soundService.alertsEnabled = v));
-  const [volume,          setVolState]       = useState(soundService.volume);
+  const [enabled,         setEnabledState] = useSoundPref(() => soundService.enabled, v => (soundService.enabled = v));
+  const [messagesEnabled, setMsgState]     = useSoundPref(() => soundService.messagesEnabled, v => (soundService.messagesEnabled = v));
+  const [feeEnabled,      setFeeState]     = useSoundPref(() => soundService.feeEnabled, v => (soundService.feeEnabled = v));
+  const [alertsEnabled,   setAlertsState]  = useSoundPref(() => soundService.alertsEnabled, v => (soundService.alertsEnabled = v));
+  const [volume,          setVolState]     = useState(soundService.volume);
 
   const setVolume = (v: number) => { soundService.volume = v; setVolState(v); };
   const preview   = (t: SoundType) => soundService.preview(t);
 
-  // toasts visible on screen
+  // toast stack
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
-  // last-seen counts to detect increases
-  const prevCounts = useRef({ messages: -1, notifications: -1, parentAlerts: -1 });
+  // per-message tracking: set of message IDs already seen (so we toast each message once)
+  const seenMsgIds      = useRef<Set<string>>(new Set());
+  const msgBaselined    = useRef(false);
+
+  // count-based tracking for general notifications and parent alerts
+  const prevNotifCount  = useRef(-1);
+  const prevAlertCount  = useRef(-1);
 
   const addToast = useCallback((type: SoundType, title: string, body: string, href?: string) => {
     const id = ++nextId.current;
     setToasts(t => [...t, { id, type, title, body, href }]);
     soundService.play(type);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 6000);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 7000);
   }, []);
 
   const dismiss = (id: number) => setToasts(t => t.filter(x => x.id !== id));
 
-  // ── polling ─────────────────────────────────────────────────────────────
+  const clickToast = (toast: Toast) => {
+    dismiss(toast.id);
+    if (toast.href) navigate(toast.href);
+  };
 
-  const poll = useCallback(async () => {
+  // ── message polling (every 15 s) ─────────────────────────────────────────
+
+  const pollMessages = useCallback(async () => {
+    if (!user?.id || !enabled || !messagesEnabled) return;
+
+    try {
+      const res: any = await (api as any).getNewUnreadMessages().catch(() => null);
+      const messages: any[] = res?.data || [];
+
+      if (!msgBaselined.current) {
+        // First call: silently record all currently-unread IDs as already seen
+        messages.forEach((m: any) => seenMsgIds.current.add(m.id));
+        msgBaselined.current = true;
+        return;
+      }
+
+      // Show a toast for each message that arrived since last poll
+      const newMsgs = messages.filter((m: any) => !seenMsgIds.current.has(m.id));
+      newMsgs.forEach((m: any) => {
+        seenMsgIds.current.add(m.id);
+        const sender = m.sender_name?.trim() || m.sender_email || 'Someone';
+        const body   = m.subject || m.preview?.slice(0, 80) || 'New message';
+        addToast('message', `Message from ${sender}`, body, '/app/messages');
+      });
+    } catch {}
+  }, [user?.id, enabled, messagesEnabled, addToast]);
+
+  // ── notifications + parent-alerts polling (every 30 s) ──────────────────
+
+  const pollOther = useCallback(async () => {
     if (!user?.id || !enabled) return;
 
+    // General notifications
     try {
-      // Unread messages (all roles)
-      const msgRes: any = await api.getUnreadMessageCount().catch(() => null);
-      const msgCount = msgRes?.data?.count ?? 0;
-      if (prevCounts.current.messages >= 0 && msgCount > prevCounts.current.messages) {
-        const diff = msgCount - prevCounts.current.messages;
-        addToast('message', 'New Message', `You have ${diff} new message${diff > 1 ? 's' : ''}`, '/app/messages');
-      }
-      prevCounts.current.messages = msgCount;
-    } catch {}
-
-    try {
-      // General notifications (all roles)
-      const notifRes: any = await api.getUnreadNotificationCount().catch(() => null);
-      const notifCount = notifRes?.data?.count ?? 0;
-      if (prevCounts.current.notifications >= 0 && notifCount > prevCounts.current.notifications) {
-        const diff = notifCount - prevCounts.current.notifications;
+      const res: any = await (api as any).getUnreadNotificationCount().catch(() => null);
+      const count = res?.data?.count ?? 0;
+      if (prevNotifCount.current >= 0 && count > prevNotifCount.current && alertsEnabled) {
+        const diff = count - prevNotifCount.current;
         addToast('alert', 'New Notification', `You have ${diff} new notification${diff > 1 ? 's' : ''}`, '/app/notifications');
       }
-      prevCounts.current.notifications = notifCount;
+      prevNotifCount.current = count;
     } catch {}
 
-    // Parent-only: fee & parent alerts
-    if (user.role === 'parent') {
+    // Parent-only: fee / school alerts
+    if (user.role === 'parent' && feeEnabled) {
       try {
-        const alertRes: any = await api.getParentAlertsCount().catch(() => null);
-        const alertCount = alertRes?.data?.count ?? 0;
-        if (prevCounts.current.parentAlerts >= 0 && alertCount > prevCounts.current.parentAlerts) {
-          const diff = alertCount - prevCounts.current.parentAlerts;
-          addToast('fee', 'Fee Reminder', `You have ${diff} new alert${diff > 1 ? 's' : ''} from school`, '/app/parent-alerts');
+        const res: any = await (api as any).getParentAlertsCount().catch(() => null);
+        const count = res?.data?.count ?? 0;
+        if (prevAlertCount.current >= 0 && count > prevAlertCount.current) {
+          const diff = count - prevAlertCount.current;
+          addToast('fee', 'Fee / School Alert', `${diff} new alert${diff > 1 ? 's' : ''} from school`, '/app/parent-alerts');
         }
-        prevCounts.current.parentAlerts = alertCount;
+        prevAlertCount.current = count;
       } catch {}
     }
-  }, [user, enabled, addToast]);
+  }, [user?.id, user?.role, enabled, alertsEnabled, feeEnabled, addToast]);
+
+  // ── effects: reset + intervals on user change ────────────────────────────
 
   useEffect(() => {
     if (!user?.id) return;
-    // Reset counts when user changes so we don't play sounds on first load
-    prevCounts.current = { messages: -1, notifications: -1, parentAlerts: -1 };
 
-    // First poll after a short delay so we baseline without making noise on login
-    const initial = setTimeout(() => {
-      // Baseline only (no sound) — set counts without calling addToast
-      const baseline = async () => {
-        try {
-          const [msgRes, notifRes, alertRes]: any[] = await Promise.allSettled([
-            api.getUnreadMessageCount(),
-            api.getUnreadNotificationCount(),
-            user.role === 'parent' ? api.getParentAlertsCount() : Promise.resolve(null),
-          ]);
-          prevCounts.current.messages      = msgRes?.value?.data?.count   ?? 0;
-          prevCounts.current.notifications = notifRes?.value?.data?.count ?? 0;
-          prevCounts.current.parentAlerts  = alertRes?.value?.data?.count ?? 0;
-        } catch {}
-      };
-      baseline();
-    }, 2000);
+    // Reset all state when user changes (logout / switch account)
+    seenMsgIds.current   = new Set();
+    msgBaselined.current = false;
+    prevNotifCount.current  = -1;
+    prevAlertCount.current  = -1;
 
-    // Poll every 30s after baseline
-    const interval = setInterval(poll, 30_000);
+    // Baseline both immediately (first call to pollMessages records IDs silently;
+    // first call to pollOther sets counts without triggering toasts)
+    pollMessages();
+    pollOther();
 
-    return () => { clearTimeout(initial); clearInterval(interval); };
-  }, [user?.id, user?.role, enabled, poll]);
+    const msgInterval   = setInterval(pollMessages, 15_000);
+    const otherInterval = setInterval(pollOther,    30_000);
 
-  // ── toast icon by type ───────────────────────────────────────────────────
+    return () => {
+      clearInterval(msgInterval);
+      clearInterval(otherInterval);
+    };
+  }, [user?.id, user?.role, enabled, pollMessages, pollOther]);
+
+  // ── toast icon / colour by type ──────────────────────────────────────────
 
   const toastIcon = (type: SoundType) => {
-    if (type === 'message') return <MessageSquare className="h-5 w-5 text-blue-500" />;
-    if (type === 'fee')     return <DollarSign    className="h-5 w-5 text-orange-500" />;
-    return                         <Bell          className="h-5 w-5 text-purple-500" />;
+    if (type === 'message') return <MessageSquare className="h-5 w-5 text-blue-500 shrink-0" />;
+    if (type === 'fee')     return <DollarSign    className="h-5 w-5 text-orange-500 shrink-0" />;
+    return                         <Bell          className="h-5 w-5 text-purple-500 shrink-0" />;
   };
 
-  const toastColor = (type: SoundType) => {
+  const toastBorder = (type: SoundType) => {
     if (type === 'message') return 'border-blue-400 bg-blue-50';
     if (type === 'fee')     return 'border-orange-400 bg-orange-50';
     return                         'border-purple-400 bg-purple-50';
@@ -181,19 +205,25 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
       {children}
 
       {/* Toast stack — top-right */}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 340 }}>
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 360 }}>
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border-l-4 shadow-lg animate-in slide-in-from-right-5 ${toastColor(toast.type)}`}
+            className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border-l-4 shadow-lg
+              animate-in slide-in-from-right-5 duration-300 ${toastBorder(toast.type)}
+              ${toast.href ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
+            onClick={() => clickToast(toast)}
           >
-            <div className="flex-shrink-0 mt-0.5">{toastIcon(toast.type)}</div>
+            <div className="mt-0.5">{toastIcon(toast.type)}</div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-gray-800">{toast.title}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{toast.body}</p>
+              <p className="font-semibold text-sm text-gray-800 leading-tight">{toast.title}</p>
+              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{toast.body}</p>
+              {toast.href && (
+                <p className="text-[10px] text-blue-400 mt-1">Click to open →</p>
+              )}
             </div>
             <button
-              onClick={() => dismiss(toast.id)}
+              onClick={e => { e.stopPropagation(); dismiss(toast.id); }}
               className="flex-shrink-0 text-gray-400 hover:text-gray-600 mt-0.5"
             >
               <X className="h-4 w-4" />

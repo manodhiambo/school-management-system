@@ -26,6 +26,27 @@ router.get('/unread-count', async (req, res) => {
   }
 });
 
+// New unread messages for notification toasts — returns id, sender name, subject, preview
+router.get('/new-unread', async (req, res) => {
+  try {
+    const rows = await query(
+      `SELECT m.id, m.subject, m.created_at,
+              LEFT(m.content, 120) AS preview,
+              TRIM(COALESCE(NULLIF(u.first_name,''),'') || ' ' || COALESCE(NULLIF(u.last_name,''),'')) AS sender_name,
+              u.email AS sender_email
+       FROM messages m
+       LEFT JOIN users u ON u.id = m.sender_id
+       WHERE m.tenant_id = $1 AND m.recipient_id = $2 AND m.is_read = false
+       ORDER BY m.created_at DESC
+       LIMIT 20`,
+      [req.tenantId, req.user.id]
+    );
+    res.json({ success: true, data: rows });
+  } catch {
+    res.json({ success: true, data: [] });
+  }
+});
+
 // Get messageable recipients — only users within the same tenant
 router.get('/recipients', async (req, res) => {
   try {

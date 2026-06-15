@@ -17,16 +17,7 @@ export type SoundType = 'message' | 'fee' | 'alert' | 'success';
 
 class SoundService {
   private ctx: AudioContext | null = null;
-
-  private async getReadyCtx(): Promise<AudioContext> {
-    if (!this.ctx || this.ctx.state === 'closed') {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (this.ctx.state === 'suspended') {
-      await this.ctx.resume();
-    }
-    return this.ctx;
-  }
+  private _unlocked = false;
 
   // ── settings ──────────────────────────────────────────────────────────────
 
@@ -35,12 +26,42 @@ class SoundService {
   get feeEnabled()      { return getBool(LS_FEE,      true); }
   get alertsEnabled()   { return getBool(LS_ALERTS,   true); }
   get volume()          { return getNum(LS_VOLUME, 0.5); }
+  get isUnlocked()      { return this._unlocked && this.ctx?.state === 'running'; }
 
   set enabled(v: boolean)         { localStorage.setItem(LS_ENABLED,  String(v)); }
   set messagesEnabled(v: boolean) { localStorage.setItem(LS_MESSAGES, String(v)); }
   set feeEnabled(v: boolean)      { localStorage.setItem(LS_FEE,      String(v)); }
   set alertsEnabled(v: boolean)   { localStorage.setItem(LS_ALERTS,   String(v)); }
   set volume(v: number)           { localStorage.setItem(LS_VOLUME,   String(v)); }
+
+  // ── unlock: MUST be called from a user-gesture event handler ──────────────
+  // Browser autoplay policy keeps AudioContext suspended until a real click/key
+  // event resumes it. Call this once on any user interaction; after that,
+  // timer-based play() calls work fine because the context stays running.
+
+  async unlock(): Promise<void> {
+    try {
+      if (!this.ctx || this.ctx.state === 'closed') {
+        this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (this.ctx.state === 'suspended') {
+        await this.ctx.resume();
+      }
+      this._unlocked = this.ctx.state === 'running';
+    } catch {
+      // AudioContext not supported
+    }
+  }
+
+  // ── internal: get context (only works after unlock()) ─────────────────────
+
+  private async getCtx(): Promise<AudioContext | null> {
+    if (!this.ctx) return null;
+    if (this.ctx.state === 'suspended') {
+      try { await this.ctx.resume(); } catch {}
+    }
+    return this.ctx.state === 'running' ? this.ctx : null;
+  }
 
   // ── tone generation ───────────────────────────────────────────────────────
 
@@ -57,8 +78,6 @@ class SoundService {
     osc.start(ctx.currentTime + startAt);
     osc.stop(ctx.currentTime + startAt + dur + 0.05);
   }
-
-  // ── sounds ────────────────────────────────────────────────────────────────
 
   private playMessageTone(ctx: AudioContext, vol: number) {
     this.tone(ctx, 880, 0.18, 0,    vol);
@@ -90,21 +109,24 @@ class SoundService {
     if (type === 'fee'     && !this.feeEnabled)      return;
     if (type === 'alert'   && !this.alertsEnabled)   return;
 
+    const ctx = await this.getCtx();
+    if (!ctx) return; // context not unlocked yet — skip silently
+
     try {
-      const ctx = await this.getReadyCtx();
       const vol = Math.max(0.05, Math.min(1, this.volume));
       if (type === 'message') this.playMessageTone(ctx, vol);
       if (type === 'fee')     this.playFeeTone(ctx, vol);
       if (type === 'alert')   this.playAlertTone(ctx, vol);
       if (type === 'success') this.playSuccessTone(ctx, vol);
-    } catch {
-      // AudioContext not available in this environment
-    }
+    } catch {}
   }
 
   async preview(type: SoundType): Promise<void> {
+    // preview() is always called from a button click, so unlock first
+    await this.unlock();
+    const ctx = await this.getCtx();
+    if (!ctx) return;
     try {
-      const ctx = await this.getReadyCtx();
       const vol = Math.max(0.05, Math.min(1, this.volume));
       if (type === 'message') this.playMessageTone(ctx, vol);
       if (type === 'fee')     this.playFeeTone(ctx, vol);

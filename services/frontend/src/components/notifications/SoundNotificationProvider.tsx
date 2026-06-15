@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, MessageSquare, DollarSign, X, Volume2, VolumeX } from 'lucide-react';
+import { Bell, MessageSquare, DollarSign, X, Volume2, VolumeX, BellRing } from 'lucide-react';
 import { soundService, SoundType } from '@/services/soundService';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
@@ -64,9 +64,38 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
   const [feeEnabled,      setFeeState]     = useSoundPref(() => soundService.feeEnabled, v => (soundService.feeEnabled = v));
   const [alertsEnabled,   setAlertsState]  = useSoundPref(() => soundService.alertsEnabled, v => (soundService.alertsEnabled = v));
   const [volume,          setVolState]     = useState(soundService.volume);
+  const [audioReady,      setAudioReady]   = useState(false);
 
   const setVolume = (v: number) => { soundService.volume = v; setVolState(v); };
   const preview   = (t: SoundType) => soundService.preview(t);
+
+  // ── AudioContext unlock ───────────────────────────────────────────────────
+  // Browsers block audio until a real user gesture occurs. We listen for the
+  // first click/keydown/touch and call soundService.unlock() from inside that
+  // handler, which is the only place browsers allow AudioContext.resume().
+  // After that, timer-triggered play() calls work fine.
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (soundService.isUnlocked) { setAudioReady(true); return; }
+
+    const unlock = async () => {
+      await soundService.unlock();
+      if (soundService.isUnlocked) {
+        setAudioReady(true);
+      }
+    };
+
+    window.addEventListener('click',      unlock, { passive: true });
+    window.addEventListener('keydown',    unlock, { passive: true });
+    window.addEventListener('touchstart', unlock, { passive: true });
+
+    return () => {
+      window.removeEventListener('click',      unlock);
+      window.removeEventListener('keydown',    unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, [enabled]);
 
   // toast stack
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -231,6 +260,19 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
           </div>
         ))}
       </div>
+
+      {/* "Click to enable audio" hint — shown only until first user interaction unlocks AudioContext */}
+      {enabled && !audioReady && user?.id && (
+        <div
+          className="fixed bottom-16 right-4 z-[9997] flex items-center gap-2 px-3 py-2 rounded-xl
+            bg-blue-600 text-white text-xs shadow-lg cursor-pointer animate-pulse select-none"
+          onClick={async () => { await soundService.unlock(); setAudioReady(soundService.isUnlocked); }}
+          title="Click to enable sound notifications"
+        >
+          <BellRing className="h-3.5 w-3.5 shrink-0" />
+          Click to enable sounds
+        </div>
+      )}
 
       {/* Master mute toggle — bottom-right corner */}
       <button

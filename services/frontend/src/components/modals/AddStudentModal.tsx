@@ -189,10 +189,11 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
   }, [open]);
 
   // Load parents when entering step 3
+  // Note: axios interceptor already unwraps response.data, so res = { statusCode, data: [...], message }
   useEffect(() => {
     if (step !== 3) return;
     api.getParents({ limit: 500 }).then((res: any) => {
-      setParents(res.data?.data || res.data?.parents || []);
+      setParents(res?.data || []);
     }).catch(() => {});
   }, [step]);
 

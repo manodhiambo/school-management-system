@@ -707,7 +707,9 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
     </div>
   );
 
-  const stepBody = [null, <Step1 />, <Step2 />, <Step3 />, <Step4 />];
+  // Call as plain functions, NOT as JSX elements (<Step1 />) — defining components
+  // inside a parent causes React to unmount/remount on every keystroke (focus lost).
+  const stepBody = [null, Step1(), Step2(), Step3(), Step4()];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

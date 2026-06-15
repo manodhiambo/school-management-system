@@ -60,7 +60,7 @@ export function TeacherCheckinAdminPage() {
     doc.text(`School hours: ${hours.start} – ${hours.end}  |  Late after: ${hours.late_after}`, 14, 23);
     const rows = [
       ...(data.checkins || []).map((r: any) => [
-        `${r.first_name} ${r.last_name}`,
+        (r.first_name || r.last_name) ? `${r.first_name || ''} ${r.last_name || ''}`.trim() : r.email,
         r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : r.status,
         r.checkin_time ? new Date(r.checkin_time).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }) : '—',
         r.checkout_time ? new Date(r.checkout_time).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }) : '—',
@@ -198,8 +198,10 @@ export function TeacherCheckinAdminPage() {
                             </div>
                           )}
                           <div>
-                            <p className="font-semibold text-gray-900">{r.first_name} {r.last_name}</p>
-                            <p className="text-xs text-gray-400">{r.email}</p>
+                            <p className="font-semibold text-gray-900">
+                              {(r.first_name || r.last_name) ? `${r.first_name || ''} ${r.last_name || ''}`.trim() : r.email}
+                            </p>
+                            {(r.first_name || r.last_name) && <p className="text-xs text-gray-400">{r.email}</p>}
                           </div>
                         </div>
                       </td>
@@ -276,8 +278,10 @@ export function TeacherCheckinAdminPage() {
                     <User className="h-4 w-4 text-red-400" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm text-gray-800 truncate">{t.first_name} {t.last_name}</p>
-                    <p className="text-xs text-gray-400 truncate">{t.email}</p>
+                    <p className="font-semibold text-sm text-gray-800 truncate">
+                      {(t.first_name || t.last_name) ? `${t.first_name || ''} ${t.last_name || ''}`.trim() : t.email}
+                    </p>
+                    {(t.first_name || t.last_name) && <p className="text-xs text-gray-400 truncate">{t.email}</p>}
                   </div>
                 </div>
               ))}

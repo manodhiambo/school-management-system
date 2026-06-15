@@ -11,12 +11,17 @@ router.use(requireModule('teacher_checkin'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
-// ─── Helper: parse "HH:MM" into a Date for today ────────────────────────────
-function timeToday(hhmm) {
-  const [h, m] = (hhmm || '08:00').split(':').map(Number);
-  const d = new Date();
-  d.setHours(h, m, 0, 0);
-  return d;
+// ─── Helpers: all time comparisons in EAT (Africa/Nairobi, UTC+3) ────────────
+function eatMinutes() {
+  const d = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
+function eatDateStr() {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
+}
+function parseMins(hhmm) {
+  const [h, m] = (hhmm || '00:00').split(':').map(Number);
+  return h * 60 + m;
 }
 
 // ─── GET school check-in hours (public to auth users) ────────────────────────
@@ -53,7 +58,6 @@ router.post('/checkin', async (req, res) => {
     }
     const tid = req.tenantId;
     const { latitude, longitude, notes } = req.body;
-    const today = new Date().toISOString().split('T')[0];
 
     // Read configurable late-after and end time from settings (fallback to defaults if columns missing)
     let sch = {};
@@ -68,11 +72,12 @@ router.post('/checkin', async (req, res) => {
     const lateAfter = sch.teacher_checkin_late_after || '08:15';
     const checkinEnd = sch.teacher_checkin_end || '17:00';
 
-    const now = new Date();
-    if (now > timeToday(checkinEnd)) {
+    const nowMins = eatMinutes();
+    const today = eatDateStr();
+    if (nowMins >= parseMins(checkinEnd)) {
       return res.status(400).json({ success: false, message: `Check-in is closed for today (closes at ${checkinEnd})` });
     }
-    const status = now > timeToday(lateAfter) ? 'late' : 'present';
+    const status = nowMins >= parseMins(lateAfter) ? 'late' : 'present';
 
     // If teacher_checkins table doesn't exist yet (migration pending), tell user clearly
     let existing;
@@ -161,7 +166,7 @@ router.post('/checkout', async (req, res) => {
     }
     const tid = req.tenantId;
     const { latitude, longitude, notes } = req.body;
-    const today = new Date().toISOString().split('T')[0];
+    const today = eatDateStr();
 
     const rows = await query(
       `UPDATE teacher_checkins SET
@@ -186,7 +191,7 @@ router.get('/my-status', async (req, res) => {
   try {
     const tid = req.tenantId;
     const { date } = req.query;
-    const d = date || new Date().toISOString().split('T')[0];
+    const d = date || eatDateStr();
 
     const rows = await query(
       'SELECT * FROM teacher_checkins WHERE teacher_id=$1 AND checkin_date=$2 AND tenant_id=$3',
@@ -205,7 +210,7 @@ router.get('/today', async (req, res) => {
   }
   const tid = req.tenantId;
   const { date } = req.query;
-  const d = date || new Date().toISOString().split('T')[0];
+  const d = date || eatDateStr();
 
   // Each query is independently wrapped — a missing column or table never 500s
   let allTeachers = [];
@@ -226,7 +231,7 @@ router.get('/today', async (req, res) => {
     rows = await query(
       `SELECT tc.*, u.first_name, u.last_name, u.email
        FROM teacher_checkins tc
-       JOIN users u ON u.id = tc.teacher_id AND u.tenant_id = $2
+       LEFT JOIN users u ON u.id = tc.teacher_id
        WHERE tc.checkin_date = $1 AND tc.tenant_id = $2
        ORDER BY tc.checkin_time ASC`,
       [d, tid]

@@ -12,6 +12,7 @@ import api from '@/services/api';
 interface LogEntry {
   id: string;
   created_at: string;
+  user_name: string | null;
   user_email: string;
   user_role: string;
   action: string;
@@ -42,7 +43,7 @@ function exportCSV(rows: LogEntry[]) {
   const headers = ['Timestamp', 'User', 'Role', 'Action', 'Resource', 'Resource ID', 'IP Address'];
   const lines = rows.map((r) => [
     fmt(r.created_at),
-    r.user_email || '',
+    r.user_name || r.user_email || '',
     r.user_role || '',
     r.action,
     r.resource,
@@ -84,9 +85,8 @@ export function AuditLogPage() {
       if (toDate) params.to_date = toDate;
       if (userSearch) params.user = userSearch;
 
-      const qs = new URLSearchParams(params).toString();
-      const res: any = await (api as any).api.get(`/audit-log?${qs}`);
-      // Response interceptor unwraps axios, so res = { success, data: [...rows], total, page, pages }
+      const res: any = await api.getAuditLog(params);
+      // Response interceptor unwraps axios → res = { success, data: [...], total, page, pages }
       const rows = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
       setLogs(rows);
       setTotal(typeof res?.total === 'number' ? res.total : rows.length);
@@ -100,11 +100,10 @@ export function AuditLogPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    (api as any).api.get('/audit-log/summary').then((res: any) => {
-      // res = { success, data: { total_today, most_active_user, most_common_action } }
+    api.getAuditSummary().then((res: any) => {
       setSummary(res?.data ?? res ?? null);
     }).catch(() => { /* silent */ });
-    (api as any).api.get('/audit-log/actions').then((res: any) => {
+    api.getAuditActions().then((res: any) => {
       setActions(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);
     }).catch(() => { /* silent */ });
   }, []);
@@ -260,7 +259,10 @@ export function AuditLogPage() {
                     <tr key={row.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmt(row.created_at)}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{row.user_email || '—'}</div>
+                        <div className="font-medium text-gray-900">{row.user_name || row.user_email || '—'}</div>
+                        {row.user_name && row.user_email && (
+                          <div className="text-xs text-gray-400">{row.user_email}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[row.user_role] ?? 'bg-gray-100 text-gray-700'}`}>

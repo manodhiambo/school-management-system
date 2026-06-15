@@ -29,10 +29,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('/api/')) return;
 
-  // Skip caching for external CDN and API domains to avoid tracking-prevention issues
   const url = event.request.url;
+
+  // Skip non-http(s) schemes (e.g. chrome-extension://) — Cache API rejects them
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+
+  // Skip API calls — always go to network
+  if (url.includes('/api/')) return;
+
+  // Skip external CDN and API domains to avoid tracking-prevention issues
   if (SKIP_CACHE_DOMAINS.some(domain => url.includes(domain))) return;
 
   event.respondWith(
@@ -44,12 +50,14 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => {
-        // For SPA navigation requests, fall back to index.html so React Router handles routing
+      .catch(async () => {
+        // For SPA navigation requests, fall back to cached index.html
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          const cached = await caches.match('/index.html');
+          return cached || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
         }
-        return caches.match(event.request);
+        const cached = await caches.match(event.request);
+        return cached || new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
       })
   );
 });

@@ -78,7 +78,10 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     }
     if (user) {
       params.push(`%${user}%`);
-      conditions.push(`al.user_email ILIKE $${params.length}`);
+      // Search by email OR full name
+      conditions.push(
+        `(al.user_email ILIKE $${params.length} OR CONCAT(u.first_name, ' ', u.last_name) ILIKE $${params.length})`
+      );
     }
     if (from_date) {
       params.push(from_date);
@@ -90,20 +93,24 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     }
 
     const where = conditions.join(' AND ');
+    // LEFT JOIN users on both count and data queries (needed for name search + display)
+    const joinClause = `LEFT JOIN users u ON al.user_id = u.id`;
 
     // Total count
     const countRows = await query(
-      `SELECT COUNT(*) AS total FROM audit_log al WHERE ${where}`,
+      `SELECT COUNT(*) AS total FROM audit_log al ${joinClause} WHERE ${where}`,
       params
     );
     const total = parseInt(countRows[0].total);
     const pages = Math.ceil(total / limit);
 
-    // Data rows
+    // Data rows — include user's full name alongside stored email/role
     params.push(limit, offset);
     const rows = await query(
-      `SELECT al.*
+      `SELECT al.*,
+              NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS user_name
        FROM audit_log al
+       ${joinClause}
        WHERE ${where}
        ORDER BY al.created_at DESC
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -145,10 +152,13 @@ router.get('/summary', requireRole(['admin', 'superadmin']), async (req, res) =>
         [tid]
       ),
       query(
-        `SELECT user_email, COUNT(*)::int AS cnt
-         FROM audit_log
-         WHERE tenant_id = $1 AND created_at >= NOW() - INTERVAL '30 days'
-         GROUP BY user_email ORDER BY cnt DESC LIMIT 1`,
+        `SELECT al.user_email,
+                NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS user_name,
+                COUNT(*)::int AS cnt
+         FROM audit_log al
+         LEFT JOIN users u ON al.user_id = u.id
+         WHERE al.tenant_id = $1 AND al.created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY al.user_email, u.first_name, u.last_name ORDER BY cnt DESC LIMIT 1`,
         [tid]
       ),
       query(
@@ -164,7 +174,7 @@ router.get('/summary', requireRole(['admin', 'superadmin']), async (req, res) =>
       success: true,
       data: {
         total_today: todayRows[0]?.total_today ?? 0,
-        most_active_user: activeUserRows[0]?.user_email ?? null,
+        most_active_user: activeUserRows[0]?.user_name ?? activeUserRows[0]?.user_email ?? null,
         most_common_action: commonActionRows[0]?.action ?? null,
       },
     });

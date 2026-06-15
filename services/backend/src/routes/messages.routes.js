@@ -5,20 +5,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
-// Unread message count (lightweight — for notification polling)
-router.get('/unread-count', authenticate, async (req, res) => {
-  try {
-    const rows = await query(
-      `SELECT COUNT(*) AS count FROM messages
-       WHERE tenant_id = $1 AND recipient_id = $2 AND is_read = false`,
-      [req.user.tenant_id, req.user.id]
-    );
-    res.json({ success: true, data: { count: parseInt(rows[0]?.count || 0, 10) } });
-  } catch {
-    res.json({ success: true, data: { count: 0 } });
-  }
-});
-
 // Get messages
 router.get('/', authenticate, async (req, res) => {
   try {

@@ -1382,7 +1382,7 @@ router.delete('/classes/:id', requireRole(['admin']), async (req, res) => {
 });
 
 // GET /classes/:id/subjects — subjects linked to this class
-router.get('/classes/:id/subjects', requireRole(['admin','teacher']), async (req, res) => {
+router.get('/classes/:id/subjects', requireRole(['admin','teacher','student','parent']), async (req, res) => {
   try {
     const result = await query(`
       SELECT cs.*, s.name AS subject_name, s.code, s.education_level, s.color, s.is_elective, s.weekly_periods,

@@ -12,6 +12,20 @@ router.use(requireModule('communication'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
+// Unread message count — lightweight polling endpoint
+router.get('/unread-count', async (req, res) => {
+  try {
+    const rows = await query(
+      `SELECT COUNT(*) AS count FROM messages
+       WHERE tenant_id = $1 AND recipient_id = $2 AND is_read = false`,
+      [req.tenantId, req.user.id]
+    );
+    res.json({ success: true, data: { count: parseInt(rows[0]?.count || 0, 10) } });
+  } catch {
+    res.json({ success: true, data: { count: 0 } });
+  }
+});
+
 // Get messageable recipients — only users within the same tenant
 router.get('/recipients', async (req, res) => {
   try {

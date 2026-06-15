@@ -223,7 +223,15 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       classId, class_id, parentId, parent_id, admissionDate, admission_date,
       address, city, state, pincode, phonePrimary, phone_primary, phone,
       student_type, studentType, uses_transport, profile_photo_url,
-      admissionNumber, admission_number: admissionNumberAlt
+      admissionNumber, admission_number: admissionNumberAlt,
+      // Kenya CBE comprehensive fields
+      nemis_number, education_level, birth_certificate_number,
+      county, sub_county, special_needs, special_needs_details,
+      previous_school, medical_conditions,
+      emergency_contact_name, emergency_contact_phone,
+      is_new_admission, religion,
+      // Inline parent creation
+      newParent,
     } = req.body;
 
     const actualFirstName = firstName || first_name;
@@ -278,32 +286,108 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       finalAdmissionNumber = `STD${year}${seq.toString().padStart(4, '0')}`;
     }
 
+    // ── Inline parent creation (if newParent body object provided) ───────────
+    let resolvedParentId = actualParentId;
+    if (newParent && (newParent.firstName || newParent.first_name)) {
+      const pFirst = (newParent.firstName || newParent.first_name || '').trim();
+      const pLast  = (newParent.lastName  || newParent.last_name  || '').trim();
+      const pEmail = (newParent.email || '').trim().toLowerCase();
+      const pPhone = (newParent.phonePrimary || newParent.phone_primary || '').trim();
+
+      let parentUserId = null;
+      if (pEmail) {
+        const existingPU = await query('SELECT id FROM users WHERE email = $1', [pEmail]);
+        if (existingPU.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Parent email "${pEmail}" is already registered in the system`
+          });
+        }
+        parentUserId = uuidv4();
+        const parentHash = await bcrypt.hash(newParent.password || 'parent123', 10);
+        await query(
+          `INSERT INTO users (id, email, password, role, first_name, last_name, tenant_id, is_active, is_verified)
+           VALUES ($1, $2, $3, 'parent', $4, $5, $6, true, true)`,
+          [parentUserId, pEmail, parentHash, pFirst, pLast, tid]
+        );
+      }
+
+      const newParentId = uuidv4();
+      await query(
+        `INSERT INTO parents
+           (id, user_id, first_name, last_name, relationship, phone_primary, phone_secondary,
+            whatsapp_number, occupation, tenant_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          newParentId, parentUserId, pFirst, pLast,
+          newParent.relationship || 'guardian', pPhone || null,
+          newParent.phoneSecondary || null,
+          newParent.whatsappNumber || null,
+          newParent.occupation || null,
+          tid,
+        ]
+      );
+      resolvedParentId = newParentId;
+    }
+
     // Create user with tenant_id
     const userId = uuidv4();
     const hashedPassword = await bcrypt.hash(password || 'student123', 10);
 
     await query(
-      `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified)
-       VALUES ($1, $2, $3, 'student', $4, true, true)`,
-      [userId, actualEmail, hashedPassword, tid]
+      `INSERT INTO users (id, email, password, role, first_name, last_name, tenant_id, is_active, is_verified)
+       VALUES ($1, $2, $3, 'student', $4, $5, $6, true, true)`,
+      [userId, actualEmail, hashedPassword, actualFirstName, actualLastName, tid]
     );
 
-    // Create student with tenant_id
+    // Create student with all fields
     const studentId = uuidv4();
     await query(
       `INSERT INTO students (
         id, user_id, admission_number, first_name, last_name, date_of_birth,
         gender, blood_group, class_id, parent_id, admission_date,
-        address, city, state, pincode, phone, student_type, uses_transport, tenant_id, status, profile_photo_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'active', $20)`,
+        address, city, state, pincode, phone, student_type, uses_transport,
+        tenant_id, status, profile_photo_url,
+        nemis_number, education_level, birth_certificate_number,
+        county, sub_county, special_needs, special_needs_details,
+        previous_school, medical_conditions,
+        emergency_contact_name, emergency_contact_phone, is_new_admission
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+        $19,'active',$20,
+        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32
+      )`,
       [
         studentId, userId, finalAdmissionNumber, actualFirstName, actualLastName,
         actualDateOfBirth, actualGender, actualBloodGroup,
-        actualClassId, actualParentId, actualAdmissionDate,
+        actualClassId, resolvedParentId, actualAdmissionDate,
         address || null, city || null, state || null, pincode || null, actualPhone,
-        actualStudentType, actualUsesTransport, tid, profile_photo_url || null
+        actualStudentType, actualUsesTransport, tid, profile_photo_url || null,
+        nemis_number || null, education_level || null, birth_certificate_number || null,
+        county || null, sub_county || null,
+        special_needs === true || special_needs === 'true' || false,
+        special_needs_details || null,
+        previous_school || null, medical_conditions || null,
+        emergency_contact_name || null, emergency_contact_phone || null,
+        is_new_admission !== false && is_new_admission !== 'false',
       ]
     );
+
+    // Update religion separately — column may not exist in all DB versions
+    if (religion) {
+      await query(
+        `UPDATE students SET religion = $1 WHERE id = $2`,
+        [religion, studentId]
+      ).catch(() => {});
+    }
+
+    // Link parent → student in junction table
+    if (resolvedParentId) {
+      await query(
+        `INSERT INTO parent_students (parent_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+        [resolvedParentId, studentId]
+      ).catch(() => {});
+    }
 
     const newStudent = await query(
       `SELECT s.*, u.email FROM students s JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
@@ -331,7 +415,11 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
       firstName, first_name, lastName, last_name, dateOfBirth, date_of_birth,
       gender, bloodGroup, blood_group, classId, class_id, parentId, parent_id,
       address, city, state, pincode, phone, status, admission_number, student_type,
-      uses_transport, profile_photo_url
+      uses_transport, profile_photo_url,
+      nemis_number, education_level, birth_certificate_number,
+      county, sub_county, special_needs, special_needs_details,
+      previous_school, medical_conditions,
+      emergency_contact_name, emergency_contact_phone,
     } = req.body;
 
     // Convert empty strings to null for UUID fields
@@ -373,6 +461,17 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
         student_type = COALESCE(NULLIF($15, ''), student_type),
         uses_transport = COALESCE($16, uses_transport),
         profile_photo_url = CASE WHEN $19 THEN $20 ELSE profile_photo_url END,
+        nemis_number = COALESCE(NULLIF($21,''), nemis_number),
+        education_level = COALESCE(NULLIF($22,''), education_level),
+        birth_certificate_number = COALESCE(NULLIF($23,''), birth_certificate_number),
+        county = COALESCE(NULLIF($24,''), county),
+        sub_county = COALESCE(NULLIF($25,''), sub_county),
+        special_needs = COALESCE($26, special_needs),
+        special_needs_details = COALESCE(NULLIF($27,''), special_needs_details),
+        previous_school = COALESCE(NULLIF($28,''), previous_school),
+        medical_conditions = COALESCE(NULLIF($29,''), medical_conditions),
+        emergency_contact_name = COALESCE(NULLIF($30,''), emergency_contact_name),
+        emergency_contact_phone = COALESCE(NULLIF($31,''), emergency_contact_phone),
         updated_at = NOW()
        WHERE id = $17 AND tenant_id = $18`,
       [
@@ -383,7 +482,13 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
         phone || null, status, admission_number || null, student_type || null,
         uses_transport !== undefined ? (uses_transport === true || uses_transport === 'true') : null,
         req.params.id, tid,
-        updatePhotoUrl, profile_photo_url || null
+        updatePhotoUrl, profile_photo_url || null,
+        nemis_number || null, education_level || null, birth_certificate_number || null,
+        county || null, sub_county || null,
+        special_needs !== undefined ? (special_needs === true || special_needs === 'true') : null,
+        special_needs_details || null,
+        previous_school || null, medical_conditions || null,
+        emergency_contact_name || null, emergency_contact_phone || null,
       ]
     );
 

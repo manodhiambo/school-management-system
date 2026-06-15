@@ -59,6 +59,18 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
     pincode: '',
     status: 'active',
     profile_photo_url: '',
+    // Kenya CBE fields
+    nemis_number: '',
+    education_level: '',
+    birth_certificate_number: '',
+    county: '',
+    sub_county: '',
+    special_needs: false,
+    special_needs_details: '',
+    medical_conditions: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    previous_school: '',
   });
 
   useEffect(() => {
@@ -102,6 +114,17 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
         pincode: student.pincode || '',
         status: student.status || 'active',
         profile_photo_url: photoUrl,
+        nemis_number: student.nemis_number || '',
+        education_level: student.education_level || '',
+        birth_certificate_number: student.birth_certificate_number || '',
+        county: student.county || '',
+        sub_county: student.sub_county || '',
+        special_needs: student.special_needs === true,
+        special_needs_details: student.special_needs_details || '',
+        medical_conditions: student.medical_conditions || '',
+        emergency_contact_name: student.emergency_contact_name || '',
+        emergency_contact_phone: student.emergency_contact_phone || '',
+        previous_school: student.previous_school || '',
       });
     } catch (error) {
       console.error('Error loading student:', error);
@@ -403,6 +426,123 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                       id="pincode"
                       value={formData.pincode}
                       onChange={(e) => handleChange('pincode', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Kenya CBE Details */}
+              <div className="border-b pb-4">
+                <h3 className="font-semibold mb-3">Kenya CBE Details</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="nemis_number">NEMIS Number</Label>
+                    <Input
+                      id="nemis_number"
+                      value={formData.nemis_number}
+                      onChange={(e) => handleChange('nemis_number', e.target.value)}
+                      placeholder="e.g. 12345678"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="birth_certificate_number">Birth Certificate No.</Label>
+                    <Input
+                      id="birth_certificate_number"
+                      value={formData.birth_certificate_number}
+                      onChange={(e) => handleChange('birth_certificate_number', e.target.value)}
+                      placeholder="e.g. BC/2012/123456"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="county">Home County</Label>
+                    <Input
+                      id="county"
+                      value={formData.county}
+                      onChange={(e) => handleChange('county', e.target.value)}
+                      placeholder="e.g. Nairobi City"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="sub_county">Sub-County</Label>
+                    <Input
+                      id="sub_county"
+                      value={formData.sub_county}
+                      onChange={(e) => handleChange('sub_county', e.target.value)}
+                      placeholder="e.g. Westlands"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="previous_school">Previous School</Label>
+                    <Input
+                      id="previous_school"
+                      value={formData.previous_school}
+                      onChange={(e) => handleChange('previous_school', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="education_level">Education Level</Label>
+                    <select
+                      id="education_level"
+                      value={formData.education_level}
+                      onChange={(e) => handleChange('education_level', e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">Not specified</option>
+                      <option value="playgroup">Playgroup</option>
+                      <option value="pre_primary">Pre-Primary (PP1/PP2)</option>
+                      <option value="lower_primary">Lower Primary (Grade 1–6)</option>
+                      <option value="junior_secondary">Junior Secondary (Grade 7–9)</option>
+                      <option value="senior_secondary">Senior Secondary (Grade 10–12)</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.special_needs}
+                        onChange={(e) => handleChange('special_needs', e.target.checked)}
+                        className="w-4 h-4 rounded"
+                      />
+                      <span className="text-sm font-medium text-orange-700">Student has special needs</span>
+                    </label>
+                  </div>
+                  {formData.special_needs && (
+                    <div className="md:col-span-2">
+                      <Label htmlFor="special_needs_details">Special Needs Details</Label>
+                      <textarea
+                        id="special_needs_details"
+                        value={formData.special_needs_details}
+                        onChange={(e) => handleChange('special_needs_details', e.target.value)}
+                        rows={2}
+                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                  )}
+                  <div className="md:col-span-2">
+                    <Label htmlFor="medical_conditions">Medical Conditions / Allergies</Label>
+                    <textarea
+                      id="medical_conditions"
+                      value={formData.medical_conditions}
+                      onChange={(e) => handleChange('medical_conditions', e.target.value)}
+                      rows={2}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="Known medical conditions, allergies..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
+                    <Input
+                      id="emergency_contact_name"
+                      value={formData.emergency_contact_name}
+                      onChange={(e) => handleChange('emergency_contact_name', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="emergency_contact_phone">Emergency Contact Phone</Label>
+                    <Input
+                      id="emergency_contact_phone"
+                      value={formData.emergency_contact_phone}
+                      onChange={(e) => handleChange('emergency_contact_phone', e.target.value)}
                     />
                   </div>
                 </div>

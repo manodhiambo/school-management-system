@@ -12,14 +12,15 @@ export const auditLog = (action, resource) => {
 
       // Log audit trail
       if (req.user && res.statusCode < 400) {
+        // Strip _oldValues to prevent clients from forging audit history
+        const { _oldValues: _stripped, ...safeBody } = req.body || {};
         const logData = {
           userId: req.user.id,
           action,
           resource,
           resourceId: req.params.id || null,
-          oldValues: req.body._oldValues || null,
-          newValues: req.body,
-          ipAddress: req.ip || req.connection.remoteAddress,
+          newValues: safeBody,
+          ipAddress: req.ip || req.socket?.remoteAddress,
           userAgent: req.get('user-agent'),
           method: req.method,
           endpoint: req.originalUrl,

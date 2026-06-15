@@ -55,7 +55,7 @@ export const ProcurementAuditPage: React.FC = () => {
               logs.map(log => (
                 <tr key={log.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {new Date(log.actioned_at || log.created_at).toLocaleString()}
+                    {(() => { const d = new Date(log.actioned_at || log.created_at); return isNaN(d.getTime()) ? '—' : d.toLocaleString('en-KE'); })()}
                   </td>
                   <td className="px-4 py-3 text-sm">{refTypeLabel(log.reference_type)}</td>
                   <td className="px-4 py-3">

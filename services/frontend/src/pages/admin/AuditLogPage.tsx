@@ -11,10 +11,9 @@ import api from '@/services/api';
 
 interface LogEntry {
   id: string;
-  timestamp: string;
-  user_name: string;
+  created_at: string;
   user_email: string;
-  role: string;
+  user_role: string;
   action: string;
   resource: string;
   resource_id: string | null;
@@ -29,8 +28,11 @@ interface Summary {
 
 const LIMIT = 50;
 
-function fmt(d: string) {
-  return new Date(d).toLocaleString('en-KE', {
+function fmt(d: string | null | undefined) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleString('en-KE', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
@@ -39,9 +41,9 @@ function fmt(d: string) {
 function exportCSV(rows: LogEntry[]) {
   const headers = ['Timestamp', 'User', 'Role', 'Action', 'Resource', 'Resource ID', 'IP Address'];
   const lines = rows.map((r) => [
-    fmt(r.timestamp),
-    r.user_name || r.user_email || '',
-    r.role,
+    fmt(r.created_at),
+    r.user_email || '',
+    r.user_role || '',
     r.action,
     r.resource,
     r.resource_id || '',
@@ -256,14 +258,13 @@ export function AuditLogPage() {
                 <tbody className="divide-y">
                   {logs.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmt(row.timestamp)}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmt(row.created_at)}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{row.user_name || '—'}</div>
-                        {row.user_email && <div className="text-xs text-gray-400">{row.user_email}</div>}
+                        <div className="font-medium text-gray-900">{row.user_email || '—'}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[row.role] ?? 'bg-gray-100 text-gray-700'}`}>
-                          {row.role}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[row.user_role] ?? 'bg-gray-100 text-gray-700'}`}>
+                          {row.user_role || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-indigo-700">{row.action}</td>

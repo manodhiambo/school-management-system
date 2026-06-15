@@ -50,7 +50,16 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
     const offset = (page - 1) * limit;
 
-    const { action, resource, user_id, from_date, to_date } = req.query;
+    const { action, resource, user_id, user, from_date, to_date } = req.query;
+
+    // Validate date inputs before hitting Postgres
+    const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    if (from_date && !ISO_DATE.test(from_date)) {
+      return res.status(400).json({ success: false, message: 'Invalid from_date format (expected YYYY-MM-DD)' });
+    }
+    if (to_date && !ISO_DATE.test(to_date)) {
+      return res.status(400).json({ success: false, message: 'Invalid to_date format (expected YYYY-MM-DD)' });
+    }
 
     const conditions = ['al.tenant_id = $1'];
     const params = [tid];
@@ -67,13 +76,17 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
       params.push(user_id);
       conditions.push(`al.user_id = $${params.length}`);
     }
+    if (user) {
+      params.push(`%${user}%`);
+      conditions.push(`al.user_email ILIKE $${params.length}`);
+    }
     if (from_date) {
       params.push(from_date);
-      conditions.push(`al.created_at >= $${params.length}`);
+      conditions.push(`al.created_at >= $${params.length}::date`);
     }
     if (to_date) {
       params.push(to_date);
-      conditions.push(`al.created_at <= $${params.length}::date + interval '1 day'`);
+      conditions.push(`al.created_at < $${params.length}::date + interval '1 day'`);
     }
 
     const where = conditions.join(' AND ');

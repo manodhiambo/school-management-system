@@ -136,7 +136,8 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      alert(error.message || 'Failed to update student');
+      const msg = error.response?.data?.message || error.message || 'Failed to update student';
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -212,6 +213,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                       value={formData.admission_number}
                       onChange={(e) => handleChange('admission_number', e.target.value)}
                     />
+                    <p className="text-xs text-gray-400 mt-1">Must be unique across all students</p>
                   </div>
                   <div>
                     <Label htmlFor="first_name">First Name *</Label>

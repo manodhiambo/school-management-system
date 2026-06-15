@@ -138,6 +138,10 @@ class ApiService {
     return this.api.delete('/students/' + id);
   }
 
+  getNextAdmissionNumber() {
+    return this.api.get('/students/next-admission-number');
+  }
+
   getStudentStatistics() {
     return this.api.get('/students/statistics');
   }

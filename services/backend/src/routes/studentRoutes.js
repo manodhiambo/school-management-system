@@ -165,6 +165,25 @@ router.get('/statistics', requireRole(['admin', 'teacher']), async (req, res) =>
   }
 });
 
+// Get next available admission number for this tenant
+router.get('/next-admission-number', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const year = new Date().getFullYear();
+    const rows = await query(
+      `SELECT MAX(CAST(SUBSTRING(admission_number FROM 8) AS INTEGER)) AS max_seq
+       FROM students
+       WHERE admission_number ~ $1 AND tenant_id = $2`,
+      [`^STD${year}[0-9]+$`, tid]
+    );
+    const seq = (rows[0]?.max_seq || 0) + 1;
+    res.json({ success: true, data: { admission_number: `STD${year}${seq.toString().padStart(4, '0')}` } });
+  } catch (error) {
+    logger.error('Next admission number error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Get single student
 router.get('/:id', async (req, res) => {
   try {
@@ -203,7 +222,8 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       dateOfBirth, date_of_birth, gender, bloodGroup, blood_group,
       classId, class_id, parentId, parent_id, admissionDate, admission_date,
       address, city, state, pincode, phonePrimary, phone_primary, phone,
-      student_type, studentType, uses_transport, profile_photo_url
+      student_type, studentType, uses_transport, profile_photo_url,
+      admissionNumber, admission_number: admissionNumberAlt
     } = req.body;
 
     const actualFirstName = firstName || first_name;
@@ -232,20 +252,31 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email already exists' });
     }
 
-    // Generate admission number scoped to tenant
-    const year = new Date().getFullYear();
-    const lastStudent = await query(
-      `SELECT admission_number FROM students
-       WHERE admission_number LIKE $1 AND tenant_id = $2
-       ORDER BY admission_number DESC LIMIT 1`,
-      [`STD${year}%`, tid]
-    );
+    // Resolve admission number: use custom value if provided, otherwise auto-generate
+    const customAdmNum = (admissionNumber || admissionNumberAlt || '').trim();
+    let finalAdmissionNumber;
 
-    let sequence = 1;
-    if (lastStudent.length > 0) {
-      sequence = parseInt(lastStudent[0].admission_number.slice(-4)) + 1;
+    if (customAdmNum) {
+      // Validate the custom number is not already in use for this tenant
+      const taken = await query(
+        'SELECT id FROM students WHERE admission_number = $1 AND tenant_id = $2',
+        [customAdmNum, tid]
+      );
+      if (taken.length > 0) {
+        return res.status(400).json({ success: false, message: `Admission number "${customAdmNum}" is already in use` });
+      }
+      finalAdmissionNumber = customAdmNum;
+    } else {
+      // Auto-generate collision-safe admission number
+      const year = new Date().getFullYear();
+      const rows = await query(
+        `SELECT MAX(CAST(SUBSTRING(admission_number FROM 8) AS INTEGER)) AS max_seq
+         FROM students WHERE admission_number ~ $1 AND tenant_id = $2`,
+        [`^STD${year}[0-9]+$`, tid]
+      );
+      const seq = (rows[0]?.max_seq || 0) + 1;
+      finalAdmissionNumber = `STD${year}${seq.toString().padStart(4, '0')}`;
     }
-    const admissionNumber = `STD${year}${sequence.toString().padStart(4, '0')}`;
 
     // Create user with tenant_id
     const userId = uuidv4();
@@ -266,7 +297,7 @@ router.post('/', requireRole(['admin']), async (req, res) => {
         address, city, state, pincode, phone, student_type, uses_transport, tenant_id, status, profile_photo_url
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'active', $20)`,
       [
-        studentId, userId, admissionNumber, actualFirstName, actualLastName,
+        studentId, userId, finalAdmissionNumber, actualFirstName, actualLastName,
         actualDateOfBirth, actualGender, actualBloodGroup,
         actualClassId, actualParentId, actualAdmissionDate,
         address || null, city || null, state || null, pincode || null, actualPhone,
@@ -307,6 +338,20 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
     const actualClassId = (classId || class_id) || null;
     const actualParentId = (parentId || parent_id) || null;
     const actualDob = (dateOfBirth || date_of_birth) || null;
+
+    // If admission_number is being changed, verify it's unique for this tenant
+    if (admission_number && admission_number.trim()) {
+      const conflict = await query(
+        'SELECT id FROM students WHERE admission_number = $1 AND tenant_id = $2 AND id != $3',
+        [admission_number.trim(), tid, req.params.id]
+      );
+      if (conflict.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Admission number "${admission_number.trim()}" is already assigned to another student`
+        });
+      }
+    }
 
     const updatePhotoUrl = 'profile_photo_url' in req.body;
     await query(
@@ -358,6 +403,9 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
     });
   } catch (error) {
     logger.error('Update student error:', error);
+    if (error.code === '23505' && error.constraint?.includes('admission_number')) {
+      return res.status(400).json({ success: false, message: 'This admission number is already in use by another student' });
+    }
     res.status(500).json({ success: false, message: 'Error updating student' });
   }
 });

@@ -56,9 +56,11 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
     state: '',
     pincode: '',
     profile_photo_url: '',
+    admissionNumber: '',
   });
 
   useEffect(() => {
+    if (!open) return;
     const fetchClasses = async () => {
       try {
         const response = await api.getClasses();
@@ -67,7 +69,16 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
         console.error('Error fetching classes:', error);
       }
     };
-    if (open) fetchClasses();
+    const fetchNextAdmissionNumber = async () => {
+      try {
+        const res: any = await (api as any).getNextAdmissionNumber();
+        setFormData(prev => ({ ...prev, admissionNumber: res.data?.admission_number || '' }));
+      } catch {
+        // leave blank — backend will auto-generate on submit
+      }
+    };
+    fetchClasses();
+    fetchNextAdmissionNumber();
   }, [open]);
 
   const handleChange = (field: string, value: any) => {
@@ -90,7 +101,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
     e.preventDefault();
     try {
       setLoading(true);
-      await api.createStudent(formData);
+      await api.createStudent({ ...formData, admission_number: formData.admissionNumber.trim() || undefined });
       toast({
         title: 'Success',
         description: 'Student added successfully',
@@ -114,6 +125,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
         state: '',
         pincode: '',
         profile_photo_url: '',
+        admissionNumber: '',
       });
     } catch (error: any) {
       toast({
@@ -184,6 +196,17 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: AddSt
             <div className="border-b pb-4">
               <h3 className="font-semibold mb-3">Personal Information</h3>
               <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="admissionNumber">Admission Number</Label>
+                  <Input
+                    id="admissionNumber"
+                    value={formData.admissionNumber}
+                    onChange={(e) => handleChange('admissionNumber', e.target.value)}
+                    placeholder="Auto-generated"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Leave unchanged to use auto-generated number</p>
+                </div>
+                <div />
                 <div>
                   <Label htmlFor="firstName">First Name *</Label>
                   <Input

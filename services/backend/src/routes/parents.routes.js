@@ -112,9 +112,9 @@ router.post('/', authenticate, requireRole(['admin']), async (req, res) => {
     const hashedPassword = await bcrypt.hash(password || 'parent123', 10);
     
     await query(
-      `INSERT INTO users (id, email, password, role, is_active, is_verified)
-       VALUES ($1, $2, $3, 'parent', true, true)`,
-      [userId, email, hashedPassword]
+      `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified)
+       VALUES ($1, $2, $3, 'parent', $4, true, true)`,
+      [userId, email, hashedPassword, req.user.tenant_id]
     );
 
     // Create parent

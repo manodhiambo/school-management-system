@@ -38,7 +38,9 @@ router.put('/', requireRole(['admin']), async (req, res) => {
       school_name, school_code, phone, email, address, city, state, pincode,
       website, current_academic_year, timezone, currency, date_format, time_format,
       school_logo_url, motto,
-      teacher_checkin_start, teacher_checkin_late_after, teacher_checkin_end
+      teacher_checkin_start, teacher_checkin_late_after, teacher_checkin_end,
+      payment_instructions, bank_account_number, bank_name,
+      mpesa_paybill, mpesa_till, mpesa_account_ref
     } = req.body;
 
     // school_logo_url can be explicitly set to null (remove logo) or a base64/url string
@@ -83,13 +85,21 @@ router.put('/', requireRole(['admin']), async (req, res) => {
           teacher_checkin_start     = COALESCE($18, teacher_checkin_start),
           teacher_checkin_late_after = COALESCE($19, teacher_checkin_late_after),
           teacher_checkin_end       = COALESCE($20, teacher_checkin_end),
+          payment_instructions      = COALESCE($22, payment_instructions),
+          bank_account_number       = COALESCE($23, bank_account_number),
+          bank_name                 = COALESCE($24, bank_name),
+          mpesa_paybill             = COALESCE($25, mpesa_paybill),
+          mpesa_till                = COALESCE($26, mpesa_till),
+          mpesa_account_ref         = COALESCE($27, mpesa_account_ref),
           updated_at = NOW()
          WHERE tenant_id = $21`,
         [school_name, school_code, phone, email, address, city, state, pincode,
           website, current_academic_year, timezone, currency, date_format, time_format,
           logoValue !== undefined, logoValue ?? null, motto || null,
           teacher_checkin_start || null, teacher_checkin_late_after || null, teacher_checkin_end || null,
-          tenantId]
+          tenantId,
+          payment_instructions || null, bank_account_number || null, bank_name || null,
+          mpesa_paybill || null, mpesa_till || null, mpesa_account_ref || null]
       );
     }
 

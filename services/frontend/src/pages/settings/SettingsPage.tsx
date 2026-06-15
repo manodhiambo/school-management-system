@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard } from 'lucide-react';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/languageStore';
 
@@ -40,7 +40,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance' | 'security'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance' | 'security' | 'payments'>('general');
   const [logoUploading, setLogoUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -238,6 +238,15 @@ export function SettingsPage() {
         >
           <Shield className="h-4 w-4 inline mr-2" />
           {t('Security')}
+        </button>
+        <button
+          onClick={() => setActiveTab('payments')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'payments' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <CreditCard className="h-4 w-4 inline mr-2" />
+          Payments
         </button>
       </div>
 
@@ -734,6 +743,85 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+      {/* Payments Tab */}
+      {activeTab === 'payments' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                School Payment Details
+              </CardTitle>
+              <p className="text-sm text-gray-500">
+                Payment details shown to parents on their fee payment page so they can make manual transfers.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="bank_name">Bank Name</Label>
+                  <Input
+                    id="bank_name"
+                    value={settings?.bank_name || ''}
+                    onChange={(e) => handleChange('bank_name', e.target.value)}
+                    placeholder="e.g. Co-operative Bank"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bank_account_number">Bank Account Number</Label>
+                  <Input
+                    id="bank_account_number"
+                    value={settings?.bank_account_number || ''}
+                    onChange={(e) => handleChange('bank_account_number', e.target.value)}
+                    placeholder="e.g. 01234567890100"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="mpesa_paybill">M-Pesa Paybill Number</Label>
+                  <Input
+                    id="mpesa_paybill"
+                    value={settings?.mpesa_paybill || ''}
+                    onChange={(e) => handleChange('mpesa_paybill', e.target.value)}
+                    placeholder="e.g. 400200"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="mpesa_account_ref">M-Pesa Account Reference</Label>
+                  <Input
+                    id="mpesa_account_ref"
+                    value={settings?.mpesa_account_ref || ''}
+                    onChange={(e) => handleChange('mpesa_account_ref', e.target.value)}
+                    placeholder="e.g. Admission No. / Student Name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="mpesa_till">M-Pesa Till Number (Buy Goods)</Label>
+                  <Input
+                    id="mpesa_till"
+                    value={settings?.mpesa_till || ''}
+                    onChange={(e) => handleChange('mpesa_till', e.target.value)}
+                    placeholder="e.g. 5678901"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="payment_instructions">Additional Payment Instructions</Label>
+                <textarea
+                  id="payment_instructions"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  value={settings?.payment_instructions || ''}
+                  onChange={(e) => handleChange('payment_instructions', e.target.value)}
+                  placeholder="e.g. After making payment, send your deposit slip to the school accounts office..."
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                These details appear as a blue info box on the parent fee payments page. Leave blank to hide that section.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );

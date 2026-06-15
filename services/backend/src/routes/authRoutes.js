@@ -49,6 +49,20 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
+    // For parent users created before tenant_id was stored on users, back-fill from parents table
+    if (user.role === 'parent' && !user.tenant_id) {
+      const parentRows = await query(
+        'SELECT tenant_id FROM parents WHERE user_id = $1 LIMIT 1',
+        [user.id]
+      );
+      if (parentRows.length > 0 && parentRows[0].tenant_id) {
+        user.tenant_id = parentRows[0].tenant_id;
+        // Persist the fix so future logins don't need the extra query
+        query('UPDATE users SET tenant_id = $1 WHERE id = $2', [user.tenant_id, user.id])
+          .catch(err => logger.warn('Failed to back-fill parent tenant_id:', err.message));
+      }
+    }
+
     // For non-superadmin users, check tenant status
     let tenantStatus = null;
     let tenantDisabledModules = [];

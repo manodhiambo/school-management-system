@@ -762,35 +762,44 @@ router.get('/defaulters', async (req, res) => {
 // Get student fee account — full ledger with expected fees
 router.get('/student/:studentId', async (req, res) => {
   try {
-    const tid = req.user.tenant_id;
     const { role, id: callerId } = req.user;
     const { academic_year, term } = req.query;
     const year = academic_year || new Date().getFullYear().toString();
 
-    // Resolve student
-    const studentRows = await query(
-      `SELECT s.*, c.name AS class_name, c.education_level
-       FROM students s
-       LEFT JOIN classes c ON c.id = s.class_id
-       WHERE (s.id = $1 OR s.user_id = $1) AND s.tenant_id = $2`,
-      [req.params.studentId, tid]
-    );
-    if (!studentRows.length) {
-      return res.status(404).json({ success: false, message: 'Student not found' });
-    }
-    const std = studentRows[0];
+    let std, tid;
 
-    // Parents may only view fee accounts for their own children
     if (role === 'parent') {
-      const access = await query(
-        `SELECT 1 FROM parent_students ps
+      // For parents: resolve student AND verify ownership in one query.
+      // We use the parents table tenant_id (not users.tenant_id which may be null
+      // for legacy parent accounts created before tenant_id was stored on users).
+      const parentStudentRows = await query(
+        `SELECT s.*, c.name AS class_name, c.education_level, p.tenant_id AS resolved_tenant_id
+         FROM parent_students ps
          JOIN parents p ON p.id = ps.parent_id
+         JOIN students s ON s.id = ps.student_id
+         LEFT JOIN classes c ON c.id = s.class_id
          WHERE ps.student_id = $1 AND p.user_id = $2`,
-        [std.id, callerId]
+        [req.params.studentId, callerId]
       );
-      if (!access.length) {
+      if (!parentStudentRows.length) {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
+      std = parentStudentRows[0];
+      tid = std.resolved_tenant_id;
+    } else {
+      // Non-parent roles: use JWT tenant_id directly
+      tid = req.user.tenant_id;
+      const studentRows = await query(
+        `SELECT s.*, c.name AS class_name, c.education_level
+         FROM students s
+         LEFT JOIN classes c ON c.id = s.class_id
+         WHERE (s.id = $1 OR s.user_id = $1) AND s.tenant_id = $2`,
+        [req.params.studentId, tid]
+      );
+      if (!studentRows.length) {
+        return res.status(404).json({ success: false, message: 'Student not found' });
+      }
+      std = studentRows[0];
     }
 
     // Full invoice list — exclude cancelled invoices so they never appear in statements or PDFs

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, CreditCard, CheckCircle, AlertCircle, Clock, Phone, Loader2, Printer } from 'lucide-react';
+import { DollarSign, CreditCard, CheckCircle, AlertCircle, Clock, Phone, Loader2, Printer, Building2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -79,7 +79,8 @@ export function FeePaymentsPage() {
   const [feeDetails, setFeeDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [schoolSettings, setSchoolSettings] = useState<any>(null);
+
   // M-Pesa payment state
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
@@ -88,18 +89,25 @@ export function FeePaymentsPage() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [paymentMessage, setPaymentMessage] = useState('');
-  const [schoolName, setSchoolName] = useState('School');
+
+  const mpesaEnabled = !!(
+    schoolSettings?.mpesa_paybill ||
+    schoolSettings?.mpesa_till ||
+    process.env.VITE_MPESA_ENABLED === 'true'
+  );
 
   useEffect(() => {
     if (user?.id) {
       loadChildren();
-      api.getSettings().then((r: any) => { if (r?.data?.school_name) setSchoolName(r.data.school_name); }).catch(() => {});
+      api.getSettings()
+        .then((r: any) => setSchoolSettings(r?.data || r || null))
+        .catch(() => {});
     }
   }, [user]);
 
   useEffect(() => {
     if (selectedChild) {
-      loadFeeDetails(selectedChild.student_id || selectedChild.id);
+      loadFeeDetails(selectedChild.id || selectedChild.student_id);
     }
   }, [selectedChild]);
 
@@ -114,28 +122,30 @@ export function FeePaymentsPage() {
       if (childrenData.length > 0) {
         setSelectedChild(childrenData[0]);
       }
-    } catch (error: any) {
-      console.error('Error loading children:', error);
-      setError(error?.message || 'Failed to load children');
+    } catch (err: any) {
+      console.error('Error loading children:', err);
+      setError(err?.message || 'Failed to load children');
     } finally {
       setLoading(false);
     }
   };
 
   const loadFeeDetails = async (studentId: string) => {
+    if (!studentId) return;
     try {
       const response: any = await api.getStudentFeeAccount(studentId);
-      console.log('Fee details:', response);
+      // Backend returns: { success, data: { student, invoices, payments, structures, extra_fees, summary } }
       setFeeDetails(response.data || response);
-    } catch (error: any) {
-      console.error('Error loading fee details:', error);
+    } catch (err: any) {
+      console.error('Error loading fees:', err);
       setFeeDetails(null);
     }
   };
 
   const openPaymentModal = (invoice: any) => {
     setSelectedInvoice(invoice);
-    setPaymentAmount(invoice.balance?.toString() || invoice.amount?.toString() || '');
+    const balance = parseFloat(invoice.balance_amount || invoice.net_amount || 0);
+    setPaymentAmount(balance > 0 ? balance.toString() : '');
     setPhoneNumber('');
     setPaymentStatus('idle');
     setPaymentMessage('');
@@ -154,12 +164,12 @@ export function FeePaymentsPage() {
       return;
     }
 
-    if (amount > parseFloat(selectedInvoice.balance || selectedInvoice.amount)) {
-      setPaymentMessage('Amount exceeds the balance due');
+    const maxBalance = parseFloat(selectedInvoice.balance_amount || selectedInvoice.net_amount || 0);
+    if (amount > maxBalance) {
+      setPaymentMessage(`Amount exceeds the balance due (KES ${maxBalance.toLocaleString()})`);
       return;
     }
 
-    // Validate phone number format
     const phoneRegex = /^(\+?254|0)?[17]\d{8}$/;
     if (!phoneRegex.test(phoneNumber.replace(/\s/g, ''))) {
       setPaymentMessage('Please enter a valid Kenyan phone number (e.g., 0712345678)');
@@ -177,28 +187,23 @@ export function FeePaymentsPage() {
         amount
       );
 
-      console.log('M-Pesa response:', response);
-
-      if (response.data?.success || response.success) {
+      if (response.success || response.data?.success) {
         setPaymentStatus('success');
         setPaymentMessage(
-          response.data?.message || response.message || 
-          'Payment request sent! Please check your phone and enter your M-Pesa PIN to complete the payment.'
+          response.message || response.data?.message ||
+          'Payment request sent! Check your phone and enter your M-Pesa PIN to complete.'
         );
-        
-        // Poll for payment status (optional - can be done via callback)
-        // After successful payment, reload fee details
         setTimeout(() => {
-          loadFeeDetails(selectedChild.student_id || selectedChild.id);
+          loadFeeDetails(selectedChild?.id || selectedChild?.student_id);
         }, 5000);
       } else {
         setPaymentStatus('failed');
-        setPaymentMessage(response.data?.message || response.message || 'Failed to initiate payment');
+        setPaymentMessage(response.message || response.data?.message || 'Failed to initiate payment');
       }
-    } catch (error: any) {
-      console.error('M-Pesa payment error:', error);
+    } catch (err: any) {
+      console.error('M-Pesa payment error:', err);
       setPaymentStatus('failed');
-      setPaymentMessage(error?.message || 'Failed to initiate M-Pesa payment. Please try again.');
+      setPaymentMessage(err?.message || 'Failed to initiate M-Pesa payment. Please try again.');
     } finally {
       setPaymentLoading(false);
     }
@@ -211,17 +216,27 @@ export function FeePaymentsPage() {
     setPaymentAmount('');
     setPaymentStatus('idle');
     setPaymentMessage('');
-    
-    // Reload fee details to get updated payment status
     if (selectedChild) {
-      loadFeeDetails(selectedChild.student_id || selectedChild.id);
+      loadFeeDetails(selectedChild.id || selectedChild.student_id);
     }
   };
+
+  // Pull summary from backend response
+  const summary = feeDetails?.summary || {};
+  const invoices: any[] = feeDetails?.invoices || [];
+  const payments: any[] = feeDetails?.payments || [];
+
+  const hasPaymentInfo = schoolSettings && (
+    schoolSettings.bank_account_number ||
+    schoolSettings.mpesa_paybill ||
+    schoolSettings.mpesa_till ||
+    schoolSettings.payment_instructions
+  );
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
@@ -258,15 +273,15 @@ export function FeePaymentsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold">Fee Payments</h2>
-        <p className="text-gray-500">Manage and pay school fees via M-Pesa</p>
+        <p className="text-gray-500">View fee invoices and make payments</p>
       </div>
 
       {/* Child Selector */}
       <div className="flex gap-2 flex-wrap">
         {children.map((child) => (
           <Button
-            key={child.student_id || child.id}
-            variant={(selectedChild?.student_id || selectedChild?.id) === (child.student_id || child.id) ? "default" : "outline"}
+            key={child.id || child.student_id}
+            variant={(selectedChild?.id || selectedChild?.student_id) === (child.id || child.student_id) ? 'default' : 'outline'}
             onClick={() => setSelectedChild(child)}
           >
             {child.first_name} {child.last_name}
@@ -274,18 +289,54 @@ export function FeePaymentsPage() {
         ))}
       </div>
 
+      {/* School Payment Details */}
+      {hasPaymentInfo && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-800 flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              School Payment Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-blue-900 space-y-1">
+            {schoolSettings.bank_name && (
+              <p><span className="font-medium">Bank:</span> {schoolSettings.bank_name}</p>
+            )}
+            {schoolSettings.bank_account_number && (
+              <p><span className="font-medium">Account No:</span> {schoolSettings.bank_account_number}</p>
+            )}
+            {schoolSettings.mpesa_paybill && (
+              <p>
+                <span className="font-medium">M-Pesa Paybill:</span> {schoolSettings.mpesa_paybill}
+                {schoolSettings.mpesa_account_ref && (
+                  <span className="ml-2 text-xs">(Account: {schoolSettings.mpesa_account_ref})</span>
+                )}
+              </p>
+            )}
+            {schoolSettings.mpesa_till && (
+              <p><span className="font-medium">M-Pesa Till No:</span> {schoolSettings.mpesa_till}</p>
+            )}
+            {schoolSettings.payment_instructions && (
+              <p className="mt-2 text-xs italic border-t border-blue-200 pt-2">
+                {schoolSettings.payment_instructions}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {selectedChild && (
         <>
           {/* Fee Summary */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Fees</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Invoiced</CardTitle>
                 <DollarSign className="h-4 w-4 text-gray-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  KES {parseFloat(feeDetails?.total_fees || '0').toLocaleString()}
+                  KES {parseFloat(summary.total_invoiced || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">This academic year</p>
               </CardContent>
@@ -298,7 +349,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  KES {parseFloat(feeDetails?.paid || '0').toLocaleString()}
+                  KES {parseFloat(summary.total_paid || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">Cleared payments</p>
               </CardContent>
@@ -311,7 +362,7 @@ export function FeePaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
-                  KES {parseFloat(feeDetails?.pending || '0').toLocaleString()}
+                  KES {parseFloat(summary.total_balance || '0').toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500">Outstanding amount</p>
               </CardContent>
@@ -324,61 +375,82 @@ export function FeePaymentsPage() {
               <CardTitle>Fee Invoices</CardTitle>
             </CardHeader>
             <CardContent>
-              {feeDetails?.invoices && feeDetails.invoices.length > 0 ? (
+              {invoices.length > 0 ? (
                 <div className="space-y-4">
-                  {feeDetails.invoices.map((invoice: any) => (
-                    <div
-                      key={invoice.id}
-                      className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-4"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <h4 className="font-semibold">
-                            {invoice.description || invoice.invoice_number || 'School Fees'}
-                          </h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            invoice.status === 'paid'
-                              ? 'bg-green-100 text-green-700'
-                              : invoice.status === 'overdue'
-                              ? 'bg-red-100 text-red-700'
-                              : invoice.status === 'partial'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {invoice.status}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-500 flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Due: {new Date(invoice.due_date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                        <div className="text-left md:text-right">
-                          <p className="text-lg font-bold">
-                            KES {parseFloat(invoice.amount || invoice.net_amount || 0).toLocaleString()}
-                          </p>
-                          {invoice.balance > 0 && (
-                            <p className="text-sm text-red-600">
-                              Balance: KES {parseFloat(invoice.balance).toLocaleString()}
+                  {invoices.map((invoice: any) => {
+                    const balance = parseFloat(invoice.balance_amount || 0);
+                    const total = parseFloat(invoice.net_amount || invoice.total_amount || 0);
+                    const canPay = invoice.status !== 'paid' && balance > 0;
+
+                    return (
+                      <div
+                        key={invoice.id}
+                        className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-4"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h4 className="font-semibold">
+                              {invoice.description || invoice.structure_name || invoice.invoice_number || 'School Fees'}
+                            </h4>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              invoice.status === 'paid'
+                                ? 'bg-green-100 text-green-700'
+                                : invoice.status === 'overdue'
+                                ? 'bg-red-100 text-red-700'
+                                : invoice.status === 'partial'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {invoice.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500">Inv: {invoice.invoice_number}</p>
+                          {invoice.due_date && (
+                            <p className="text-sm text-gray-500 flex items-center mt-1">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Due: {new Date(invoice.due_date).toLocaleDateString('en-KE')}
                             </p>
                           )}
+                          {invoice.term && (
+                            <p className="text-xs text-gray-400">{invoice.term} — {invoice.academic_year}</p>
+                          )}
                         </div>
-                        {invoice.status !== 'paid' && parseFloat(invoice.balance || invoice.amount) > 0 && (
-                          <Button
-                            onClick={() => openPaymentModal(invoice)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <Phone className="h-4 w-4 mr-2" />
-                            Pay with M-Pesa
-                          </Button>
-                        )}
+                        <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                          <div className="text-left md:text-right">
+                            <p className="text-lg font-bold">
+                              KES {total.toLocaleString()}
+                            </p>
+                            {balance > 0 && (
+                              <p className="text-sm text-red-600">
+                                Balance: KES {balance.toLocaleString()}
+                              </p>
+                            )}
+                            {parseFloat(invoice.paid_amount || 0) > 0 && (
+                              <p className="text-xs text-green-600">
+                                Paid: KES {parseFloat(invoice.paid_amount).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                          {canPay && mpesaEnabled && (
+                            <Button
+                              onClick={() => openPaymentModal(invoice)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <Phone className="h-4 w-4 mr-2" />
+                              Pay with M-Pesa
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-center text-gray-500 py-8">No invoices found</p>
+                <div className="text-center py-8 text-gray-500">
+                  <Info className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p>No invoices found for this student</p>
+                  <p className="text-xs mt-1">Contact the school office if you believe fees are owed</p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -389,14 +461,14 @@ export function FeePaymentsPage() {
               <CardTitle>Payment History</CardTitle>
             </CardHeader>
             <CardContent>
-              {feeDetails?.payment_history && feeDetails.payment_history.length > 0 ? (
+              {payments.length > 0 ? (
                 <div className="space-y-2">
-                  {feeDetails.payment_history.map((payment: any, index: number) => (
+                  {payments.map((payment: any, index: number) => (
                     <div key={payment.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
-                        <p className="font-medium">{payment.description || 'Fee Payment'}</p>
+                        <p className="font-medium">{payment.invoice_number || 'Fee Payment'}</p>
                         <p className="text-sm text-gray-500">
-                          {new Date(payment.payment_date || payment.created_at).toLocaleDateString()}
+                          {new Date(payment.payment_date || payment.created_at).toLocaleDateString('en-KE')}
                           {payment.transaction_id && (
                             <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
                               {payment.transaction_id}
@@ -409,13 +481,19 @@ export function FeePaymentsPage() {
                           <p className="font-bold text-green-600">
                             KES {parseFloat(payment.amount).toLocaleString()}
                           </p>
-                          <p className="text-xs text-gray-500 capitalize">{payment.payment_method || 'N/A'}</p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            {(payment.payment_method || 'N/A').replace(/_/g, ' ')}
+                          </p>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           title="Print receipt"
-                          onClick={() => printPaymentReceipt(payment, `${selectedChild?.first_name || ''} ${selectedChild?.last_name || ''}`.trim(), schoolName)}
+                          onClick={() => printPaymentReceipt(
+                            payment,
+                            `${selectedChild?.first_name || ''} ${selectedChild?.last_name || ''}`.trim(),
+                            schoolSettings?.school_name || 'School'
+                          )}
                         >
                           <Printer className="h-4 w-4" />
                         </Button>
@@ -436,7 +514,7 @@ export function FeePaymentsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6" />
+              <CreditCard className="h-5 w-5 text-green-600" />
               Pay with M-Pesa
             </DialogTitle>
             <DialogDescription>
@@ -450,7 +528,7 @@ export function FeePaymentsPage() {
                 <Label htmlFor="invoice">Invoice</Label>
                 <Input
                   id="invoice"
-                  value={selectedInvoice?.invoice_number || selectedInvoice?.description || 'School Fees'}
+                  value={selectedInvoice?.description || selectedInvoice?.invoice_number || 'School Fees'}
                   disabled
                   className="bg-gray-50"
                 />
@@ -464,10 +542,10 @@ export function FeePaymentsPage() {
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   placeholder="Enter amount"
-                  max={selectedInvoice?.balance || selectedInvoice?.amount}
+                  max={parseFloat(selectedInvoice?.balance_amount || selectedInvoice?.net_amount || 0)}
                 />
                 <p className="text-xs text-gray-500">
-                  Maximum: KES {parseFloat(selectedInvoice?.balance || selectedInvoice?.amount || 0).toLocaleString()}
+                  Maximum: KES {parseFloat(selectedInvoice?.balance_amount || selectedInvoice?.net_amount || 0).toLocaleString()}
                 </p>
               </div>
 
@@ -524,8 +602,8 @@ export function FeePaymentsPage() {
                 <Button variant="outline" onClick={closePaymentModal}>
                   Cancel
                 </Button>
-                <Button 
-                  onClick={handleMpesaPayment} 
+                <Button
+                  onClick={handleMpesaPayment}
                   disabled={paymentLoading}
                   className="bg-green-600 hover:bg-green-700"
                 >
@@ -544,9 +622,7 @@ export function FeePaymentsPage() {
               </>
             )}
             {(paymentStatus === 'success' || paymentStatus === 'failed') && (
-              <Button onClick={closePaymentModal}>
-                Close
-              </Button>
+              <Button onClick={closePaymentModal}>Close</Button>
             )}
           </DialogFooter>
         </DialogContent>

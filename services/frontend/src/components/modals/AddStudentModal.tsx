@@ -159,6 +159,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [classes, setClasses] = useState<any[]>([]);
   const [parents, setParents] = useState<any[]>([]);
   const [parentSearch, setParentSearch] = useState('');
@@ -170,6 +171,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
   useEffect(() => {
     if (!open) return;
     setStep(1);
+    setSubmitError('');
     setForm({ ...INITIAL, newParent: { ...BLANK_PARENT } });
     setPhotoPreview('');
     setParentSearch('');
@@ -229,6 +231,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
   const handleNext = () => {
     const err = validate();
     if (err) { toast({ title: 'Required', description: err, variant: 'destructive' }); return; }
+    setSubmitError('');
     setStep(s => s + 1);
   };
 
@@ -299,11 +302,9 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to admit student',
-        variant: 'destructive',
-      });
+      const msg = error.response?.data?.message || 'Failed to admit student. Please try again.';
+      setSubmitError(msg);
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -752,10 +753,21 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
         </div>
 
         {/* Step content */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={e => { if (e.key === 'Enter' && step < 4) e.preventDefault(); }}
+          className="flex flex-col flex-1 min-h-0"
+        >
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {stepBody[step]}
           </div>
+
+          {/* Inline error banner — visible above nav buttons */}
+          {submitError && (
+            <div className="mx-6 mb-2 rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
 
           {/* Nav */}
           <div className="flex items-center justify-between gap-3 px-6 py-4 border-t bg-gray-50 shrink-0">

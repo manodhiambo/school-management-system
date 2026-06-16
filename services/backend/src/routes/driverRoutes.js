@@ -118,7 +118,8 @@ router.get('/session', async (req, res) => {
            c.name AS class_name,
            COALESCE(tp.status, 'pending') AS pickup_status,
            tp.id AS pickup_id,
-           tp.pickup_time, tp.latitude, tp.longitude, tp.notes
+           tp.pickup_time, tp.latitude, tp.longitude, tp.notes,
+           tp.parent_left_home_at, tp.parent_left_home_note
          FROM student_transport st
          JOIN students s ON s.id = st.student_id AND s.tenant_id = $3
          LEFT JOIN classes c ON c.id = s.class_id
@@ -208,19 +209,25 @@ router.post('/pickup', async (req, res) => {
 
     // Send notifications based on status
     try {
-      // Get student + parent info
+      // Get student + parent + class teacher info
       const studentInfo = await query(
         `SELECT s.first_name||' '||s.last_name AS student_name,
+                s.class_id,
                 p.user_id AS parent_user_id,
-                p.phone AS parent_phone,
-                r.route_name
+                p.phone   AS parent_phone,
+                r.route_name,
+                tp_existing.parent_left_home_at
          FROM students s
          LEFT JOIN parent_students ps ON ps.student_id = s.id
          LEFT JOIN parents p ON p.id = ps.parent_id AND p.tenant_id = $3
          JOIN transport_routes r ON r.id = $2 AND r.tenant_id = $3
+         LEFT JOIN transport_pickups tp_existing
+           ON tp_existing.student_id = s.id AND tp_existing.route_id = $2
+           AND tp_existing.trip_date = CURRENT_DATE AND tp_existing.trip_type = $4
+           AND tp_existing.tenant_id = $3
          WHERE s.id = $1 AND s.tenant_id = $3
          LIMIT 1`,
-        [student_id, route_id, tid]
+        [student_id, route_id, tid, trip_type]
       );
 
       // Get all admin IDs
@@ -230,77 +237,114 @@ router.post('/pickup', async (req, res) => {
       );
 
       const info = studentInfo.length ? studentInfo[0] : null;
-      const studentName = info?.student_name || 'Student';
-      const routeName   = info?.route_name   || 'route';
-      const pickupTime  = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
-      const gpsLink     = latitude && longitude ? ` https://www.google.com/maps?q=${latitude},${longitude}` : '';
+      const studentName  = info?.student_name || 'Student';
+      const routeName    = info?.route_name   || 'route';
+      const pickupTime   = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+      const gpsCoords    = latitude && longitude ? `${latitude.toFixed(6)},${longitude.toFixed(6)}` : null;
+      const gpsLink      = gpsCoords ? ` 📍 https://www.google.com/maps?q=${gpsCoords}` : '';
+      const leftHomeFlag = info?.parent_left_home_at ? ' ⚠️ Parent confirmed child had LEFT HOME before this event.' : '';
 
-      // Admin notification message
-      const adminMsg = `Transport Update: ${studentName} on route "${routeName}" — status: ${status} at ${pickupTime} (${trip_type}).${gpsLink}`;
+      // Build messages per status
+      let parentTitle = 'Transport Update';
+      let parentMsg   = '';
+      let teacherMsg  = '';
+      let adminMsg    = '';
 
-      // Notify all admins
+      if (status === 'picked') {
+        parentTitle = '✅ Child Picked Up';
+        parentMsg   = `${studentName} has been picked up at ${pickupTime} (${trip_type} trip, route: ${routeName}).${gpsLink}`;
+        teacherMsg  = `Transport: ${studentName} was picked up at ${pickupTime} on route "${routeName}".${gpsLink}`;
+        adminMsg    = `Transport: ${studentName} picked — route "${routeName}" at ${pickupTime}.${gpsLink}`;
+      } else if (status === 'dropped') {
+        parentTitle = '🏠 Child Dropped Off';
+        parentMsg   = `${studentName} has been safely dropped off at ${pickupTime}.${gpsLink}`;
+        teacherMsg  = `Transport: ${studentName} dropped off at ${pickupTime} on route "${routeName}".${gpsLink}`;
+        adminMsg    = `Transport: ${studentName} dropped — route "${routeName}" at ${pickupTime}.${gpsLink}`;
+      } else if (status === 'missed') {
+        parentTitle = '🚨 URGENT — Child Not Found';
+        parentMsg   = `URGENT: ${studentName} was NOT found at the ${trip_type} pickup stop on route "${routeName}" at ${pickupTime}.${leftHomeFlag}${gpsLink} Please contact the school and driver immediately.`;
+        teacherMsg  = `⚠️ URGENT: ${studentName} NOT FOUND for ${trip_type} transport on route "${routeName}" at ${pickupTime}.${leftHomeFlag} Please check if the student is in school.`;
+        adminMsg    = `🚨 URGENT: ${studentName} MISSED ${trip_type} transport on route "${routeName}" at ${pickupTime}.${leftHomeFlag}${gpsLink}`;
+      } else if (status === 'absent') {
+        parentTitle = 'Transport Absent';
+        parentMsg   = `${studentName} was marked absent for ${trip_type} transport today.`;
+        teacherMsg  = `Transport: ${studentName} is absent for today's ${trip_type} trip.`;
+        adminMsg    = `Transport absent: ${studentName} on route "${routeName}" (${trip_type}).`;
+      }
+
+      // ── Notify all admins ──────────────────────────────────────────────────────
       for (const admin of admins) {
         try {
           await query(
             `INSERT INTO notifications (id, tenant_id, user_id, title, message, type, is_read)
              VALUES ($1,$2,$3,$4,$5,'transport',FALSE)`,
-            [uuidv4(), tid, admin.id, 'Transport Update', adminMsg]
+            [uuidv4(), tid, admin.id, parentTitle, adminMsg]
           );
         } catch (e) { /* non-fatal */ }
       }
 
+      // ── Notify parent ──────────────────────────────────────────────────────────
       if (info?.parent_user_id) {
-        let parentMsg = '';
-        let parentAlertMsg = '';
-
-        if (status === 'picked') {
-          parentMsg = `✅ ${studentName} has been picked up at ${pickupTime}.${gpsLink}`;
-          parentAlertMsg = parentMsg;
-        } else if (status === 'dropped') {
-          parentMsg = `🏠 ${studentName} has been safely dropped off at ${pickupTime}.${gpsLink}`;
-          parentAlertMsg = parentMsg;
-        } else if (status === 'missed') {
-          parentMsg = `⚠️ URGENT: ${studentName} was not found for ${trip_type} transport on ${routeName}. Please contact the school immediately.`;
-          parentAlertMsg = parentMsg;
-        } else if (status === 'absent') {
-          parentMsg = `${studentName} is marked absent for ${trip_type} transport today.`;
-          parentAlertMsg = parentMsg;
-        }
-
-        // parent_alerts insert
         try {
           await query(
             `INSERT INTO parent_alerts (id, tenant_id, parent_user_id, student_id, alert_type, message, is_read)
              VALUES ($1,$2,$3,$4,'transport',$5,FALSE)
              ON CONFLICT DO NOTHING`,
-            [uuidv4(), tid, info.parent_user_id, student_id, parentAlertMsg]
+            [uuidv4(), tid, info.parent_user_id, student_id, parentMsg]
           );
         } catch (e) { /* non-fatal */ }
-
-        // notifications insert for parent
         try {
           await query(
             `INSERT INTO notifications (id, tenant_id, user_id, title, message, type, is_read)
              VALUES ($1,$2,$3,$4,$5,'transport',FALSE)`,
-            [uuidv4(), tid, info.parent_user_id, 'Transport Update', parentMsg]
+            [uuidv4(), tid, info.parent_user_id, parentTitle, parentMsg]
           );
         } catch (e) { /* non-fatal */ }
       }
 
-      // For missed: also notify all teachers
-      if (status === 'missed') {
+      // ── Notify class teacher(s) for every status ──────────────────────────────
+      if (info?.class_id && teacherMsg) {
         try {
-          const teachers = await query(
-            `SELECT id FROM users WHERE role='teacher' AND tenant_id=$1 AND is_active=TRUE`,
-            [tid]
+          const classTeachers = await query(
+            `SELECT DISTINCT u.id
+             FROM users u
+             JOIN classes c ON c.class_teacher_id = u.id AND c.id = $1
+             WHERE u.tenant_id = $2 AND u.is_active = TRUE
+             UNION
+             SELECT DISTINCT u.id
+             FROM users u
+             JOIN teacher_subjects ts ON ts.teacher_id = u.id
+             JOIN subjects s ON s.id = ts.subject_id AND s.class_id = $1
+             WHERE u.tenant_id = $2 AND u.is_active = TRUE`,
+            [info.class_id, tid]
           );
-          for (const teacher of teachers) {
+          const teacherTitle = status === 'missed' ? '🚨 Transport Alert' : 'Transport Update';
+          for (const t of classTeachers) {
             try {
               await query(
                 `INSERT INTO notifications (id, tenant_id, user_id, title, message, type, is_read)
                  VALUES ($1,$2,$3,$4,$5,'transport',FALSE)`,
-                [uuidv4(), tid, teacher.id, 'Transport Alert',
-                 `${studentName} was NOT FOUND for ${trip_type} transport on route ${routeName}. Parent may need to be contacted.`]
+                [uuidv4(), tid, t.id, teacherTitle, teacherMsg]
+              );
+            } catch (e) { /* non-fatal */ }
+          }
+        } catch (e) { /* non-fatal: class teacher tables may vary */ }
+      }
+
+      // ── For missed: also notify ALL teachers (school-wide urgency) ─────────────
+      if (status === 'missed') {
+        try {
+          const allTeachers = await query(
+            `SELECT id FROM users WHERE role='teacher' AND tenant_id=$1 AND is_active=TRUE`,
+            [tid]
+          );
+          for (const teacher of allTeachers) {
+            try {
+              await query(
+                `INSERT INTO notifications (id, tenant_id, user_id, title, message, type, is_read)
+                 VALUES ($1,$2,$3,'🚨 Transport Alert',$4,'transport',FALSE)
+                 ON CONFLICT DO NOTHING`,
+                [uuidv4(), tid, teacher.id, teacherMsg]
               );
             } catch (e) { /* non-fatal */ }
           }
@@ -313,6 +357,112 @@ router.post('/pickup', async (req, res) => {
     res.json({ success: true, data: record });
   } catch (err) {
     logger.error('Driver pickup error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── Parent: mark child as "left home" heading to school ─────────────────────
+router.post('/parent-left-home', async (req, res) => {
+  try {
+    if (!['parent', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const tid = req.user.tenant_id;
+    const { student_id, trip_type = 'morning', note } = req.body;
+
+    if (!student_id) {
+      return res.status(400).json({ success: false, message: 'student_id required' });
+    }
+
+    // If parent, verify this is their child
+    if (req.user.role === 'parent') {
+      const access = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [student_id, req.user.id]
+      );
+      if (!access.length) return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Find the route for this student
+    const routeRow = await query(
+      `SELECT st.route_id, r.route_name, r.driver_user_id
+       FROM student_transport st
+       JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $2
+       WHERE st.student_id = $1 AND st.is_active = TRUE AND st.tenant_id = $2
+       LIMIT 1`,
+      [student_id, tid]
+    );
+
+    if (!routeRow.length) {
+      return res.status(404).json({ success: false, message: 'Student is not on a transport route' });
+    }
+    const { route_id, route_name, driver_user_id } = routeRow[0];
+
+    // Upsert transport_pickups — set parent_left_home_at
+    const existing = await query(
+      'SELECT id FROM transport_pickups WHERE student_id=$1 AND route_id=$2 AND trip_date=$3 AND trip_type=$4 AND tenant_id=$5',
+      [student_id, route_id, today, trip_type, tid]
+    );
+
+    if (existing.length) {
+      await query(
+        `UPDATE transport_pickups
+         SET parent_left_home_at = NOW(), parent_left_home_note = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [note || null, existing[0].id]
+      );
+    } else {
+      await query(
+        `INSERT INTO transport_pickups
+           (id, tenant_id, route_id, student_id, trip_date, trip_type, status, parent_left_home_at, parent_left_home_note)
+         VALUES ($1,$2,$3,$4,$5,$6,'pending',NOW(),$7)`,
+        [uuidv4(), tid, route_id, student_id, today, trip_type, note || null]
+      );
+    }
+
+    // Get student name
+    const studentRow = await query(
+      `SELECT first_name||' '||last_name AS student_name FROM students WHERE id=$1`,
+      [student_id]
+    );
+    const studentName = studentRow[0]?.student_name || 'Student';
+    const nowTime = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+
+    // Notify driver
+    if (driver_user_id) {
+      try {
+        await query(
+          `INSERT INTO notifications (id, tenant_id, user_id, title, message, type, is_read)
+           VALUES ($1,$2,$3,'🏠 Student Left Home',$4,'transport',FALSE)`,
+          [uuidv4(), tid, driver_user_id,
+           `Parent confirmed: ${studentName} left home at ${nowTime} and is heading to the ${trip_type} pickup stop on route "${route_name}".${note ? ` Note: ${note}` : ''}`]
+        );
+      } catch (e) { /* non-fatal */ }
+    }
+
+    // Notify admins
+    const admins = await query(`SELECT id FROM users WHERE role='admin' AND tenant_id=$1`, [tid]);
+    for (const admin of admins) {
+      try {
+        await query(
+          `INSERT INTO notifications (id, tenant_id, user_id, title, message, type, is_read)
+           VALUES ($1,$2,$3,'🏠 Student Left Home',$4,'transport',FALSE)`,
+          [uuidv4(), tid, admin.id,
+           `Parent confirmed: ${studentName} left home at ${nowTime} for ${trip_type} trip on route "${route_name}".`]
+        );
+      } catch (e) { /* non-fatal */ }
+    }
+
+    res.json({
+      success: true,
+      message: `Confirmed: ${studentName} has left home at ${nowTime}. Driver and admin have been notified.`
+    });
+  } catch (err) {
+    logger.error('Parent left-home error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -444,9 +594,11 @@ router.get('/my-child-status', async (req, res) => {
          COALESCE(tp_m.status,'pending') AS morning_status,
          tp_m.pickup_time AS morning_pickup_time,
          tp_m.latitude AS morning_lat, tp_m.longitude AS morning_lng,
+         tp_m.parent_left_home_at AS morning_left_home_at,
          COALESCE(tp_a.status,'pending') AS afternoon_status,
          tp_a.pickup_time AS afternoon_time,
-         tp_a.latitude AS afternoon_lat, tp_a.longitude AS afternoon_lng
+         tp_a.latitude AS afternoon_lat, tp_a.longitude AS afternoon_lng,
+         tp_a.parent_left_home_at AS afternoon_left_home_at
        FROM students s
        JOIN student_transport st ON st.student_id = s.id AND st.is_active = TRUE AND st.tenant_id = $2
        JOIN transport_routes r ON r.id = st.route_id AND r.tenant_id = $2

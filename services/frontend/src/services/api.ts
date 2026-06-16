@@ -1219,6 +1219,7 @@ class ApiService {
   assignDriverToRoute(routeId: string, data: any) { return this.api.put('/driver/routes/' + routeId + '/driver', data); }
   getTransportTrackingOverview(params?: any) { return this.api.get('/driver/tracking-overview', { params }); }
   getChildTransportStatus(params?: any) { return this.api.get('/driver/my-child-status', { params }); }
+  parentLeftHome(data: any) { return this.api.post('/driver/parent-left-home', data); }
 
   // Teacher check-in
   teacherCheckin(data: any) { return this.api.post('/checkin/checkin', data); }

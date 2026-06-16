@@ -1,12 +1,13 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import { UserManualCard } from '@/components/UserManualCard';
+import { playNotificationSound } from '@/utils/notificationSound';
 import {
   Bus, MapPin, CheckCircle2, XCircle, AlertTriangle,
-  User, Phone, Navigation, RefreshCw, Clock, Users
+  User, Phone, Navigation, RefreshCw, Clock, Users, Home
 } from 'lucide-react';
 
 type TripType = 'morning' | 'afternoon';
@@ -29,9 +30,10 @@ export function DriverDashboard() {
   const [marking, setMarking]         = useState<string | null>(null);
   const [gpsError, setGpsError]       = useState('');
   const [filter, setFilter]           = useState<'all' | PickupStatus>('all');
+  const prevStatusRef = useRef<Record<string, string>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     // Load route and session independently — a session failure must not hide the route
     try {
       const routeRes: any = await (api as any).getDriverRoute();
@@ -39,12 +41,30 @@ export function DriverDashboard() {
     } catch { /* no route assigned or server error */ }
     try {
       const sessionRes: any = await (api as any).getDriverSession({ trip_type: tripType });
+      const students: any[] = sessionRes?.data?.students || [];
+
+      // Play sound if a parent confirmed "left home" since last poll
+      students.forEach((s: any) => {
+        const prevLeftHome = prevStatusRef.current[s.student_id + '_lh'];
+        const hasLeftHome  = s.parent_left_home_at;
+        if (!prevLeftHome && hasLeftHome) {
+          // New "left home" notification from parent
+          playNotificationSound('warning');
+        }
+        prevStatusRef.current[s.student_id + '_lh'] = hasLeftHome || '';
+      });
+
       setSession(sessionRes?.data);
     } catch { /* session not available yet */ }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [tripType]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    // Poll every 30 seconds so driver sees parent "left home" confirmations in real-time
+    const interval = setInterval(() => load(true), 30000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const getCoords = (): Promise<{ lat: number; lng: number } | null> =>
     new Promise(resolve => {
@@ -75,7 +95,11 @@ export function DriverDashboard() {
         longitude:  coords?.lng,
       });
       setGpsError('');
-      await load();
+      // Play confirmation sound
+      if (status === 'picked' || status === 'dropped') playNotificationSound('success');
+      else if (status === 'missed') playNotificationSound('urgent');
+      else if (status === 'absent') playNotificationSound('warning');
+      await load(true);
     } catch (err: any) {
       alert(err?.response?.data?.message || 'Failed to record pickup');
     } finally {
@@ -215,9 +239,35 @@ export function DriverDashboard() {
                       student.pickup_status === 'dropped' ? 'border-green-500' :
                       student.pickup_status === 'missed'  ? 'border-red-500'   :
                       student.pickup_status === 'absent'  ? 'border-amber-500' :
+                      student.parent_left_home_at         ? 'border-blue-400'  :
                       'border-gray-200'
                     }`}>
                       <CardContent className="p-3">
+                        {/* Parent "left home" alert banner */}
+                        {student.parent_left_home_at && (
+                          <div className={`flex items-start gap-1.5 rounded-md px-2.5 py-2 mb-2 text-xs ${
+                            student.pickup_status === 'missed'
+                              ? 'bg-red-100 border border-red-300 text-red-800'
+                              : 'bg-blue-50 border border-blue-200 text-blue-800'
+                          }`}>
+                            <Home className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">
+                                {student.pickup_status === 'missed'
+                                  ? '🚨 URGENT — Parent confirmed child left home!'
+                                  : '🏠 Parent confirmed child left home'}
+                              </span>
+                              <span className="ml-1">
+                                at {new Date(student.parent_left_home_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+                                {student.parent_left_home_note ? ` — "${student.parent_left_home_note}"` : ''}
+                              </span>
+                              {student.pickup_status === 'missed' && (
+                                <p className="font-semibold mt-0.5">Child left home but not at pickup stop. Take action immediately.</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={`h-10 w-10 rounded-full ${meta.bg} flex items-center justify-center shrink-0`}>

@@ -119,7 +119,13 @@ class ParentService {
     }
 
     const children = await query(
-      `SELECT s.*, c.name as class_name
+      `SELECT s.*, c.name as class_name,
+          (SELECT a.status FROM attendance a
+           WHERE a.student_id = s.id AND DATE(a.date) = CURRENT_DATE
+           ORDER BY a.id DESC LIMIT 1) AS today_status,
+          (SELECT ROUND((COUNT(*) FILTER (WHERE a2.status = 'present') * 100.0 /
+                NULLIF(COUNT(*), 0))::numeric, 1)
+           FROM attendance a2 WHERE a2.student_id = s.id) AS attendance_percentage
        FROM students s
        LEFT JOIN classes c ON s.class_id = c.id
        JOIN parent_students ps ON s.id = ps.student_id
@@ -215,7 +221,13 @@ class ParentService {
 
   async getChildren(parentId) {
     return await query(
-      `SELECT s.*, c.name as class_name, ps.relationship, ps.is_primary_contact
+      `SELECT s.*, c.name as class_name, ps.relationship, ps.is_primary_contact,
+          (SELECT a.status FROM attendance a
+           WHERE a.student_id = s.id AND DATE(a.date) = CURRENT_DATE
+           ORDER BY a.id DESC LIMIT 1) AS today_status,
+          (SELECT ROUND((COUNT(*) FILTER (WHERE a2.status = 'present') * 100.0 /
+                NULLIF(COUNT(*), 0))::numeric, 1)
+           FROM attendance a2 WHERE a2.student_id = s.id) AS attendance_percentage
        FROM students s
        LEFT JOIN classes c ON s.class_id = c.id
        JOIN parent_students ps ON s.id = ps.student_id

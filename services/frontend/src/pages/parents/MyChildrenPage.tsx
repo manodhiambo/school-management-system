@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, BookOpen, Calendar, DollarSign } from 'lucide-react';
+import { Users, BookOpen, Calendar, DollarSign, CheckCircle, XCircle, Clock, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
@@ -92,9 +92,37 @@ export function MyChildrenPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center text-gray-600">
                       <Calendar className="h-4 w-4 mr-2" />
-                      Attendance
+                      Today's Status
                     </span>
-                    <span className="font-medium text-green-600">{child.attendance_percentage || 0}%</span>
+                    {child.today_status === 'present' && (
+                      <span className="flex items-center gap-1 font-medium text-green-600">
+                        <CheckCircle className="h-4 w-4" /> Present
+                      </span>
+                    )}
+                    {child.today_status === 'absent' && (
+                      <span className="flex items-center gap-1 font-medium text-red-600">
+                        <XCircle className="h-4 w-4" /> Absent
+                      </span>
+                    )}
+                    {child.today_status === 'late' && (
+                      <span className="flex items-center gap-1 font-medium text-yellow-600">
+                        <Clock className="h-4 w-4" /> Late
+                      </span>
+                    )}
+                    {!child.today_status && (
+                      <span className="flex items-center gap-1 font-medium text-gray-400">
+                        <HelpCircle className="h-4 w-4" /> Not yet marked
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center text-gray-600">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Attendance Rate
+                    </span>
+                    <span className={`font-medium ${child.attendance_percentage >= 75 ? 'text-green-600' : child.attendance_percentage > 0 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                      {child.attendance_percentage != null ? `${child.attendance_percentage}%` : 'No records yet'}
+                    </span>
                   </div>
                   {child.pending_fees && (
                     <div className="flex items-center justify-between text-sm">

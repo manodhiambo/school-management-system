@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users, Calendar, Clock, CheckCircle, Award,
-  Bell, ArrowRight, DollarSign, AlertCircle, TrendingUp
+  Bell, ArrowRight, DollarSign, AlertCircle, TrendingUp, XCircle, HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
@@ -191,19 +191,26 @@ export function ParentDashboard() {
 
                   <div className="grid grid-cols-3 gap-2 mt-4">
                     <div className="text-center p-3 bg-white rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
+                      {child.today_status === 'present' && <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />}
+                      {child.today_status === 'absent'  && <XCircle    className="h-5 w-5 text-red-600 mx-auto mb-1" />}
+                      {child.today_status === 'late'    && <Clock       className="h-5 w-5 text-yellow-500 mx-auto mb-1" />}
+                      {!child.today_status              && <HelpCircle  className="h-5 w-5 text-gray-300 mx-auto mb-1" />}
+                      <p className="text-xs text-gray-500">{t('Today')}</p>
+                      <p className={`font-semibold text-xs capitalize ${child.today_status === 'present' ? 'text-green-600' : child.today_status === 'absent' ? 'text-red-600' : child.today_status === 'late' ? 'text-yellow-600' : 'text-gray-400'}`}>
+                        {child.today_status || 'Not marked'}
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-blue-600 mx-auto mb-1" />
                       <p className="text-xs text-gray-500">{t('Attendance')}</p>
-                      <p className="font-semibold">--</p>
+                      <p className={`font-semibold text-xs ${child.attendance_percentage >= 75 ? 'text-green-600' : child.attendance_percentage > 0 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                        {child.attendance_percentage != null ? `${child.attendance_percentage}%` : '--'}
+                      </p>
                     </div>
                     <div className="text-center p-3 bg-white rounded-lg">
-                      <Award className="h-5 w-5 text-blue-600 mx-auto mb-1" />
+                      <Award className="h-5 w-5 text-purple-600 mx-auto mb-1" />
                       <p className="text-xs text-gray-500">{t('Grade')}</p>
-                      <p className="font-semibold">--</p>
-                    </div>
-                    <div className="text-center p-3 bg-white rounded-lg">
-                      <TrendingUp className="h-5 w-5 text-purple-600 mx-auto mb-1" />
-                      <p className="text-xs text-gray-500">{t('Rank')}</p>
-                      <p className="font-semibold">--</p>
+                      <p className="font-semibold text-xs">--</p>
                     </div>
                   </div>
                 </div>

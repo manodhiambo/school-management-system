@@ -580,28 +580,38 @@ export function LandingPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <span className="inline-block bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-full px-4 py-1.5 mb-4">Simple Pricing</span>
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">One Price. Every Feature. No Surprises.</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Transparent Pricing. Every Feature Included.</h2>
             <p className="text-xl text-gray-500">
-              All 24+ modules included — unlimited students, teachers, and parents
+              All 24+ modules, unlimited students and teachers — one payment to get started
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
 
-            {/* Monthly */}
+            {/* One-time setup */}
             <div className="rounded-2xl border-2 border-gray-200 p-8 hover:border-blue-300 hover:shadow-lg transition-all">
-              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Monthly Plan</div>
-              <div className="flex items-end gap-2 mb-2">
-                <span className="text-5xl font-extrabold text-gray-900">2,500</span>
-                <span className="text-gray-500 mb-1">KSH / month</span>
+              <div className="inline-block bg-orange-100 text-orange-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
+                One-Time Payment
               </div>
-              <p className="text-gray-400 text-sm mb-8">Billed monthly. Cancel anytime.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Setup & Onboarding</h3>
+              <div className="flex items-end gap-2 mb-2">
+                <span className="text-5xl font-extrabold text-gray-900">50,000</span>
+                <span className="text-gray-500 mb-1">KSH</span>
+              </div>
+              <p className="text-gray-400 text-sm mb-8">Paid once. Covers full system setup, data migration, and staff training.</p>
               <Button className="w-full bg-gray-900 hover:bg-gray-800 text-white mb-8"
                 onClick={() => navigate('/register')}>
-                Start Free Trial
+                Register Your School
               </Button>
               <ul className="space-y-3">
-                {['All 24+ modules included', 'Unlimited students & teachers', 'M-Pesa & bank payments', 'SMS & WhatsApp alerts', 'CBE report cards', 'Priority support'].map(f => (
+                {[
+                  'Full system installation & configuration',
+                  'School data setup & migration',
+                  'On-site or remote staff training',
+                  'Student & parent portal setup',
+                  'M-Pesa & SMS integration',
+                  'First year of support included',
+                ].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm text-gray-700">
                     <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />{f}
                   </li>
@@ -609,51 +619,58 @@ export function LandingPage() {
               </ul>
             </div>
 
-            {/* Annual — highlighted */}
+            {/* Annual renewal — highlighted */}
             <div className="relative rounded-2xl border-2 border-blue-600 p-8 bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 text-xs font-bold px-4 py-1.5 rounded-full">
-                BEST VALUE — SAVE KSH 10,000
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap">
+                ANNUAL SUBSCRIPTION
               </div>
-              <div className="text-sm font-semibold text-blue-200 uppercase tracking-wider mb-4">Annual Plan</div>
+              <div className="inline-block bg-white/20 text-blue-100 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
+                Yearly Renewal
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Annual Licence</h3>
               <div className="flex items-end gap-2 mb-2">
                 <span className="text-5xl font-extrabold">20,000</span>
                 <span className="text-blue-200 mb-1">KSH / year</span>
               </div>
-              <p className="text-blue-200 text-sm mb-2">
-                <span className="line-through opacity-60">KSH 30,000/yr</span>
-                {' '}— save KSH 10,000
-              </p>
-              <p className="text-blue-100 text-xs mb-8">Pay via M-Pesa Paybill 522533 · A/C 8071524</p>
+              <p className="text-blue-100 text-sm mb-2">Renewed every year to keep your system active and updated.</p>
+              <p className="text-blue-200 text-xs mb-8">Pay via M-Pesa Paybill 522533 · A/C 8071524</p>
               <Button className="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold mb-8"
                 onClick={() => navigate('/register')}>
-                Get Annual Plan <ArrowRight className="ml-2 h-4 w-4" />
+                Get Started <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <ul className="space-y-3">
                 {[
-                  'Everything in Monthly',
-                  '30-day free trial included',
-                  'Priority onboarding support',
-                  'Free staff training session',
-                  'Dedicated account manager',
-                  'Custom school branding',
+                  'All 24+ modules always active',
+                  'Unlimited students & teachers',
+                  'All future updates & new features',
+                  'Priority technical support',
+                  'Cloud hosting & backups',
+                  'SMS & WhatsApp alerts',
                 ].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm text-blue-100">
-                    <CheckCircle className="h-4 w-4 text-yellow-400 shrink-0 fill-none" />{f}
+                    <CheckCircle className="h-4 w-4 text-yellow-400 shrink-0" />{f}
                   </li>
                 ))}
               </ul>
             </div>
           </div>
 
-          {/* M-Pesa instructions */}
-          <div className="mt-10 max-w-lg mx-auto bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
-            <p className="text-sm font-bold text-green-800 mb-3">Pay Easily via M-Pesa</p>
-            <div className="flex justify-center gap-8 text-sm">
-              <div><p className="text-green-600 font-medium">Paybill</p><p className="text-2xl font-extrabold text-gray-900">522533</p></div>
-              <div className="w-px bg-green-200" />
-              <div><p className="text-green-600 font-medium">Account No.</p><p className="text-2xl font-extrabold text-gray-900">8071524</p></div>
+          {/* Summary & M-Pesa */}
+          <div className="mt-10 max-w-2xl mx-auto grid sm:grid-cols-2 gap-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-center">
+              <p className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-1">Total First Year</p>
+              <p className="text-3xl font-extrabold text-gray-900">KSH 70,000</p>
+              <p className="text-xs text-gray-500 mt-1">Setup (50,000) + Year 1 licence (20,000)</p>
             </div>
-            <p className="text-xs text-gray-500 mt-3">Then contact us on 0110 421 320 to activate your school</p>
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
+              <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">Pay via M-Pesa</p>
+              <div className="flex justify-center gap-6 text-sm">
+                <div><p className="text-green-600 font-medium text-xs">Paybill</p><p className="text-xl font-extrabold text-gray-900">522533</p></div>
+                <div className="w-px bg-green-200" />
+                <div><p className="text-green-600 font-medium text-xs">Account</p><p className="text-xl font-extrabold text-gray-900">8071524</p></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Call 0110 421 320 after payment</p>
+            </div>
           </div>
         </div>
       </section>
@@ -769,6 +786,10 @@ export function LandingPage() {
                     <span className="text-white font-bold tracking-wider">8071524</span>
                   </div>
                   <div className="flex items-center justify-between pt-1 border-t border-green-900/50">
+                    <span className="text-gray-400">Setup</span>
+                    <span className="text-green-400 font-bold">KSH 50,000</span>
+                  </div>
+                  <div className="flex items-center justify-between">
                     <span className="text-gray-400">Annual</span>
                     <span className="text-green-400 font-bold">KSH 20,000/yr</span>
                   </div>

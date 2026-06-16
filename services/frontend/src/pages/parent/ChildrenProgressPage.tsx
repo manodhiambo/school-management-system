@@ -60,8 +60,22 @@ export function ChildrenProgressPage() {
         api.getStudentAttendance(childId),
         api.getStudentExamResults(childId)
       ]);
+
+      // Response is { success, data: [...records] } after interceptor unwrap
+      const records: any[] = Array.isArray(attendanceRes?.data)
+        ? attendanceRes.data
+        : Array.isArray(attendanceRes)
+          ? attendanceRes
+          : [];
+
+      const summary = {
+        present: records.filter((r: any) => r.status === 'present').length,
+        absent:  records.filter((r: any) => r.status === 'absent').length,
+        late:    records.filter((r: any) => r.status === 'late').length,
+      };
+
       setProgress({
-        attendance: attendanceRes.data || attendanceRes,
+        attendance: { summary, records },
         results: resultsRes.data?.results || resultsRes.results || resultsRes.data || []
       });
     } catch { /* silent */ }

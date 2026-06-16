@@ -811,8 +811,17 @@ export function LandingPage() {
             <div>
               <h4 className="font-semibold text-white mb-4">Support</h4>
               <ul className="space-y-2.5 text-sm text-gray-400">
-                {['User Documentation','Video Tutorials','FAQ','Contact Support','Privacy Policy','Terms of Service'].map(l => (
-                  <li key={l} className="hover:text-white cursor-pointer transition-colors">{l}</li>
+                {[
+                  { label: 'User Documentation', path: '/docs' },
+                  { label: 'Video Tutorials',    path: '/tutorials' },
+                  { label: 'FAQ',                path: '/faq' },
+                  { label: 'Contact Support',    path: '/contact' },
+                  { label: 'Privacy Policy',     path: '/privacy' },
+                  { label: 'Terms of Service',   path: '/terms' },
+                ].map(l => (
+                  <li key={l.label}>
+                    <button onClick={() => navigate(l.path)} className="hover:text-white transition-colors text-left">{l.label}</button>
+                  </li>
                 ))}
               </ul>
               <div className="mt-6 p-3 bg-green-900/30 rounded-lg border border-green-800/30">

@@ -5,6 +5,12 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { LandingPage } from './pages/LandingPage';
 import { SchoolRegistrationPage } from './pages/SchoolRegistrationPage';
+import { DocumentationPage } from './pages/public/DocumentationPage';
+import { VideoTutorialsPage } from './pages/public/VideoTutorialsPage';
+import { FAQPage } from './pages/public/FAQPage';
+import { ContactSupportPage } from './pages/public/ContactSupportPage';
+import { PrivacyPolicyPage } from './pages/public/PrivacyPolicyPage';
+import { TermsOfServicePage } from './pages/public/TermsOfServicePage';
 
 // SuperAdmin
 import { SuperAdminLayout } from './components/layout/SuperAdminLayout';
@@ -188,6 +194,12 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/register" element={<SchoolRegistrationPage />} />
+            <Route path="/docs" element={<DocumentationPage />} />
+            <Route path="/tutorials" element={<VideoTutorialsPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/contact" element={<ContactSupportPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
 
             {/* SuperAdmin routes */}
             <Route

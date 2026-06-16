@@ -146,7 +146,7 @@ export function SchoolRegistrationPage() {
                   <div>
                     <p className="font-semibold text-green-800 text-sm">5-Day Free Trial — No payment needed to start</p>
                     <p className="text-xs text-gray-600 mt-0.5">
-                      Explore all features free. After your trial: <strong className="text-blue-700">KSh 50,000</strong> one-time activation &nbsp;+&nbsp; <strong className="text-blue-700">KSh 10,000/year</strong> renewal
+                      Explore all features free. After your trial: <strong className="text-blue-700">KSh 50,000</strong> one-time activation &nbsp;+&nbsp; <strong className="text-blue-700">KSh 20,000/year</strong> renewal
                     </p>
                   </div>
                 </div>
@@ -352,7 +352,7 @@ export function SchoolRegistrationPage() {
                   <p className="text-xs font-semibold text-amber-800 mb-2">After your trial ends:</p>
                   <ul className="text-sm text-amber-700 space-y-1">
                     <li>• One-time activation: <strong>KSh 50,000</strong></li>
-                    <li>• Annual renewal: <strong>KSh 10,000/year</strong></li>
+                    <li>• Annual renewal: <strong>KSh 20,000/year</strong></li>
                     <li>• Payment via M-Pesa — available inside your dashboard</li>
                   </ul>
                 </div>

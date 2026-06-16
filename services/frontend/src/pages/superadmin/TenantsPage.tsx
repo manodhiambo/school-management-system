@@ -548,8 +548,8 @@ export function TenantsPage() {
                 <option value={1}>1 month — KSh 833</option>
                 <option value={3}>3 months — KSh 2,500</option>
                 <option value={6}>6 months — KSh 5,000</option>
-                <option value={12}>12 months — KSh 10,000</option>
-                <option value={24}>24 months — KSh 20,000</option>
+                <option value={12}>12 months — KSh 20,000</option>
+                <option value={24}>24 months — KSh 40,000</option>
               </select>
             </div>
             <div className="bg-blue-50 rounded-lg p-3 mb-5">

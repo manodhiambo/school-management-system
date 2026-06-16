@@ -132,7 +132,7 @@ export function TrialBanner() {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm font-semibold text-blue-800">One-time Activation Fee</p>
                   <p className="text-3xl font-bold text-blue-700 mt-1">KSh 50,000</p>
-                  <p className="text-xs text-blue-600 mt-1">Includes 1 year subscription · Renews at KSh 10,000/year</p>
+                  <p className="text-xs text-blue-600 mt-1">Includes 1 year subscription · Renews at KSh 20,000/year</p>
                 </div>
 
                 <div>

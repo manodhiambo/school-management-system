@@ -1318,12 +1318,12 @@ router.get('/class-summary/:classId', authenticate, requireModule('academics'), 
 });
 
 // ── BROADSHEET ─────────────────────────────────────────────────────────────
-// GET /api/v1/cbe/broadsheet?class_id=&term=&academic_year=
+// GET /api/v1/cbe/broadsheet?class_id=&term=&academic_year=&exam_period=
 // Returns a class-wide performance grid: students (rows) × subjects (columns)
 router.get('/broadsheet', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { class_id, term, academic_year } = req.query;
+    const { class_id, term, academic_year, exam_period } = req.query;
     if (!class_id) return res.status(400).json({ success: false, message: 'class_id required' });
     const year = academic_year || new Date().getFullYear().toString();
 
@@ -1369,20 +1369,23 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
       WD: 87.5, D: 49, B: 20,
     }[g] ?? null);
 
-    // Grades from student_competency_summary (preferred) ─────────────────────
-    let gradeParams = [tid, class_id, year];
-    let gradeSql = `
-      SELECT cs.student_id, sub.name AS subject_name, sub.id AS subject_id,
-             cs.overall_cbc_grade AS overall_grade, cs.pre_primary_grade,
-             cs.percentage, cs.total_score AS raw_score, cs.max_score AS raw_max
-      FROM student_competency_summary cs
-      JOIN subjects sub ON sub.id = cs.subject_id
-      WHERE cs.tenant_id = $1 AND cs.class_id = $2 AND cs.academic_year = $3`;
-    if (term) { gradeSql += ` AND cs.term = $${gradeParams.length + 1}`; gradeParams.push(term); }
-    gradeSql += ' ORDER BY sub.name';
-    let gradeRows = await query(gradeSql, gradeParams);
+    // Grades from student_competency_summary (preferred, unless exam_period is specified) ─────
+    let gradeRows = [];
+    if (!exam_period) {
+      let gradeParams = [tid, class_id, year];
+      let gradeSql = `
+        SELECT cs.student_id, sub.name AS subject_name, sub.id AS subject_id,
+               cs.overall_cbc_grade AS overall_grade, cs.pre_primary_grade,
+               cs.percentage, cs.total_score AS raw_score, cs.max_score AS raw_max
+        FROM student_competency_summary cs
+        JOIN subjects sub ON sub.id = cs.subject_id
+        WHERE cs.tenant_id = $1 AND cs.class_id = $2 AND cs.academic_year = $3`;
+      if (term) { gradeSql += ` AND cs.term = $${gradeParams.length + 1}`; gradeParams.push(term); }
+      gradeSql += ' ORDER BY sub.name';
+      gradeRows = await query(gradeSql, gradeParams);
+    }
 
-    // Fall back to cbc_assessments if competency summary is empty ─────────────
+    // Fall back to (or use directly when exam_period set) cbc_assessments ─────
     if (!gradeRows.length) {
       let aParams = [tid, class_id, year];
       let aSql = `
@@ -1395,6 +1398,7 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
         JOIN subjects sub ON sub.id = a.subject_id
         WHERE a.tenant_id = $1 AND a.class_id = $2 AND a.academic_year = $3`;
       if (term) { aSql += ` AND a.term = $${aParams.length + 1}`; aParams.push(term); }
+      if (exam_period) { aSql += ` AND a.exam_period = $${aParams.length + 1}`; aParams.push(exam_period); }
       aSql += ' ORDER BY a.student_id, sub.id, a.assessment_date DESC';
       gradeRows = await query(aSql, aParams);
     }

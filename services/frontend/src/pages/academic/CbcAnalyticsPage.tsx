@@ -40,6 +40,7 @@ export function CbcAnalyticsPage() {
   // Broadsheet
   const [bsClassId, setBsClassId] = useState('');
   const [bsTerm, setBsTerm] = useState('');
+  const [bsExamPeriod, setBsExamPeriod] = useState('');
   const [bsYear, setBsYear] = useState(new Date().getFullYear().toString());
   const [broadsheet, setBroadsheet] = useState<any>(null);
 
@@ -104,6 +105,7 @@ export function CbcAnalyticsPage() {
     try {
       const params: any = { class_id: bsClassId };
       if (bsTerm) params.term = bsTerm;
+      if (bsExamPeriod) params.exam_period = bsExamPeriod;
       if (bsYear) params.academic_year = bsYear;
       const res: any = await (api as any).getCbcBroadsheet(params);
       setBroadsheet(res?.data || res);
@@ -162,7 +164,8 @@ export function CbcAnalyticsPage() {
     doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
     doc.text('CBE PERFORMANCE BROADSHEET', pw / 2, 10, { align: 'center' });
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    doc.text(`${className}${bsTerm ? ' · ' + bsTerm.toUpperCase() : ''}${bsYear ? ' · ' + bsYear : ''} · Generated: ${new Date().toLocaleDateString('en-KE')}`, pw / 2, 18, { align: 'center' });
+    const examPeriodLabel = bsExamPeriod === 'mid_term' ? 'Mid-Term' : bsExamPeriod === 'end_term' ? 'End-Term' : '';
+    doc.text(`${className}${bsTerm ? ' · ' + bsTerm.toUpperCase() : ''}${examPeriodLabel ? ' · ' + examPeriodLabel : ''}${bsYear ? ' · ' + bsYear : ''} · Generated: ${new Date().toLocaleDateString('en-KE')}`, pw / 2, 18, { align: 'center' });
     doc.setTextColor(30, 30, 30);
     y = 28;
 
@@ -620,7 +623,7 @@ export function CbcAnalyticsPage() {
           {/* Controls */}
           <Card>
             <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Class</label>
                   <select value={bsClassId} onChange={e => setBsClassId(e.target.value)} className="mt-1 w-full border rounded-md px-3 py-2 text-sm">
@@ -635,6 +638,14 @@ export function CbcAnalyticsPage() {
                     <option value="term1">Term 1</option>
                     <option value="term2">Term 2</option>
                     <option value="term3">Term 3</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Exam Period</label>
+                  <select value={bsExamPeriod} onChange={e => setBsExamPeriod(e.target.value)} className="mt-1 w-full border rounded-md px-3 py-2 text-sm">
+                    <option value="">All Periods</option>
+                    <option value="mid_term">Mid-Term</option>
+                    <option value="end_term">End-Term</option>
                   </select>
                 </div>
                 <div>
@@ -668,6 +679,7 @@ export function CbcAnalyticsPage() {
                   <CardTitle>
                     Broadsheet — {classes.find((c: any) => c.id === bsClassId)?.name || ''}
                     {bsTerm && ` · ${bsTerm.toUpperCase()}`}
+                    {bsExamPeriod && ` · ${bsExamPeriod === 'mid_term' ? 'Mid-Term' : 'End-Term'}`}
                     {bsYear && ` · ${bsYear}`}
                     <span className="text-sm font-normal text-gray-500 ml-2">
                       ({broadsheet.students?.length || 0} students · {broadsheet.subjects?.length || 0} subjects)

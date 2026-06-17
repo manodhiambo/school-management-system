@@ -186,11 +186,11 @@ export function LandingPage() {
       {/* ─────────── STICKY HEADER ─────────── */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center">
-              <GraduationCap className="h-5 w-5 text-white" />
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0">
+              <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
+            <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent whitespace-nowrap">
               Skul Manager
             </span>
           </div>
@@ -202,12 +202,14 @@ export function LandingPage() {
             <a href="#gallery"   className="hover:text-blue-600 transition-colors">Gallery</a>
             <a href="#contact"   className="hover:text-blue-600 transition-colors">Contact</a>
           </nav>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/login')} className="hidden sm:flex text-gray-600 hover:text-blue-600">
+          <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+            <Button variant="ghost" onClick={() => navigate('/login')} className="px-2 sm:px-4 text-xs sm:text-sm text-gray-600 hover:text-blue-600">
               Sign In
             </Button>
-            <Button onClick={() => navigate('/register')} className="bg-blue-600 hover:bg-blue-700 group">
-              Get Started <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+            <Button onClick={() => navigate('/register')} className="px-2.5 sm:px-4 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 group">
+              <span className="sm:hidden">Start</span>
+              <span className="hidden sm:inline">Get Started</span>
+              <ArrowRight className="ml-1 h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:translate-x-0.5 transition-transform" />
             </Button>
           </div>
         </div>

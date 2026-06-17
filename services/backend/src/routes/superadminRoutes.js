@@ -845,15 +845,20 @@ router.get('/security/geo-lookup', async (req, res) => {
     try {
       // ip-api.com free tier is HTTP-only (HTTPS requires a paid plan) — acceptable
       // here since we're only transmitting a bare IP address, not user data.
-      const resp = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}`, { signal: controller.signal });
+      const resp = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,regionName,city,isp,mobile,proxy,hosting`, { signal: controller.signal });
       const json = await resp.json();
       if (json.status !== 'success') throw new Error(json.message || 'lookup failed');
+      // Mobile carrier IPs (Safaricom, Airtel, MTN, etc.) sit behind a single
+      // nationwide CGNAT pool registered to the carrier's HQ, so every subscriber
+      // resolves to the same city (almost always the capital) regardless of where
+      // they actually are. ip-api flags this via the `mobile` field.
       data = {
         ip,
         country: json.country || null,
         region: json.regionName || null,
         city: json.city || null,
         isp: json.isp || null,
+        isMobileCarrier: !!json.mobile,
         location: [json.city, json.regionName, json.country].filter(Boolean).join(', ') || 'Unknown',
       };
     } finally {

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { useNavigate } from 'react-router-dom';
 import { Bell, MessageSquare, DollarSign, X, Volume2, VolumeX, BellRing } from 'lucide-react';
 import { soundService, SoundType } from '@/services/soundService';
+import { voiceService } from '@/services/voiceService';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 
@@ -13,6 +14,9 @@ export interface SoundSettings {
   feeEnabled: boolean;
   alertsEnabled: boolean;
   volume: number;
+  voiceEnabled: boolean;
+  voiceURI: string;
+  voiceRate: number;
 }
 
 interface SoundCtx extends SoundSettings {
@@ -21,7 +25,12 @@ interface SoundCtx extends SoundSettings {
   setFeeEnabled(v: boolean): void;
   setAlertsEnabled(v: boolean): void;
   setVolume(v: number): void;
+  setVoiceEnabled(v: boolean): void;
+  setVoiceURI(v: string): void;
+  setVoiceRate(v: number): void;
   preview(type: SoundType): void;
+  previewVoice(text: string): void;
+  voiceSupported: boolean;
 }
 
 interface Toast {
@@ -36,8 +45,10 @@ interface Toast {
 
 const Ctx = createContext<SoundCtx>({
   enabled: true, messagesEnabled: true, feeEnabled: true, alertsEnabled: true, volume: 0.5,
+  voiceEnabled: true, voiceURI: '', voiceRate: 1, voiceSupported: false,
   setEnabled: () => {}, setMessagesEnabled: () => {}, setFeeEnabled: () => {},
   setAlertsEnabled: () => {}, setVolume: () => {}, preview: () => {},
+  setVoiceEnabled: () => {}, setVoiceURI: () => {}, setVoiceRate: () => {}, previewVoice: () => {},
 });
 
 export function useSoundSettings() { return useContext(Ctx); }
@@ -66,8 +77,17 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
   const [volume,          setVolState]     = useState(soundService.volume);
   const [audioReady,      setAudioReady]   = useState(false);
 
-  const setVolume = (v: number) => { soundService.volume = v; setVolState(v); };
-  const preview   = (t: SoundType) => soundService.preview(t);
+  // voice (text-to-speech) settings — mirror voiceService localStorage
+  const [voiceEnabled, setVoiceState] = useSoundPref(() => voiceService.enabled, v => (voiceService.enabled = v));
+  const [voiceURI,      setVoiceURIState] = useState(voiceService.voiceURI);
+  const [voiceRate,     setVoiceRateState] = useState(voiceService.rate);
+  const voiceSupported = voiceService.supported;
+
+  const setVolume    = (v: number) => { soundService.volume = v; setVolState(v); };
+  const setVoiceURI  = (v: string) => { voiceService.voiceURI = v; setVoiceURIState(v); };
+  const setVoiceRate = (v: number) => { voiceService.rate = v; setVoiceRateState(v); };
+  const preview      = (t: SoundType) => soundService.preview(t);
+  const previewVoice = (text: string) => voiceService.preview(text, volume);
 
   // ── AudioContext unlock ───────────────────────────────────────────────────
   // Browsers block audio until a real user gesture occurs. We listen for the
@@ -81,6 +101,7 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
 
     const unlock = async () => {
       await soundService.unlock();
+      voiceService.unlock();
       if (soundService.isUnlocked) {
         setAudioReady(true);
       }
@@ -113,6 +134,7 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
     const id = ++nextId.current;
     setToasts(t => [...t, { id, type, title, body, href }]);
     soundService.play(type);
+    voiceService.speak(`${title}. ${body}`, soundService.volume);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 7000);
   }, []);
 
@@ -221,12 +243,17 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
 
   const ctx: SoundCtx = {
     enabled, messagesEnabled, feeEnabled, alertsEnabled, volume,
+    voiceEnabled, voiceURI, voiceRate, voiceSupported,
     setEnabled: setEnabledState,
     setMessagesEnabled: setMsgState,
     setFeeEnabled: setFeeState,
     setAlertsEnabled: setAlertsState,
     setVolume,
+    setVoiceEnabled: setVoiceState,
+    setVoiceURI,
+    setVoiceRate,
     preview,
+    previewVoice,
   };
 
   return (

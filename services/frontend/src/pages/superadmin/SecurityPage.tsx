@@ -58,6 +58,12 @@ interface BlacklistedUser {
   blacklisted_by_email: string | null;
 }
 
+interface LocationInfo {
+  location: string;
+  isp: string | null;
+  isMobileCarrier: boolean;
+}
+
 const LIMIT = 50;
 
 const REASON_LABELS: Record<string, string> = {
@@ -103,7 +109,7 @@ type BlacklistTarget =
 export function SecurityPage() {
   const [tab, setTab] = useState<'attempts' | 'activity' | 'blacklist'>('attempts');
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [locations, setLocations] = useState<Record<string, string>>({});
+  const [locations, setLocations] = useState<Record<string, LocationInfo>>({});
   const [locating, setLocating] = useState<string | null>(null);
   const [blacklistTarget, setBlacklistTarget] = useState<BlacklistTarget | null>(null);
   const [blacklistReason, setBlacklistReason] = useState('');
@@ -119,9 +125,16 @@ export function SecurityPage() {
     try {
       const res: any = await api.getSecurityIpLocation(ip);
       const data = res?.data ?? res;
-      setLocations((prev) => ({ ...prev, [ip]: data?.location || 'Unknown' }));
+      setLocations((prev) => ({
+        ...prev,
+        [ip]: {
+          location: data?.location || 'Unknown',
+          isp: data?.isp || null,
+          isMobileCarrier: !!data?.isMobileCarrier,
+        },
+      }));
     } catch {
-      setLocations((prev) => ({ ...prev, [ip]: 'Lookup failed' }));
+      setLocations((prev) => ({ ...prev, [ip]: { location: 'Lookup failed', isp: null, isMobileCarrier: false } }));
     } finally {
       setLocating(null);
     }
@@ -299,7 +312,7 @@ export function SecurityPage() {
 function AttemptsTab({
   locations, locating, locate, onBlacklistDevice, onBlacklistUser,
 }: {
-  locations: Record<string, string>;
+  locations: Record<string, LocationInfo>;
   locating: string | null;
   locate: (ip: string) => void;
   onBlacklistDevice: (row: LogEntry, label: string) => void;
@@ -421,7 +434,17 @@ function AttemptsTab({
                             {row.ip_address && (
                               <div className="mt-0.5">
                                 {locations[row.ip_address] ? (
-                                  <span className="text-xs text-gray-500 flex items-center gap-1"><MapPin className="h-3 w-3" /> {locations[row.ip_address]}</span>
+                                  <div className="text-xs text-gray-500">
+                                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {locations[row.ip_address].location}</span>
+                                    {locations[row.ip_address].isp && (
+                                      <span className="block text-gray-400 mt-0.5">
+                                        {locations[row.ip_address].isp}
+                                        {locations[row.ip_address].isMobileCarrier && (
+                                          <span title="Mobile carrier IPs are shared nationwide (CGNAT) — this location is the carrier's registered address, not necessarily the subscriber's real location." className="ml-1 text-amber-500 cursor-help">approximate ⓘ</span>
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
                                 ) : (
                                   <button onClick={(e) => { e.stopPropagation(); locate(row.ip_address!); }} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
                                     {locating === row.ip_address ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />} Locate
@@ -494,7 +517,7 @@ function AttemptsTab({
 // ============================================================
 function ActivityTab({
   locations, locating, locate,
-}: { locations: Record<string, string>; locating: string | null; locate: (ip: string) => void }) {
+}: { locations: Record<string, LocationInfo>; locating: string | null; locate: (ip: string) => void }) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -605,7 +628,17 @@ function ActivityTab({
                             {row.ip_address && (
                               <div className="mt-0.5">
                                 {locations[row.ip_address] ? (
-                                  <span className="text-xs text-gray-500 flex items-center gap-1"><MapPin className="h-3 w-3" /> {locations[row.ip_address]}</span>
+                                  <div className="text-xs text-gray-500">
+                                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {locations[row.ip_address].location}</span>
+                                    {locations[row.ip_address].isp && (
+                                      <span className="block text-gray-400 mt-0.5">
+                                        {locations[row.ip_address].isp}
+                                        {locations[row.ip_address].isMobileCarrier && (
+                                          <span title="Mobile carrier IPs are shared nationwide (CGNAT) — this location is the carrier's registered address, not necessarily the subscriber's real location." className="ml-1 text-amber-500 cursor-help">approximate ⓘ</span>
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
                                 ) : (
                                   <button onClick={(e) => { e.stopPropagation(); locate(row.ip_address!); }} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
                                     {locating === row.ip_address ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />} Locate

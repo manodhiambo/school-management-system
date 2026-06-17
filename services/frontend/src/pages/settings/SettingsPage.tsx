@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard, Volume2, VolumeX, Bell, MessageSquare, DollarSign, Play } from 'lucide-react';
+import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard, Volume2, VolumeX, Bell, MessageSquare, DollarSign, Play, Mic, MicOff } from 'lucide-react';
 import { useSoundSettings } from '@/components/notifications/SoundNotificationProvider';
+import { voiceService } from '@/services/voiceService';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/languageStore';
 
@@ -43,8 +44,13 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance' | 'security' | 'payments' | 'sounds'>('general');
   const sound = useSoundSettings();
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [logoUploading, setLogoUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    voiceService.getVoices().then(setVoices);
+  }, []);
 
   // 2FA state
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
@@ -986,6 +992,77 @@ export function SettingsPage() {
               <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
                 <span className="font-semibold">Note:</span> Your browser may ask for permission to play audio the first time. Sound settings are saved locally on this device. The mute/unmute button (🔊) in the bottom-right corner is a quick toggle.
               </p>
+            </CardContent>
+          </Card>
+
+          {/* Voice Announcements */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {sound.voiceEnabled ? <Mic className="h-5 w-5 text-blue-600" /> : <MicOff className="h-5 w-5 text-gray-400" />}
+                Voice Announcements
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {!sound.voiceSupported ? (
+                <p className="text-sm text-gray-500 bg-gray-50 rounded-lg p-3">
+                  Your browser doesn't support spoken announcements (Web Speech API unavailable).
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                    <div>
+                      <p className="font-semibold">Enable Voice Announcements</p>
+                      <p className="text-sm text-gray-500">Speak new messages and alerts out loud, in addition to the notification sound</p>
+                    </div>
+                    <button
+                      onClick={() => sound.setVoiceEnabled(!sound.voiceEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        sound.voiceEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        sound.voiceEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+
+                  <div className={`space-y-4 ${!sound.voiceEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <div className="space-y-2">
+                      <Label>Voice</Label>
+                      <Select value={sound.voiceURI} onChange={e => sound.setVoiceURI(e.target.value)}>
+                        <option value="">System Default</option>
+                        {voices.map(v => (
+                          <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Speech Rate</Label>
+                        <span className="text-sm text-gray-500">{sound.voiceRate.toFixed(2)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={2}
+                        step={0.05}
+                        value={sound.voiceRate}
+                        onChange={e => sound.setVoiceRate(parseFloat(e.target.value))}
+                        className="w-full accent-blue-600"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => sound.previewVoice('This is a test announcement. You have a new message.')}
+                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      <Play className="h-3 w-3" /> Test voice
+                    </button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

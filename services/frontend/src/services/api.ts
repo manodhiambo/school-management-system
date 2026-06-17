@@ -1322,6 +1322,46 @@ class ApiService {
     return this.api.get('/superadmin/stats');
   }
 
+  getSecurityLoginAttempts(params?: any) {
+    return this.api.get('/superadmin/security/login-attempts', { params });
+  }
+
+  getSecuritySummary() {
+    return this.api.get('/superadmin/security/summary');
+  }
+
+  getSecurityIpLocation(ip: string) {
+    return this.api.get('/superadmin/security/geo-lookup', { params: { ip } });
+  }
+
+  getAllLogins(params?: any) {
+    return this.api.get('/superadmin/security/all-logins', { params });
+  }
+
+  getDeviceBlacklist() {
+    return this.api.get('/superadmin/security/blacklist');
+  }
+
+  blacklistDevice(data: { ip_address?: string; user_agent?: string; reason?: string }) {
+    return this.api.post('/superadmin/security/blacklist', data);
+  }
+
+  unblacklistDevice(id: string) {
+    return this.api.delete('/superadmin/security/blacklist/' + id);
+  }
+
+  getBlacklistedUsers() {
+    return this.api.get('/superadmin/security/blacklisted-users');
+  }
+
+  blacklistUser(id: string, reason?: string) {
+    return this.api.post('/superadmin/security/users/' + id + '/blacklist', { reason });
+  }
+
+  unblacklistUser(id: string) {
+    return this.api.post('/superadmin/security/users/' + id + '/unblacklist');
+  }
+
   getTenants(params?: any) {
     return this.api.get('/superadmin/tenants', { params });
   }

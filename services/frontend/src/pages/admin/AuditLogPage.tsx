@@ -1,11 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Fragment, useEffect, useState, useCallback } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import {
   Activity, Download, ChevronLeft, ChevronRight, Search,
-  User, Clock, Zap,
+  User, Clock, Zap, ShieldAlert, Monitor, Smartphone, Tablet,
+  ChevronDown, ChevronUp,
 } from 'lucide-react';
 import api from '@/services/api';
 
@@ -18,13 +19,22 @@ interface LogEntry {
   action: string;
   resource: string;
   resource_id: string | null;
+  details: Record<string, any> | string | null;
   ip_address: string | null;
+  user_agent: string | null;
+  device_type: string | null;
+  browser: string | null;
+  os: string | null;
+  http_method: string | null;
+  request_path: string | null;
+  status_code: number | null;
 }
 
 interface Summary {
   total_today: number;
   most_active_user: string | null;
   most_common_action: string | null;
+  failed_logins_today: number;
 }
 
 const LIMIT = 50;
@@ -39,8 +49,25 @@ function fmt(d: string | null | undefined) {
   });
 }
 
+function parseDetails(details: LogEntry['details']) {
+  if (!details) return null;
+  if (typeof details === 'string') {
+    try { return JSON.parse(details); } catch { return details; }
+  }
+  return details;
+}
+
+function DeviceIcon({ deviceType }: { deviceType: string | null }) {
+  if (deviceType === 'mobile') return <Smartphone className="h-3.5 w-3.5 text-gray-500" />;
+  if (deviceType === 'tablet') return <Tablet className="h-3.5 w-3.5 text-gray-500" />;
+  return <Monitor className="h-3.5 w-3.5 text-gray-500" />;
+}
+
 function exportCSV(rows: LogEntry[]) {
-  const headers = ['Timestamp', 'User', 'Role', 'Action', 'Resource', 'Resource ID', 'IP Address'];
+  const headers = [
+    'Timestamp', 'User', 'Role', 'Action', 'Resource', 'Resource ID',
+    'IP Address', 'Device', 'Browser', 'OS', 'Method', 'Path', 'Status',
+  ];
   const lines = rows.map((r) => [
     fmt(r.created_at),
     r.user_name || r.user_email || '',
@@ -49,6 +76,12 @@ function exportCSV(rows: LogEntry[]) {
     r.resource,
     r.resource_id || '',
     r.ip_address || '',
+    r.device_type || '',
+    r.browser || '',
+    r.os || '',
+    r.http_method || '',
+    r.request_path || '',
+    r.status_code ?? '',
   ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','));
   const csv = [headers.join(','), ...lines].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -66,14 +99,18 @@ export function AuditLogPage() {
   const [actions, setActions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [filterAction, setFilterAction] = useState('');
+  const [filterDevice, setFilterDevice] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [ipSearch, setIpSearch] = useState('');
+  const [ipInput, setIpInput] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,9 +118,11 @@ export function AuditLogPage() {
     try {
       const params: Record<string, any> = { page, limit: LIMIT };
       if (filterAction) params.action = filterAction;
+      if (filterDevice) params.device_type = filterDevice;
       if (fromDate) params.from_date = fromDate;
       if (toDate) params.to_date = toDate;
       if (userSearch) params.user = userSearch;
+      if (ipSearch) params.ip_address = ipSearch;
 
       const res: any = await api.getAuditLog(params);
       // Response interceptor unwraps axios → res = { success, data: [...], total, page, pages }
@@ -95,7 +134,7 @@ export function AuditLogPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterAction, fromDate, toDate, userSearch]);
+  }, [page, filterAction, filterDevice, fromDate, toDate, userSearch, ipSearch]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -110,6 +149,7 @@ export function AuditLogPage() {
 
   const applySearch = () => {
     setUserSearch(searchInput);
+    setIpSearch(ipInput);
     setPage(1);
   };
 
@@ -124,6 +164,8 @@ export function AuditLogPage() {
     finance_officer: 'bg-amber-100 text-amber-800',
   };
 
+  const isSecurityAction = (action: string) => action === 'login_failed' || action === 'login_blocked';
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -131,7 +173,7 @@ export function AuditLogPage() {
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Activity className="h-6 w-6 text-indigo-600" /> Audit Log
           </h2>
-          <p className="text-gray-500 text-sm mt-1">Track all user actions across the system</p>
+          <p className="text-gray-500 text-sm mt-1">Track every action across the system — who, when, from where, and on what device</p>
         </div>
         <Button
           onClick={() => exportCSV(logs)}
@@ -144,7 +186,7 @@ export function AuditLogPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="bg-indigo-100 p-2 rounded-lg">
@@ -178,12 +220,23 @@ export function AuditLogPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="bg-red-100 p-2 rounded-lg">
+              <ShieldAlert className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Failed Logins Today</p>
+              <p className="text-2xl font-bold text-gray-900">{summary?.failed_logins_today ?? '—'}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Action</label>
               <Select
@@ -192,6 +245,18 @@ export function AuditLogPage() {
               >
                 <option value="">All Actions</option>
                 {actions.map((a) => <option key={a} value={a}>{a}</option>)}
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Device</label>
+              <Select
+                value={filterDevice}
+                onChange={(e) => { setFilterDevice(e.target.value); setPage(1); }}
+              >
+                <option value="">All Devices</option>
+                <option value="desktop">Desktop</option>
+                <option value="mobile">Mobile</option>
+                <option value="tablet">Tablet</option>
               </Select>
             </div>
             <div>
@@ -217,6 +282,17 @@ export function AuditLogPage() {
                   placeholder="Name or email"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Search IP</label>
+              <div className="flex gap-1">
+                <Input
+                  placeholder="e.g. 41.90"
+                  value={ipInput}
+                  onChange={(e) => setIpInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applySearch()}
                 />
                 <Button onClick={applySearch} size="sm" variant="outline">
@@ -249,32 +325,83 @@ export function AuditLogPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    {['Timestamp', 'User', 'Role', 'Action', 'Resource', 'Resource ID', 'IP Address'].map((h) => (
+                    {['Timestamp', 'User', 'Role', 'Action', 'Resource', 'IP Address', 'Device', 'Browser / OS', ''].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {logs.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmt(row.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{row.user_name || row.user_email || '—'}</div>
-                        {row.user_name && row.user_email && (
-                          <div className="text-xs text-gray-400">{row.user_email}</div>
+                  {logs.map((row) => {
+                    const isOpen = expanded === row.id;
+                    const parsedDetails = parseDetails(row.details);
+                    return (
+                      <Fragment key={row.id}>
+                        <tr
+                          className={`hover:bg-gray-50 cursor-pointer ${isSecurityAction(row.action) ? 'bg-red-50/40' : ''}`}
+                          onClick={() => setExpanded(isOpen ? null : row.id)}
+                        >
+                          <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmt(row.created_at)}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-gray-900">{row.user_name || row.user_email || '—'}</div>
+                            {row.user_name && row.user_email && (
+                              <div className="text-xs text-gray-400">{row.user_email}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[row.user_role] ?? 'bg-gray-100 text-gray-700'}`}>
+                              {row.user_role || '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs">
+                            <span className={isSecurityAction(row.action) ? 'text-red-700 font-semibold' : 'text-indigo-700'}>
+                              {row.action}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {row.resource}
+                            {row.resource_id && <span className="text-gray-400 font-mono text-xs ml-1">#{row.resource_id.slice(0, 8)}</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 font-mono text-xs">{row.ip_address || '—'}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <DeviceIcon deviceType={row.device_type} />
+                              <span className="text-xs capitalize">{row.device_type || '—'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500">
+                            {row.browser || '—'}{row.os ? ` · ${row.os}` : ''}
+                          </td>
+                          <td className="px-4 py-3 text-gray-400">
+                            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={9} className="px-4 py-3 text-xs text-gray-600">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <span className="font-semibold text-gray-700">Request: </span>
+                                  {row.http_method || '—'} {row.request_path || ''} {row.status_code ? `→ ${row.status_code}` : ''}
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-gray-700">User Agent: </span>
+                                  <span className="break-all">{row.user_agent || '—'}</span>
+                                </div>
+                                {parsedDetails && (
+                                  <div className="sm:col-span-2">
+                                    <span className="font-semibold text-gray-700">Details: </span>
+                                    <pre className="mt-1 bg-white border rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                                      {typeof parsedDetails === 'string' ? parsedDetails : JSON.stringify(parsedDetails, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[row.user_role] ?? 'bg-gray-100 text-gray-700'}`}>
-                          {row.user_role || '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-indigo-700">{row.action}</td>
-                      <td className="px-4 py-3 text-gray-700">{row.resource}</td>
-                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">{row.resource_id || '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">{row.ip_address || '—'}</td>
-                    </tr>
-                  ))}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

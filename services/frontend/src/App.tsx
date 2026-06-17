@@ -17,6 +17,7 @@ import { SuperAdminLayout } from './components/layout/SuperAdminLayout';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
 import { TenantsPage } from './pages/superadmin/TenantsPage';
 import { SuperAdminProfilePage } from './pages/superadmin/SuperAdminProfilePage';
+import { SecurityPage } from './pages/superadmin/SecurityPage';
 import { ProtectedSuperAdmin } from './components/auth/ProtectedSuperAdmin';
 
 // Dashboard & Main Pages
@@ -213,6 +214,7 @@ function App() {
               <Route index element={<Navigate to="/superadmin/dashboard" replace />} />
               <Route path="dashboard" element={<SuperAdminDashboard />} />
               <Route path="tenants" element={<TenantsPage />} />
+              <Route path="security" element={<SecurityPage />} />
               <Route path="profile" element={<SuperAdminProfilePage />} />
             </Route>
 

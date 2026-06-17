@@ -11,11 +11,13 @@ import {
   GraduationCap,
   User,
   Shield,
+  ShieldAlert,
 } from 'lucide-react';
 
 const NAV = [
   { name: 'Dashboard',     href: '/superadmin/dashboard', icon: LayoutDashboard },
   { name: 'Tenant Schools',href: '/superadmin/tenants',   icon: Building2       },
+  { name: 'Security',      href: '/superadmin/security',  icon: ShieldAlert     },
   { name: 'My Profile',    href: '/superadmin/profile',   icon: User            },
 ];
 

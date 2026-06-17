@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+import { buildAuditContext } from '../utils/auditContext.js';
 
 // Routes that handle their own audit logging (skip auto-audit)
 const SKIP_PREFIXES = ['/api/v1/auth', '/api/v1/audit-log'];
@@ -45,20 +46,19 @@ export function autoAuditMiddleware(req, res, next) {
     const resource = resourceFromPath(req.originalUrl);
     const action = `${METHOD_VERB[req.method]}_${resource}`;
     const resourceId = req.params?.id || req.params?.studentId || null;
-    const ipAddress =
-      req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-      req.socket?.remoteAddress ||
-      null;
+    const { ipAddress, userAgent, deviceType, browser, os } = buildAuditContext(req);
 
     query(
       `INSERT INTO audit_log
-         (id, tenant_id, user_id, user_email, user_role, action, resource, resource_id, ip_address)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+         (id, tenant_id, user_id, user_email, user_role, action, resource, resource_id,
+          ip_address, user_agent, device_type, browser, os, http_method, request_path, status_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         uuidv4(), tid, uid, req.user.email, req.user.role,
         action, resource,
         resourceId ? String(resourceId) : null,
-        ipAddress,
+        ipAddress, userAgent, deviceType, browser, os,
+        req.method, req.originalUrl.split('?')[0], res.statusCode,
       ]
     ).catch(err => logger.warn('autoAudit insert failed:', err.message));
   });

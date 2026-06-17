@@ -3,6 +3,11 @@ import { config } from '../config/env.js';
 import pool from '../config/database.js';
 import ApiError from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
+import { findBlacklistMatch } from '../utils/blacklist.js';
+
+function extractIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || null;
+}
 
 export const authenticate = async (req, res, next) => {
   try {
@@ -17,9 +22,14 @@ export const authenticate = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, config.jwt.secret);
-    
+
+    const blacklistReason = await findBlacklistMatch(extractIp(req), req.headers['user-agent'] || null);
+    if (blacklistReason) {
+      throw new ApiError(403, 'Access from this device has been blocked.');
+    }
+
     const result = await pool.query(
-      `SELECT u.id, u.email, u.role, u.tenant_id, u.is_active, u.is_verified, t.disabled_modules
+      `SELECT u.id, u.email, u.role, u.tenant_id, u.is_active, u.is_verified, u.is_blacklisted, t.disabled_modules
        FROM users u
        LEFT JOIN tenants t ON t.id = u.tenant_id
        WHERE u.id = $1`,
@@ -34,6 +44,10 @@ export const authenticate = async (req, res, next) => {
 
     if (!user.is_active) {
       throw new ApiError(401, 'Account is deactivated');
+    }
+
+    if (user.is_blacklisted) {
+      throw new ApiError(403, 'This account has been blocked by the platform administrator.');
     }
 
     req.user = {

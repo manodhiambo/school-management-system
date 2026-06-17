@@ -11,6 +11,8 @@ import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { logAction } from './auditLogRoutes.js';
 import { passwordResetLimiter } from '../middleware/rateLimiter.js';
+import { findBlacklistMatch } from '../utils/blacklist.js';
+import { buildAuditContext } from '../utils/auditContext.js';
 
 const router = express.Router();
 
@@ -18,34 +20,54 @@ const router = express.Router();
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     logger.info(`Login attempt for: ${email}`);
-    
+
+    const { ipAddress, userAgent } = buildAuditContext(req);
+    const blacklistReason = await findBlacklistMatch(ipAddress, userAgent);
+    if (blacklistReason) {
+      logger.warn(`Blocked login attempt from blacklisted device: ${ipAddress}`);
+      req.user = { email };
+      logAction(req, 'login_blocked', 'user', null, { email, reason: 'device_blacklisted', detail: blacklistReason });
+      return res.status(403).json({ success: false, message: 'Access from this device has been blocked.' });
+    }
+
     const users = await query(
-      'SELECT id, email, password, role, is_active, is_verified, tenant_id, totp_enabled, first_name, last_name FROM users WHERE email = $1',
+      'SELECT id, email, password, role, is_active, is_verified, is_blacklisted, tenant_id, totp_enabled, first_name, last_name FROM users WHERE email = $1',
       [email]
     );
 
     if (users.length === 0) {
       logger.warn(`User not found: ${email}`);
+      req.user = { email };
+      logAction(req, 'login_failed', 'user', null, { email, reason: 'user_not_found' });
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
     const user = users[0];
     logger.info(`User found: ${user.email}, role: ${user.role}`);
+    req.user = { email: user.email, role: user.role, tenant_id: user.tenant_id || null };
+
+    if (user.is_blacklisted) {
+      logAction(req, 'login_blocked', 'user', user.id, { email, reason: 'user_blacklisted' });
+      return res.status(403).json({ success: false, message: 'This account has been blocked by the platform administrator.' });
+    }
 
     if (!user.is_active) {
+      logAction(req, 'login_failed', 'user', user.id, { email, reason: 'account_deactivated' });
       return res.status(401).json({ success: false, message: 'Account is deactivated' });
     }
 
     if (!user.password) {
       logger.error('User has no password set');
+      logAction(req, 'login_failed', 'user', user.id, { email, reason: 'no_password_set' });
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       logger.warn(`Invalid password for: ${email}`);
+      logAction(req, 'login_failed', 'user', user.id, { email, reason: 'invalid_password' });
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
@@ -98,18 +120,21 @@ router.post('/login', async (req, res) => {
         tenantStatus = tenantRows[0].status;
         tenantDisabledModules = Array.isArray(tenantRows[0].disabled_modules) ? tenantRows[0].disabled_modules : [];
         if (tenantStatus === 'suspended') {
+          logAction(req, 'login_blocked', 'user', user.id, { email, reason: 'tenant_suspended' });
           return res.status(403).json({
             success: false,
             message: 'School account is suspended. Please contact Helvino Technologies Limited at helvinotechltd@gmail.com or 0703445756.'
           });
         }
         if (tenantStatus === 'expired') {
+          logAction(req, 'login_blocked', 'user', user.id, { email, reason: 'tenant_expired' });
           return res.status(403).json({
             success: false,
             message: 'School subscription has expired. Please renew to continue.'
           });
         }
         if (tenantStatus === 'pending') {
+          logAction(req, 'login_blocked', 'user', user.id, { email, reason: 'tenant_pending' });
           return res.status(403).json({
             success: false,
             message: 'School registration is pending payment. Please complete payment to activate.'

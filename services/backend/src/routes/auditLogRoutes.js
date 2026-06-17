@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/authMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+import { buildAuditContext } from '../utils/auditContext.js';
 
 const router = express.Router();
 router.use(authenticate);
@@ -15,22 +16,21 @@ export async function logAction(req, action, resource, resourceId, details) {
     const uid = req.user?.id || null;
     const userEmail = req.user?.email || null;
     const userRole = req.user?.role || null;
-    const ipAddress =
-      req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-      req.socket?.remoteAddress ||
-      null;
+    const { ipAddress, userAgent, deviceType, browser, os } = buildAuditContext(req);
 
     // Fire-and-forget — do not await
     query(
       `INSERT INTO audit_log
-         (id, tenant_id, user_id, user_email, user_role, action, resource, resource_id, details, ip_address)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+         (id, tenant_id, user_id, user_email, user_role, action, resource, resource_id, details,
+          ip_address, user_agent, device_type, browser, os, http_method, request_path)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         uuidv4(), tid, uid, userEmail, userRole,
         action, resource || null,
         resourceId != null ? String(resourceId) : null,
         details ? JSON.stringify(details) : null,
-        ipAddress
+        ipAddress, userAgent, deviceType, browser, os,
+        req.method || null, req.originalUrl ? req.originalUrl.split('?')[0] : null,
       ]
     ).catch(err => logger.warn('logAction insert failed:', err.message));
   } catch (err) {
@@ -50,7 +50,7 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
     const offset = (page - 1) * limit;
 
-    const { action, resource, user_id, user, from_date, to_date } = req.query;
+    const { action, resource, user_id, user, from_date, to_date, device_type, ip_address } = req.query;
 
     // Validate date inputs before hitting Postgres
     const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -90,6 +90,14 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     if (to_date) {
       params.push(to_date);
       conditions.push(`al.created_at < $${params.length}::date + interval '1 day'`);
+    }
+    if (device_type) {
+      params.push(device_type);
+      conditions.push(`al.device_type = $${params.length}`);
+    }
+    if (ip_address) {
+      params.push(`%${ip_address}%`);
+      conditions.push(`al.ip_address ILIKE $${params.length}`);
     }
 
     const where = conditions.join(' AND ');
@@ -144,7 +152,7 @@ router.get('/summary', requireRole(['admin', 'superadmin']), async (req, res) =>
   try {
     const tid = req.user.tenant_id;
 
-    const [todayRows, activeUserRows, commonActionRows] = await Promise.all([
+    const [todayRows, activeUserRows, commonActionRows, failedLoginRows] = await Promise.all([
       query(
         `SELECT COUNT(*)::int AS total_today
          FROM audit_log
@@ -168,6 +176,13 @@ router.get('/summary', requireRole(['admin', 'superadmin']), async (req, res) =>
          GROUP BY action ORDER BY cnt DESC LIMIT 1`,
         [tid]
       ),
+      query(
+        `SELECT COUNT(*)::int AS failed_today
+         FROM audit_log
+         WHERE tenant_id = $1 AND action IN ('login_failed', 'login_blocked')
+           AND DATE(created_at) = CURRENT_DATE`,
+        [tid]
+      ),
     ]);
 
     res.json({
@@ -176,6 +191,7 @@ router.get('/summary', requireRole(['admin', 'superadmin']), async (req, res) =>
         total_today: todayRows[0]?.total_today ?? 0,
         most_active_user: activeUserRows[0]?.user_name ?? activeUserRows[0]?.user_email ?? null,
         most_common_action: commonActionRows[0]?.action ?? null,
+        failed_logins_today: failedLoginRows[0]?.failed_today ?? 0,
       },
     });
   } catch (err) {

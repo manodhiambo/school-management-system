@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skulmanager-v2';
+const CACHE_NAME = 'skulmanager-v3';
 const STATIC_ASSETS = ['/', '/index.html'];
 
 // Never cache requests to these external domains (avoids tracking-prevention warnings)

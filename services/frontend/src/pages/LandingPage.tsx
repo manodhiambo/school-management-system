@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { InstallAppButton } from '@/components/InstallAppButton';
 import {
   GraduationCap, Users, BookOpen, Calendar, TrendingUp, Shield,
   ArrowRight, CheckCircle, UserCheck, BarChart3, Phone, Mail,
@@ -203,6 +204,10 @@ export function LandingPage() {
             <a href="#contact"   className="hover:text-blue-600 transition-colors">Contact</a>
           </nav>
           <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+            <InstallAppButton
+              variant="ghost"
+              className="hidden lg:inline-flex px-3 text-sm text-gray-600 hover:text-blue-600"
+            />
             <Button variant="ghost" onClick={() => navigate('/login')} className="px-2 sm:px-4 text-xs sm:text-sm text-gray-600 hover:text-blue-600">
               Sign In
             </Button>
@@ -250,11 +255,16 @@ export function LandingPage() {
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <Button size="lg" variant="outline"
-                  className="border-white/40 text-white hover:bg-white/10 text-base px-8 group"
+                  className="bg-transparent border-white/40 text-white hover:bg-white/10 text-base px-8 group"
                   onClick={() => { document.getElementById('showcase')?.scrollIntoView({ behavior: 'smooth' }); }}>
                   <Play className="mr-2 h-4 w-4 fill-white group-hover:scale-110 transition-transform" />
                   Watch Tour
                 </Button>
+                <InstallAppButton
+                  size="lg"
+                  variant="outline"
+                  className="bg-transparent border-white/40 text-white hover:bg-white/10 text-base px-8"
+                />
               </div>
 
               <div className="flex flex-wrap items-center gap-5 mt-10 text-sm text-blue-200">
@@ -730,7 +740,7 @@ export function LandingPage() {
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <a href="tel:0110421320">
-              <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 text-base px-10 w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="bg-transparent border-white/40 text-white hover:bg-white/10 text-base px-10 w-full sm:w-auto">
                 <Phone className="mr-2 h-4 w-4" />
                 Call: 0110 421 320
               </Button>

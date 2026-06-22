@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 
@@ -11,7 +12,11 @@ interface DialogProps {
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
-  return (
+  // Portal to document.body so this isn't trapped by an ancestor's
+  // backdrop-filter/transform, which creates a new containing block for
+  // position:fixed and breaks full-viewport centering (e.g. inside a
+  // sticky header that uses backdrop-blur).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="fixed inset-0 bg-black/50"
@@ -20,7 +25,8 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
       <div className="relative bg-white rounded-lg shadow-lg max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

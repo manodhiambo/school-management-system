@@ -10,8 +10,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Neon: DDL must go through the DIRECT endpoint, not the PgBouncer pooler.
 // The pooler URL contains "-pooler" in the hostname — strip it for migrations.
 function buildDirectUrl() {
-  const raw = process.env.DATABASE_URL
-    || 'postgresql://REDACTED:REDACTED@REDACTED/neondb?sslmode=require';
+  const raw = process.env.DATABASE_URL;
+  if (!raw) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
   return raw.replace('-pooler', '');
 }
 

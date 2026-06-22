@@ -2,8 +2,14 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Phone, Mail, MapPin, Clock, MessageSquare, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { useSEO } from '@/hooks/useSEO';
 
 export function ContactSupportPage() {
+  useSEO({
+    title: 'Contact Support | SkulManager',
+    description: 'Get in touch with SkulManager support — call 0110 421 320, email info@helvino.org, or send us a message. Based in Siaya, Kenya.',
+    path: '/contact',
+  });
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', school: '', subject: '', message: '' });
   const [sent, setSent] = useState(false);

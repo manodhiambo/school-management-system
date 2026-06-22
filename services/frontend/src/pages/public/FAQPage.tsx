@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronUp, HelpCircle, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSEO } from '@/hooks/useSEO';
 
 const FAQS = [
   {
@@ -49,6 +50,30 @@ const FAQS = [
 ];
 
 export function FAQPage() {
+  useSEO({
+    title: 'Frequently Asked Questions | SkulManager',
+    description: 'Answers to common questions about SkulManager pricing, M-Pesa payments, CBE curriculum support, data security, and getting started.',
+    path: '/faq',
+  });
+
+  // FAQPage structured data from the real Q&A content on this page, richer
+  // than the static 5-question schema in index.html which only covers "/".
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: FAQS.flatMap(cat => cat.items).map(({ q, a }) => ({
+        '@type': 'Question',
+        name: q,
+        acceptedAnswer: { '@type': 'Answer', text: a },
+      })),
+    });
+    document.head.appendChild(script);
+    return () => { document.head.removeChild(script); };
+  }, []);
+
   const navigate = useNavigate();
   const [open, setOpen] = useState<string | null>(null);
 

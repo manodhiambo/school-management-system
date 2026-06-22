@@ -11,6 +11,7 @@ import { FAQPage } from './pages/public/FAQPage';
 import { ContactSupportPage } from './pages/public/ContactSupportPage';
 import { PrivacyPolicyPage } from './pages/public/PrivacyPolicyPage';
 import { TermsOfServicePage } from './pages/public/TermsOfServicePage';
+import { NotFoundPage } from './pages/public/NotFoundPage';
 
 // SuperAdmin
 import { SuperAdminLayout } from './components/layout/SuperAdminLayout';
@@ -361,6 +362,9 @@ function App() {
 
               <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
             </Route>
+
+            {/* Top-level catch-all for unmatched public URLs */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </SoundNotificationProvider>
         </BrowserRouter>

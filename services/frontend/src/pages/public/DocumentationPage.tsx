@@ -95,6 +95,11 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 export function DocumentationPage() {
+  useSEO({
+    title: 'User Documentation | SkulManager Help Center',
+    description: 'Browse SkulManager\'s documentation — guides for school registration, CBE academics, fees, M-Pesa payments, transport, library, procurement and more.',
+    path: '/docs',
+  });
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<{ cat: string; article: any } | null>(null);

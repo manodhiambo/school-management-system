@@ -6,8 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GraduationCap, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import api from '@/services/api';
+import { useSEO } from '@/hooks/useSEO';
 
 export function ResetPasswordPage() {
+  useSEO({
+    title: 'Reset Password | SkulManager',
+    description: 'Reset your SkulManager account password.',
+    path: '/reset-password',
+    noindex: true,
+  });
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');

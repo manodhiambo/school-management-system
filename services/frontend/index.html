@@ -95,7 +95,7 @@
       "@type": "Organization",
       "name": "Helvino Technologies Limited",
       "url": "https://helvino.org",
-      "logo": "https://skulmanager.org/favicon.svg",
+      "logo": "https://skulmanager.org/icon-512.png",
       "email": "info@helvino.org",
       "telephone": "+254110421320",
       "address": {
@@ -123,55 +123,9 @@
     }
     </script>
 
-    <!-- Schema 4: FAQPage (triggers Google's answer box / featured snippet) -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is the best school management system in Kenya?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "SkulManager (skulmanager.org) is Kenya's #1 cloud-based school management system, built specifically for the CBC curriculum. It manages students, teachers, fees (M-Pesa integrated), exams, timetables and parent communication all in one platform. Developed by Helvino Technologies Limited, Siaya."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Which school management system supports Kenya CBC curriculum?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "SkulManager is fully aligned with Kenya's CBC (Competency Based Curriculum). It supports CBC grading (EE, ME, AE, BE), strand-based assessments, CBC report cards, School Based Assessments (SBA), and all education levels from Playgroup to Senior Secondary."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How do I register my school on SkulManager?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Visit skulmanager.org and click 'Register Your School'. Fill in your school details and you will receive access credentials. For support contact Helvino Technologies at info@helvino.org or call 0110 421 320."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does SkulManager support M-Pesa school fee payments?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. SkulManager has built-in M-Pesa integration for fee collection. Schools use Paybill 522533, Account 8071524. Parents can pay fees directly and the system automatically updates student fee records."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Who developed SkulManager?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "SkulManager is developed and maintained by Helvino Technologies Limited, based in Siaya, Kenya. Website: helvino.org, Email: info@helvino.org, Phone: 0110 421 320."
-          }
-        }
-      ]
-    }
-    </script>
+    <!-- Schema 4 (FAQPage) lives in LandingPage.tsx now, injected only on "/" —
+         a FAQPage schema describing homepage-targeted Q&As shouldn't be present
+         on every route of this SPA (it used to be, since this file is static). -->
   </head>
   <body>
     <div id="root"></div>

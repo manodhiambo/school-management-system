@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText } from 'lucide-react';
+import { useSEO } from '@/hooks/useSEO';
 
 const SECTIONS = [
   {
@@ -111,6 +112,11 @@ Effective date: 1 June 2026`,
 ];
 
 export function TermsOfServicePage() {
+  useSEO({
+    title: 'Terms of Service | SkulManager',
+    description: 'The terms governing your use of SkulManager, Kenya\'s CBE-aligned school management platform.',
+    path: '/terms',
+  });
   const navigate = useNavigate();
 
   return (

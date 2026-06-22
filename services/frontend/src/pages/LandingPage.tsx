@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { InstallAppButton } from '@/components/InstallAppButton';
@@ -146,10 +146,52 @@ const catIcon: Record<string, string> = {
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
+const HOMEPAGE_FAQS = [
+  {
+    q: 'What is the best school management system in Kenya?',
+    a: "SkulManager (skulmanager.org) is Kenya's #1 cloud-based school management system, built specifically for the CBC curriculum. It manages students, teachers, fees (M-Pesa integrated), exams, timetables and parent communication all in one platform. Developed by Helvino Technologies Limited, Siaya.",
+  },
+  {
+    q: 'Which school management system supports Kenya CBC curriculum?',
+    a: "SkulManager is fully aligned with Kenya's CBC (Competency Based Curriculum). It supports CBC grading (EE, ME, AE, BE), strand-based assessments, CBC report cards, School Based Assessments (SBA), and all education levels from Playgroup to Senior Secondary.",
+  },
+  {
+    q: 'How do I register my school on SkulManager?',
+    a: "Visit skulmanager.org and click 'Register Your School'. Fill in your school details and you will receive access credentials. For support contact Helvino Technologies at info@helvino.org or call 0110 421 320.",
+  },
+  {
+    q: 'Does SkulManager support M-Pesa school fee payments?',
+    a: 'Yes. SkulManager has built-in M-Pesa integration for fee collection. Schools use Paybill 522533, Account 8071524. Parents can pay fees directly and the system automatically updates student fee records.',
+  },
+  {
+    q: 'Who developed SkulManager?',
+    a: 'SkulManager is developed and maintained by Helvino Technologies Limited, based in Siaya, Kenya. Website: helvino.org, Email: info@helvino.org, Phone: 0110 421 320.',
+  },
+];
+
 export function LandingPage() {
   const navigate = useNavigate();
   const [showVideo, setShowVideo] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+
+  // Homepage-targeted FAQPage schema (for Google's answer box) — scoped to "/"
+  // only via this component, not statically in index.html (which would leak
+  // onto every route of this SPA).
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: HOMEPAGE_FAQS.map(({ q, a }) => ({
+        '@type': 'Question',
+        name: q,
+        acceptedAnswer: { '@type': 'Answer', text: a },
+      })),
+    });
+    document.head.appendChild(script);
+    return () => { document.head.removeChild(script); };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white font-sans">

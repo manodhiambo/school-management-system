@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Shield } from 'lucide-react';
+import { useSEO } from '@/hooks/useSEO';
 
 const SECTIONS = [
   {
@@ -109,6 +110,11 @@ Effective date: 1 June 2026`,
 ];
 
 export function PrivacyPolicyPage() {
+  useSEO({
+    title: 'Privacy Policy | SkulManager',
+    description: 'How SkulManager and Helvino Technologies Limited collect, use, store, and protect your school\'s data.',
+    path: '/privacy',
+  });
   const navigate = useNavigate();
 
   return (

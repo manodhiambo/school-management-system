@@ -1,11 +1,11 @@
 User-agent: *
 Allow: /
 
-# Sitemap location
-Sitemap: https://skulmanager.org/sitemap.xml
-
-# Block internal app routes from indexing
-Disallow: /dashboard
+# Block authenticated app areas and utility pages with no SEO value
+Disallow: /app
+Disallow: /superadmin
 Disallow: /login
-Disallow: /register
+Disallow: /reset-password
 Disallow: /api/
+
+Sitemap: https://skulmanager.org/sitemap.xml

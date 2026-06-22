@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/services/api';
+import { useSEO } from '@/hooks/useSEO';
 
 type Step = 'form' | 'success';
 
@@ -39,6 +40,11 @@ interface SuccessData {
 }
 
 export function SchoolRegistrationPage() {
+  useSEO({
+    title: 'Register Your School | SkulManager — Free 5-Day Trial',
+    description: 'Register your Kenyan school on SkulManager and get a free 5-day trial. CBE-aligned, M-Pesa integrated, all modules included from KSh 70,000/year.',
+    path: '/register',
+  });
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('form');
   const [loading, setLoading] = useState(false);

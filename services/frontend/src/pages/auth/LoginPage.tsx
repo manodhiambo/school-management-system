@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import { useSEO } from '@/hooks/useSEO';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
   BookOpen, Users, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound,
@@ -72,6 +73,12 @@ const ROLES: { key: Role; label: string; description: string; icon: React.Elemen
 ];
 
 export function LoginPage() {
+  useSEO({
+    title: 'Sign In | SkulManager',
+    description: 'Sign in to your SkulManager account.',
+    path: '/login',
+    noindex: true,
+  });
   const [view, setView] = useState<View>('role');
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 

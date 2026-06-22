@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Clock, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSEO } from '@/hooks/useSEO';
 
 const VIDEOS = [
   {
@@ -42,6 +43,11 @@ const VIDEOS = [
 ];
 
 export function VideoTutorialsPage() {
+  useSEO({
+    title: 'Video Tutorials | SkulManager',
+    description: 'Step-by-step video tutorials for SkulManager — school registration, dashboard tour, CBE academics, fees, M-Pesa payments, and more.',
+    path: '/tutorials',
+  });
   const navigate = useNavigate();
 
   return (

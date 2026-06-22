@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, ChevronRight, Search, BookOpen, Users, DollarSign, Bus, Package, BarChart3, Shield, ArrowLeft, ExternalLink } from 'lucide-react';
+import { useSEO } from '@/hooks/useSEO';
 
 const DOCS = [
   {

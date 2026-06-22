@@ -124,8 +124,7 @@ export function CbcAnalyticsPage() {
     BE1: 'bg-red-200 text-red-900',     BE2: 'bg-red-100 text-red-800',
   };
 
-  // Playgroup/PP1/PP2 use the same 8-level scale as Junior Secondary in the broadsheet.
-  const isJSSBroadsheet = ['junior_secondary', 'playgroup', 'pp1', 'pp2', 'pre_primary'].includes(broadsheet?.education_level);
+  const isJSSBroadsheet = broadsheet?.education_level === 'junior_secondary';
 
   const downloadBroadsheetCSV = () => {
     if (!broadsheet) return;

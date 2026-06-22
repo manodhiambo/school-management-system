@@ -1346,14 +1346,15 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
     );
     const educationLevel = classRow[0]?.education_level || '';
 
-    // Playgroup/PP1/PP2 use the same 8-level KJSEA scale as Junior Secondary
-    // in the broadsheet, not the 3-tier WD/D/B scale used on report cards.
-    const use8LevelGrading = ['junior_secondary', 'playgroup', 'pp1', 'pp2', 'pre_primary'].includes(educationLevel);
+    // Only Junior Secondary uses the 8-level KJSEA scale in the broadsheet.
+    // Playgroup/PP1/PP2 use the same EE/ME/AE/BE scale as Grade 1-6 (lower/
+    // upper primary), not the 3-tier WD/D/B scale used on report cards.
+    const use8LevelGrading = educationLevel === 'junior_secondary';
 
     // Fallback mapping when only a WD/D/B grade is recorded with no percentage
-    const PP_TO_8LEVEL_GRADE = { WD: 'EE2', D: 'ME2', B: 'BE2' };
+    const PP_TO_STANDARD_GRADE = { WD: 'EE', D: 'ME', B: 'BE' };
 
-    // Percentage → 8-level grade (JSS KJSEA scale, also used for Playgroup/PP1/PP2)
+    // Percentage → 8-level grade (JSS KJSEA scale)
     const pctToJssGrade = (pct) => {
       if (pct === null || pct === undefined) return '';
       if (pct >= 90) return 'EE1';
@@ -1429,12 +1430,14 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
         if (pct !== null) {
           grade = pctToJssGrade(pct);
         } else {
-          grade = r.overall_grade || PP_TO_8LEVEL_GRADE[r.pre_primary_grade] || '';
+          grade = r.overall_grade || '';
           // Back-compute a midpoint percentage from grade for ranking
           pct = gradeToMidPct(grade);
         }
       } else {
-        grade = r.overall_grade || '';
+        // Standard CBE levels and Playgroup/PP1/PP2 both land here, both
+        // using the EE/ME/AE/BE scale.
+        grade = r.overall_grade || PP_TO_STANDARD_GRADE[r.pre_primary_grade] || '';
         if (pct === null) pct = gradeToMidPct(grade);
       }
 

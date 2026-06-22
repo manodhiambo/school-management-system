@@ -773,13 +773,7 @@ export function CbcAnalyticsPage() {
 
                   {/* Grade legend */}
                   <div className="mt-4 flex flex-wrap gap-3">
-                    {broadsheet.education_level === 'pre_primary' ? (
-                      <>
-                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-100 text-green-800 font-semibold">WD</span> Well Developed</span>
-                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">D</span> Developing</span>
-                        <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-semibold">B</span> Beginning</span>
-                      </>
-                    ) : broadsheet.education_level === 'junior_secondary' ? (
+                    {broadsheet.education_level === 'junior_secondary' ? (
                       <>
                         <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-200 text-green-900 font-semibold">EE1</span> Exceeding Expectations L1 (90–100%)</span>
                         <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-100 text-green-800 font-semibold">EE2</span> Exceeding Expectations L2 (75–89%)</span>

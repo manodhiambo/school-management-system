@@ -1347,7 +1347,11 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
     const educationLevel = classRow[0]?.education_level || '';
 
     const isJSS = educationLevel === 'junior_secondary';
-    const isPrePrimary = ['playgroup', 'pp1', 'pp2', 'pre_primary'].includes(educationLevel);
+
+    // Playgroup/PP1/PP2 use the same EE/ME/AE/BE scale as every other level in
+    // the broadsheet — map their WD/D/B grade (where that's the only thing
+    // recorded) to the nearest EE/ME/AE/BE equivalent for display/ranking.
+    const PP_TO_STANDARD_GRADE = { WD: 'EE', D: 'ME', B: 'BE' };
 
     // JSS percentage → 8-level grade
     const pctToJssGrade = (pct) => {
@@ -1419,11 +1423,7 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
       let grade = '';
       let pct = r.percentage !== null && r.percentage !== undefined ? parseFloat(r.percentage) : null;
 
-      if (isPrePrimary) {
-        grade = r.pre_primary_grade || r.overall_grade || '';
-        // Back-compute a midpoint percentage from grade for ranking
-        if (pct === null) pct = gradeToMidPct(grade);
-      } else if (isJSS) {
+      if (isJSS) {
         // For JSS: derive 8-level grade from percentage if available,
         // otherwise use stored grade (which may already be 8-level)
         if (pct !== null) {
@@ -1434,7 +1434,9 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
           pct = gradeToMidPct(grade);
         }
       } else {
-        grade = r.overall_grade || '';
+        // Standard CBE levels and Playgroup/PP1/PP2 both land here, both
+        // using the EE/ME/AE/BE scale.
+        grade = r.overall_grade || PP_TO_STANDARD_GRADE[r.pre_primary_grade] || '';
         if (pct === null) pct = gradeToMidPct(grade);
       }
 
@@ -1463,8 +1465,6 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
       if (scoredCount > 0) {
         if (isJSS) {
           overall = pctToJssGrade(meanPct);
-        } else if (isPrePrimary) {
-          overall = meanPct >= 75 ? 'WD' : meanPct >= 40 ? 'D' : 'B';
         } else {
           overall = meanPct >= 80 ? 'EE' : meanPct >= 60 ? 'ME' : meanPct >= 40 ? 'AE' : 'BE';
         }

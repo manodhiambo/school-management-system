@@ -124,7 +124,8 @@ export function CbcAnalyticsPage() {
     BE1: 'bg-red-200 text-red-900',     BE2: 'bg-red-100 text-red-800',
   };
 
-  const isJSSBroadsheet = broadsheet?.education_level === 'junior_secondary';
+  // Playgroup/PP1/PP2 use the same 8-level scale as Junior Secondary in the broadsheet.
+  const isJSSBroadsheet = ['junior_secondary', 'playgroup', 'pp1', 'pp2', 'pre_primary'].includes(broadsheet?.education_level);
 
   const downloadBroadsheetCSV = () => {
     if (!broadsheet) return;
@@ -773,7 +774,7 @@ export function CbcAnalyticsPage() {
 
                   {/* Grade legend */}
                   <div className="mt-4 flex flex-wrap gap-3">
-                    {broadsheet.education_level === 'junior_secondary' ? (
+                    {isJSSBroadsheet ? (
                       <>
                         <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-200 text-green-900 font-semibold">EE1</span> Exceeding Expectations L1 (90–100%)</span>
                         <span className="flex items-center gap-1 text-xs"><span className="px-2 py-0.5 rounded bg-green-100 text-green-800 font-semibold">EE2</span> Exceeding Expectations L2 (75–89%)</span>

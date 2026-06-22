@@ -1346,14 +1346,14 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
     );
     const educationLevel = classRow[0]?.education_level || '';
 
-    const isJSS = educationLevel === 'junior_secondary';
+    // Playgroup/PP1/PP2 use the same 8-level KJSEA scale as Junior Secondary
+    // in the broadsheet, not the 3-tier WD/D/B scale used on report cards.
+    const use8LevelGrading = ['junior_secondary', 'playgroup', 'pp1', 'pp2', 'pre_primary'].includes(educationLevel);
 
-    // Playgroup/PP1/PP2 use the same EE/ME/AE/BE scale as every other level in
-    // the broadsheet — map their WD/D/B grade (where that's the only thing
-    // recorded) to the nearest EE/ME/AE/BE equivalent for display/ranking.
-    const PP_TO_STANDARD_GRADE = { WD: 'EE', D: 'ME', B: 'BE' };
+    // Fallback mapping when only a WD/D/B grade is recorded with no percentage
+    const PP_TO_8LEVEL_GRADE = { WD: 'EE2', D: 'ME2', B: 'BE2' };
 
-    // JSS percentage → 8-level grade
+    // Percentage → 8-level grade (JSS KJSEA scale, also used for Playgroup/PP1/PP2)
     const pctToJssGrade = (pct) => {
       if (pct === null || pct === undefined) return '';
       if (pct >= 90) return 'EE1';
@@ -1423,20 +1423,18 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
       let grade = '';
       let pct = r.percentage !== null && r.percentage !== undefined ? parseFloat(r.percentage) : null;
 
-      if (isJSS) {
-        // For JSS: derive 8-level grade from percentage if available,
-        // otherwise use stored grade (which may already be 8-level)
+      if (use8LevelGrading) {
+        // Derive the 8-level grade from percentage when available, otherwise
+        // fall back to whatever grade was already stored.
         if (pct !== null) {
           grade = pctToJssGrade(pct);
         } else {
-          grade = r.overall_grade || '';
+          grade = r.overall_grade || PP_TO_8LEVEL_GRADE[r.pre_primary_grade] || '';
           // Back-compute a midpoint percentage from grade for ranking
           pct = gradeToMidPct(grade);
         }
       } else {
-        // Standard CBE levels and Playgroup/PP1/PP2 both land here, both
-        // using the EE/ME/AE/BE scale.
-        grade = r.overall_grade || PP_TO_STANDARD_GRADE[r.pre_primary_grade] || '';
+        grade = r.overall_grade || '';
         if (pct === null) pct = gradeToMidPct(grade);
       }
 
@@ -1463,7 +1461,7 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
 
       let overall = '';
       if (scoredCount > 0) {
-        if (isJSS) {
+        if (use8LevelGrading) {
           overall = pctToJssGrade(meanPct);
         } else {
           overall = meanPct >= 80 ? 'EE' : meanPct >= 60 ? 'ME' : meanPct >= 40 ? 'AE' : 'BE';

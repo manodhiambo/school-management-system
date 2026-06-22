@@ -1421,6 +1421,8 @@ router.get('/broadsheet', authenticate, requireModule('academics'), async (req, 
 
       if (isPrePrimary) {
         grade = r.pre_primary_grade || r.overall_grade || '';
+        // Back-compute a midpoint percentage from grade for ranking
+        if (pct === null) pct = gradeToMidPct(grade);
       } else if (isJSS) {
         // For JSS: derive 8-level grade from percentage if available,
         // otherwise use stored grade (which may already be 8-level)

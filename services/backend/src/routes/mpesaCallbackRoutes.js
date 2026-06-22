@@ -5,7 +5,43 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// POST /api/v1/fee/mpesa/callback — Safaricom STK push result (no auth required)
+async function getMpesaToken() {
+  const key = process.env.MPESA_CONSUMER_KEY;
+  const secret = process.env.MPESA_CONSUMER_SECRET;
+  if (!key || !secret) throw new Error('M-Pesa credentials not configured');
+  const credentials = Buffer.from(`${key}:${secret}`).toString('base64');
+  const resp = await fetch(
+    'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+    { headers: { Authorization: `Basic ${credentials}` } }
+  );
+  if (!resp.ok) throw new Error(`M-Pesa auth failed: ${resp.status}`);
+  const json = await resp.json();
+  return json.access_token;
+}
+
+// Independently verify a transaction with Safaricom rather than trusting the
+// callback body, since the callback endpoint has no auth (it's a public webhook)
+// and anyone who has initiated their own STK push knows their CheckoutRequestID —
+// trusting the POSTed Amount/ResultCode directly would let them forge "paid" results.
+async function verifyWithSafaricom(checkoutRequestId) {
+  const shortcode = process.env.MPESA_SHORTCODE;
+  const passkey = process.env.MPESA_PASSKEY;
+  if (!shortcode || !passkey) throw new Error('M-Pesa not configured');
+  const token = await getMpesaToken();
+  const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+  const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+  const resp = await fetch(
+    'https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ BusinessShortCode: shortcode, Password: password, Timestamp: timestamp, CheckoutRequestID: checkoutRequestId }),
+    }
+  );
+  return resp.json();
+}
+
+// POST /api/v1/fee/mpesa/callback — Safaricom STK push result (no auth required — public webhook)
 router.post('/callback', async (req, res) => {
   // Always respond 200 immediately so Safaricom doesn't retry
   res.json({ ResultCode: 0, ResultDesc: 'OK' });
@@ -14,21 +50,12 @@ router.post('/callback', async (req, res) => {
     const body = req.body?.Body?.stkCallback;
     if (!body) return;
 
-    const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = body;
-    if (ResultCode !== 0) {
-      logger.warn(`M-Pesa STK failed [${CheckoutRequestID}]: ${ResultDesc}`);
-      return;
-    }
-
-    const meta = {};
-    (CallbackMetadata?.Item || []).forEach(({ Name, Value }) => { meta[Name] = Value; });
-
-    const amount = parseFloat(meta.Amount || 0);
-    const mpesaRef = String(meta.MpesaReceiptNumber || '');
+    const { CheckoutRequestID } = body;
+    if (!CheckoutRequestID) return;
 
     // Find invoice by the checkout ID we stored when initiating
     const invoiceRows = await query(
-      `SELECT id, tenant_id, student_id, net_amount, paid_amount, balance_amount
+      `SELECT id, tenant_id, student_id, net_amount, paid_amount, balance_amount, metadata
        FROM fee_invoices
        WHERE (metadata->>'mpesa_checkout_id') = $1`,
       [CheckoutRequestID]
@@ -38,6 +65,25 @@ router.post('/callback', async (req, res) => {
       return;
     }
     const inv = invoiceRows[0];
+
+    // Don't trust the callback body for the result — re-verify directly with
+    // Safaricom using our own credentials, which an attacker cannot forge.
+    const verified = await verifyWithSafaricom(CheckoutRequestID);
+    if (String(verified.ResultCode) !== '0') {
+      logger.warn(`M-Pesa STK not completed [${CheckoutRequestID}]: ${verified.ResultDesc || verified.errorMessage}`);
+      return;
+    }
+
+    // The query API only confirms completion — it does not return the amount or
+    // receipt number (those only ever appear in the unauthenticated callback body,
+    // which we don't trust). Credit exactly the amount our own server fixed when
+    // it initiated this STK push, since that is what Safaricom actually debited.
+    const amount = parseFloat(inv.metadata?.mpesa_amount || 0);
+    if (!amount) {
+      logger.warn('M-Pesa callback: no recorded mpesa_amount for checkout', CheckoutRequestID);
+      return;
+    }
+    const mpesaRef = String(verified.MerchantRequestID || CheckoutRequestID);
     const newPaid = parseFloat(inv.paid_amount || 0) + amount;
     const newBalance = Math.max(0, parseFloat(inv.balance_amount ?? inv.net_amount ?? 0) - amount);
     const newStatus = newBalance <= 0 ? 'paid' : 'partial';

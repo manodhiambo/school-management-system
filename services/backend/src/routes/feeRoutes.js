@@ -1728,9 +1728,9 @@ router.post('/mpesa/pay', async (req, res) => {
       // Store pending transaction reference
       await query(
         `UPDATE fee_invoices SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-           jsonb_build_object('mpesa_checkout_id', $1::text, 'mpesa_initiated_at', NOW()::text)
+           jsonb_build_object('mpesa_checkout_id', $1::text, 'mpesa_initiated_at', NOW()::text, 'mpesa_amount', $3::numeric)
          WHERE id = $2`,
-        [stkJson.CheckoutRequestID, invoiceId]
+        [stkJson.CheckoutRequestID, invoiceId, parsedAmount]
       ).catch(() => {}); // non-fatal
       return res.json({
         success: true,

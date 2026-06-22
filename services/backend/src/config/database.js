@@ -26,8 +26,15 @@ const pool = new Pool({
   statement_timeout: 15000,
 });
 
-pool.on('connect', () => {
+pool.on('connect', (client) => {
   console.log('Connected to PostgreSQL database');
+  // Pin every connection to the public schema. Some connections to this
+  // database default search_path to a stale tenant_* schema (a leftover
+  // from an abandoned schema-per-tenant approach) which shadows newer
+  // columns/tables that only exist in public, causing silent query failures.
+  client.query('SET search_path TO public').catch((err) => {
+    console.error('Failed to set search_path:', err.message);
+  });
 });
 
 pool.on('error', (err) => {

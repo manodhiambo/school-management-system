@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
-import { FileText, CheckCircle, Download, PlusCircle, Users, Share2, Mail, MessageCircle, X, Phone, AtSign, AlertCircle, Loader2 } from 'lucide-react';
+import { FileText, CheckCircle, Download, PlusCircle, Users, Share2, Mail, MessageCircle, X, Phone, AtSign, AlertCircle, Loader2, History } from 'lucide-react';
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────
 const GRADE_HEX: Record<string, [number, number, number]> = {
@@ -600,6 +600,8 @@ export function CbcReportCardPage() {
   const [filters, setFilters] = useState({ class_id: '', term: 'term1', academic_year: new Date().getFullYear().toString() });
   const [termDates, setTermDates] = useState({ closing_date: '', opening_date: '' });
   const [period, setPeriod] = useState('');
+  const [examId, setExamId] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [showShare, setShowShare] = useState(false);
   const [shareResult, setShareResult] = useState<any>(null);
@@ -608,7 +610,18 @@ export function CbcReportCardPage() {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => api.getClasses() });
-  const { data: periodsData } = useQuery({ queryKey: ['cbc-report-card-periods'], queryFn: () => api.getCbcReportCardPeriods() });
+  const { data: periodsData } = useQuery({
+    queryKey: ['cbc-report-card-periods', filters.class_id, filters.term, filters.academic_year],
+    queryFn: () => api.getCbcReportCardPeriods({
+      class_id: filters.class_id, term: filters.term, academic_year: filters.academic_year,
+    }),
+    enabled: !!filters.class_id,
+  });
+  const { data: batchesData } = useQuery({
+    queryKey: ['cbc-report-card-batches'],
+    queryFn: () => api.getCbcReportCardBatches(),
+    enabled: showHistory,
+  });
   const { data: cardsData, isLoading } = useQuery({
     queryKey: ['cbc-report-cards', filters],
     queryFn: () => api.getCbcReportCards(filters),
@@ -642,10 +655,12 @@ export function CbcReportCardPage() {
       closing_date: termDates.closing_date || undefined,
       opening_date: termDates.opening_date || undefined,
       period: period.trim() || undefined,
+      exam_id: examId || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cbc-report-cards'] });
       qc.invalidateQueries({ queryKey: ['cbc-report-card-periods'] });
+      qc.invalidateQueries({ queryKey: ['cbc-report-card-batches'] });
     },
   });
 
@@ -655,7 +670,9 @@ export function CbcReportCardPage() {
   });
 
   const classes = (classesData as any)?.data || [];
-  const periodSuggestions: string[] = (periodsData as any)?.data || ['Mid-Term', 'End-Term'];
+  const examOptions: any[] = (periodsData as any)?.data?.exams || [];
+  const labelSuggestions: string[] = (periodsData as any)?.data?.labels || ['Mid-Term', 'End-Term'];
+  const batches: any[] = (batchesData as any)?.data || [];
   const cards = (cardsData as any)?.data || [];
   const detail = (cardDetail as any)?.data;
   const cardsWithId = cards.filter((c: any) => c.id);
@@ -712,6 +729,17 @@ export function CbcReportCardPage() {
           <h1 className="text-2xl font-bold text-gray-900">CBE Report Cards</h1>
           <p className="text-sm text-gray-500 mt-1">Holistic Learner Progress Reports — Kenya CBE</p>
         </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowHistory(v => !v)}
+          className="flex items-center gap-2"
+        >
+          <History className="h-4 w-4" />
+          {showHistory ? 'Hide History' : 'Generation History'}
+        </Button>
 
         {/* Download PDF dropdown */}
         {filters.class_id && cardsWithId.length > 0 && (
@@ -773,7 +801,72 @@ export function CbcReportCardPage() {
             )}
           </div>
         )}
+        </div>
       </div>
+
+      {/* History panel */}
+      {showHistory && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="h-4 w-4 text-gray-400" />
+              Report Card Generation History
+            </CardTitle>
+            <p className="text-xs text-gray-500">Every time "Generate Report Cards" was run, with who ran it and what was created.</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            {batches.length === 0 ? (
+              <div className="p-6 text-center text-sm text-gray-400">No report cards have been generated yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-600 border-b">
+                      <th className="text-left px-3 py-2 font-semibold">Date</th>
+                      <th className="text-left px-3 py-2 font-semibold">Class</th>
+                      <th className="text-left px-3 py-2 font-semibold">Term / Year</th>
+                      <th className="text-left px-3 py-2 font-semibold">Period</th>
+                      <th className="text-right px-3 py-2 font-semibold">Students</th>
+                      <th className="text-right px-3 py-2 font-semibold">Created</th>
+                      <th className="text-right px-3 py-2 font-semibold">Updated</th>
+                      <th className="text-left px-3 py-2 font-semibold">By</th>
+                      <th className="text-left px-3 py-2 font-semibold"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batches.map((b: any) => (
+                      <tr key={b.id} className="border-b last:border-0 hover:bg-gray-50">
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-600">{new Date(b.created_at).toLocaleString()}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">{b.class_name}</td>
+                        <td className="px-3 py-2 text-gray-600">{String(b.term).replace('term', 'Term ')} / {b.academic_year}</td>
+                        <td className="px-3 py-2 text-gray-600">{b.exam_name || b.period || '—'}</td>
+                        <td className="px-3 py-2 text-right text-gray-600">{b.total_students}</td>
+                        <td className="px-3 py-2 text-right text-green-700">{b.cards_created}</td>
+                        <td className="px-3 py-2 text-right text-blue-700">{b.cards_updated}</td>
+                        <td className="px-3 py-2 text-gray-600">{b.generated_by_name || '—'}</td>
+                        <td className="px-3 py-2">
+                          <button
+                            className="text-indigo-600 hover:text-indigo-800 font-medium"
+                            onClick={() => {
+                              setSelectedCard(null);
+                              setFilters({ class_id: b.class_id, term: b.term, academic_year: b.academic_year });
+                              setPeriod(b.period || '');
+                              setExamId(b.exam_id || '');
+                              setShowHistory(false);
+                            }}
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -834,27 +927,58 @@ export function CbcReportCardPage() {
             </div>
           </div>
 
-          {/* Period — e.g. Mid-Term, End-Term. Click a quick option below or type your own. */}
+          {/* Period — pick which exam's results to print, or a generic Mid-Term/End-Term label. */}
           <div className="mt-4">
             <Label>Period (optional)</Label>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              {periodSuggestions.map(p => (
+
+            {!filters.class_id ? (
+              <p className="text-xs text-gray-400 mt-1">Select a class above to see exams already done for this term/year.</p>
+            ) : examOptions.length > 0 ? (
+              <div className="mt-1">
+                <p className="text-xs font-medium text-gray-600 mb-1">Exams done for this class/term/year — pick one to print its results:</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {examOptions.map(ex => (
+                    <button
+                      key={ex.id}
+                      type="button"
+                      onClick={() => { setPeriod(ex.name); setExamId(ex.id); }}
+                      title={ex.start_date ? new Date(ex.start_date).toLocaleDateString() : undefined}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors
+                        ${examId === ex.id
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {ex.name}
+                      {ex.start_date ? <span className="opacity-70"> · {new Date(ex.start_date).toLocaleDateString()}</span> : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-amber-600 mt-1">
+                No exams found for this class/term/year yet. Create one in the Exams module, or use a generic label below.
+              </p>
+            )}
+
+            <p className="text-xs font-medium text-gray-600 mt-3 mb-1">Or use a generic label (no specific exam):</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {labelSuggestions.map(p => (
                 <button
                   key={p}
                   type="button"
-                  onClick={() => setPeriod(p)}
+                  onClick={() => { setPeriod(p); setExamId(''); }}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-colors
-                    ${period === p
+                    ${period === p && !examId
                       ? 'bg-indigo-600 text-white border-indigo-600'
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                 >
                   {p}
                 </button>
               ))}
-              {period && !periodSuggestions.includes(period) && (
+              {period && (
                 <button
                   type="button"
-                  onClick={() => setPeriod('')}
+                  onClick={() => { setPeriod(''); setExamId(''); }}
                   className="text-xs px-3 py-1.5 rounded-full border bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
                 >
                   Clear "{period}"
@@ -865,15 +989,15 @@ export function CbcReportCardPage() {
               list="report-card-period-suggestions"
               className="mt-2"
               value={period}
-              onChange={e => setPeriod(e.target.value)}
+              onChange={e => { setPeriod(e.target.value); setExamId(''); }}
               placeholder="Or type a custom period name…"
             />
             <datalist id="report-card-period-suggestions">
-              {periodSuggestions.map(p => <option key={p} value={p} />)}
+              {labelSuggestions.map(p => <option key={p} value={p} />)}
             </datalist>
             <p className="text-xs text-gray-400 mt-0.5">
-              Click Mid-Term or End-Term above, or type your own label. Printed on the report card; Mid-Term/End-Term
-              also filter grades to that period's assessment scores when generating.
+              Picking an exam prints that exam's actual results. A generic label (or custom text) is just printed on
+              the card — Mid-Term/End-Term also filter grades to that period's assessment scores when generating.
             </p>
           </div>
 

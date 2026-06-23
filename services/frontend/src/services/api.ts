@@ -1140,7 +1140,10 @@ class ApiService {
 
   // Report Cards
   getCbcReportCards(params?: any) { return this.api.get('/cbe/report-cards', { params }); }
-  getCbcReportCardPeriods() { return this.api.get('/cbe/report-cards/periods'); }
+  getCbcReportCardPeriods(params?: { class_id?: string; term?: string; academic_year?: string }) {
+    return this.api.get('/cbe/report-cards/periods', { params });
+  }
+  getCbcReportCardBatches() { return this.api.get('/cbe/report-cards/batches'); }
   getCbcReportCard(id: string) { return this.api.get('/cbe/report-cards/' + id); }
   getMyReportCards() { return this.api.get('/cbe/report-cards/my'); }
   getMyReportCard(id: string) { return this.api.get('/cbe/report-cards/' + id); }

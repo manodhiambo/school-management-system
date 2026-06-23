@@ -834,21 +834,46 @@ export function CbcReportCardPage() {
             </div>
           </div>
 
-          {/* Period — e.g. Mid-Term, End-Term. Pick a system-known value or type your own. */}
+          {/* Period — e.g. Mid-Term, End-Term. Click a quick option below or type your own. */}
           <div className="mt-4">
             <Label>Period (optional)</Label>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              {periodSuggestions.map(p => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPeriod(p)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors
+                    ${period === p
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                >
+                  {p}
+                </button>
+              ))}
+              {period && !periodSuggestions.includes(period) && (
+                <button
+                  type="button"
+                  onClick={() => setPeriod('')}
+                  className="text-xs px-3 py-1.5 rounded-full border bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
+                >
+                  Clear "{period}"
+                </button>
+              )}
+            </div>
             <Input
               list="report-card-period-suggestions"
-              className="mt-1"
+              className="mt-2"
               value={period}
               onChange={e => setPeriod(e.target.value)}
-              placeholder="e.g. Mid-Term, End-Term — pick a suggestion or type your own"
+              placeholder="Or type a custom period name…"
             />
             <datalist id="report-card-period-suggestions">
               {periodSuggestions.map(p => <option key={p} value={p} />)}
             </datalist>
             <p className="text-xs text-gray-400 mt-0.5">
-              Printed on the report card and used to filter Mid-Term/End-Term assessment scores when generating grades.
+              Click Mid-Term or End-Term above, or type your own label. Printed on the report card; Mid-Term/End-Term
+              also filter grades to that period's assessment scores when generating.
             </p>
           </div>
 

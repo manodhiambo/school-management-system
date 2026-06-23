@@ -440,6 +440,26 @@ router.get('/report-cards/my', authenticate, requireModule('academics'), async (
   }
 });
 
+// GET /api/v1/cbe/report-cards/periods — suggested period labels for the report card form:
+// the two system exam periods (mid_term/end_term, same as the assessments module) plus any
+// custom labels already typed for this tenant. The frontend still lets users type their own.
+router.get('/report-cards/periods', authenticate, requireModule('academics'), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const rows = await query(
+      `SELECT DISTINCT period FROM cbc_report_cards
+       WHERE tenant_id = $1 AND period IS NOT NULL AND period != '' ORDER BY period`,
+      [tid]
+    );
+    const systemDefaults = ['Mid-Term', 'End-Term'];
+    const custom = rows.map(r => r.period).filter(p => !systemDefaults.includes(p));
+    res.json({ success: true, data: [...systemDefaults, ...custom] });
+  } catch (err) {
+    logger.error('Get report card periods error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/v1/cbe/report-cards?student_id=&term=&academic_year=&class_id=
 // When class_id is provided, returns ALL students in that class (LEFT JOIN) so students without
 // a report card yet still appear in the list.
@@ -460,6 +480,7 @@ router.get('/report-cards', authenticate, requireModule('academics'), async (req
                rc.id,
                rc.status,
                rc.term,
+               rc.period,
                rc.academic_year,
                rc.overall_grade,
                rc.published_at,
@@ -506,7 +527,7 @@ router.get('/report-cards', authenticate, requireModule('academics'), async (req
 // POST /api/v1/cbe/report-cards/generate — bulk-create draft report cards for all students in a class
 router.post('/report-cards/generate', authenticate, requireModule('academics'), async (req, res) => {
   try {
-    const { class_id, term, academic_year, closing_date, opening_date } = req.body;
+    const { class_id, term, academic_year, closing_date, opening_date, period } = req.body;
     if (!class_id || !term || !academic_year) {
       return res.status(400).json({ success: false, message: 'class_id, term and academic_year are required' });
     }
@@ -530,21 +551,22 @@ router.post('/report-cards/generate', authenticate, requireModule('academics'), 
         [s.id, class_id, term, academic_year, tid]
       );
       if (existing.length) {
-        // Update closing/opening dates if provided
-        if (closing_date || opening_date) {
+        // Update closing/opening dates and period if provided
+        if (closing_date || opening_date || period) {
           await query(
-            `UPDATE cbc_report_cards SET closing_date=COALESCE($1, closing_date), opening_date=COALESCE($2, opening_date), updated_at=NOW()
+            `UPDATE cbc_report_cards SET closing_date=COALESCE($1, closing_date), opening_date=COALESCE($2, opening_date),
+             period=COALESCE($8, period), updated_at=NOW()
              WHERE student_id=$3 AND class_id=$4 AND term=$5 AND academic_year=$6 AND tenant_id=$7`,
-            [closing_date || null, opening_date || null, s.id, class_id, term, academic_year, tid]
+            [closing_date || null, opening_date || null, s.id, class_id, term, academic_year, tid, period || null]
           );
         }
         continue;
       }
 
       await query(
-        `INSERT INTO cbc_report_cards (id, tenant_id, student_id, class_id, term, academic_year, closing_date, opening_date, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',NOW(),NOW())`,
-        [uuidv4(), tid, s.id, class_id, term, academic_year, closing_date || null, opening_date || null]
+        `INSERT INTO cbc_report_cards (id, tenant_id, student_id, class_id, term, academic_year, closing_date, opening_date, period, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',NOW(),NOW())`,
+        [uuidv4(), tid, s.id, class_id, term, academic_year, closing_date || null, opening_date || null, period || null]
       );
       created++;
     }
@@ -590,7 +612,17 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
       }
     }
     const rc = rows[0];
-    const competencies = await query(
+
+    // Normalize the report card's period to the assessment exam_period values (mid_term/end_term)
+    // so a period-specific report only pulls in scores recorded for that period. A custom typed
+    // period (e.g. "Opening Exam") doesn't match either value and falls back to the whole-term
+    // aggregate, same as when no period is set. student_competency_summary aggregates the whole
+    // term and has no period breakdown, so a period-specific report skips straight to the
+    // cbc_assessments fallback below, filtered by exam_period.
+    const normalizedPeriod = (rc.period || '').toLowerCase().replace(/[\s-]+/g, '_');
+    const examPeriodFilter = ['mid_term', 'end_term'].includes(normalizedPeriod) ? normalizedPeriod : null;
+
+    const competencies = examPeriodFilter ? [] : await query(
       `SELECT cs.*, sub.name as subject_name,
               UPPER(t.first_name || ' ' || t.last_name) AS teacher_name,
               CASE cs.overall_cbc_grade
@@ -610,14 +642,16 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
       [rc.student_id, rc.term, rc.academic_year, rc.class_id]
     );
 
-    // If student_competency_summary is empty, fall back to cbc_assessments
-    // (same data source used by Student Report page — ensures both pages show the same grades)
+    // If student_competency_summary is empty (or a period filter forced the fallback), use
+    // cbc_assessments (same data source used by Student Report page — ensures both pages show
+    // the same grades). $6 carries the exam_period filter when the report card is period-specific.
     let finalCompetencies = competencies;
     if (competencies.length === 0) {
       const gradePointMap = {
         EE:4, ME:3, AE:2, BE:1, WD:4, D:2, B:1,
         EE1:8, EE2:7, ME1:6, ME2:5, AE1:4, AE2:3, BE1:2, BE2:1,
       };
+      const periodClause = examPeriodFilter ? 'AND a.exam_period = $6' : '';
       const fallback = await query(
         `SELECT
            a.subject_id,
@@ -633,21 +667,21 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
            (SELECT a2.cbc_grade FROM cbc_assessments a2
             WHERE a2.student_id = $1 AND a2.subject_id = a.subject_id
               AND a2.term = $2 AND a2.academic_year = $3 AND a2.tenant_id = $5
-              AND a2.cbc_grade IS NOT NULL
+              AND a2.cbc_grade IS NOT NULL ${examPeriodFilter ? 'AND a2.exam_period = $6' : ''}
             ORDER BY a2.assessment_date DESC LIMIT 1) AS overall_cbc_grade,
            (SELECT a2.pre_primary_grade FROM cbc_assessments a2
             WHERE a2.student_id = $1 AND a2.subject_id = a.subject_id
               AND a2.term = $2 AND a2.academic_year = $3 AND a2.tenant_id = $5
-              AND a2.pre_primary_grade IS NOT NULL
+              AND a2.pre_primary_grade IS NOT NULL ${examPeriodFilter ? 'AND a2.exam_period = $6' : ''}
             ORDER BY a2.assessment_date DESC LIMIT 1) AS pre_primary_grade
          FROM cbc_assessments a
          JOIN subjects sub ON sub.id = a.subject_id
          LEFT JOIN class_subjects csj ON csj.class_id = $4 AND csj.subject_id = a.subject_id
          LEFT JOIN teachers t ON t.user_id = csj.teacher_id
-         WHERE a.student_id = $1 AND a.term = $2 AND a.academic_year = $3 AND a.tenant_id = $5
+         WHERE a.student_id = $1 AND a.term = $2 AND a.academic_year = $3 AND a.tenant_id = $5 ${periodClause}
          GROUP BY a.subject_id, sub.name, t.first_name, t.last_name
          ORDER BY sub.name`,
-        [rc.student_id, rc.term, rc.academic_year, rc.class_id, rc.tenant_id]
+        [rc.student_id, rc.term, rc.academic_year, rc.class_id, rc.tenant_id, ...(examPeriodFilter ? [examPeriodFilter] : [])]
       ).catch(() => []);
 
       finalCompetencies = fallback.map(r => ({
@@ -1043,7 +1077,7 @@ router.post('/report-cards', authenticate, requireModule('academics'), async (re
       overall_grade, days_present, days_absent, days_late,
       learning_areas, values_citizenship, co_curricular,
       class_teacher_comment, head_teacher_comment,
-      closing_date, opening_date
+      closing_date, opening_date, period
     } = req.body;
     const tid = req.user.tenant_id;
     const rows = await query(
@@ -1051,14 +1085,15 @@ router.post('/report-cards', authenticate, requireModule('academics'), async (re
        (student_id, class_id, term, academic_year, overall_grade,
         days_present, days_absent, days_late, learning_areas,
         values_citizenship, co_curricular, class_teacher_comment,
-        head_teacher_comment, class_teacher_id, tenant_id, closing_date, opening_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        head_teacher_comment, class_teacher_id, tenant_id, closing_date, opening_date, period)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        ON CONFLICT (student_id, term, academic_year)
        DO UPDATE SET overall_grade=$5, days_present=$6, days_absent=$7,
        days_late=$8, learning_areas=$9, values_citizenship=$10,
        co_curricular=$11, class_teacher_comment=$12, head_teacher_comment=$13,
        class_teacher_id=$14, closing_date=COALESCE($16, cbc_report_cards.closing_date),
-       opening_date=COALESCE($17, cbc_report_cards.opening_date), updated_at=NOW()
+       opening_date=COALESCE($17, cbc_report_cards.opening_date),
+       period=COALESCE($18, cbc_report_cards.period), updated_at=NOW()
        RETURNING *`,
       [student_id, class_id, term, academic_year, overall_grade,
        days_present || 0, days_absent || 0, days_late || 0,
@@ -1066,7 +1101,7 @@ router.post('/report-cards', authenticate, requireModule('academics'), async (re
        JSON.stringify(values_citizenship || {}),
        JSON.stringify(co_curricular || {}),
        class_teacher_comment, head_teacher_comment, req.user.id, tid,
-       closing_date || null, opening_date || null]
+       closing_date || null, opening_date || null, period || null]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {

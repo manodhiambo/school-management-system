@@ -484,9 +484,11 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
 
     // Load existing invoices for duplicate detection — covers fee_structure_id and extra_fee_id
     const existingInvoices = await query(
-      `SELECT student_id, fee_structure_id, extra_fee_id, term, academic_year
-       FROM fee_invoices
-       WHERE tenant_id = $1 AND status NOT IN ('cancelled')`,
+      `SELECT fi.id, fi.student_id, fi.fee_structure_id, fi.extra_fee_id, fi.term, fi.academic_year,
+              fi.status, fs.name AS fee_name, fs.student_type AS fee_student_type
+       FROM fee_invoices fi
+       LEFT JOIN fee_structure fs ON fs.id = fi.fee_structure_id
+       WHERE fi.tenant_id = $1 AND fi.status NOT IN ('cancelled')`,
       [tid]
     );
     const existingSet = new Set([
@@ -497,6 +499,16 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
         .filter(r => r.extra_fee_id)
         .map(r => `${r.student_id}|ef:${r.extra_fee_id}|${r.term||''}|${r.academic_year||''}`),
     ]);
+    // Stale invoices from before a student's boarder/day-scholar status changed — e.g. a
+    // day-scholar "Term 2 Fee" invoice left pending after the student became a boarder.
+    // Keyed by student+fee name+term+year so we can find and cancel them when the correctly
+    // typed structure is invoiced, instead of letting the student get billed for both.
+    const staleByKey = {};
+    for (const r of existingInvoices) {
+      if (r.status !== 'pending' || !r.fee_name) continue;
+      const key = `${r.student_id}|${r.fee_name.trim().toLowerCase()}|${r.term||''}|${r.academic_year||''}`;
+      (staleByKey[key] ||= []).push(r);
+    }
 
     const summary = { created: [], skipped: [], errors: [] };
 
@@ -552,6 +564,22 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
         if (struct.is_transport_fee && transportMap[student.id]) {
           const tf = parseFloat(transportMap[student.id].term_fee);
           if (tf > 0) amount = tf;
+        }
+
+        // If this student has a pending invoice for the same fee name/term/year but from a
+        // structure for the OTHER student_type (boarder vs day_scholar), it's a leftover from
+        // before their status changed — cancel it so they aren't billed for both.
+        const staleKey = `${student.id}|${struct.name.trim().toLowerCase()}|${term || ''}|${academic_year || ''}`;
+        const staleMatches = (staleByKey[staleKey] || []).filter(
+          r => r.fee_structure_id !== struct.id
+            && r.fee_student_type && r.fee_student_type !== 'all'
+            && r.fee_student_type !== struct.student_type
+        );
+        if (staleMatches.length && !dry_run) {
+          for (const stale of staleMatches) {
+            await query(`UPDATE fee_invoices SET status = 'cancelled', updated_at = NOW() WHERE id = $1`, [stale.id]);
+            summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'superseded_stale_student_type_invoice' });
+          }
         }
 
         if (!dry_run) {

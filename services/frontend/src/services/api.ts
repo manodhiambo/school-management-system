@@ -1140,6 +1140,7 @@ class ApiService {
 
   // Report Cards
   getCbcReportCards(params?: any) { return this.api.get('/cbe/report-cards', { params }); }
+  getCbcReportCardPeriods() { return this.api.get('/cbe/report-cards/periods'); }
   getCbcReportCard(id: string) { return this.api.get('/cbe/report-cards/' + id); }
   getMyReportCards() { return this.api.get('/cbe/report-cards/my'); }
   getMyReportCard(id: string) { return this.api.get('/cbe/report-cards/' + id); }

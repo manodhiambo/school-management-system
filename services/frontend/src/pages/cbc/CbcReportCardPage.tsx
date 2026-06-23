@@ -130,7 +130,7 @@ export async function renderReportCardPage(
 
   // "LEARNER ASSESSMENT REPORT CARD" title banner
   const termRoman = term === 'term1' ? 'I' : term === 'term2' ? 'II' : 'III';
-  const termLabel = `END TERM ${termRoman}`;
+  const termLabel = detail.period ? `${String(detail.period).toUpperCase()} – TERM ${termRoman}` : `END TERM ${termRoman}`;
   doc.setFillColor(21, 101, 192);
   doc.rect(M, headerH + 2, CW, 7, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
@@ -249,7 +249,9 @@ export async function renderReportCardPage(
     facilitator: { x: M + 137,  w: CW - 137 },
   };
 
-  const termPeriod = term === 'term1' ? 'END TERM 1' : term === 'term2' ? 'END TERM 2' : 'END TERM 3';
+  const termPeriod = detail.period
+    ? String(detail.period).toUpperCase()
+    : (term === 'term1' ? 'END TERM 1' : term === 'term2' ? 'END TERM 2' : 'END TERM 3');
 
   // Column header row
   doc.setFillColor(189, 214, 238);
@@ -597,6 +599,7 @@ export function CbcReportCardPage() {
   const qc = useQueryClient();
   const [filters, setFilters] = useState({ class_id: '', term: 'term1', academic_year: new Date().getFullYear().toString() });
   const [termDates, setTermDates] = useState({ closing_date: '', opening_date: '' });
+  const [period, setPeriod] = useState('');
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [showShare, setShowShare] = useState(false);
   const [shareResult, setShareResult] = useState<any>(null);
@@ -605,6 +608,7 @@ export function CbcReportCardPage() {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => api.getClasses() });
+  const { data: periodsData } = useQuery({ queryKey: ['cbc-report-card-periods'], queryFn: () => api.getCbcReportCardPeriods() });
   const { data: cardsData, isLoading } = useQuery({
     queryKey: ['cbc-report-cards', filters],
     queryFn: () => api.getCbcReportCards(filters),
@@ -637,8 +641,12 @@ export function CbcReportCardPage() {
       academic_year: filters.academic_year,
       closing_date: termDates.closing_date || undefined,
       opening_date: termDates.opening_date || undefined,
+      period: period.trim() || undefined,
     }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cbc-report-cards'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cbc-report-cards'] });
+      qc.invalidateQueries({ queryKey: ['cbc-report-card-periods'] });
+    },
   });
 
   const shareMutation = useMutation({
@@ -647,6 +655,7 @@ export function CbcReportCardPage() {
   });
 
   const classes = (classesData as any)?.data || [];
+  const periodSuggestions: string[] = (periodsData as any)?.data || ['Mid-Term', 'End-Term'];
   const cards = (cardsData as any)?.data || [];
   const detail = (cardDetail as any)?.data;
   const cardsWithId = cards.filter((c: any) => c.id);
@@ -825,6 +834,24 @@ export function CbcReportCardPage() {
             </div>
           </div>
 
+          {/* Period — e.g. Mid-Term, End-Term. Pick a system-known value or type your own. */}
+          <div className="mt-4">
+            <Label>Period (optional)</Label>
+            <Input
+              list="report-card-period-suggestions"
+              className="mt-1"
+              value={period}
+              onChange={e => setPeriod(e.target.value)}
+              placeholder="e.g. Mid-Term, End-Term — pick a suggestion or type your own"
+            />
+            <datalist id="report-card-period-suggestions">
+              {periodSuggestions.map(p => <option key={p} value={p} />)}
+            </datalist>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Printed on the report card and used to filter Mid-Term/End-Term assessment scores when generating grades.
+            </p>
+          </div>
+
           {/* Generate button — shown when a class is selected */}
           {filters.class_id && (
             <div className="mt-4 flex items-center gap-3">
@@ -977,7 +1004,8 @@ export function CbcReportCardPage() {
                     <div>
                       <CardTitle>{detail.student_name}</CardTitle>
                       <p className="text-sm text-gray-500 mt-1">
-                        {detail.class_name} · {detail.term?.replace('term', 'Term ')} · {detail.academic_year}
+                        {detail.class_name} · {detail.term?.replace('term', 'Term ')}
+                        {detail.period ? ` (${detail.period})` : ''} · {detail.academic_year}
                       </p>
                       <p className="text-xs text-gray-400">Admission: {detail.admission_number}</p>
                     </div>
@@ -1052,7 +1080,7 @@ export function CbcReportCardPage() {
                               grade === 'ME' ? 3 :
                               grade === 'AE' || grade === 'D' ? 2 :
                               grade === 'BE' || grade === 'B' ? 1 : '—';
-                            const period = detail.term === 'term1' ? 'End Term 1' : detail.term === 'term2' ? 'End Term 2' : 'End Term 3';
+                            const period = detail.period || (detail.term === 'term1' ? 'End Term 1' : detail.term === 'term2' ? 'End Term 2' : 'End Term 3');
                             return (
                               <tr key={c.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                 <td className="px-3 py-1.5 text-gray-800 font-medium">{c.subject_name}</td>

@@ -501,6 +501,22 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
       [req.params.id, tid]
     );
 
+    // If boarder/day-scholar status changed, any still-unpaid invoice generated under the
+    // old status no longer applies (e.g. day-scholar fee left pending after becoming a boarder)
+    // — cancel it so the student isn't billed for both. Paid/partial invoices are left alone
+    // since real money has already moved and needs manual review.
+    if (updated[0]?.student_type) {
+      await query(
+        `UPDATE fee_invoices fi SET status = 'cancelled', updated_at = NOW()
+         FROM fee_structure fs
+         WHERE fi.fee_structure_id = fs.id
+           AND fi.student_id = $1 AND fi.tenant_id = $2
+           AND fi.status = 'pending'
+           AND fs.student_type NOT IN ('all', $3)`,
+        [req.params.id, tid, updated[0].student_type]
+      );
+    }
+
     res.json({
       success: true,
       message: 'Student updated successfully',

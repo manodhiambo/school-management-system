@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users, Calendar, Clock, CheckCircle, Award,
-  Bell, ArrowRight, DollarSign, AlertCircle, TrendingUp, XCircle, HelpCircle
+  Bell, ArrowRight, DollarSign, AlertCircle, TrendingUp, XCircle, HelpCircle, FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
@@ -264,6 +264,14 @@ export function ParentDashboard() {
             >
               <Award className="h-8 w-8 mb-2 text-purple-600" />
               <span>{t('My Profile')}</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-6 flex flex-col items-center hover:bg-teal-50 hover:border-teal-300"
+              onClick={() => navigate('/app/report-cards')}
+            >
+              <FileText className="h-8 w-8 mb-2 text-teal-600" />
+              <span>{t('Report Cards')}</span>
             </Button>
           </div>
         </CardContent>

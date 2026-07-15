@@ -1168,6 +1168,7 @@ class ApiService {
   getCbcReportCard(id: string) { return this.api.get('/cbe/report-cards/' + id); }
   getMyReportCards() { return this.api.get('/cbe/report-cards/my'); }
   getMyReportCard(id: string) { return this.api.get('/cbe/report-cards/' + id); }
+  getChildReportCards(studentId: string) { return this.api.get('/cbe/report-cards/child/' + studentId); }
   createCbcReportCard(data: any) { return this.api.post('/cbe/report-cards', data); }
   generateCbcReportCards(data: any) { return this.api.post('/cbe/report-cards/generate', data); }
   publishCbcReportCard(id: string) { return this.api.put('/cbe/report-cards/' + id + '/publish'); }

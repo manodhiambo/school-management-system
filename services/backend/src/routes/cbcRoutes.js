@@ -440,6 +440,45 @@ router.get('/report-cards/my', authenticate, requireModule('academics'), async (
   }
 });
 
+// GET /api/v1/cbe/report-cards/child/:studentId — parent fetches one of their
+// children's published report cards, mirroring /report-cards/my for students.
+router.get('/report-cards/child/:studentId', authenticate, requireModule('academics'), async (req, res) => {
+  try {
+    if (req.user.role !== 'parent') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const tid = req.user.tenant_id;
+    const { studentId } = req.params;
+
+    const ownsChild = await query(
+      `SELECT 1 FROM parent_students ps
+       JOIN parents p ON p.id = ps.parent_id
+       WHERE ps.student_id = $1 AND p.user_id = $2`,
+      [studentId, req.user.id]
+    );
+    if (!ownsChild.length) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const rows = await query(
+      `SELECT rc.*,
+              s.first_name||' '||s.last_name AS student_name,
+              s.admission_number, c.name AS class_name
+       FROM cbc_report_cards rc
+       JOIN students s ON s.id = rc.student_id
+       JOIN classes c ON c.id = rc.class_id
+       WHERE rc.student_id = $1 AND rc.tenant_id = $2
+         AND rc.status IN ('published','acknowledged')
+       ORDER BY rc.academic_year DESC, rc.term`,
+      [studentId, tid]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('Get child report cards error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/v1/cbe/report-cards/periods?class_id=&term=&academic_year=
 // Period options for the report card form:
 //   - exams: real exam records (e.g. "Mid Term Exam", "CAT 1") already created in the Exams
@@ -481,6 +520,12 @@ router.get('/report-cards/periods', authenticate, requireModule('academics'), as
 // a report card yet still appear in the list.
 router.get('/report-cards', authenticate, requireModule('academics'), async (req, res) => {
   try {
+    // This unfiltered list (no ownership check, no status restriction — drafts
+    // included) is for staff managing report cards. Students/parents have their
+    // own scoped endpoints (/report-cards/my, /report-cards/child/:studentId).
+    if (!['admin', 'teacher', 'superadmin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
     const { student_id, term, academic_year, class_id, status } = req.query;
     const tid = req.user.tenant_id;
     let sql, params;
@@ -661,6 +706,19 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
       );
       const studentId = studentRows[0]?.id;
       if (rows[0].student_id !== studentId || !['published','acknowledged'].includes(rows[0].status)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
+
+    // Parents may only view their own children's published/acknowledged report cards
+    if (req.user.role === 'parent') {
+      const ownsChild = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [rows[0].student_id, req.user.id]
+      );
+      if (!ownsChild.length || !['published','acknowledged'].includes(rows[0].status)) {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
     }

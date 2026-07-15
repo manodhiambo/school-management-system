@@ -54,6 +54,7 @@ import { LearningMaterialsPage } from './pages/student/LearningMaterialsPage';
 
 // Parent Pages
 import { MyChildrenPage } from './pages/parent/MyChildrenPage';
+import { ParentReportCardsPage } from './pages/parent/ParentReportCardsPage';
 import { ChildrenProgressPage } from './pages/parent/ChildrenProgressPage';
 import { FeePaymentsPage } from './pages/parent/FeePaymentsPage';
 import { MyTransportPage } from './pages/parent/MyTransportPage';
@@ -277,6 +278,7 @@ function App() {
               {/* Parent Routes */}
               <Route path="my-children" element={<RoleRoute allowedRoles={['parent']}><MyChildrenPage /></RoleRoute>} />
               <Route path="children-progress" element={<RoleRoute allowedRoles={['parent']}><ChildrenProgressPage /></RoleRoute>} />
+              <Route path="report-cards" element={<RoleRoute allowedRoles={['parent']}><ParentReportCardsPage /></RoleRoute>} />
               <Route path="fee-payments" element={<RoleRoute allowedRoles={['parent']}><FeePaymentsPage /></RoleRoute>} />
               <Route path="my-transport" element={<RoleRoute allowedRoles={['parent']}><MyTransportPage /></RoleRoute>} />
 

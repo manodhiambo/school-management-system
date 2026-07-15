@@ -327,6 +327,14 @@ export function StudentDashboard() {
               <Bell className="h-8 w-8 mb-2 text-orange-600" />
               <span>{t('Messages')}</span>
             </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-6 flex flex-col items-center hover:bg-teal-50 hover:border-teal-300"
+              onClick={() => navigate('/app/my-report-card')}
+            >
+              <FileText className="h-8 w-8 mb-2 text-teal-600" />
+              <span>{t('Report Card')}</span>
+            </Button>
           </div>
         </CardContent>
       </Card>

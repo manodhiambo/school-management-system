@@ -40,15 +40,18 @@ class ApiService {
             try {
               const { data } = await axios.post(`${API_URL}/auth/refresh-token`, { refreshToken });
               const newAccessToken = data?.data?.accessToken;
+              const newRefreshToken = data?.data?.refreshToken;
 
               if (newAccessToken) {
                 const inLocal = !!localStorage.getItem('accessToken');
                 if (inLocal) {
                   localStorage.setItem('accessToken', newAccessToken);
                   localStorage.setItem('token', newAccessToken);
+                  if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken);
                 } else {
                   sessionStorage.setItem('accessToken', newAccessToken);
                   sessionStorage.setItem('token', newAccessToken);
+                  if (newRefreshToken) sessionStorage.setItem('refreshToken', newRefreshToken);
                 }
                 originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
                 return this.api(originalRequest);
@@ -422,6 +425,11 @@ class ApiService {
     return this.api.get('/fee/mpesa/student/' + studentId);
   }
 
+  // IntaSend bank/card payments
+  initiateIntasendCheckout(invoiceId: string) {
+    return this.api.post('/fee/intasend/checkout', { invoiceId });
+  }
+
   // Parent payment requests
   submitPaymentRequest(data: { invoiceId: string; amount: number; paymentMethod: string; transactionRef?: string; parentMessage?: string }) {
     return this.api.post('/fee/payment-request', data);
@@ -582,6 +590,19 @@ class ApiService {
 
   updateSettings(data: any) {
     return this.api.put('/settings', data);
+  }
+
+  // IntaSend bank/card payment gateway config
+  getIntasendConfig() {
+    return this.api.get('/settings/intasend-config');
+  }
+
+  updateIntasendConfig(data: any) {
+    return this.api.put('/settings/intasend-config', data);
+  }
+
+  getIntasendRecentPayments(limit = 20) {
+    return this.api.get('/fee/intasend/recent', { params: { limit } });
   }
 
   getAcademicYears() {

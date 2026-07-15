@@ -16,15 +16,17 @@ const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || INSECURE_REFRESH_DEFA
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 
-if (nodeEnv === 'production') {
-  if (jwtSecret === INSECURE_JWT_DEFAULT || jwtRefreshSecret === INSECURE_REFRESH_DEFAULT) {
-    console.error('FATAL: JWT_SECRET and JWT_REFRESH_SECRET must be set in production. Exiting.');
-    process.exit(1);
-  }
-  if (jwtSecret.length < 32 || jwtRefreshSecret.length < 32) {
-    console.error('FATAL: JWT secrets must be at least 32 characters in production. Exiting.');
-    process.exit(1);
-  }
+// Checked in every environment, not just production — a misconfigured staging/dev
+// box that's internet-reachable with the placeholder secret would otherwise let
+// anyone forge admin/superadmin JWTs, since the fallback strings are public (they're
+// right here in this file).
+if (jwtSecret === INSECURE_JWT_DEFAULT || jwtRefreshSecret === INSECURE_REFRESH_DEFAULT) {
+  console.error('FATAL: JWT_SECRET and JWT_REFRESH_SECRET must be set (not left as the example placeholder). Exiting.');
+  process.exit(1);
+}
+if (jwtSecret.length < 32 || jwtRefreshSecret.length < 32) {
+  console.error('FATAL: JWT secrets must be at least 32 characters. Exiting.');
+  process.exit(1);
 }
 
 export const config = {
@@ -46,7 +48,7 @@ export const config = {
   jwt: {
     secret: jwtSecret,
     refreshSecret: jwtRefreshSecret,
-    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '8h',
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d'
   },
   

@@ -51,6 +51,7 @@ function printReceipt(payment: any, studentName: string, schoolName: string) {
 const METHODS = [
   { value: 'mpesa_paybill',  label: 'M-Pesa Paybill',   icon: '📱', hint: 'M-Pesa confirmation code (e.g. QJK8XXXXXXX)' },
   { value: 'mpesa_stk',      label: 'M-Pesa STK Push',  icon: '📲', hint: 'Automated prompt sent to your phone' },
+  { value: 'intasend',       label: 'Bank / Card',       icon: '💳', hint: 'Pay by bank transfer or card — auto-confirmed' },
   { value: 'bank_transfer',  label: 'Bank Transfer',     icon: '🏦', hint: 'Bank reference / deposit slip number' },
   { value: 'mpesa',          label: 'M-Pesa (Other)',    icon: '💚', hint: 'M-Pesa confirmation code' },
   { value: 'cash',           label: 'Cash',              icon: '💵', hint: 'Receipt number from accounts office' },
@@ -74,7 +75,7 @@ export function FeePaymentsPage() {
   // modal state
   const [modal, setModal] = useState<'closed' | 'pay'>('closed');
   const [activeInvoice, setActiveInvoice] = useState<any>(null);
-  const [step, setStep] = useState<'method' | 'details' | 'stk' | 'done'>('method');
+  const [step, setStep] = useState<'method' | 'details' | 'stk' | 'intasend' | 'done'>('method');
 
   // form fields
   const [method, setMethod] = useState('mpesa_paybill');
@@ -87,6 +88,9 @@ export function FeePaymentsPage() {
   const [formError, setFormError] = useState('');
   const [stkStatus, setStkStatus] = useState<'idle'|'processing'|'sent'|'failed'>('idle');
   const [stkMsg, setStkMsg] = useState('');
+  const [intasendStatus, setIntasendStatus] = useState<'idle'|'processing'|'sent'|'failed'>('idle');
+  const [intasendMsg, setIntasendMsg] = useState('');
+  const [intasendRedirectUrl, setIntasendRedirectUrl] = useState('');
 
   // ── derived ──────────────────────────────────────────────────────────────
 
@@ -104,8 +108,10 @@ export function FeePaymentsPage() {
   const pendingByInvoice: Record<string, any> = {};
   for (const r of pendingRequests) if (r.invoice_id) pendingByInvoice[r.invoice_id] = r;
 
+  const hasIntasend = !!settings?.intasend_enabled;
   const availableMethods = METHODS.filter(m =>
-    m.value !== 'mpesa_stk' || hasMpesaStk
+    (m.value !== 'mpesa_stk' || hasMpesaStk) &&
+    (m.value !== 'intasend' || hasIntasend)
   );
   const activeMethod = METHODS.find(m => m.value === method) || METHODS[0];
 
@@ -167,6 +173,7 @@ export function FeePaymentsPage() {
     setAmount(fmt(invoice.balance_amount || invoice.net_amount).replace(/,/g, ''));
     setRef(''); setMsg(''); setStkPhone('');
     setFormError(''); setStkStatus('idle'); setStkMsg('');
+    setIntasendStatus('idle'); setIntasendMsg(''); setIntasendRedirectUrl('');
     setStep('method');
     setModal('pay');
   };
@@ -175,6 +182,7 @@ export function FeePaymentsPage() {
     setModal('closed');
     setStep('method');
     setStkStatus('idle');
+    setIntasendStatus('idle');
     setFormError('');
   };
 
@@ -234,6 +242,32 @@ export function FeePaymentsPage() {
     } catch (e: any) {
       setStkStatus('failed');
       setStkMsg(e?.message || 'Failed to send STK push');
+    }
+  };
+
+  // ── IntaSend bank/card checkout ─────────────────────────────────────────
+
+  const handleIntasendCheckout = async () => {
+    setFormError('');
+    try {
+      setIntasendStatus('processing'); setIntasendMsg('Creating secure payment session...');
+      const res: any = await api.initiateIntasendCheckout(activeInvoice.id);
+      const data = res.data || res.data?.data;
+      if ((res.success || res.data?.success) && data) {
+        setIntasendStatus('sent');
+        setIntasendMsg(res.message || res.data?.message || 'Payment session created.');
+        if (data.redirectUrl) {
+          setIntasendRedirectUrl(data.redirectUrl);
+          window.open(data.redirectUrl, '_blank', 'noopener,noreferrer');
+        }
+        setTimeout(refresh, 8000);
+      } else {
+        setIntasendStatus('failed');
+        setIntasendMsg(res.message || res.data?.message || 'Could not start payment. Try another method.');
+      }
+    } catch (e: any) {
+      setIntasendStatus('failed');
+      setIntasendMsg(e?.message || 'Failed to start bank/card payment');
     }
   };
 
@@ -574,7 +608,7 @@ export function FeePaymentsPage() {
 
                 <Button
                   className="w-full bg-blue-600 hover:bg-blue-700 mt-2"
-                  onClick={() => setStep(method === 'mpesa_stk' ? 'stk' : 'details')}
+                  onClick={() => setStep(method === 'mpesa_stk' ? 'stk' : method === 'intasend' ? 'intasend' : 'details')}
                 >
                   Continue with {activeMethod.label}
                   <ChevronRight className="h-4 w-4 ml-1" />
@@ -786,6 +820,80 @@ export function FeePaymentsPage() {
                     </Button>
                   )}
                   {stkStatus === 'sent' && (
+                    <Button onClick={closeModal} className="flex-1">Done</Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STEP: INTASEND BANK/CARD */}
+            {step === 'intasend' && (
+              <div className="p-6 space-y-5">
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
+                  <CreditCard className="h-8 w-8 text-indigo-600 mx-auto mb-2" />
+                  <p className="font-semibold text-indigo-800">Bank / Card Payment</p>
+                  <p className="text-sm text-indigo-600 mt-1">
+                    You'll be taken to a secure payment page. Once you complete payment there,
+                    it's automatically confirmed here — no need to submit a reference.
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600">
+                  Balance due: <span className="font-semibold">KES {fmt(activeInvoice.balance_amount)}</span>
+                </div>
+
+                {intasendStatus === 'idle' && formError && (
+                  <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />{formError}
+                  </div>
+                )}
+
+                {intasendStatus === 'processing' && (
+                  <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    <p className="text-blue-700">{intasendMsg}</p>
+                  </div>
+                )}
+
+                {intasendStatus === 'sent' && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                    <CreditCard className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <p className="font-semibold text-green-700">Payment Page Opened</p>
+                    <p className="text-sm text-green-600 mt-1">{intasendMsg}</p>
+                    {intasendRedirectUrl && (
+                      <a href={intasendRedirectUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline mt-2 inline-block">
+                        Didn't open? Click here
+                      </a>
+                    )}
+                    <p className="text-xs text-gray-400 mt-2">
+                      This page will update automatically once payment is confirmed.
+                    </p>
+                  </div>
+                )}
+
+                {intasendStatus === 'failed' && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                    <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                    <p className="font-semibold text-red-600">Could Not Start Payment</p>
+                    <p className="text-sm text-red-500 mt-1">{intasendMsg}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={() => setStep('method')} className="flex-1">Back</Button>
+                  {intasendStatus !== 'sent' && (
+                    <Button
+                      onClick={handleIntasendCheckout}
+                      disabled={intasendStatus === 'processing'}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      {intasendStatus === 'processing'
+                        ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        : <CreditCard className="h-4 w-4 mr-2" />}
+                      Pay Now
+                    </Button>
+                  )}
+                  {intasendStatus === 'sent' && (
                     <Button onClick={closeModal} className="flex-1">Done</Button>
                   )}
                 </div>

@@ -16,6 +16,22 @@ import { buildAuditContext } from '../utils/auditContext.js';
 
 const router = express.Router();
 
+// One active session per user — a fresh login/refresh replaces the previous
+// row, which is what actually makes /logout and refresh-token revocation work
+// (the JWT itself stays valid until natural expiry regardless, so this DB row
+// is the only thing that lets us invalidate a refresh token early).
+async function upsertSession(userId, refreshToken, req) {
+  const { ipAddress, userAgent } = buildAuditContext(req);
+  await query(
+    `INSERT INTO user_sessions (user_id, refresh_token, expires_at, ip_address, user_agent, updated_at)
+     VALUES ($1, $2, NOW() + INTERVAL '7 days', $3, $4, NOW())
+     ON CONFLICT (user_id) DO UPDATE
+       SET refresh_token = $2, expires_at = NOW() + INTERVAL '7 days',
+           ip_address = $3, user_agent = $4, updated_at = NOW()`,
+    [userId, refreshToken, ipAddress || null, userAgent || null]
+  ).catch(err => logger.warn('Failed to persist session:', err.message));
+}
+
 // Login
 router.post('/login', async (req, res) => {
   try {
@@ -169,6 +185,7 @@ router.post('/login', async (req, res) => {
     // Update last login — fire and forget, don't block the response
     query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
       .catch(err => logger.warn('Failed to update last_login:', err.message));
+    upsertSession(user.id, refreshToken, req);
 
     // Audit log — fire and forget
     req.user = { id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id };
@@ -245,7 +262,17 @@ router.post('/refresh-token', async (req, res) => {
     }
     
     const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
-    
+
+    // The JWT signature alone doesn't reflect logout — check it against the
+    // session row too, since that's what /logout actually deletes.
+    const sessions = await query(
+      `SELECT 1 FROM user_sessions WHERE user_id = $1 AND refresh_token = $2 AND expires_at > NOW()`,
+      [decoded.userId, refreshToken]
+    );
+    if (sessions.length === 0) {
+      return res.status(401).json({ success: false, message: 'Session expired or logged out. Please log in again.' });
+    }
+
     const users = await query('SELECT * FROM users WHERE id = $1 AND is_active = true', [decoded.userId]);
 
     if (users.length === 0) {
@@ -259,10 +286,18 @@ router.post('/refresh-token', async (req, res) => {
       config.jwt.secret,
       { expiresIn: config.jwt.accessExpiresIn }
     );
-    
+
+    // Rotate the refresh token so a stolen one only works for a single refresh cycle.
+    const newRefreshToken = jwt.sign(
+      { userId: user.id },
+      config.jwt.refreshSecret,
+      { expiresIn: config.jwt.refreshExpiresIn }
+    );
+    await upsertSession(user.id, newRefreshToken, req);
+
     res.json({
       success: true,
-      data: { accessToken: newAccessToken }
+      data: { accessToken: newAccessToken, refreshToken: newRefreshToken }
     });
   } catch (error) {
     logger.error('Refresh token error:', error);
@@ -573,6 +608,7 @@ router.post('/2fa/validate', async (req, res) => {
     );
 
     query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]).catch(() => {});
+    upsertSession(user.id, refreshToken, req);
     logger.info(`2FA validated, login successful: ${user.email}`);
 
     res.json({

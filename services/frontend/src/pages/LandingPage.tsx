@@ -855,8 +855,25 @@ export function LandingPage() {
             <div>
               <h4 className="font-semibold text-white mb-4">Platform</h4>
               <ul className="space-y-2.5 text-sm text-gray-400">
-                {['Student Admissions','Kenya CBE Curriculum','Finance & M-Pesa','Exams & Results','Transport Tracking','Library Management','Procurement Module','Parent Portal','SMS Broadcasts','CBE Analytics'].map(l => (
-                  <li key={l} className="hover:text-white cursor-pointer transition-colors">{l}</li>
+                {[
+                  { label: 'Student Admissions',    path: null },
+                  { label: 'Kenya CBE Curriculum',  path: '/features/cbc-academics' },
+                  { label: 'Finance & M-Pesa',      path: '/features/fee-management' },
+                  { label: 'Exams & Results',       path: '/features/exams-results' },
+                  { label: 'Timetable',             path: '/features/timetable' },
+                  { label: 'Transport Tracking',    path: '/features/transport' },
+                  { label: 'Teacher HR & Payroll',  path: '/features/hr-payroll' },
+                  { label: 'Procurement Module',    path: '/features/procurement' },
+                  { label: 'SMS Broadcasts',        path: '/features/parent-communication' },
+                  { label: 'CBE Analytics',         path: null },
+                ].map(l => (
+                  <li key={l.label}>
+                    {l.path ? (
+                      <button onClick={() => navigate(l.path!)} className="hover:text-white transition-colors text-left">{l.label}</button>
+                    ) : (
+                      <span className="cursor-default">{l.label}</span>
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>

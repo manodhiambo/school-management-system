@@ -11,6 +11,7 @@ import { FAQPage } from './pages/public/FAQPage';
 import { ContactSupportPage } from './pages/public/ContactSupportPage';
 import { PrivacyPolicyPage } from './pages/public/PrivacyPolicyPage';
 import { TermsOfServicePage } from './pages/public/TermsOfServicePage';
+import { FeatureLandingPage } from './pages/public/FeatureLandingPage';
 import { NotFoundPage } from './pages/public/NotFoundPage';
 
 // SuperAdmin
@@ -202,6 +203,7 @@ function App() {
             <Route path="/contact" element={<ContactSupportPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/features/:slug" element={<FeatureLandingPage />} />
 
             {/* SuperAdmin routes */}
             <Route

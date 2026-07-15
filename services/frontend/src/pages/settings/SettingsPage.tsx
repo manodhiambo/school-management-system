@@ -70,7 +70,43 @@ export function SettingsPage() {
   useEffect(() => {
     loadSettings();
     load2FAStatus();
+    loadIntasendConfig();
   }, []);
+
+  // IntaSend bank/card gateway config
+  const [intasendConfig, setIntasendConfig] = useState<any>(null);
+  const [intasendForm, setIntasendForm] = useState({ publishable_key: '', secret_key: '', webhook_challenge: '', is_enabled: false, is_test_mode: true });
+  const [intasendSaving, setIntasendSaving] = useState(false);
+
+  const loadIntasendConfig = async () => {
+    try {
+      const res: any = await api.getIntasendConfig();
+      const data = res.data;
+      setIntasendConfig(data);
+      if (data) {
+        setIntasendForm(f => ({
+          ...f,
+          publishable_key: data.publishable_key || '',
+          is_enabled: !!data.is_enabled,
+          is_test_mode: data.is_test_mode !== false,
+        }));
+      }
+    } catch { /* not configured yet */ }
+  };
+
+  const saveIntasendConfig = async () => {
+    setIntasendSaving(true);
+    try {
+      await api.updateIntasendConfig(intasendForm);
+      alert('IntaSend configuration saved.');
+      setIntasendForm(f => ({ ...f, secret_key: '', webhook_challenge: '' }));
+      loadIntasendConfig();
+    } catch (e: any) {
+      alert(e.message || 'Failed to save IntaSend configuration');
+    } finally {
+      setIntasendSaving(false);
+    }
+  };
 
   const load2FAStatus = async () => {
     try {
@@ -835,6 +871,84 @@ export function SettingsPage() {
               </div>
               <p className="text-xs text-gray-400">
                 These details appear as a blue info box on the parent fee payments page. Leave blank to hide that section.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Bank/Card Payment Gateway (IntaSend)
+              </CardTitle>
+              <p className="text-sm text-gray-500">
+                Connect an IntaSend account so parent bank/card payments are automatically detected and reflected on the correct invoice — no manual reconciliation.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {intasendConfig?.is_enabled && (
+                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                  <CheckCircle className="h-4 w-4" /> IntaSend is enabled ({intasendConfig.is_test_mode ? 'test mode' : 'live mode'})
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="is_publishable_key">Publishable (Public) Key</Label>
+                  <Input
+                    id="is_publishable_key"
+                    value={intasendForm.publishable_key}
+                    onChange={(e) => setIntasendForm(f => ({ ...f, publishable_key: e.target.value }))}
+                    placeholder="ISPubKey_test_..."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="is_secret_key">
+                    Secret Key {intasendConfig?.secret_key_masked && <span className="text-gray-400 font-normal">(current: {intasendConfig.secret_key_masked})</span>}
+                  </Label>
+                  <Input
+                    id="is_secret_key"
+                    type="password"
+                    value={intasendForm.secret_key}
+                    onChange={(e) => setIntasendForm(f => ({ ...f, secret_key: e.target.value }))}
+                    placeholder="Leave blank to keep current"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="is_webhook_challenge">
+                    Webhook Challenge {intasendConfig?.webhook_challenge_masked && <span className="text-gray-400 font-normal">(current: {intasendConfig.webhook_challenge_masked})</span>}
+                  </Label>
+                  <Input
+                    id="is_webhook_challenge"
+                    type="password"
+                    value={intasendForm.webhook_challenge}
+                    onChange={(e) => setIntasendForm(f => ({ ...f, webhook_challenge: e.target.value }))}
+                    placeholder="Set the same value in your IntaSend webhook settings"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-6 pt-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={intasendForm.is_test_mode}
+                    onChange={(e) => setIntasendForm(f => ({ ...f, is_test_mode: e.target.checked }))}
+                  />
+                  Test / sandbox mode
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={intasendForm.is_enabled}
+                    onChange={(e) => setIntasendForm(f => ({ ...f, is_enabled: e.target.checked }))}
+                  />
+                  Enabled — parents can pay via IntaSend
+                </label>
+              </div>
+              <Button onClick={saveIntasendConfig} disabled={intasendSaving}>
+                {intasendSaving ? 'Saving...' : 'Save IntaSend Settings'}
+              </Button>
+              <p className="text-xs text-gray-400">
+                Get these keys from your IntaSend dashboard under Settings → API Keys. The webhook challenge must match what you set when adding the webhook URL in IntaSend.
               </p>
             </CardContent>
           </Card>

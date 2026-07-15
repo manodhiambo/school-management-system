@@ -58,6 +58,8 @@ import payrollRoutes from './routes/payrollRoutes.js';
 import appraisalRoutes from './routes/appraisalRoutes.js';
 import substituteRoutes from './routes/substituteRoutes.js';
 import mpesaCallbackRouter from './routes/mpesaCallbackRoutes.js';
+import intasendWebhookRoutes from './routes/intasendWebhookRoutes.js';
+import intasendConfigRoutes from './routes/intasendConfigRoutes.js';
 import counselingRoutes from './routes/counselingRoutes.js';
 import announcementsRoutes from './routes/announcementsRoutes.js';
 import auditLogRoutes from './routes/auditLogRoutes.js';
@@ -109,7 +111,19 @@ app.use(cors(corsOptions));
 
 // Security headers
 app.use(helmet({
-  contentSecurityPolicy: false, // managed by frontend
+  // This API only ever serves JSON, but keep a CSP for the rare HTML response
+  // (error pages, the /health route) as defense-in-depth — the real CSP for
+  // app content lives in the frontend's index.html meta tag since that's what
+  // actually renders untrusted-adjacent content.
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
 
@@ -132,6 +146,7 @@ app.use('/api/v1', autoAuditMiddleware);
 
 // M-Pesa callback — must be registered BEFORE authenticate middleware (Safaricom sends no Bearer token)
 app.use('/api/v1/fee/mpesa', mpesaCallbackRouter);
+app.use('/api/v1/fee/intasend/webhook', intasendWebhookRoutes);
 
 // API routes — auth gets a strict rate limiter (10 reqs / 15 min per IP)
 app.use('/api/v1/auth', authLimiter, authRoutes);
@@ -151,6 +166,7 @@ app.use('/api/v1/assignments', assignmentRoutes);
 app.use('/api/v1/gradebook', gradebookRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/settings/intasend-config', intasendConfigRoutes);
 app.use('/api/v1/password', passwordRoutes);
 app.use('/api/v1/finance', financeRoutes);
 app.use('/api/v1/finance/purchase-orders', purchaseOrderRoutes);

@@ -5,6 +5,10 @@ import financeService, { IncomeRecord, ExpenseRecord } from '@/services/financeS
 import api from '@/services/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+// xlsx has known prototype-pollution/ReDoS advisories in XLSX.read/parse (no fix
+// upstream) but this file only ever calls json_to_sheet/writeFile on data we
+// already hold — it never parses an uploaded/untrusted file — so those CVEs
+// aren't reachable here. Re-evaluate if this file ever adds file-upload import.
 import * as XLSX from 'xlsx';
 import { useAuthStore } from '@/store/authStore';
 

@@ -37,4 +37,14 @@ export const registrationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-export default { apiLimiter, authLimiter, passwordResetLimiter, registrationLimiter };
+// Public inbound webhooks (SMS/M-Pesa) — 60 req / min per IP, generous for a
+// legitimate provider but enough to blunt abuse of an unauthenticated endpoint
+export const inboundWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { success: false, message: 'Too many requests.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export default { apiLimiter, authLimiter, passwordResetLimiter, registrationLimiter, inboundWebhookLimiter };

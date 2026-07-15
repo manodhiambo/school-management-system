@@ -1826,4 +1826,87 @@ router.get('/mpesa/student/:studentId', async (req, res) => {
   }
 });
 
+// POST /api/v1/fee/intasend/checkout — initiate a bank/card collection via IntaSend
+router.post('/intasend/checkout', async (req, res) => {
+  try {
+    if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const { invoiceId } = req.body;
+    if (!invoiceId) {
+      return res.status(400).json({ success: false, message: 'invoiceId is required' });
+    }
+
+    const tid = req.user.tenant_id;
+    const invoiceRows = await query(
+      `SELECT fi.*, s.first_name || ' ' || s.last_name AS student_name,
+              u.email AS parent_email, u.phone AS parent_phone
+       FROM fee_invoices fi
+       JOIN students s ON s.id = fi.student_id
+       LEFT JOIN parent_students ps ON ps.student_id = s.id
+       LEFT JOIN parents p ON p.id = ps.parent_id
+       LEFT JOIN users u ON u.id = p.user_id
+       WHERE fi.id = $1 AND fi.tenant_id = $2 AND fi.status != 'paid'
+       LIMIT 1`,
+      [invoiceId, tid]
+    );
+    if (!invoiceRows.length) {
+      return res.status(404).json({ success: false, message: 'Invoice not found or already paid' });
+    }
+    const invoice = invoiceRows[0];
+
+    if (req.user.role === 'parent') {
+      const access = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [invoice.student_id, req.user.id]
+      );
+      if (!access.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
+
+    const { createCheckout } = await import('../services/intasendService.js');
+    const result = await createCheckout(tid, invoice, {
+      name: invoice.student_name || 'Parent',
+      email: invoice.parent_email || req.user.email,
+      phone: invoice.parent_phone || '',
+    });
+
+    res.json({
+      success: true,
+      message: result.redirectUrl
+        ? 'Redirecting to secure payment page.'
+        : 'Payment request created. Complete it using the instructions provided.',
+      data: result,
+    });
+  } catch (err) {
+    logger.error('IntaSend checkout error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to initiate payment' });
+  }
+});
+
+// GET /api/v1/fee/intasend/recent — recently auto-synced IntaSend payments (finance visibility)
+router.get('/intasend/recent', requireRole(['admin', 'finance_officer']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const rows = await query(
+      `SELECT fp.id, fp.amount, fp.payment_date, fp.transaction_id, fp.invoice_id,
+              s.first_name || ' ' || s.last_name AS student_name
+       FROM fee_payments fp
+       JOIN students s ON s.id = fp.student_id
+       WHERE fp.tenant_id = $1 AND fp.payment_method = 'intasend'
+       ORDER BY fp.payment_date DESC
+       LIMIT $2`,
+      [tid, limit]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('IntaSend recent payments error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 export default router;

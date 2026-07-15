@@ -20,9 +20,19 @@ router.get('/', async (req, res) => {
       'SELECT * FROM settings WHERE tenant_id = $1 LIMIT 1',
       [tenantId]
     );
+    // Non-secret flag only — lets parents know the option exists without
+    // exposing any IntaSend credentials (those stay behind the admin-only
+    // /settings/intasend-config endpoint).
+    const intasendRows = await query(
+      'SELECT is_enabled FROM intasend_config WHERE tenant_id = $1',
+      [tenantId]
+    );
     res.json({
       success: true,
-      data: settings[0] || {}
+      data: {
+        ...(settings[0] || {}),
+        intasend_enabled: !!intasendRows[0]?.is_enabled,
+      }
     });
   } catch (error) {
     logger.error('Get settings error:', error);

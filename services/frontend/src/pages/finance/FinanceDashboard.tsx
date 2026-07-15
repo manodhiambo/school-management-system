@@ -13,6 +13,7 @@ import {
   FileText,
 } from 'lucide-react';
 import financeService from '@/services/financeService';
+import api from '@/services/api';
 
 interface DashboardStats {
   totalIncome: number;
@@ -39,10 +40,19 @@ export default function FinanceDashboard() {
   const [loading, setLoading] = useState(true);
   const [incomeByCategory, setIncomeByCategory] = useState<any[]>([]);
   const [expensesByCategory, setExpensesByCategory] = useState<any[]>([]);
+  const [intasendPayments, setIntasendPayments] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboard();
+    loadIntasendPayments();
   }, []);
+
+  const loadIntasendPayments = async () => {
+    try {
+      const res: any = await api.getIntasendRecentPayments(10);
+      setIntasendPayments(res.data || []);
+    } catch { /* IntaSend may not be configured for this school */ }
+  };
 
   const loadDashboard = async () => {
     try {
@@ -263,6 +273,31 @@ export default function FinanceDashboard() {
           )}
         </div>
       </div>
+
+      {/* Recently auto-synced bank/card payments (IntaSend) */}
+      {intasendPayments.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-indigo-600" />
+            Recently Auto-Synced Bank/Card Payments
+          </h3>
+          <div className="divide-y divide-gray-100">
+            {intasendPayments.map((p: any) => (
+              <div key={p.id} className="flex items-center justify-between py-3">
+                <div>
+                  <p className="font-medium text-gray-900">{p.student_name}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(p.payment_date).toLocaleString('en-KE')} · Ref: {p.transaction_id}
+                  </p>
+                </div>
+                <p className="font-semibold text-green-600">
+                  KES {parseFloat(p.amount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Navigation Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

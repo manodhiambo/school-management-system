@@ -1,9 +1,33 @@
 import express from 'express';
+import crypto from 'crypto';
 import { query } from '../config/database.js';
 import { authenticate, requireModule } from '../middleware/authMiddleware.js';
+import { inboundWebhookLimiter } from '../middleware/rateLimiter.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+// Verifies the shared-secret token Mobitech's inbound webhook URL is configured
+// with (?token=...). Without this, anyone could POST a forged {from, message}
+// and trigger paid SMS replies / spoof inbound data — the same class of bug
+// already fixed for the M-Pesa callback (see mpesaCallbackRoutes.js).
+function verifyInboundWebhookSecret(req, res, next) {
+  const expected = process.env.INBOUND_SMS_WEBHOOK_SECRET;
+  if (!expected) {
+    logger.error('INBOUND_SMS_WEBHOOK_SECRET not configured — rejecting inbound SMS webhook');
+    return res.status(503).json({ success: false, message: 'Webhook not configured' });
+  }
+  const provided = req.query.token || '';
+  const expectedBuf = Buffer.from(expected);
+  const providedBuf = Buffer.from(String(provided));
+  const valid = expectedBuf.length === providedBuf.length &&
+    crypto.timingSafeEqual(expectedBuf, providedBuf);
+  if (!valid) {
+    logger.warn('Inbound SMS webhook: invalid or missing token');
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  next();
+}
 
 // ─── Ensure inbound_sms_log table exists ─────────────────────────────────────
 (async () => {
@@ -175,8 +199,8 @@ const BUILTIN_KEYWORDS = {
 
 // ─── INBOUND (public) ─────────────────────────────────────────────────────────
 
-// POST /inbound — PUBLIC, called by Mobitech webhook
-router.post('/inbound', async (req, res) => {
+// POST /inbound — PUBLIC, called by Mobitech webhook (must include ?token=INBOUND_SMS_WEBHOOK_SECRET)
+router.post('/inbound', inboundWebhookLimiter, verifyInboundWebhookSecret, async (req, res) => {
   const { from, to, message, message_id } = req.body;
   // Acknowledge immediately (Mobitech expects 200 quickly)
   res.json({ success: true });

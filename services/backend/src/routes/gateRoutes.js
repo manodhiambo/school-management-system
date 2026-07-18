@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { authenticate } from '../middleware/authMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
@@ -584,7 +585,7 @@ router.post('/pickup/otp/request', requireRole(GATE_ROLES), async (req, res) => 
     const { student_id, pickup_person_name, pickup_person_phone } = req.body;
     if (!student_id) return res.status(400).json({ success: false, message: 'student_id required' });
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 15 * 60000); // 15 minutes
 
     // Find parent user to notify

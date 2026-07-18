@@ -30,7 +30,7 @@ export const requireActiveTenant = async (req, res, next) => {
   }
   try {
     const rows = await query(
-      'SELECT status, trial_ends_at FROM tenants WHERE id = $1',
+      'SELECT status, trial_ends_at, subscription_ends_at FROM tenants WHERE id = $1',
       [req.tenantId]
     );
 
@@ -61,6 +61,18 @@ export const requireActiveTenant = async (req, res, next) => {
         return res.status(403).json({
           success: false,
           message: 'Your free trial has ended. Please pay to continue using the system.'
+        });
+      }
+    }
+
+    // Active subscription: allow access but block if the paid period has ended
+    // and payment hasn't been renewed yet (the auto-expiry job flips status to
+    // 'suspended' within 15 minutes; this catches the request-time gap).
+    if (rows[0].status === 'active' && rows[0].subscription_ends_at) {
+      if (new Date(rows[0].subscription_ends_at) < new Date()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your subscription has ended. Please make payment to continue using the system.'
         });
       }
     }

@@ -23,7 +23,7 @@ function mobitekHeaders() {
 }
 
 // Send a single SMS via Mobitech
-async function sendSMSViaProvider(phone, message) {
+export async function sendSMSViaProvider(phone, message) {
   const apiKey     = process.env.MOBITECH_API_KEY;
   const senderName = process.env.MOBITECH_SENDER_NAME || 'SKULMANAGER';
 
@@ -109,7 +109,7 @@ async function sendBulkSMSViaProvider(recipients, message) {
 }
 
 // Normalise phone to +254XXXXXXXXX (Kenya)
-function normalisePhone(phone) {
+export function normalisePhone(phone) {
   const digits = phone.replace(/\D/g, '');
   if (digits.startsWith('254') && digits.length === 12) return '+' + digits;
   if (digits.startsWith('0')   && digits.length === 10) return '+254' + digits.slice(1);

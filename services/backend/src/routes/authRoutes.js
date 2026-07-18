@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { query } from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -492,9 +493,9 @@ router.post('/2fa/enable', authenticate, async (req, res) => {
     }
 
     // Generate 8 one-time backup codes
+    const randomChunk = () => crypto.randomBytes(2).toString('hex').toUpperCase();
     const plainBackupCodes = Array.from({ length: 8 }, () =>
-      Math.random().toString(36).substring(2, 6).toUpperCase() + '-' +
-      Math.random().toString(36).substring(2, 6).toUpperCase()
+      randomChunk() + '-' + randomChunk()
     );
     const hashedBackupCodes = await Promise.all(
       plainBackupCodes.map(async (c) => ({ code: await bcrypt.hash(c, 12), used: false }))

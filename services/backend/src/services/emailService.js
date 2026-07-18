@@ -321,6 +321,43 @@ const templates = {
       `${data.schoolName}`,
   }),
 
+  tenantSuspended: (data) => ({
+    subject: `Tenant auto-suspended: ${data.schoolName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+          .details { background: #fef2f2; border-radius: 8px; padding: 16px; margin: 16px 0; }
+          .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>Tenant Auto-Suspended</h1></div>
+          <div class="content">
+            <p>A school account was automatically suspended for non-payment:</p>
+            <div class="details">
+              <p><strong>School:</strong> ${data.schoolName}</p>
+              <p><strong>Tenant ID:</strong> ${data.tenantId}</p>
+              <p><strong>Reason:</strong> ${data.reason}</p>
+              <p><strong>Suspended at:</strong> ${data.suspendedAt}</p>
+            </div>
+            <p>They will remain suspended until payment is confirmed and the account is reactivated from the Superadmin dashboard.</p>
+          </div>
+          <div class="footer"><p>Automated notice from Skul Manager</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Tenant auto-suspended\n\nSchool: ${data.schoolName}\nTenant ID: ${data.tenantId}\nReason: ${data.reason}\nSuspended at: ${data.suspendedAt}\n\nThey remain suspended until payment is confirmed.`
+  }),
+
   message: (data) => ({
     subject: `New Message: ${data.subject || 'You have a message'}`,
     html: `

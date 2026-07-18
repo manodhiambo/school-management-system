@@ -429,7 +429,8 @@ router.post('/tenants/:id/extend', async (req, res) => {
     const result = await query(`
       UPDATE tenants SET
         subscription_ends_at = $1,
-        status = CASE WHEN status = 'expired' THEN 'active' ELSE status END,
+        status = CASE WHEN status IN ('expired', 'suspended') THEN 'active' ELSE status END,
+        suspended_at = CASE WHEN status IN ('expired', 'suspended') THEN NULL ELSE suspended_at END,
         updated_at = NOW()
       WHERE id = $2
       RETURNING *

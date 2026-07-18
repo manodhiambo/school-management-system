@@ -318,7 +318,7 @@ router.post('/rfqs', async (req, res) => {
     for (const sid of supplier_ids) {
       await client.query(`INSERT INTO proc_rfq_suppliers (tenant_id,rfq_id,supplier_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [t, rfqId, sid]);
     }
-    if (pr_id) await client.query(`UPDATE proc_purchase_requisitions SET status='converted_to_rfq' WHERE id=$1`, [pr_id]);
+    if (pr_id) await client.query(`UPDATE proc_purchase_requisitions SET status='converted_to_rfq' WHERE id=$1 AND tenant_id=$2`, [pr_id, t]);
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
   } catch (e) { await client.query('ROLLBACK'); res.status(500).json({ error: e.message }); }
@@ -462,7 +462,7 @@ router.post('/orders', async (req, res) => {
         [t, poId, item.item_name, item.quantity, item.unit, item.unit_price || 0, item.vat_rate || 0, item.total_price]
       );
     }
-    if (pr_id) await client.query(`UPDATE proc_purchase_requisitions SET status='converted_to_po' WHERE id=$1`, [pr_id]);
+    if (pr_id) await client.query(`UPDATE proc_purchase_requisitions SET status='converted_to_po' WHERE id=$1 AND tenant_id=$2`, [pr_id, t]);
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
   } catch (e) { await client.query('ROLLBACK'); res.status(500).json({ error: e.message }); }
@@ -570,8 +570,12 @@ router.post('/grn', async (req, res) => {
   try {
     await client.query('BEGIN');
     const num = await nextSeq(client, t, 'proc_grn', 'grn_number', 'GRN');
-    const poRow = await client.query(`SELECT supplier_id FROM proc_purchase_orders WHERE id=$1`, [po_id]);
-    const supplierId = poRow.rows[0]?.supplier_id;
+    const poRow = await client.query(`SELECT supplier_id FROM proc_purchase_orders WHERE id=$1 AND tenant_id=$2`, [po_id, t]);
+    if (!poRow.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Purchase order not found' });
+    }
+    const supplierId = poRow.rows[0].supplier_id;
     const { rows } = await client.query(
       `INSERT INTO proc_grn (tenant_id,grn_number,po_id,supplier_id,delivery_date,received_by,delivery_note_number,remarks,status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'completed') RETURNING *`,
@@ -587,7 +591,8 @@ router.post('/grn', async (req, res) => {
       );
       if (item.po_item_id) {
         await client.query(
-          `UPDATE proc_po_items SET received_qty=received_qty+$1 WHERE id=$2`, [item.received_qty, item.po_item_id]
+          `UPDATE proc_po_items SET received_qty=received_qty+$1 WHERE id=$2 AND po_id=$3`,
+          [item.received_qty, item.po_item_id, po_id]
         );
       }
     }
@@ -595,7 +600,7 @@ router.post('/grn', async (req, res) => {
       `SELECT COUNT(*) cnt FROM proc_po_items WHERE po_id=$1 AND received_qty < quantity`, [po_id]
     );
     const newStatus = Number(allReceived.rows[0].cnt) === 0 ? 'completed' : 'partially_delivered';
-    await client.query(`UPDATE proc_purchase_orders SET status=$1,updated_at=NOW() WHERE id=$2`, [newStatus, po_id]);
+    await client.query(`UPDATE proc_purchase_orders SET status=$1,updated_at=NOW() WHERE id=$2 AND tenant_id=$3`, [newStatus, po_id, t]);
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
   } catch (e) { await client.query('ROLLBACK'); res.status(500).json({ error: e.message }); }

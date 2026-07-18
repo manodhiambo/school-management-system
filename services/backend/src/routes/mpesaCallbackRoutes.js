@@ -66,6 +66,14 @@ router.post('/callback', async (req, res) => {
     }
     const inv = invoiceRows[0];
 
+    // Idempotency guard — Safaricom (and anyone replaying a captured callback
+    // request) can cause this handler to run more than once for the same
+    // checkout; don't double-credit the invoice.
+    if (inv.metadata?.mpesa_ref) {
+      logger.info(`M-Pesa callback: checkout ${CheckoutRequestID} already credited, skipping`);
+      return;
+    }
+
     // Don't trust the callback body for the result — re-verify directly with
     // Safaricom using our own credentials, which an attacker cannot forge.
     const verified = await verifyWithSafaricom(CheckoutRequestID);

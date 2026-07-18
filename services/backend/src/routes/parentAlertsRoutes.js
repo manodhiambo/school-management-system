@@ -144,6 +144,9 @@ router.put('/mark-all-read', authenticate, requireModule('communication'), async
 // POST /send — admin/teacher manually sends an alert
 router.post('/send', authenticate, requireModule('communication'), async (req, res) => {
   try {
+    if (!['admin', 'teacher'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Admin or teacher only' });
+    }
     const { student_id, alert_type, title, message, reference_type, reference_id } = req.body;
     const tid = req.user.tenant_id;
     const count = await sendStudentAlert(student_id, alert_type, title, message, reference_type, reference_id, tid);
@@ -157,6 +160,9 @@ router.post('/send', authenticate, requireModule('communication'), async (req, r
 // POST /broadcast — send alert to all parents in a class or all
 router.post('/broadcast', authenticate, requireModule('communication'), async (req, res) => {
   try {
+    if (!['admin', 'teacher'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Admin or teacher only' });
+    }
     const { class_id, alert_type, title, message } = req.body;
     const tid = req.user.tenant_id;
 

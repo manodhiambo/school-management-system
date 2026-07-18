@@ -1369,7 +1369,10 @@ router.post('/portfolios', authenticate, requireModule('academics'), async (req,
 // DELETE /api/v1/cbe/portfolios/:id
 router.delete('/portfolios/:id', authenticate, requireModule('academics'), async (req, res) => {
   try {
-    await query('DELETE FROM student_portfolios WHERE id=$1', [req.params.id]);
+    const rows = await query('DELETE FROM student_portfolios WHERE id=$1 AND tenant_id=$2 RETURNING id', [req.params.id, req.user.tenant_id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Portfolio item not found' });
+    }
     res.json({ success: true, message: 'Portfolio item deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1451,8 +1454,11 @@ router.put('/terms/:id/set-current', authenticate, requireModule('academics'), a
     const tid = req.user.tenant_id;
     await query('UPDATE academic_terms SET is_current=FALSE WHERE tenant_id=$1', [tid]);
     const rows = await query(
-      'UPDATE academic_terms SET is_current=TRUE WHERE id=$1 RETURNING *', [req.params.id]
+      'UPDATE academic_terms SET is_current=TRUE WHERE id=$1 AND tenant_id=$2 RETURNING *', [req.params.id, tid]
     );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Term not found' });
+    }
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

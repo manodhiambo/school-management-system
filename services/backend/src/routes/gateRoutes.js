@@ -91,7 +91,9 @@ router.get('/visitors', requireRole(GATE_ROLES), async (req, res) => {
   try {
     const { tenant_id } = req.user;
     const { search, blacklisted, page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const offset = (safePage - 1) * safeLimit;
     const params = [tenant_id];
     let where = 'WHERE v.tenant_id=$1';
     if (search) {
@@ -102,12 +104,13 @@ router.get('/visitors', requireRole(GATE_ROLES), async (req, res) => {
       params.push(blacklisted === 'true');
       where += ` AND v.is_blacklisted=$${params.length}`;
     }
+    params.push(safeLimit, offset);
     const rows = await query(
       `SELECT v.*,
               (SELECT COUNT(*) FROM visitor_visits vv WHERE vv.visitor_id=v.id) AS visit_count,
               (SELECT MAX(vv.check_in_time) FROM visitor_visits vv WHERE vv.visitor_id=v.id) AS last_visit
        FROM visitors v ${where}
-       ORDER BY v.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+       ORDER BY v.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
     res.json({ success: true, data: rows });
@@ -258,7 +261,9 @@ router.get('/visits', requireRole(GATE_ROLES), async (req, res) => {
   try {
     const { tenant_id } = req.user;
     const { status, date, search, page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const offset = (safePage - 1) * safeLimit;
     const params = [tenant_id];
     let where = 'WHERE vv.tenant_id=$1';
     if (status) { params.push(status); where += ` AND vv.status=$${params.length}`; }
@@ -267,6 +272,7 @@ router.get('/visits', requireRole(GATE_ROLES), async (req, res) => {
       params.push(`%${search}%`);
       where += ` AND (v.full_name ILIKE $${params.length} OR v.national_id ILIKE $${params.length} OR v.phone ILIKE $${params.length} OR vv.pass_number ILIKE $${params.length})`;
     }
+    params.push(safeLimit, offset);
     const rows = await query(
       `SELECT vv.*, v.full_name, v.phone, v.national_id, v.organization, v.photo_url,
               u.first_name||' '||u.last_name AS registered_by_name
@@ -274,7 +280,7 @@ router.get('/visits', requireRole(GATE_ROLES), async (req, res) => {
        JOIN visitors v ON v.id=vv.visitor_id
        LEFT JOIN users u ON u.id=vv.registered_by
        ${where}
-       ORDER BY vv.check_in_time DESC LIMIT ${limit} OFFSET ${offset}`,
+       ORDER BY vv.check_in_time DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
     res.json({ success: true, data: rows });
@@ -492,13 +498,16 @@ router.get('/pickup/history', requireRole(GATE_ROLES), async (req, res) => {
   try {
     const { tenant_id } = req.user;
     const { date, student_id, unauthorized_only, page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const offset = (safePage - 1) * safeLimit;
     const params = [tenant_id];
     let where = 'WHERE pt.tenant_id=$1';
     if (date) { params.push(date); where += ` AND pt.pickup_time::date=$${params.length}`; }
     if (student_id) { params.push(student_id); where += ` AND pt.student_id=$${params.length}`; }
     if (unauthorized_only === 'true') where += ` AND pt.is_authorized=FALSE`;
 
+    params.push(safeLimit, offset);
     const rows = await query(
       `SELECT pt.*, s.first_name||' '||s.last_name AS student_name, s.admission_number,
               c.name AS class_name,
@@ -508,7 +517,7 @@ router.get('/pickup/history', requireRole(GATE_ROLES), async (req, res) => {
        LEFT JOIN classes c ON c.id=s.class_id
        LEFT JOIN users u ON u.id=pt.approved_by
        ${where}
-       ORDER BY pt.pickup_time DESC LIMIT ${limit} OFFSET ${offset}`,
+       ORDER BY pt.pickup_time DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
     res.json({ success: true, data: rows });

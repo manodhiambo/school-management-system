@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
@@ -53,7 +54,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Create subject
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { name, code, description, credits, is_active, education_level, category } = req.body;
     const tid = req.user.tenant_id;
@@ -79,20 +80,25 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // Update subject
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { name, code, description, credits, is_active, education_level, category } = req.body;
     const tid = req.user.tenant_id;
 
-    await query(
+    const updateResult = await query(
       `UPDATE subjects
        SET name=$1, code=$2, description=$3, credits=$4, is_active=$5,
            education_level=$6, category=$7, updated_at=NOW()
-       WHERE id=$8 AND tenant_id=$9`,
+       WHERE id=$8 AND tenant_id=$9
+       RETURNING id`,
       [name, code, description, credits, is_active, education_level || null, category || 'core', req.params.id, tid]
     );
 
-    const updated = await query('SELECT * FROM subjects WHERE id = $1', [req.params.id]);
+    if (updateResult.length === 0) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
+    const updated = await query('SELECT * FROM subjects WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
 
     res.json({ success: true, message: 'Subject updated successfully', data: updated[0] });
   } catch (error) {
@@ -102,7 +108,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // Delete subject
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('DELETE FROM subjects WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);

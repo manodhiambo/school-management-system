@@ -278,11 +278,11 @@ export function LandingPage() {
                 Kenya's #1 CBE School Management Platform
               </div>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
-                Transform Your<br />
+                The School Management<br />
+                System That<br />
                 <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  School's Future
-                </span><br />
-                Today
+                  Transforms Kenyan Schools
+                </span>
               </h1>
               <p className="text-lg text-blue-100 mb-8 max-w-lg leading-relaxed">
                 The complete cloud-based school management system for Kenya — students, teachers, fees,

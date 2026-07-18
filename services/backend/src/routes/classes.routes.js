@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
+import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -55,7 +56,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Create class
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { name, section, capacity, room_number, academic_year, description, education_level, grade_number } = req.body;
     const tid = req.user.tenant_id;
@@ -84,20 +85,25 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // Update class
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const { name, section, capacity, room_number, academic_year, description, is_active, education_level, grade_number } = req.body;
     const tid = req.user.tenant_id;
 
-    await query(
+    const updateResult = await query(
       `UPDATE classes
        SET name=$1, section=$2, capacity=$3, room_number=$4, academic_year=$5,
            description=$6, is_active=$7, education_level=$8, grade_number=$9, updated_at=NOW()
-       WHERE id=$10 AND tenant_id=$11`,
+       WHERE id=$10 AND tenant_id=$11
+       RETURNING id`,
       [name, section, capacity, room_number, academic_year, description, is_active !== false, education_level || 'lower_primary', grade_number || null, req.params.id, tid]
     );
 
-    const updated = await query('SELECT * FROM classes WHERE id = $1', [req.params.id]);
+    if (updateResult.length === 0) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
+    const updated = await query('SELECT * FROM classes WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
 
     res.json({ success: true, message: 'Class updated successfully', data: updated[0] });
   } catch (error) {
@@ -107,7 +113,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // Delete class
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     await query('DELETE FROM classes WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);

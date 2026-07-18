@@ -196,7 +196,7 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
       address, city, state, pincode
     } = req.body;
 
-    await query(
+    const updateResult = await query(
       `UPDATE parents SET
         first_name = COALESCE($1, first_name),
         last_name = COALESCE($2, last_name),
@@ -209,20 +209,25 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
         state = COALESCE($9, state),
         pincode = COALESCE($10, pincode),
         updated_at = NOW()
-       WHERE id = $11`,
+       WHERE id = $11 AND tenant_id = $12
+       RETURNING id`,
       [
         firstName, lastName, relationship,
         occupation, phonePrimary, phoneSecondary,
-        address, city, state, pincode, req.params.id
+        address, city, state, pincode, req.params.id, req.user.tenant_id
       ]
     );
+
+    if (updateResult.length === 0) {
+      return res.status(404).json({ success: false, message: 'Parent not found' });
+    }
 
     const updated = await query(`
       SELECT p.*, u.email
       FROM parents p
       LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.id = $1
-    `, [req.params.id]);
+      WHERE p.id = $1 AND p.tenant_id = $2
+    `, [req.params.id, req.user.tenant_id]);
 
     res.json({
       success: true,
@@ -238,11 +243,14 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
 // Delete parent
 router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    const parent = await query('SELECT user_id FROM parents WHERE id = $1', [req.params.id]);
-    if (parent.length > 0 && parent[0].user_id) {
+    const parent = await query('SELECT user_id FROM parents WHERE id = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    if (parent.length === 0) {
+      return res.status(404).json({ success: false, message: 'Parent not found' });
+    }
+    if (parent[0].user_id) {
       await query('DELETE FROM users WHERE id = $1', [parent[0].user_id]);
     }
-    await query('DELETE FROM parents WHERE id = $1', [req.params.id]);
+    await query('DELETE FROM parents WHERE id = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
     res.json({
       success: true,
       message: 'Parent deleted successfully'

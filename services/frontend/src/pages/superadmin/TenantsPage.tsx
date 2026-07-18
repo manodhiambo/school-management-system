@@ -328,7 +328,7 @@ export function TenantsPage() {
                     </Button>
                     {openMenu === t.id && (
                       <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                        <button onClick={() => handleLoginAs(t)} disabled={t.status !== 'active' || !!actionLoading}
+                        <button onClick={() => handleLoginAs(t)} disabled={(t.status !== 'active' && t.status !== 'trial') || !!actionLoading}
                           className="w-full flex items-center px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50 disabled:opacity-50">
                           {actionLoading === 'login_' + t.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
                           Login as Admin

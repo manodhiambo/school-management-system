@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { testConnection } from './config/database.js';
 import { runMigrations } from './database/runMigrations.js';
 import { authLimiter, apiLimiter, registrationLimiter } from './middleware/rateLimiter.js';
+import { startTrialExpiryJob } from './jobs/trialExpiryJob.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -255,6 +256,7 @@ async function startServer() {
   } catch (err) {
     console.error('Startup error (migrations may be incomplete):', err.message);
   }
+  startTrialExpiryJob();
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

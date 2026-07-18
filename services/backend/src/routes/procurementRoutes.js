@@ -391,10 +391,18 @@ router.post('/quotations', async (req, res) => {
 });
 
 router.put('/quotations/:id/recommend', async (req, res) => {
-  await pool.query(`UPDATE proc_quotations SET is_recommended=FALSE WHERE rfq_id=(SELECT rfq_id FROM proc_quotations WHERE id=$1)`, [req.params.id]);
+  const t = tid(req);
+  const { rows: target } = await pool.query(
+    `SELECT rfq_id FROM proc_quotations WHERE id=$1 AND tenant_id=$2`, [req.params.id, t]
+  );
+  if (!target.length) return res.status(404).json({ error: 'Not found' });
+  await pool.query(
+    `UPDATE proc_quotations SET is_recommended=FALSE WHERE rfq_id=$1 AND tenant_id=$2`,
+    [target[0].rfq_id, t]
+  );
   const { rows } = await pool.query(
     `UPDATE proc_quotations SET is_recommended=TRUE,status='awarded' WHERE id=$1 AND tenant_id=$2 RETURNING *`,
-    [req.params.id, tid(req)]
+    [req.params.id, t]
   );
   res.json(rows[0]);
 });
@@ -845,13 +853,14 @@ router.delete('/assets/:id', async (req, res) => {
 router.get('/reports/summary', async (req, res) => {
   const { year, department } = req.query;
   const t = tid(req);
+  const safeYear = year && /^\d{4}$/.test(String(year)) ? parseInt(year, 10) : null;
   const [prStats, poStats, supStats, budStats] = await Promise.all([
     pool.query(`SELECT status, COUNT(*) cnt, COALESCE(SUM(total_estimated_cost),0) value
-                FROM proc_purchase_requisitions WHERE tenant_id=$1 ${year ? `AND EXTRACT(YEAR FROM created_at)=${year}` : ''}
-                GROUP BY status`, [t]),
+                FROM proc_purchase_requisitions WHERE tenant_id=$1 ${safeYear ? `AND EXTRACT(YEAR FROM created_at)=$2` : ''}
+                GROUP BY status`, safeYear ? [t, safeYear] : [t]),
     pool.query(`SELECT status, COUNT(*) cnt, COALESCE(SUM(total_amount),0) value
-                FROM proc_purchase_orders WHERE tenant_id=$1 ${year ? `AND EXTRACT(YEAR FROM created_at)=${year}` : ''}
-                GROUP BY status`, [t]),
+                FROM proc_purchase_orders WHERE tenant_id=$1 ${safeYear ? `AND EXTRACT(YEAR FROM created_at)=$2` : ''}
+                GROUP BY status`, safeYear ? [t, safeYear] : [t]),
     pool.query(`SELECT s.supplier_name, COUNT(po.id) po_count, COALESCE(SUM(po.total_amount),0) total
                 FROM proc_purchase_orders po JOIN proc_suppliers s ON s.id=po.supplier_id
                 WHERE po.tenant_id=$1 GROUP BY s.id,s.supplier_name ORDER BY total DESC LIMIT 10`, [t]),

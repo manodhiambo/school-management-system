@@ -205,7 +205,7 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
     const fn = firstName ? firstName.trim() : undefined;
     const ln = lastName  ? lastName.trim()  : undefined;
 
-    await query(
+    const updateResult = await query(
       `UPDATE teachers SET
         first_name = COALESCE($1, first_name),
         last_name = COALESCE($2, last_name),
@@ -224,14 +224,19 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
         salary = COALESCE($15, salary),
         status = COALESCE($16, status),
         updated_at = NOW()
-       WHERE id = $17`,
+       WHERE id = $17 AND tenant_id = $18
+       RETURNING id`,
       [
         fn, ln, employeeId,
         dateOfBirth, gender, phonePrimary, phoneSecondary,
         address, city, state, pincode, qualification,
-        experienceYears, specialization, salary, status, req.params.id
+        experienceYears, specialization, salary, status, req.params.id, req.user.tenant_id
       ]
     );
+
+    if (updateResult.length === 0) {
+      return res.status(404).json({ success: false, message: 'Teacher not found' });
+    }
 
     // Mirror name changes to users table so all features read correct names
     if (fn || ln) {
@@ -239,8 +244,8 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
         `UPDATE users SET
            first_name = COALESCE($1, first_name),
            last_name  = COALESCE($2, last_name)
-         WHERE id = (SELECT user_id FROM teachers WHERE id = $3)`,
-        [fn || null, ln || null, req.params.id]
+         WHERE id = (SELECT user_id FROM teachers WHERE id = $3 AND tenant_id = $4)`,
+        [fn || null, ln || null, req.params.id, req.user.tenant_id]
       );
     }
 
@@ -248,8 +253,8 @@ router.put('/:id', authenticate, requireRole(['admin']), async (req, res) => {
       SELECT t.*, u.email
       FROM teachers t
       LEFT JOIN users u ON t.user_id = u.id
-      WHERE t.id = $1
-    `, [req.params.id]);
+      WHERE t.id = $1 AND t.tenant_id = $2
+    `, [req.params.id, req.user.tenant_id]);
 
     res.json({
       success: true,
@@ -287,11 +292,14 @@ router.post('/sync-names', authenticate, requireRole(['admin']), async (req, res
 // Delete teacher
 router.delete('/:id', authenticate, requireRole(['admin']), async (req, res) => {
   try {
-    const teacher = await query('SELECT user_id FROM teachers WHERE id = $1', [req.params.id]);
-    if (teacher.length > 0 && teacher[0].user_id) {
+    const teacher = await query('SELECT user_id FROM teachers WHERE id = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    if (teacher.length === 0) {
+      return res.status(404).json({ success: false, message: 'Teacher not found' });
+    }
+    if (teacher[0].user_id) {
       await query('DELETE FROM users WHERE id = $1', [teacher[0].user_id]);
     }
-    await query('DELETE FROM teachers WHERE id = $1', [req.params.id]);
+    await query('DELETE FROM teachers WHERE id = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
     res.json({
       success: true,
       message: 'Teacher deleted successfully'

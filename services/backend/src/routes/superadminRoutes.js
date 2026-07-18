@@ -486,6 +486,28 @@ router.delete('/tenants/:id/permanent', async (req, res) => {
       await query(`DELETE FROM ${table} WHERE tenant_id = $1`, [id]);
     }
 
+    // assignment_submissions has no tenant_id column at all — only reachable
+    // via student_id, which isn't ON DELETE CASCADE from students.
+    await query(
+      `DELETE FROM assignment_submissions WHERE student_id IN (SELECT id FROM students WHERE tenant_id = $1)`,
+      [id]
+    );
+
+    // income_records is auto-inserted by a DB trigger whenever a fee payment
+    // is recorded (finance_settings' auto_generate_journal_entries), but the
+    // trigger leaves income_records.tenant_id NULL — so it can only be found
+    // via the tenant-scoped rows it actually references, not a tenant_id
+    // filter. None of these FKs are ON DELETE CASCADE either.
+    await query(
+      `DELETE FROM income_records WHERE
+         student_id IN (SELECT id FROM students WHERE tenant_id = $1)
+         OR account_id IN (SELECT id FROM chart_of_accounts WHERE tenant_id = $1)
+         OR created_by IN (SELECT id FROM users WHERE tenant_id = $1)
+         OR bank_account_id IN (SELECT id FROM bank_accounts WHERE tenant_id = $1)
+         OR journal_entry_id IN (SELECT id FROM journal_entries WHERE tenant_id = $1)`,
+      [id]
+    );
+
     // Delete the tenant row — CASCADE handles all other related tables
     await query('DELETE FROM tenants WHERE id = $1', [id]);
 

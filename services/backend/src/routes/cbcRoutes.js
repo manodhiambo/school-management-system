@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate, requireModule } from '../middleware/authMiddleware.js';
+import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../services/emailService.js';
 
@@ -1101,7 +1102,7 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
 });
 
 // POST /api/v1/cbe/report-cards/:id/share — send report card to parent via email and/or WhatsApp
-router.post('/report-cards/:id/share', authenticate, requireModule('academics'), async (req, res) => {
+router.post('/report-cards/:id/share', authenticate, requireModule('academics'), blockDemoSideEffects('sharing a report card by email/WhatsApp'), async (req, res) => {
   try {
     // channels: ['email', 'whatsapp']
     // override_email / override_phone / override_name let the sender specify a custom recipient

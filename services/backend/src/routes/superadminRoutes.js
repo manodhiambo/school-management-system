@@ -625,6 +625,7 @@ router.get('/stats', async (req, res) => {
           AND status = 'active'
         ) AS expiring_soon
       FROM tenants
+      WHERE is_demo = FALSE
     `);
 
     const revenueRows = await query(`
@@ -638,6 +639,7 @@ router.get('/stats', async (req, res) => {
     const recentRows = await query(`
       SELECT id, school_name, email, admin_email, county, status, created_at
       FROM tenants
+      WHERE is_demo = FALSE
       ORDER BY created_at DESC
       LIMIT 5
     `);
@@ -647,6 +649,7 @@ router.get('/stats', async (req, res) => {
       FROM tenants
       WHERE subscription_ends_at BETWEEN NOW() AND NOW() + INTERVAL '30 days'
         AND status = 'active'
+        AND is_demo = FALSE
       ORDER BY subscription_ends_at ASC
       LIMIT 5
     `);

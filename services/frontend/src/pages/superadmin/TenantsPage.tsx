@@ -23,6 +23,7 @@ type Tenant = {
   school_code?: string;
   subdomain?: string;
   status: 'trial' | 'active' | 'suspended' | 'expired' | 'cancelled';
+  is_demo?: boolean;
   subscription_starts_at?: string;
   subscription_ends_at?: string;
   trial_ends_at?: string;
@@ -295,6 +296,11 @@ export function TenantsPage() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[t.status] || STATUS_COLORS.trial}`}>
                           {t.status}
                         </span>
+                        {t.is_demo && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-purple-100 text-purple-700 border-purple-200" title="Public live demo — resets nightly, excluded from business stats">
+                            DEMO
+                          </span>
+                        )}
                         {t.school_code && <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-mono">{t.school_code}</span>}
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">

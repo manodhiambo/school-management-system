@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { InstallAppButton } from '@/components/InstallAppButton';
+import { useAuthStore } from '@/store/authStore';
+import api from '@/services/api';
 import {
   GraduationCap, Users, BookOpen, Calendar, TrendingUp, Shield,
   ArrowRight, CheckCircle, UserCheck, BarChart3, Phone, Mail,
   Star, Award, Globe, Zap, Play, X, Bus, Heart, Package,
   MessageSquare, Library, ClipboardList, Briefcase, DollarSign,
   Bell, MapPin, Activity, FileText, Layers, Clock, ChevronRight,
+  Loader2,
 } from 'lucide-react';
 
 /* ── Pexels photo helpers ── */
@@ -171,8 +174,27 @@ const HOMEPAGE_FAQS = [
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const { setAuth } = useAuthStore();
   const [showVideo, setShowVideo] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleViewDemo = async () => {
+    setDemoLoading(true);
+    try {
+      const res: any = await api.demoLogin();
+      const token = res?.data?.accessToken;
+      const refreshToken = res?.data?.refreshToken;
+      const demoUser = res?.data?.user;
+      if (!token || !demoUser) throw new Error('No token received');
+      setAuth(demoUser, token, true, refreshToken);
+      navigate('/app/dashboard');
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Could not start the live demo — please try again shortly.');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   // Homepage-targeted FAQPage schema (for Google's answer box) — scoped to "/"
   // only via this component, not statically in index.html (which would leak
@@ -295,6 +317,14 @@ export function LandingPage() {
                   onClick={() => navigate('/register')}>
                   Register Your School
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                <Button size="lg" variant="outline"
+                  className="bg-transparent border-white/40 text-white hover:bg-white/10 text-base px-8 group"
+                  onClick={handleViewDemo} disabled={demoLoading}>
+                  {demoLoading
+                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    : <Zap className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />}
+                  View Live Demo
                 </Button>
                 <Button size="lg" variant="outline"
                   className="bg-transparent border-white/40 text-white hover:bg-white/10 text-base px-8 group"

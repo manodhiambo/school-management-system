@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
 import { initiateSTKPush, formatPhone } from '../services/mpesaService.js';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import logger from '../utils/logger.js';
 import { seedTenantData } from '../utils/seedTenantData.js';
 
@@ -175,7 +176,7 @@ router.post('/register', async (req, res) => {
 // POST /pay — Initiate M-Pesa payment to activate full subscription
 // Can be called during trial or after expiry
 // ============================================================
-router.post('/pay', authenticate, async (req, res) => {
+router.post('/pay', authenticate, blockDemoSideEffects('an M-Pesa payment'), async (req, res) => {
   try {
     const { phone } = req.body;
 

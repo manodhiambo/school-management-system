@@ -14,6 +14,7 @@ import { logAction } from './auditLogRoutes.js';
 import { passwordResetLimiter } from '../middleware/rateLimiter.js';
 import { findBlacklistMatch } from '../utils/blacklist.js';
 import { buildAuditContext } from '../utils/auditContext.js';
+import { getDemoTenantId } from '../services/demoTenant.js';
 
 const router = express.Router();
 
@@ -216,6 +217,71 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     logger.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Login failed' });
+  }
+});
+
+// One-click public demo — no credentials needed. Logs straight into the
+// admin account of the sandboxed, nightly-reset demo tenant (see
+// database/seedDemoTenant.js). Rate-limited the same as /login via the
+// authLimiter mounted on this whole router in server.js.
+router.post('/demo-login', async (req, res) => {
+  try {
+    let demoTenantId = getDemoTenantId();
+    if (!demoTenantId) {
+      const rows = await query('SELECT id FROM tenants WHERE is_demo = TRUE LIMIT 1');
+      demoTenantId = rows[0]?.id || null;
+    }
+
+    if (!demoTenantId) {
+      return res.status(503).json({ success: false, message: 'The live demo is not available right now — please try again shortly.' });
+    }
+
+    const users = await query(
+      `SELECT id, email, role, tenant_id, first_name, last_name, is_active
+       FROM users WHERE tenant_id = $1 AND role = 'admin' AND is_active = true LIMIT 1`,
+      [demoTenantId]
+    );
+    if (users.length === 0) {
+      return res.status(503).json({ success: false, message: 'The live demo is not available right now — please try again shortly.' });
+    }
+    const user = users[0];
+
+    const accessToken = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id },
+      config.jwt.secret,
+      { expiresIn: config.jwt.accessExpiresIn }
+    );
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      config.jwt.refreshSecret,
+      { expiresIn: config.jwt.refreshExpiresIn }
+    );
+
+    upsertSession(user.id, refreshToken, req);
+    logAction(req, 'demo_login', 'user', user.id, {});
+
+    res.json({
+      success: true,
+      message: 'Demo login successful',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          tenant_id: user.tenant_id,
+          first_name: user.first_name || 'Demo',
+          last_name: user.last_name || 'Admin',
+          isActive: user.is_active,
+          isVerified: true,
+          disabled_modules: []
+        },
+        accessToken,
+        refreshToken
+      }
+    });
+  } catch (error) {
+    logger.error('Demo login error:', error);
+    res.status(500).json({ success: false, message: 'Demo login failed' });
   }
 });
 

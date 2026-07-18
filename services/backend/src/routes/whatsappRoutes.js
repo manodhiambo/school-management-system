@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate, requireModule } from '../middleware/authMiddleware.js';
+import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import logger from '../utils/logger.js';
 import axios from 'axios';
 
@@ -101,7 +102,7 @@ router.put('/config', adminOnly, async (req, res) => {
 });
 
 // POST /test — send a test message
-router.post('/test', adminOnly, async (req, res) => {
+router.post('/test', adminOnly, blockDemoSideEffects('sending a WhatsApp message'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { phone, message } = req.body;
@@ -130,7 +131,7 @@ router.post('/test', adminOnly, async (req, res) => {
 });
 
 // POST /send — bulk or targeted send
-router.post('/send', adminOnly, async (req, res) => {
+router.post('/send', adminOnly, blockDemoSideEffects('sending a WhatsApp message'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { target, class_id, phone, message } = req.body;

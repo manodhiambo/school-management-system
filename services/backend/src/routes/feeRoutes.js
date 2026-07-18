@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import requireRole from '../middleware/roleMiddleware.js';
+import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
@@ -1669,7 +1670,7 @@ function normalizeMpesaPhone(raw) {
 }
 
 // POST /api/v1/fee/mpesa/pay — initiate STK push for a fee invoice
-router.post('/mpesa/pay', async (req, res) => {
+router.post('/mpesa/pay', blockDemoSideEffects('an M-Pesa payment'), async (req, res) => {
   try {
     if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
@@ -1827,7 +1828,7 @@ router.get('/mpesa/student/:studentId', async (req, res) => {
 });
 
 // POST /api/v1/fee/intasend/checkout — initiate a bank/card collection via IntaSend
-router.post('/intasend/checkout', async (req, res) => {
+router.post('/intasend/checkout', blockDemoSideEffects('an IntaSend payment'), async (req, res) => {
   try {
     if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });

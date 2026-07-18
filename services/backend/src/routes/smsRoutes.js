@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
+import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
@@ -118,7 +119,7 @@ export function normalisePhone(phone) {
 }
 
 // ─── POST /sms/send — single recipient ───────────────────────────────────────
-router.post('/send', async (req, res) => {
+router.post('/send', blockDemoSideEffects('sending an SMS'), async (req, res) => {
   try {
     if (!['admin', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Admin or teacher only' });
@@ -183,7 +184,7 @@ router.post('/send', async (req, res) => {
 });
 
 // ─── POST /sms/bulk — multiple recipients via Mobitech /sendmultiple ─────────
-router.post('/bulk', async (req, res) => {
+router.post('/bulk', blockDemoSideEffects('bulk SMS'), async (req, res) => {
   try {
     if (!['admin', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Admin or teacher only' });

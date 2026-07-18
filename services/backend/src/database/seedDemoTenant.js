@@ -67,6 +67,14 @@ async function wipeDemoTenantData(tenantId) {
   await query('DELETE FROM exam_results WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM exams WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM attendance WHERE tenant_id = $1', [tenantId]);
+  // A DB trigger auto-creates income_records from fee_payments (finance_settings'
+  // auto_generate_journal_entries) but leaves income_records.tenant_id NULL, so
+  // it has to be found via the student join, not a tenant_id filter — and it
+  // must go before students are deleted, since that FK has no ON DELETE CASCADE.
+  await query(
+    'DELETE FROM income_records WHERE student_id IN (SELECT id FROM students WHERE tenant_id = $1)',
+    [tenantId]
+  );
   await query('DELETE FROM fee_payments WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM fee_invoices WHERE tenant_id = $1', [tenantId]);
   await query(
@@ -141,12 +149,9 @@ async function seedShowcaseData(tenant) {
     [classJuniorId, currentYear, tenantId]
   );
 
-  // subjects.code has a global (not per-tenant) UNIQUE constraint on the live
-  // schema, so plain codes like "MAT" collide with whatever real tenant
-  // happens to use them first — prefix ours so a reset never collides.
   const subjectDefs = [
-    ['English', 'DEMO-ENG'], ['Mathematics', 'DEMO-MAT'], ['Kiswahili', 'DEMO-KIS'],
-    ['Integrated Science', 'DEMO-SCI'], ['Social Studies', 'DEMO-SST'],
+    ['English', 'ENG'], ['Mathematics', 'MAT'], ['Kiswahili', 'KIS'],
+    ['Integrated Science', 'SCI'], ['Social Studies', 'SST'],
   ];
   const subjectIds = [];
   for (const [name, code] of subjectDefs) {

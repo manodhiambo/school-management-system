@@ -57,7 +57,7 @@ async function findOrCreateDemoTenant() {
     [
       'SkulManager Demo Academy', DEMO_SCHOOL_EMAIL, '+254700000000',
       'Nairobi, Kenya', 'Nairobi', DEMO_ADMIN_EMAIL,
-      'DEMO001', 'demo', 'tenant_demo001',
+      'SKULDEMO01', 'skulmanager-demo', 'tenant_skuldemo01',
     ]
   );
   return created[0];
@@ -141,9 +141,12 @@ async function seedShowcaseData(tenant) {
     [classJuniorId, currentYear, tenantId]
   );
 
+  // subjects.code has a global (not per-tenant) UNIQUE constraint on the live
+  // schema, so plain codes like "MAT" collide with whatever real tenant
+  // happens to use them first — prefix ours so a reset never collides.
   const subjectDefs = [
-    ['English', 'ENG'], ['Mathematics', 'MAT'], ['Kiswahili', 'KIS'],
-    ['Integrated Science', 'SCI'], ['Social Studies', 'SST'],
+    ['English', 'DEMO-ENG'], ['Mathematics', 'DEMO-MAT'], ['Kiswahili', 'DEMO-KIS'],
+    ['Integrated Science', 'DEMO-SCI'], ['Social Studies', 'DEMO-SST'],
   ];
   const subjectIds = [];
   for (const [name, code] of subjectDefs) {

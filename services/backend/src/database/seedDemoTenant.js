@@ -26,6 +26,10 @@ const DEMO_TEACHER_EMAIL = 'teacher@demo.skulmanager.org';
 const DEMO_PARENT_EMAIL = 'parent@demo.skulmanager.org';
 const DEMO_STUDENT1_EMAIL = 'student1@demo.skulmanager.org';
 const DEMO_STUDENT2_EMAIL = 'student2@demo.skulmanager.org';
+const DEMO_FINANCE_EMAIL = 'finance@demo.skulmanager.org';
+const DEMO_DRIVER_EMAIL = 'driver@demo.skulmanager.org';
+const DEMO_SECURITY_EMAIL = 'security@demo.skulmanager.org';
+const DEMO_TECHNICIAN_EMAIL = 'technician@demo.skulmanager.org';
 
 function cbeGrade(percentage) {
   if (percentage >= 75) return 'EE';
@@ -134,6 +138,14 @@ async function seedShowcaseData(tenant) {
      VALUES ($1,$2,'Peter','Otieno','father','+254711000000','Engineer',$3)`,
     [parentId, parentUserId, tenantId]
   );
+
+  // These 4 roles have no dedicated profile table (matches driverRoutes.js /
+  // gateRoutes.js / financeRoutes.js / maintenanceRoutes.js, which all key
+  // off users.role directly) — a plain login-capable user is the whole demo.
+  await createUser({ email: DEMO_FINANCE_EMAIL, role: 'finance_officer', tenantId, firstName: 'Susan', lastName: 'Kamau' });
+  await createUser({ email: DEMO_DRIVER_EMAIL, role: 'driver', tenantId, firstName: 'Moses', lastName: 'Kiptoo' });
+  await createUser({ email: DEMO_SECURITY_EMAIL, role: 'security', tenantId, firstName: 'James', lastName: 'Mwangi' });
+  await createUser({ email: DEMO_TECHNICIAN_EMAIL, role: 'technician', tenantId, firstName: 'David', lastName: 'Mutua' });
 
   // ── Academics: classes + subjects ──────────────────────────────────────
   const classLowerId = uuidv4();

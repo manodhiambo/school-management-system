@@ -111,3 +111,32 @@ export const initiateSTKPush = async (phone, amount, accountRef, description) =>
     throw new Error(`M-Pesa STK Push failed: ${msg}`);
   }
 };
+
+/**
+ * Independently verify an STK push result with Safaricom's own query API
+ * rather than trusting a callback's POSTed body — callback endpoints are
+ * public webhooks with no auth, and anyone who has initiated their own STK
+ * push knows their CheckoutRequestID, so trusting a POSTed Amount/ResultCode
+ * directly would let them forge a "paid" result. Shared by mpesaCallbackRoutes.js
+ * (fee invoices) and admissionsRoutes.js (application fees) so this
+ * security-critical check has exactly one implementation.
+ */
+export const verifyWithSafaricom = async (checkoutRequestId) => {
+  const accessToken = await getOAuthToken();
+  const timestamp = _generateTimestamp();
+  const password = Buffer.from(`${_SHORTCODE}${_PASSKEY}${timestamp}`).toString('base64');
+  const response = await axios.post(
+    `${_BASE_URL}/mpesa/stkpushquery/v1/query`,
+    {
+      BusinessShortCode: _SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestId
+    },
+    {
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      timeout: 15000
+    }
+  );
+  return response.data;
+};

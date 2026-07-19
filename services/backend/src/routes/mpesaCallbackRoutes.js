@@ -2,44 +2,9 @@ import express from 'express';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+import { verifyWithSafaricom } from '../services/mpesaService.js';
 
 const router = express.Router();
-
-async function getMpesaToken() {
-  const key = process.env.MPESA_CONSUMER_KEY;
-  const secret = process.env.MPESA_CONSUMER_SECRET;
-  if (!key || !secret) throw new Error('M-Pesa credentials not configured');
-  const credentials = Buffer.from(`${key}:${secret}`).toString('base64');
-  const resp = await fetch(
-    'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-    { headers: { Authorization: `Basic ${credentials}` } }
-  );
-  if (!resp.ok) throw new Error(`M-Pesa auth failed: ${resp.status}`);
-  const json = await resp.json();
-  return json.access_token;
-}
-
-// Independently verify a transaction with Safaricom rather than trusting the
-// callback body, since the callback endpoint has no auth (it's a public webhook)
-// and anyone who has initiated their own STK push knows their CheckoutRequestID —
-// trusting the POSTed Amount/ResultCode directly would let them forge "paid" results.
-async function verifyWithSafaricom(checkoutRequestId) {
-  const shortcode = process.env.MPESA_SHORTCODE;
-  const passkey = process.env.MPESA_PASSKEY;
-  if (!shortcode || !passkey) throw new Error('M-Pesa not configured');
-  const token = await getMpesaToken();
-  const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-  const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
-  const resp = await fetch(
-    'https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query',
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ BusinessShortCode: shortcode, Password: password, Timestamp: timestamp, CheckoutRequestID: checkoutRequestId }),
-    }
-  );
-  return resp.json();
-}
 
 // POST /api/v1/fee/mpesa/callback — Safaricom STK push result (no auth required — public webhook)
 router.post('/callback', async (req, res) => {

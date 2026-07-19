@@ -90,6 +90,8 @@ import { LaundryPage } from './pages/welfare/LaundryPage';
 import { DormitoryInspectionPage } from './pages/welfare/DormitoryInspectionPage';
 import { HostelInventoryPage } from './pages/welfare/HostelInventoryPage';
 import { MaintenanceRequestsPage } from './pages/welfare/MaintenanceRequestsPage';
+import { ApplyPage } from './pages/admissions/ApplyPage';
+import { AdmissionsPage } from './pages/admissions/AdmissionsPage';
 import { WhatsAppPage } from './pages/communication/WhatsAppPage';
 import { SmsKeywordsPage } from './pages/communication/SmsKeywordsPage';
 import { PortfolioPage } from './pages/student/PortfolioPage';
@@ -214,6 +216,7 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/features/:slug" element={<FeatureLandingPage />} />
+            <Route path="/apply/:schoolCode" element={<ApplyPage />} />
 
             {/* SuperAdmin routes */}
             <Route
@@ -322,6 +325,7 @@ function App() {
               <Route path="hostel-inspections" element={<RoleRoute allowedRoles={['admin']}><DormitoryInspectionPage /></RoleRoute>} />
               <Route path="hostel-inventory" element={<RoleRoute allowedRoles={['admin']}><HostelInventoryPage /></RoleRoute>} />
               <Route path="maintenance-requests" element={<RoleRoute allowedRoles={['admin', 'teacher']}><MaintenanceRequestsPage /></RoleRoute>} />
+              <Route path="admissions" element={<RoleRoute allowedRoles={['admin']}><AdmissionsPage /></RoleRoute>} />
               <Route path="whatsapp" element={<RoleRoute allowedRoles={['admin']}><WhatsAppPage /></RoleRoute>} />
               <Route path="sms-keywords" element={<RoleRoute allowedRoles={['admin']}><SmsKeywordsPage /></RoleRoute>} />
               <Route path="portfolio" element={<PortfolioPage />} />

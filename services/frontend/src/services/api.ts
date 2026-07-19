@@ -1776,6 +1776,30 @@ class ApiService {
   getMaintenanceTechnicianPerformanceReport() { return this.api.get('/maintenance/reports/technician-performance'); }
   getMaintenanceTrendsReport() { return this.api.get('/maintenance/reports/trends'); }
 
+  // ── Online Admission — public (no auth needed) ──────────────────────────────
+  getAdmissionPublicInfo(schoolCode: string) { return this.api.get('/admissions/public/' + schoolCode); }
+  submitAdmissionApplication(schoolCode: string, data: any) { return this.api.post('/admissions/public/' + schoolCode + '/apply', data); }
+  trackAdmissionApplication(schoolCode: string, applicationNumber: string, contact: { phone?: string; email?: string }) {
+    return this.api.get('/admissions/public/' + schoolCode + '/track/' + applicationNumber, { params: contact });
+  }
+  payAdmissionFee(schoolCode: string, applicationNumber: string, phone: string) {
+    return this.api.post('/admissions/public/' + schoolCode + '/applications/' + applicationNumber + '/pay-fee', { phone });
+  }
+
+  // ── Online Admission — admin ─────────────────────────────────────────────────
+  getAdmissionSettings() { return this.api.get('/admissions/settings'); }
+  updateAdmissionSettings(data: any) { return this.api.put('/admissions/settings', data); }
+  getAdmissionApplications(params?: any) { return this.api.get('/admissions/applications', { params }); }
+  getAdmissionApplication(id: string) { return this.api.get('/admissions/applications/' + id); }
+  verifyAdmissionDocuments(id: string) { return this.api.put('/admissions/applications/' + id + '/verify-documents', {}); }
+  scheduleAdmissionInterview(id: string, data: any) { return this.api.put('/admissions/applications/' + id + '/schedule-interview', data); }
+  recordAdmissionInterview(id: string, notes: string) { return this.api.put('/admissions/applications/' + id + '/record-interview', { interview_notes: notes }); }
+  decideAdmissionApplication(id: string, decision: string, notes?: string) {
+    return this.api.put('/admissions/applications/' + id + '/decision', { decision, decision_notes: notes });
+  }
+  enrollAdmissionApplication(id: string, data: any) { return this.api.put('/admissions/applications/' + id + '/enroll', data); }
+  getAdmissionFunnelReport() { return this.api.get('/admissions/reports/funnel'); }
+
   // ── Bursary ───────────────────────────────────────────────────────────────
   getBursaryFunders() { return this.api.get('/bursary/funders'); }
   createBursaryFunder(data: any) { return this.api.post('/bursary/funders', data); }

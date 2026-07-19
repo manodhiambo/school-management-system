@@ -1736,6 +1736,20 @@ class ApiService {
   getKitchenRequisitions() { return this.api.get('/canteen/requisitions'); }
   createKitchenRequisition(data: any) { return this.api.post('/canteen/requisitions', data); }
 
+  // ── School Store / POS (products reuse inventory_items; wallet shared with Canteen) ──
+  getStoreProducts(params?: any) { return this.api.get('/school-store/products', { params }); }
+  createStoreProduct(data: any) { return this.api.post('/school-store/products', data); }
+  updateStoreProduct(id: string, data: any) { return this.api.put('/school-store/products/' + id, data); }
+  checkoutStoreSale(data: any) { return this.api.post('/school-store/sales', data); }
+  confirmStoreMpesa(id: string, data?: any) { return this.api.put('/school-store/sales/' + id + '/confirm-mpesa', data || {}); }
+  getStoreSales(params?: any) { return this.api.get('/school-store/sales', { params }); }
+  getStoreSale(id: string) { return this.api.get('/school-store/sales/' + id); }
+  refundStoreSale(id: string, data: any) { return this.api.post('/school-store/sales/' + id + '/refund', data); }
+  getStoreDailyReport(date?: string) { return this.api.get('/school-store/reports/daily', { params: { date } }); }
+  getStoreProductsReport() { return this.api.get('/school-store/reports/products'); }
+  getStoreProfitReport() { return this.api.get('/school-store/reports/profit'); }
+  getStoreValuationReport() { return this.api.get('/school-store/reports/valuation'); }
+
   // ── Bursary ───────────────────────────────────────────────────────────────
   getBursaryFunders() { return this.api.get('/bursary/funders'); }
   createBursaryFunder(data: any) { return this.api.post('/bursary/funders', data); }

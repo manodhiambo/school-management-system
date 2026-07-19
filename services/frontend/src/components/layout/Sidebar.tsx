@@ -192,6 +192,7 @@ const navigationItems: NavItem[] = [
   { name: 'Menu Planning',      href: '/app/canteen-menu-planning', icon: CalendarDays, roles: ['admin'],                            section: 'Welfare', module: 'canteen' },
   { name: 'Meal Attendance',    href: '/app/canteen-attendance', icon: Utensils,      roles: ['admin'],                              section: 'Welfare', module: 'canteen' },
   { name: 'Kitchen Requisitions', href: '/app/canteen-requisitions', icon: ClipboardList, roles: ['admin'],                          section: 'Welfare', module: 'canteen' },
+  { name: 'School Store (POS)', href: '/app/school-store',       icon: ShoppingCart,  roles: ['admin'],                              section: 'Welfare', module: 'school_store' },
 
   // ── HR & Staff Extended ───────────────────────────────────────────────────
   { name: 'Payroll',            href: '/app/payroll',            icon: Wallet,        roles: ['admin', 'finance_officer'],           section: 'Finance', module: 'staff' },

@@ -12,6 +12,7 @@ export const MODULE_REGISTRY = [
   { key: 'hostel', label: 'Hostel Management' },
   { key: 'canteen', label: 'Canteen' },
   { key: 'inventory', label: 'Inventory' },
+  { key: 'school_store', label: 'School Store (POS)' },
   { key: 'communication', label: 'Communication (SMS, WhatsApp, Announcements, Messages)' },
   { key: 'staff', label: 'Staff Management (Payroll, Appraisals, Leave, Substitutes)' },
   { key: 'timetable', label: 'Timetable' },

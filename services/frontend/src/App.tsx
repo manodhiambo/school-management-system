@@ -82,6 +82,7 @@ import { CanteenPage } from './pages/welfare/CanteenPage';
 import { MenuPlanningPage } from './pages/welfare/MenuPlanningPage';
 import { MealAttendancePage } from './pages/welfare/MealAttendancePage';
 import { KitchenRequisitionsPage } from './pages/welfare/KitchenRequisitionsPage';
+import { SchoolStorePage } from './pages/welfare/SchoolStorePage';
 import { CounselingPage } from './pages/welfare/CounselingPage';
 import { HostelManagementPage } from './pages/welfare/HostelManagementPage';
 import { RollCallPage } from './pages/welfare/RollCallPage';
@@ -312,6 +313,7 @@ function App() {
               <Route path="canteen-menu-planning" element={<RoleRoute allowedRoles={['admin']}><MenuPlanningPage /></RoleRoute>} />
               <Route path="canteen-attendance" element={<RoleRoute allowedRoles={['admin']}><MealAttendancePage /></RoleRoute>} />
               <Route path="canteen-requisitions" element={<RoleRoute allowedRoles={['admin']}><KitchenRequisitionsPage /></RoleRoute>} />
+              <Route path="school-store" element={<RoleRoute allowedRoles={['admin']}><SchoolStorePage /></RoleRoute>} />
               <Route path="counseling" element={<CounselingPage />} />
               <Route path="hostel-management" element={<RoleRoute allowedRoles={['admin']}><HostelManagementPage /></RoleRoute>} />
               <Route path="hostel-roll-call" element={<RoleRoute allowedRoles={['admin']}><RollCallPage /></RoleRoute>} />

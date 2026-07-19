@@ -135,8 +135,10 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ limit: '5mb', extended: true }));
+// 25mb accommodates the admissions public apply form, which can carry up to
+// 5 base64-encoded document uploads (3MB raw each, larger once base64-inflated).
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Global API rate limiter
 app.use('/api/', apiLimiter);

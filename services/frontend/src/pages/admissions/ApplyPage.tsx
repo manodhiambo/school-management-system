@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSEO } from '@/hooks/useSEO';
 import api from '@/services/api';
-import { GraduationCap, ArrowLeft, CheckCircle, Search, Loader2 } from 'lucide-react';
+import { GraduationCap, ArrowLeft, CheckCircle, Search, Loader2, Upload, FileCheck, X } from 'lucide-react';
 
 type Step = 'loading' | 'not-found' | 'closed' | 'form' | 'submitted' | 'track';
 
@@ -22,8 +22,26 @@ const EDUCATION_LEVELS = [
 const EMPTY_FORM = {
   first_name: '', last_name: '', date_of_birth: '', gender: '', education_level: '', previous_school: '',
   guardian_name: '', guardian_phone: '', guardian_email: '', guardian_relationship: '',
-  birth_certificate_url: '', kcpe_results_url: '', passport_photo_url: '', report_form_url: '', medical_form_url: '',
 };
+
+const DOCUMENT_SLOTS: { key: string; label: string }[] = [
+  { key: 'birth_certificate', label: 'Birth Certificate' },
+  { key: 'kcpe_results', label: 'KCPE Results' },
+  { key: 'passport_photo', label: 'Passport Photo' },
+  { key: 'previous_report_form', label: 'Previous Report Form' },
+  { key: 'medical_form', label: 'Medical Form' },
+];
+
+const MAX_FILE_BYTES = 3 * 1024 * 1024; // 3MB per document
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function ApplyPage() {
   const { schoolCode } = useParams<{ schoolCode: string }>();
@@ -32,6 +50,8 @@ export function ApplyPage() {
   const [step, setStep] = useState<Step>('loading');
   const [school, setSchool] = useState<any>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [documents, setDocuments] = useState<Record<string, { name: string; dataUrl: string } | undefined>>({});
+  const [docError, setDocError] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [applicationNumber, setApplicationNumber] = useState('');
@@ -58,6 +78,20 @@ export function ApplyPage() {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   };
 
+  const handleFileChange = async (key: string, file: File | null) => {
+    setDocError('');
+    if (!file) {
+      setDocuments(d => ({ ...d, [key]: undefined }));
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setDocError(`${file.name} is larger than 3MB. Please upload a smaller file.`);
+      return;
+    }
+    const dataUrl = await readFileAsDataUrl(file);
+    setDocuments(d => ({ ...d, [key]: { name: file.name, dataUrl } }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -67,20 +101,16 @@ export function ApplyPage() {
     }
     setSubmitting(true);
     try {
-      const documents = [
-        { type: 'birth_certificate', url: form.birth_certificate_url },
-        { type: 'kcpe_results', url: form.kcpe_results_url },
-        { type: 'passport_photo', url: form.passport_photo_url },
-        { type: 'previous_report_form', url: form.report_form_url },
-        { type: 'medical_form', url: form.medical_form_url },
-      ].filter(d => d.url.trim());
+      const uploadedDocuments = DOCUMENT_SLOTS
+        .filter(slot => documents[slot.key])
+        .map(slot => ({ type: slot.key, name: documents[slot.key]!.name, url: documents[slot.key]!.dataUrl }));
 
       const res: any = await api.submitAdmissionApplication(schoolCode!, {
         first_name: form.first_name, last_name: form.last_name, date_of_birth: form.date_of_birth || null,
         gender: form.gender || null, education_level: form.education_level || null,
         previous_school: form.previous_school || null, guardian_name: form.guardian_name,
         guardian_phone: form.guardian_phone, guardian_email: form.guardian_email || null,
-        guardian_relationship: form.guardian_relationship || null, documents,
+        guardian_relationship: form.guardian_relationship || null, documents: uploadedDocuments,
       });
       setApplicationNumber(res?.data?.application_number || '');
       setStep('submitted');
@@ -224,14 +254,32 @@ export function ApplyPage() {
 
                   <div className="border-t pt-3">
                     <p className="text-sm font-semibold text-gray-700 mb-1">Documents</p>
-                    <p className="text-xs text-gray-400 mb-2">Paste a link to each document (e.g. a Google Drive share link). All optional at this stage.</p>
+                    <p className="text-xs text-gray-400 mb-2">Upload a photo or scan of each document (max 3MB each). All optional at this stage.</p>
                     <div className="space-y-2">
-                      <Input name="birth_certificate_url" placeholder="Birth Certificate — URL" value={form.birth_certificate_url} onChange={handleChange} />
-                      <Input name="kcpe_results_url" placeholder="KCPE Results — URL" value={form.kcpe_results_url} onChange={handleChange} />
-                      <Input name="passport_photo_url" placeholder="Passport Photo — URL" value={form.passport_photo_url} onChange={handleChange} />
-                      <Input name="report_form_url" placeholder="Previous Report Form — URL" value={form.report_form_url} onChange={handleChange} />
-                      <Input name="medical_form_url" placeholder="Medical Form — URL" value={form.medical_form_url} onChange={handleChange} />
+                      {DOCUMENT_SLOTS.map(slot => {
+                        const doc = documents[slot.key];
+                        return (
+                          <div key={slot.key} className="flex items-center gap-2">
+                            <label className="flex-1 flex items-center gap-2 border border-gray-300 rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                              {doc ? <FileCheck className="h-4 w-4 text-green-600 shrink-0" /> : <Upload className="h-4 w-4 text-gray-400 shrink-0" />}
+                              <span className={`truncate ${doc ? 'text-gray-800' : 'text-gray-400'}`}>{doc ? doc.name : slot.label}</span>
+                              <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="hidden"
+                                onChange={e => handleFileChange(slot.key, e.target.files?.[0] || null)}
+                              />
+                            </label>
+                            {doc && (
+                              <button type="button" onClick={() => handleFileChange(slot.key, null)} className="text-gray-400 hover:text-red-500 shrink-0">
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
+                    {docError && <p className="text-xs text-red-600 mt-2">{docError}</p>}
                   </div>
 
                   {error && <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>}

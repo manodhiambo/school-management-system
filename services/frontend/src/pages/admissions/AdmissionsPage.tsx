@@ -45,9 +45,18 @@ export function AdmissionsPage() {
 
   const [interviewForm, setInterviewForm] = useState({ interview_date: '', interview_time: '', interview_venue: '' });
   const [enrollClassId, setEnrollClassId] = useState('');
+  const [classes, setClasses] = useState<any[]>([]);
 
   useEffect(() => { loadApplications(); }, [statusFilter]);
+  useEffect(() => { loadClasses(); }, []);
   useEffect(() => { if (tab === 'settings') loadSettings(); if (tab === 'reports') loadFunnel(); }, [tab]);
+
+  const loadClasses = async () => {
+    try {
+      const res: any = await api.getClasses();
+      setClasses(res?.data?.classes || res?.data || []);
+    } catch { /* non-critical */ }
+  };
 
   const loadApplications = async () => {
     setLoading(true);

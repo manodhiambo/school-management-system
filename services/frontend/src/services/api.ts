@@ -1814,6 +1814,7 @@ class ApiService {
   getAdmissionSettings() { return this.api.get('/admissions/settings'); }
   updateAdmissionSettings(data: any) { return this.api.put('/admissions/settings', data); }
   getAdmissionApplications(params?: any) { return this.api.get('/admissions/applications', { params }); }
+  createAdmissionApplication(data: any) { return this.api.post('/admissions/applications', data); }
   getAdmissionApplication(id: string) { return this.api.get('/admissions/applications/' + id); }
   verifyAdmissionDocuments(id: string) { return this.api.put('/admissions/applications/' + id + '/verify-documents', {}); }
   scheduleAdmissionInterview(id: string, data: any) { return this.api.put('/admissions/applications/' + id + '/schedule-interview', data); }

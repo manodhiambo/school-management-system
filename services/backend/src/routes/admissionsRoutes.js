@@ -309,6 +309,45 @@ router.get('/applications', officeOnly, async (req, res) => {
   }
 });
 
+// POST /applications — admissions office records a walk-in/phoned-in
+// applicant directly. The only other way to create an application was the
+// public, unauthenticated /apply page, so staff had no in-dashboard way to
+// enter an applicant who didn't apply online themselves.
+router.post('/applications', officeOnly, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const {
+      first_name, last_name, date_of_birth, gender, education_level, previous_school,
+      guardian_name, guardian_phone, guardian_email, guardian_relationship, documents
+    } = req.body;
+
+    if (!first_name || !last_name || !guardian_name || !guardian_phone) {
+      return res.status(400).json({ success: false, message: 'first_name, last_name, guardian_name and guardian_phone are required' });
+    }
+
+    const applicationNumber = await generateApplicationNumber(tid);
+    const rows = await query(
+      `INSERT INTO admission_applications (
+         id, tenant_id, application_number, first_name, last_name, date_of_birth, gender,
+         education_level, previous_school, guardian_name, guardian_phone, guardian_email,
+         guardian_relationship, documents, status
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'submitted')
+       RETURNING ${APPLICATION_FIELDS}`,
+      [
+        uuidv4(), tid, applicationNumber, first_name, last_name, date_of_birth || null,
+        gender || null, education_level || null, previous_school || null, guardian_name,
+        guardian_phone, guardian_email || null, guardian_relationship || null,
+        JSON.stringify(Array.isArray(documents) ? documents : [])
+      ]
+    );
+
+    res.status(201).json({ success: true, message: 'Application recorded', data: rows[0] });
+  } catch (err) {
+    logger.error('Record admission application error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/applications/:id', officeOnly, async (req, res) => {
   try {
     const tid = req.user.tenant_id;

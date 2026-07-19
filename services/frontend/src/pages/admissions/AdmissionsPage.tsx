@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import api from '@/services/api';
 import {
-  GraduationCap, RefreshCw, BarChart2, Settings as SettingsIcon, CheckCircle2, XCircle,
+  GraduationCap, RefreshCw, BarChart2, Settings as SettingsIcon, CheckCircle2, XCircle, Plus,
 } from 'lucide-react';
 
 type Tab = 'applications' | 'settings' | 'reports';
@@ -30,6 +30,13 @@ export function AdmissionsPage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [selected, setSelected] = useState<any>(null);
+
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newApp, setNewApp] = useState({
+    first_name: '', last_name: '', date_of_birth: '', gender: '', education_level: '', previous_school: '',
+    guardian_name: '', guardian_phone: '', guardian_email: '', guardian_relationship: '',
+  });
+  const [savingNewApp, setSavingNewApp] = useState(false);
 
   const [settings, setSettings] = useState({ application_fee_amount: '0', is_open: true, academic_year: '' });
   const [savingSettings, setSavingSettings] = useState(false);
@@ -83,6 +90,22 @@ export function AdmissionsPage() {
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally { setSavingSettings(false); }
+  };
+
+  const createApplication = async () => {
+    if (!newApp.first_name || !newApp.last_name || !newApp.guardian_name || !newApp.guardian_phone) {
+      return toast({ title: 'First name, last name, guardian name and guardian phone are required', variant: 'destructive' });
+    }
+    setSavingNewApp(true);
+    try {
+      await api.createAdmissionApplication(newApp);
+      toast({ title: 'Application recorded' });
+      setShowNewForm(false);
+      setNewApp({ first_name: '', last_name: '', date_of_birth: '', gender: '', education_level: '', previous_school: '', guardian_name: '', guardian_phone: '', guardian_email: '', guardian_relationship: '' });
+      loadApplications();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally { setSavingNewApp(false); }
   };
 
   const openApplication = async (id: string) => {
@@ -165,6 +188,44 @@ export function AdmissionsPage() {
       {tab === 'applications' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-3">
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => setShowNewForm(!showNewForm)}><Plus className="h-4 w-4 mr-1" /> Add Application</Button>
+            </div>
+
+            {showNewForm && (
+              <Card><CardContent className="pt-4 space-y-3">
+                <p className="text-xs text-gray-500">For a walk-in or phoned-in applicant who didn't apply online.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="First name" value={newApp.first_name} onChange={e => setNewApp(f => ({ ...f, first_name: e.target.value }))} />
+                  <Input placeholder="Last name" value={newApp.last_name} onChange={e => setNewApp(f => ({ ...f, last_name: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input type="date" placeholder="Date of birth" value={newApp.date_of_birth} onChange={e => setNewApp(f => ({ ...f, date_of_birth: e.target.value }))} />
+                  <select className="w-full border rounded px-3 py-2 text-sm" value={newApp.gender} onChange={e => setNewApp(f => ({ ...f, gender: e.target.value }))}>
+                    <option value="">Gender...</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="Grade applying for" value={newApp.education_level} onChange={e => setNewApp(f => ({ ...f, education_level: e.target.value }))} />
+                  <Input placeholder="Previous school" value={newApp.previous_school} onChange={e => setNewApp(f => ({ ...f, previous_school: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="Guardian name" value={newApp.guardian_name} onChange={e => setNewApp(f => ({ ...f, guardian_name: e.target.value }))} />
+                  <Input placeholder="Guardian relationship" value={newApp.guardian_relationship} onChange={e => setNewApp(f => ({ ...f, guardian_relationship: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="Guardian phone" value={newApp.guardian_phone} onChange={e => setNewApp(f => ({ ...f, guardian_phone: e.target.value }))} />
+                  <Input placeholder="Guardian email (optional)" value={newApp.guardian_email} onChange={e => setNewApp(f => ({ ...f, guardian_email: e.target.value }))} />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={createApplication} disabled={savingNewApp}>{savingNewApp ? 'Saving...' : 'Save'}</Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowNewForm(false)}>Cancel</Button>
+                </div>
+              </CardContent></Card>
+            )}
+
             <div className="flex gap-2 flex-wrap">
               {['', 'submitted', 'document_review', 'interview_scheduled', 'interviewed', 'offered', 'rejected', 'enrolled'].map(s => (
                 <button key={s || 'all'} onClick={() => setStatusFilter(s)}

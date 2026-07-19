@@ -156,13 +156,24 @@ router.put('/routes/:id', authenticate, requireModule('transport'), async (req, 
       fare_per_km, distance_km
     } = req.body;
     const tid = req.user.tenant_id;
+    // driver_user_id can't use COALESCE like the other fields — an admin
+    // must be able to explicitly clear it (unassign a driver by picking
+    // "No driver assigned"), which sends an empty value. COALESCE would
+    // wrongly keep the old id in that case. But treating "not sent" the
+    // same as "explicitly cleared" was the actual bug: any edit that didn't
+    // include driver_user_id (e.g. just fixing vehicle_registration) wiped
+    // out a real assignment even though driver_name stayed correct via
+    // COALESCE — matching exactly what left a driver's route linked by name
+    // but not by account. $23 tells the query whether the caller actually
+    // sent this field at all.
+    const driverUserIdProvided = Object.prototype.hasOwnProperty.call(req.body, 'driver_user_id');
     const rows = await query(
       `UPDATE transport_routes SET
        route_name=COALESCE($1,route_name), route_code=COALESCE($2,route_code),
        description=COALESCE($3,description), vehicle_registration=COALESCE($4,vehicle_registration),
        vehicle_capacity=COALESCE($5,vehicle_capacity),
        vehicle_type=COALESCE($6,vehicle_type),
-       driver_user_id=$7,
+       driver_user_id=CASE WHEN $23::boolean THEN $7 ELSE driver_user_id END,
        driver_name=COALESCE($8,driver_name),
        driver_phone=COALESCE($9,driver_phone), driver_license=COALESCE($10,driver_license),
        conductor_name=COALESCE($11,conductor_name), conductor_phone=COALESCE($12,conductor_phone),
@@ -175,12 +186,12 @@ router.put('/routes/:id', authenticate, requireModule('transport'), async (req, 
        WHERE id=$21 AND tenant_id=$22 RETURNING *`,
       [route_name, route_code, description, vehicle_registration, vehicle_capacity,
        vehicle_type || null,
-       driver_user_id !== undefined ? (driver_user_id || null) : null,
+       driver_user_id || null,
        driver_name, driver_phone, driver_license, conductor_name, conductor_phone,
        morning_pickup_time, afternoon_dropoff_time,
        stops ? JSON.stringify(stops) : null,
        monthly_fee, term_fee, is_active,
-       fare_per_km, distance_km, req.params.id, tid]
+       fare_per_km, distance_km, req.params.id, tid, driverUserIdProvided]
     );
     if (rows.length) await syncTransportFeeStructure(rows[0], tid);
     res.json({ success: true, data: rows[0] });

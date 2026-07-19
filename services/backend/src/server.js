@@ -73,6 +73,7 @@ import canteenRoutes from './routes/canteenRoutes.js';
 import storeRoutes from './routes/storeRoutes.js';
 import maintenanceRoutes from './routes/maintenanceRoutes.js';
 import admissionsRoutes from './routes/admissionsRoutes.js';
+import crmRoutes from './routes/crmRoutes.js';
 import bursaryRoutes from './routes/bursaryRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
@@ -226,6 +227,7 @@ app.use('/api/v1/canteen', canteenRoutes);
 app.use('/api/v1/school-store', storeRoutes);
 app.use('/api/v1/maintenance', maintenanceRoutes);
 app.use('/api/v1/admissions', admissionsRoutes);
+app.use('/api/v1/crm', crmRoutes);
 app.use('/api/v1/bursary', bursaryRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
 

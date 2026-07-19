@@ -56,6 +56,7 @@ import {
   Utensils,
   Wrench,
   UserPlus,
+  Megaphone,
 } from 'lucide-react';
 
 type NavItem = {
@@ -87,6 +88,7 @@ const navigationItems: NavItem[] = [
   { name: 'Parents',         href: '/app/parents',        icon: UserCheck,     roles: ['admin', 'teacher'], section: 'People' },
   { name: 'User Management', href: '/app/users',          icon: Shield,        roles: ['admin'],            section: 'People' },
   { name: 'Admissions',      href: '/app/admissions',     icon: UserPlus,      roles: ['admin'],            section: 'People', module: 'admissions' },
+  { name: 'CRM / Leads',     href: '/app/crm',            icon: Megaphone,     roles: ['admin'],            section: 'People', module: 'crm' },
   { name: 'Appraisals',      href: '/app/appraisals',     icon: Award,         roles: ['admin'],            section: 'People', module: 'staff' },
   { name: 'Substitutes',     href: '/app/substitutes',    icon: Users,         roles: ['admin', 'teacher'], section: 'People', module: 'staff' },
 

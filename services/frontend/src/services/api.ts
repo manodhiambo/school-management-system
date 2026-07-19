@@ -1800,6 +1800,21 @@ class ApiService {
   enrollAdmissionApplication(id: string, data: any) { return this.api.put('/admissions/applications/' + id + '/enroll', data); }
   getAdmissionFunnelReport() { return this.api.get('/admissions/reports/funnel'); }
 
+  // ── School CRM ────────────────────────────────────────────────────────────
+  getCrmLeads(params?: any) { return this.api.get('/crm/leads', { params }); }
+  getCrmLead(id: string) { return this.api.get('/crm/leads/' + id); }
+  createCrmLead(data: any) { return this.api.post('/crm/leads', data); }
+  updateCrmLead(id: string, data: any) { return this.api.put('/crm/leads/' + id, data); }
+  logCrmFollowUp(id: string, data: any) { return this.api.post('/crm/leads/' + id + '/follow-up', data); }
+  convertCrmLead(id: string) { return this.api.post('/crm/leads/' + id + '/convert', {}); }
+  markCrmLeadLost(id: string, lost_reason: string) { return this.api.put('/crm/leads/' + id + '/lost', { lost_reason }); }
+  getCrmCampaigns() { return this.api.get('/crm/campaigns'); }
+  createCrmCampaign(data: any) { return this.api.post('/crm/campaigns', data); }
+  sendCrmCampaign(id: string) { return this.api.post('/crm/campaigns/' + id + '/send', {}); }
+  getCrmSourcesReport() { return this.api.get('/crm/reports/sources'); }
+  getCrmConversionReport() { return this.api.get('/crm/reports/conversion'); }
+  getCrmCampaignsReport() { return this.api.get('/crm/reports/campaigns'); }
+
   // ── Bursary ───────────────────────────────────────────────────────────────
   getBursaryFunders() { return this.api.get('/bursary/funders'); }
   createBursaryFunder(data: any) { return this.api.post('/bursary/funders', data); }

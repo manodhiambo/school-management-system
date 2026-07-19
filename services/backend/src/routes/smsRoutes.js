@@ -61,7 +61,7 @@ export async function sendSMSViaProvider(phone, message) {
 }
 
 // Send multiple SMS in one API call via Mobitech /sendmultiple
-async function sendBulkSMSViaProvider(recipients, message) {
+export async function sendBulkSMSViaProvider(recipients, message) {
   // recipients: [{ phone, ref }]
   const apiKey     = process.env.MOBITECH_API_KEY;
   const senderName = process.env.MOBITECH_SENDER_NAME || 'SKULMANAGER';

@@ -19,7 +19,8 @@ export const MODULE_REGISTRY = [
   { key: 'timetable', label: 'Timetable' },
   { key: 'teacher_checkin', label: 'Teacher Check-in' },
   { key: 'nemis', label: 'NEMIS Integration' },
-  { key: 'admissions', label: 'Online Admission' }
+  { key: 'admissions', label: 'Online Admission' },
+  { key: 'crm', label: 'School CRM' }
 ];
 
 export const MODULE_KEYS = MODULE_REGISTRY.map((m) => m.key);

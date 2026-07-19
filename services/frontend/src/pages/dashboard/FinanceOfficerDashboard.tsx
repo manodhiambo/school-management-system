@@ -74,8 +74,8 @@ export function FinanceOfficerDashboard() {
     return 'Good Evening';
   };
 
-  const collectionRate = feeCollection?.total_amount > 0
-    ? Math.round((feeCollection.total_collected / feeCollection.total_amount) * 100)
+  const collectionRate = feeCollection?.total_billed > 0
+    ? Math.round((feeCollection.total_collected / feeCollection.total_billed) * 100)
     : 0;
 
   const totalBankBalance = bankAccounts.reduce((s, a) => s + (Number(a.current_balance) || 0), 0);
@@ -224,7 +224,7 @@ export function FinanceOfficerDashboard() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-blue-50 rounded-xl p-4 text-center">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Expected')}</p>
-                  <p className="text-lg font-bold text-blue-700 mt-1">{fmt(feeCollection?.total_amount)}</p>
+                  <p className="text-lg font-bold text-blue-700 mt-1">{fmt(feeCollection?.total_billed)}</p>
                 </div>
                 <div className="bg-green-50 rounded-xl p-4 text-center">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Collected')}</p>
@@ -233,7 +233,7 @@ export function FinanceOfficerDashboard() {
                 <div className="bg-red-50 rounded-xl p-4 text-center">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">{t('Outstanding')}</p>
                   <p className="text-lg font-bold text-red-700 mt-1">
-                    {fmt((feeCollection?.total_amount || 0) - (feeCollection?.total_collected || 0))}
+                    {fmt(feeCollection?.total_outstanding)}
                   </p>
                 </div>
               </div>

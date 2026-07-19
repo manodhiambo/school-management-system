@@ -39,7 +39,7 @@ export function InventoryPage() {
   const [itemModal, setItemModal] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [itemForm, setItemForm] = useState({
-    category_id: '', name: '', sku: '', quantity: '', unit_cost: '',
+    category_id: '', name: '', unit: '', sku: '', quantity: '', unit_cost: '',
     reorder_level: '', location: '', condition: 'good'
   });
 
@@ -257,6 +257,10 @@ export function InventoryPage() {
   };
 
   const saveItem = async () => {
+    if (!itemForm.name || !itemForm.unit) {
+      setError('Name and unit (e.g. pieces, kg, litres) are required');
+      return;
+    }
     try {
       if (editItem) {
         await (api as any).updateInventoryItem(editItem.id, itemForm);
@@ -265,7 +269,7 @@ export function InventoryPage() {
       }
       setItemModal(false);
       setEditItem(null);
-      setItemForm({ category_id: '', name: '', sku: '', quantity: '', unit_cost: '', reorder_level: '', location: '', condition: 'good' });
+      setItemForm({ category_id: '', name: '', unit: '', sku: '', quantity: '', unit_cost: '', reorder_level: '', location: '', condition: 'good' });
       loadItems();
     } catch { setError('Failed to save item'); }
   };
@@ -339,7 +343,7 @@ export function InventoryPage() {
             <p className="text-gray-600 text-sm">All inventory items. Red qty = at or below reorder level.</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={loadItems}><RefreshCw className="h-4 w-4" /></Button>
-              <Button size="sm" onClick={() => { setEditItem(null); setItemForm({ category_id: '', name: '', sku: '', quantity: '', unit_cost: '', reorder_level: '', location: '', condition: 'good' }); setItemModal(true); }}>
+              <Button size="sm" onClick={() => { setEditItem(null); setItemForm({ category_id: '', name: '', unit: '', sku: '', quantity: '', unit_cost: '', reorder_level: '', location: '', condition: 'good' }); setItemModal(true); }}>
                 <Plus className="h-4 w-4 mr-1" /> Add Item
               </Button>
             </div>

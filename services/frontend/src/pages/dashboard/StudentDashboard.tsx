@@ -50,7 +50,7 @@ export function StudentDashboard() {
           !a.submission_status || a.submission_status === 'pending'
         ).length,
         attendanceRate,
-        feeBalance: feesRes?.data?.pending || 0
+        feeBalance: feesRes?.data?.summary?.total_balance || 0
       });
     } catch (error) {
       console.error('Error loading student dashboard:', error);

@@ -662,6 +662,27 @@ router.get('/payment', async (req, res) => {
   }
 });
 
+// Mirrors a successful fee_payments row into income_records — nothing else in
+// the fee-payment write path ever did this, so the Finance dashboard's
+// monthly collection chart (which reads income_records WHERE
+// income_category = 'Student Fees') was always empty regardless of how many
+// payments were recorded. Best-effort: a failure here must not roll back the
+// payment itself, since fee_payments/fee_invoices are the source of truth.
+async function recordFeeIncome({ tid, studentId, amount, paymentMethod, receiptNumber, paymentDate, userId }) {
+  try {
+    await query(
+      `INSERT INTO income_records (
+         tenant_id, income_number, income_date, income_category,
+         student_id, amount, vat_rate, vat_amount, total_amount,
+         payment_method, payment_reference, description, status, created_by
+       ) VALUES ($1,$2,COALESCE($3::timestamptz, NOW()),'Student Fees',$4,$5,0,0,$5,$6,$7,'Fee payment',$8,$9)`,
+      [tid, 'INC-FEE-' + Date.now().toString(36).toUpperCase(), paymentDate, studentId, amount, paymentMethod, receiptNumber, 'completed', userId]
+    );
+  } catch (err) {
+    logger.error('Record fee income error (payment itself already saved):', err);
+  }
+}
+
 // Record payment
 router.post('/payment', async (req, res) => {
   try {
@@ -700,6 +721,7 @@ router.post('/payment', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, 'success', COALESCE($7::timestamptz, NOW()), $8, $9)`,
         [paymentId, actualStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, receiptNumber, tid]
       );
+      await recordFeeIncome({ tid, studentId: actualStudentId, amount, paymentMethod: actualPaymentMethod, receiptNumber, paymentDate: actualPaymentDate, userId: req.user.id });
       return res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
     }
 
@@ -732,6 +754,8 @@ router.post('/payment', async (req, res) => {
        WHERE id = $2 AND tenant_id = $3`,
       [amount, actualInvoiceId, tid]
     );
+
+    await recordFeeIncome({ tid, studentId: invStudentId, amount, paymentMethod: actualPaymentMethod, receiptNumber, paymentDate: actualPaymentDate, userId: req.user.id });
 
     res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
   } catch (error) {

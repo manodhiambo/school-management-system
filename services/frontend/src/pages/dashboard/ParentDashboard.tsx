@@ -82,7 +82,7 @@ export function ParentDashboard() {
     );
   }
 
-  const totalBalance = parseFloat(fees?.pending || '0');
+  const totalBalance = parseFloat(fees?.summary?.total_balance || '0');
 
   return (
     <div className="space-y-8 pb-8">

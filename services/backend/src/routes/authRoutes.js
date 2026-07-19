@@ -220,10 +220,41 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Lists the demo tenant's showcase users so the login page can offer a
+// "log in as" picker — no secrets in the response, /demo-login below issues
+// the token without ever needing a password for these accounts.
+router.get('/demo-users', async (req, res) => {
+  try {
+    let demoTenantId = getDemoTenantId();
+    if (!demoTenantId) {
+      const rows = await query('SELECT id FROM tenants WHERE is_demo = TRUE LIMIT 1');
+      demoTenantId = rows[0]?.id || null;
+    }
+    if (!demoTenantId) {
+      return res.status(503).json({ success: false, message: 'The live demo is not available right now — please try again shortly.' });
+    }
+
+    const users = await query(
+      `SELECT email, role, first_name, last_name
+       FROM users WHERE tenant_id = $1 AND is_active = true
+       ORDER BY CASE role
+         WHEN 'admin' THEN 1 WHEN 'teacher' THEN 2 WHEN 'parent' THEN 3 WHEN 'student' THEN 4
+         ELSE 5 END, first_name`,
+      [demoTenantId]
+    );
+    res.json({ success: true, data: users });
+  } catch (error) {
+    logger.error('Demo users list error:', error);
+    res.status(500).json({ success: false, message: 'Could not load demo users' });
+  }
+});
+
 // One-click public demo — no credentials needed. Logs straight into the
 // admin account of the sandboxed, nightly-reset demo tenant (see
-// database/seedDemoTenant.js). Rate-limited the same as /login via the
-// authLimiter mounted on this whole router in server.js.
+// database/seedDemoTenant.js), or a specific showcase user if `email` is
+// given (must belong to the demo tenant — see /demo-users above). Rate-limited
+// the same as /login via the authLimiter mounted on this whole router in
+// server.js.
 router.post('/demo-login', async (req, res) => {
   try {
     let demoTenantId = getDemoTenantId();
@@ -236,11 +267,18 @@ router.post('/demo-login', async (req, res) => {
       return res.status(503).json({ success: false, message: 'The live demo is not available right now — please try again shortly.' });
     }
 
-    const users = await query(
-      `SELECT id, email, role, tenant_id, first_name, last_name, is_active
-       FROM users WHERE tenant_id = $1 AND role = 'admin' AND is_active = true LIMIT 1`,
-      [demoTenantId]
-    );
+    const { email } = req.body || {};
+    const users = email
+      ? await query(
+          `SELECT id, email, role, tenant_id, first_name, last_name, is_active
+           FROM users WHERE tenant_id = $1 AND email = $2 AND is_active = true LIMIT 1`,
+          [demoTenantId, email]
+        )
+      : await query(
+          `SELECT id, email, role, tenant_id, first_name, last_name, is_active
+           FROM users WHERE tenant_id = $1 AND role = 'admin' AND is_active = true LIMIT 1`,
+          [demoTenantId]
+        );
     if (users.length === 0) {
       return res.status(503).json({ success: false, message: 'The live demo is not available right now — please try again shortly.' });
     }

@@ -69,6 +69,12 @@ type NavItem = {
   module?: string;
 };
 
+// Items are grouped contiguously by `section` below — the sidebar prints a
+// new header only when `section` changes from the previous item in this
+// array (see the `showHeader` logic further down), so scattering a section's
+// items across the array (as used to happen here) produces duplicate headers
+// for the same section. Keep every item for a given section adjacent to the
+// rest of that section when adding new entries.
 const navigationItems: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────────────────────
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security'], section: '' },
@@ -79,6 +85,8 @@ const navigationItems: NavItem[] = [
   { name: 'Teachers',        href: '/app/teachers',       icon: GraduationCap, roles: ['admin'],            section: 'People' },
   { name: 'Parents',         href: '/app/parents',        icon: UserCheck,     roles: ['admin', 'teacher'], section: 'People' },
   { name: 'User Management', href: '/app/users',          icon: Shield,        roles: ['admin'],            section: 'People' },
+  { name: 'Appraisals',      href: '/app/appraisals',     icon: Award,         roles: ['admin'],            section: 'People', module: 'staff' },
+  { name: 'Substitutes',     href: '/app/substitutes',    icon: Users,         roles: ['admin', 'teacher'], section: 'People', module: 'staff' },
 
   // ── Academic (admin) ──────────────────────────────────────────────────────
   { name: 'Classes & Rooms',    href: '/app/academic',           icon: Building2,     roles: ['admin'],            section: 'Academic' },
@@ -92,6 +100,9 @@ const navigationItems: NavItem[] = [
   { name: 'Promotion',          href: '/app/academic',           icon: ArrowUpCircle, roles: ['admin'],            section: 'Academic', module: 'academics' },
   { name: 'Academic Calendar',  href: '/app/academic-calendar',  icon: CalendarDays,  roles: ['admin'],            section: 'Academic' },
   { name: 'IGCSE',              href: '/app/igcse',              icon: Globe,         roles: ['admin'],            section: 'Academic', badge: 'IGCSE', module: 'academics' },
+  { name: 'Exam Analytics',     href: '/app/exam-analytics',     icon: BarChart2,     roles: ['admin', 'teacher'], section: 'Academic', module: 'exams' },
+  { name: 'Term Reports',       href: '/app/term-reports',       icon: FileText,      roles: ['admin'],            section: 'Academic', module: 'academics' },
+  { name: 'NEMIS Export',       href: '/app/nemis',              icon: Globe,         roles: ['admin'],            section: 'Academic', module: 'nemis' },
 
   // ── Academic (teacher) ────────────────────────────────────────────────────
   { name: 'My Classes',    href: '/app/my-classes',   icon: Users,      roles: ['teacher'], section: 'Academic' },
@@ -109,6 +120,7 @@ const navigationItems: NavItem[] = [
   { name: 'My Report Card',    href: '/app/my-report-card',  icon: FileText,  roles: ['student'], section: 'Academic', module: 'academics' },
   { name: 'Learning Materials',href: '/app/learning-materials', icon: BookMarked, roles: ['student'], section: 'Academic', module: 'academics' },
   { name: 'IGCSE Results',     href: '/app/igcse',           icon: Globe,     roles: ['student'], section: 'Academic', badge: 'IGCSE', module: 'academics' },
+  { name: 'My Portfolio',      href: '/app/portfolio',       icon: FolderOpen, roles: ['student'], section: 'Academic', module: 'academics' },
 
   // ── Finance ───────────────────────────────────────────────────────────────
   { name: 'Finance Overview',  href: '/app/finance',                  icon: Wallet,    roles: ['admin', 'finance_officer'], section: 'Finance', badge: 'New', module: 'finance' },
@@ -124,6 +136,10 @@ const navigationItems: NavItem[] = [
   { name: 'Fee Management',    href: '/app/fee',                      icon: DollarSign,roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
   { name: 'Fee Structure',     href: '/app/fee-structure',            icon: DollarSign,roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
   { name: 'Extra Fees',        href: '/app/extra-fees',               icon: DollarSign,roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
+  { name: 'Fee Reminders',     href: '/app/fee-reminders',            icon: Bell,      roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
+  { name: 'Bursary',           href: '/app/bursary',                  icon: Star,      roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'finance' },
+  { name: 'Inventory',         href: '/app/inventory',                icon: ListChecks,roles: ['admin'],                     section: 'Finance', module: 'inventory' },
+  { name: 'Payroll',           href: '/app/payroll',                  icon: Wallet,    roles: ['admin', 'finance_officer'],  section: 'Finance', module: 'staff' },
   { name: 'My Fees',           href: '/app/my-fees',                  icon: DollarSign,roles: ['student'],                  section: 'Finance', module: 'finance' },
 
   // ── Procurement ───────────────────────────────────────────────────────────
@@ -148,41 +164,33 @@ const navigationItems: NavItem[] = [
   { name: 'Report Cards',      href: '/app/report-cards',      icon: FileText,      roles: ['parent'], section: 'Family', module: 'academics' },
   { name: 'Fee Payments',      href: '/app/fee-payments',      icon: DollarSign,    roles: ['parent'], section: 'Family', module: 'finance' },
   { name: 'My Alerts',         href: '/app/my-alerts',         icon: Bell,          roles: ['parent'], section: 'Family', module: 'communication' },
+  { name: 'My Transport',      href: '/app/my-transport',      icon: Bus,           roles: ['parent'], section: 'Family', module: 'transport' },
 
   // ── Schedule ──────────────────────────────────────────────────────────────
-  { name: 'Timetable',    href: '/app/timetable',    icon: Clock,    roles: ['admin', 'teacher'],           section: 'Schedule', module: 'timetable' },
-  { name: 'My Timetable', href: '/app/my-timetable', icon: Clock,    roles: ['student', 'teacher'],         section: 'Schedule', module: 'timetable' },
-  { name: 'Assignments',  href: '/app/assignments',  icon: FileText, roles: ['student', 'teacher'],         section: 'Schedule', module: 'exams' },
+  { name: 'Timetable',    href: '/app/timetable',    icon: Clock,        roles: ['admin', 'teacher'],           section: 'Schedule', module: 'timetable' },
+  { name: 'My Timetable', href: '/app/my-timetable', icon: Clock,        roles: ['student', 'teacher'],         section: 'Schedule', module: 'timetable' },
+  { name: 'Assignments',  href: '/app/assignments',  icon: FileText,     roles: ['student', 'teacher'],         section: 'Schedule', module: 'exams' },
+  { name: 'P-T Meetings', href: '/app/meetings',     icon: CalendarDays, roles: ['admin', 'teacher', 'parent'], section: 'Schedule', module: 'communication' },
 
   // ── Communication ─────────────────────────────────────────────────────────
   { name: 'Communication', href: '/app/communication', icon: MessageSquare, roles: ['admin', 'teacher'],          section: 'Messages', module: 'communication' },
   { name: 'Messages',      href: '/app/messages',      icon: MessageSquare, roles: ['student'],                   section: 'Messages', module: 'communication' },
   { name: 'Notifications', href: '/app/notifications', icon: Bell,          roles: ['parent', 'student'],         section: 'Messages' },
+  { name: 'SMS Messaging', href: '/app/sms',           icon: MessageCircle, roles: ['admin', 'teacher'],          section: 'Messages', module: 'communication' },
+  { name: 'WhatsApp',      href: '/app/whatsapp',      icon: MessageCircle, roles: ['admin'],                     section: 'Messages', module: 'communication' },
+  { name: 'Two-Way SMS',   href: '/app/sms-keywords',  icon: MessageSquare, roles: ['admin'],                     section: 'Messages', module: 'communication' },
+  { name: 'Announcements', href: '/app/announcements', icon: Bell,          roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer'], section: 'Messages', module: 'communication' },
 
   // ── Student Welfare ───────────────────────────────────────────────────────
   { name: 'Discipline',         href: '/app/discipline',         icon: AlertTriangle, roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'discipline' },
+  { name: 'Counseling',         href: '/app/counseling',         icon: Heart,         roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'discipline' },
   { name: 'Health',             href: '/app/health',             icon: Heart,         roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'health' },
   { name: 'Staff Leave',        href: '/app/staff-leave',        icon: ClipboardList, roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'staff' },
-  { name: 'My Attendance',     href: '/app/my-checkin',         icon: CheckCircle,   roles: ['teacher'],                              section: 'Welfare', module: 'teacher_checkin' },
+  { name: 'My Attendance',      href: '/app/my-checkin',         icon: CheckCircle,   roles: ['teacher'],                            section: 'Welfare', module: 'teacher_checkin' },
+  { name: 'Teacher Check-in',   href: '/app/teacher-checkin',    icon: CheckCircle,   roles: ['admin'],                              section: 'Welfare', module: 'teacher_checkin' },
   { name: 'Transport',          href: '/app/transport',          icon: Bus,           roles: ['admin'],                              section: 'Welfare', module: 'transport' },
   { name: 'Transport Tracking', href: '/app/transport-tracking', icon: Navigation,    roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'transport' },
   { name: 'My Route',           href: '/app/dashboard',          icon: Bus,           roles: ['driver'],                             section: 'Welfare', module: 'transport' },
-  { name: 'Teacher Check-in',   href: '/app/teacher-checkin',    icon: CheckCircle,   roles: ['admin'],                              section: 'Welfare', module: 'teacher_checkin' },
-  // ── Gate Management ──────────────────────────────────────────────────────
-  { name: 'Gate Manager',       href: '/app/gate-manager',       icon: ShieldCheck,   roles: ['admin'],                              section: 'Security' },
-  { name: 'Gate Dashboard',     href: '/app/dashboard',          icon: ShieldCheck,   roles: ['security'],                           section: 'Security' },
-  { name: 'Visitor Log',        href: '/app/gate-manager',       icon: UserCog,       roles: ['security'],                           section: 'Security' },
-  { name: 'SMS Messaging',      href: '/app/sms',                icon: MessageCircle, roles: ['admin', 'teacher'],                   section: 'Messages', module: 'communication' },
-  { name: 'My Transport',       href: '/app/my-transport',       icon: Bus,           roles: ['parent'],                             section: 'Family', module: 'transport' },
-
-  // ── Announcements ─────────────────────────────────────────────────────────
-  { name: 'Announcements',      href: '/app/announcements',      icon: Bell,          roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer'], section: 'Messages', module: 'communication' },
-
-  // ── Parent-Teacher Meetings ───────────────────────────────────────────────
-  { name: 'P-T Meetings',       href: '/app/meetings',           icon: CalendarDays,  roles: ['admin', 'teacher', 'parent'],         section: 'Schedule', module: 'communication' },
-
-  // ── Welfare Extended ─────────────────────────────────────────────────────
-  { name: 'Counseling',         href: '/app/counseling',         icon: Heart,         roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'discipline' },
   { name: 'Hostel Management',  href: '/app/hostel-management',  icon: Building2,     roles: ['admin'],                              section: 'Welfare', module: 'hostel' },
   { name: 'Roll Call',          href: '/app/hostel-roll-call',   icon: ClipboardCheck, roles: ['admin'],                             section: 'Welfare', module: 'hostel' },
   { name: 'Laundry',            href: '/app/hostel-laundry',     icon: Shirt,         roles: ['admin'],                              section: 'Welfare', module: 'hostel' },
@@ -197,30 +205,10 @@ const navigationItems: NavItem[] = [
   { name: 'Maintenance Requests', href: '/app/maintenance-requests', icon: Wrench,    roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'maintenance' },
   { name: 'My Jobs',            href: '/app/dashboard',          icon: Wrench,        roles: ['technician'],                         section: 'Welfare', module: 'maintenance' },
 
-  // ── HR & Staff Extended ───────────────────────────────────────────────────
-  { name: 'Payroll',            href: '/app/payroll',            icon: Wallet,        roles: ['admin', 'finance_officer'],           section: 'Finance', module: 'staff' },
-  { name: 'My Payslips',        href: '/app/payroll',            icon: Receipt,       roles: ['teacher'],                            section: 'Account', module: 'staff' },
-  { name: 'Appraisals',         href: '/app/appraisals',         icon: Award,         roles: ['admin'],                              section: 'People', module: 'staff' },
-  { name: 'My Appraisal',       href: '/app/appraisals',         icon: Award,         roles: ['teacher'],                            section: 'Account', module: 'staff' },
-  { name: 'Substitutes',        href: '/app/substitutes',        icon: Users,         roles: ['admin', 'teacher'],                   section: 'People', module: 'staff' },
-
-  // ── Finance Extended ──────────────────────────────────────────────────────
-  { name: 'Fee Reminders',      href: '/app/fee-reminders',      icon: Bell,          roles: ['admin', 'finance_officer'],           section: 'Finance', module: 'finance' },
-  { name: 'Bursary',            href: '/app/bursary',            icon: Star,          roles: ['admin', 'finance_officer'],           section: 'Finance', module: 'finance' },
-  { name: 'Inventory',          href: '/app/inventory',          icon: ListChecks,    roles: ['admin'],                              section: 'Finance', module: 'inventory' },
-
-  // ── Academics Extended ────────────────────────────────────────────────────
-  { name: 'Exam Analytics',     href: '/app/exam-analytics',     icon: BarChart2,     roles: ['admin', 'teacher'],                   section: 'Academic', module: 'exams' },
-  { name: 'Term Reports',       href: '/app/term-reports',       icon: FileText,      roles: ['admin'],                              section: 'Academic', module: 'academics' },
-  { name: 'NEMIS Export',       href: '/app/nemis',              icon: Globe,         roles: ['admin'],                              section: 'Academic', module: 'nemis' },
-  { name: 'My Portfolio',       href: '/app/portfolio',          icon: FolderOpen,    roles: ['student'],                            section: 'Academic', module: 'academics' },
-
-  // ── Communication Extended ────────────────────────────────────────────────
-  { name: 'WhatsApp',           href: '/app/whatsapp',           icon: MessageCircle, roles: ['admin'],                              section: 'Messages', module: 'communication' },
-  { name: 'Two-Way SMS',        href: '/app/sms-keywords',       icon: MessageSquare, roles: ['admin'],                              section: 'Messages', module: 'communication' },
-
-  // ── Admin Tools ───────────────────────────────────────────────────────────
-  { name: 'Audit Log',          href: '/app/audit-log',          icon: ClipboardList, roles: ['admin'],                              section: 'Account' },
+  // ── Gate Management / Security ───────────────────────────────────────────
+  { name: 'Gate Manager',   href: '/app/gate-manager', icon: ShieldCheck, roles: ['admin'],    section: 'Security' },
+  { name: 'Gate Dashboard', href: '/app/dashboard',    icon: ShieldCheck, roles: ['security'], section: 'Security' },
+  { name: 'Visitor Log',    href: '/app/gate-manager', icon: UserCog,     roles: ['security'], section: 'Security' },
 
   // ── Library ───────────────────────────────────────────────────────────────
   { name: 'Library Catalog',    href: '/app/library',            icon: Library,  roles: ['admin', 'teacher', 'student', 'parent'], section: 'Library' },
@@ -230,8 +218,11 @@ const navigationItems: NavItem[] = [
   { name: 'Library Members',    href: '/app/library-members',    icon: Users,    roles: ['admin'],                                 section: 'Library' },
 
   // ── Account ───────────────────────────────────────────────────────────────
-  { name: 'Settings',   href: '/app/settings', icon: Settings, roles: ['admin'], section: 'Account' },
-  { name: 'My Profile', href: '/app/profile',  icon: User,     roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security'], section: 'Account' },
+  { name: 'Settings',     href: '/app/settings', icon: Settings, roles: ['admin'],  section: 'Account' },
+  { name: 'My Payslips',  href: '/app/payroll',  icon: Receipt,  roles: ['teacher'], section: 'Account', module: 'staff' },
+  { name: 'My Appraisal', href: '/app/appraisals', icon: Award,  roles: ['teacher'], section: 'Account', module: 'staff' },
+  { name: 'Audit Log',    href: '/app/audit-log', icon: ClipboardList, roles: ['admin'], section: 'Account' },
+  { name: 'My Profile',   href: '/app/profile',  icon: User,     roles: ['admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security'], section: 'Account' },
 ];
 
 interface SidebarProps {

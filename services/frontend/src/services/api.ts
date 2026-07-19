@@ -88,8 +88,12 @@ class ApiService {
     return this.api.post('/auth/login', { email, password });
   }
 
-  demoLogin() {
-    return this.api.post('/auth/demo-login');
+  demoLogin(email?: string) {
+    return this.api.post('/auth/demo-login', email ? { email } : {});
+  }
+
+  getDemoUsers() {
+    return this.api.get('/auth/demo-users');
   }
 
   logout() {

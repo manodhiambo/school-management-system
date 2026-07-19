@@ -407,7 +407,7 @@ export function CanteenPage() {
                     {filteredAccounts.length === 0 ? (
                       <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No accounts found.</td></tr>
                     ) : filteredAccounts.map((a: any) => (
-                      <tr key={a.id} className="border-b hover:bg-gray-50">
+                      <tr key={a.student_id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium">{a.student_name}</td>
                         <td className={`px-4 py-2 font-bold ${Number(a.balance) > 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {Number(a.balance || 0).toFixed(2)}

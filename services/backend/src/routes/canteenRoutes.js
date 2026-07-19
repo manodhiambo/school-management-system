@@ -112,15 +112,21 @@ router.get('/accounts', async (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'superadmin' && req.user.role !== 'finance_officer') {
       return res.status(403).json({ success: false, message: 'Admin/Finance only' });
     }
+    // Driven from students (not canteen_accounts) so students who have never
+    // been topped up still show up — a student only gets a canteen_accounts
+    // row on their first top-up, and an inner join here previously excluded
+    // every student until then, making them unfindable by name search.
     const rows = await query(
-      `SELECT ca.*,
+      `SELECT s.id AS student_id,
+              COALESCE(ca.balance, 0) AS balance,
+              ca.updated_at,
               s.first_name || ' ' || s.last_name AS student_name,
               s.admission_number,
               c.name AS class_name
-       FROM canteen_accounts ca
-       JOIN students s ON s.id = ca.student_id
+       FROM students s
+       LEFT JOIN canteen_accounts ca ON ca.student_id = s.id AND ca.tenant_id = s.tenant_id
        LEFT JOIN classes c ON c.id = s.class_id
-       WHERE ca.tenant_id = $1
+       WHERE s.tenant_id = $1
        ORDER BY s.first_name, s.last_name`,
       [tid]
     );

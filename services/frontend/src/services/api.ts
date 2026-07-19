@@ -4,6 +4,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 class ApiService {
   api: AxiosInstance;
+  // Shared in-flight refresh call — without this, a burst of concurrent
+  // requests that all 401 at once (dashboards firing several calls together)
+  // each independently POST the same refresh token. The backend rotates
+  // refresh tokens on use, so only the first of those calls succeeds; every
+  // other concurrent call gets a 401 on the now-superseded token and forces
+  // a full logout even though the session is actually still valid.
+  private refreshPromise: Promise<{ accessToken: string; refreshToken?: string } | null> | null = null;
 
   constructor() {
     this.api = axios.create({
@@ -32,33 +39,10 @@ class ApiService {
         if (error.response?.status === 401 && !(originalRequest as any)._retry) {
           (originalRequest as any)._retry = true;
 
-          const refreshToken =
-            localStorage.getItem('refreshToken') ||
-            sessionStorage.getItem('refreshToken');
-
-          if (refreshToken) {
-            try {
-              const { data } = await axios.post(`${API_URL}/auth/refresh-token`, { refreshToken });
-              const newAccessToken = data?.data?.accessToken;
-              const newRefreshToken = data?.data?.refreshToken;
-
-              if (newAccessToken) {
-                const inLocal = !!localStorage.getItem('accessToken');
-                if (inLocal) {
-                  localStorage.setItem('accessToken', newAccessToken);
-                  localStorage.setItem('token', newAccessToken);
-                  if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken);
-                } else {
-                  sessionStorage.setItem('accessToken', newAccessToken);
-                  sessionStorage.setItem('token', newAccessToken);
-                  if (newRefreshToken) sessionStorage.setItem('refreshToken', newRefreshToken);
-                }
-                originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
-                return this.api(originalRequest);
-              }
-            } catch {
-              // refresh failed — fall through to clear auth
-            }
+          const refreshed = await this.refreshAccessToken();
+          if (refreshed) {
+            originalRequest.headers['Authorization'] = `Bearer ${refreshed.accessToken}`;
+            return this.api(originalRequest);
           }
 
           localStorage.removeItem('accessToken');
@@ -81,6 +65,46 @@ class ApiService {
         throw error.response?.data || error;
       }
     );
+  }
+
+  // Ensures only one /auth/refresh-token call is ever in flight at a time —
+  // concurrent 401s (a burst of requests hitting the same expired token)
+  // await this shared promise instead of each rotating the refresh token
+  // themselves, which would 401 every caller but the first.
+  private refreshAccessToken(): Promise<{ accessToken: string; refreshToken?: string } | null> {
+    if (this.refreshPromise) return this.refreshPromise;
+
+    const refreshToken =
+      localStorage.getItem('refreshToken') ||
+      sessionStorage.getItem('refreshToken');
+
+    if (!refreshToken) return Promise.resolve(null);
+
+    this.refreshPromise = axios
+      .post(`${API_URL}/auth/refresh-token`, { refreshToken })
+      .then(({ data }) => {
+        const newAccessToken = data?.data?.accessToken;
+        const newRefreshToken = data?.data?.refreshToken;
+        if (!newAccessToken) return null;
+
+        const inLocal = !!localStorage.getItem('accessToken');
+        if (inLocal) {
+          localStorage.setItem('accessToken', newAccessToken);
+          localStorage.setItem('token', newAccessToken);
+          if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken);
+        } else {
+          sessionStorage.setItem('accessToken', newAccessToken);
+          sessionStorage.setItem('token', newAccessToken);
+          if (newRefreshToken) sessionStorage.setItem('refreshToken', newRefreshToken);
+        }
+        return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+      })
+      .catch(() => null)
+      .finally(() => {
+        this.refreshPromise = null;
+      });
+
+    return this.refreshPromise;
   }
 
   // Auth

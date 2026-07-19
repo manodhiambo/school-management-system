@@ -679,7 +679,25 @@ router.get("/:id/exam-results", async (req, res) => {
       ) : "N/A"
     }));
 
-    res.json({ success: true, data: formattedResults });
+    // CBE continuous/formative assessments (recorded via the teacher's CBE
+    // Assessments page) live in a separate table from formal exam results
+    // and were never surfaced to students/parents at all — merge them in
+    // here since this is the one endpoint both "My Results" and the parent
+    // "Children Progress" page already call.
+    const cbeAssessments = await query(`
+      SELECT
+        a.id, a.assessment_type, a.exam_period, a.term, a.academic_year,
+        a.score, a.max_score, a.cbc_grade, a.pre_primary_grade, a.result_code,
+        a.teacher_comments, a.assessment_date,
+        sub.name AS subject_name, st.name AS strand_name
+      FROM cbc_assessments a
+      JOIN subjects sub ON sub.id = a.subject_id
+      LEFT JOIN cbc_strands st ON st.id = a.strand_id
+      WHERE a.student_id = $1 AND a.tenant_id = $2
+      ORDER BY a.assessment_date DESC
+    `, [actualStudentId, tid]);
+
+    res.json({ success: true, data: formattedResults, cbe_assessments: cbeAssessments });
   } catch (error) {
     logger.error("Get student exam results error:", error);
     res.status(500).json({ success: false, message: "Error fetching exam results" });

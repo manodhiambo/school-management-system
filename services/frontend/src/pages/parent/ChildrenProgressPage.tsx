@@ -15,6 +15,7 @@ export function ChildrenProgressPage() {
   const [selectedChild, setSelectedChild] = useState<any>(null);
   const [progress, setProgress] = useState<any>(null);
   const [cbeData, setCbcData] = useState<any>(null);
+  const [cbeAssessments, setCbeAssessments] = useState<any[]>([]);
   const [upcomingExams, setUpcomingExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +79,7 @@ export function ChildrenProgressPage() {
         attendance: { summary, records },
         results: resultsRes.data?.results || resultsRes.results || resultsRes.data || []
       });
+      setCbeAssessments(Array.isArray(resultsRes?.cbe_assessments) ? resultsRes.cbe_assessments : []);
     } catch { /* silent */ }
   };
 
@@ -267,6 +269,44 @@ export function ChildrenProgressPage() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* CBE Assessments (continuous/formative — separate from formal exam results above) */}
+          {cbeAssessments.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>CBE Assessments</CardTitle></CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="py-2 pr-4">Subject</th>
+                        <th className="py-2 pr-4">Strand</th>
+                        <th className="py-2 pr-4">Term</th>
+                        <th className="py-2 pr-4">Score</th>
+                        <th className="py-2">Grade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cbeAssessments.slice(0, 10).map((a: any) => {
+                        const grade = a.cbc_grade || a.pre_primary_grade || a.result_code || '–';
+                        return (
+                          <tr key={a.id} className="border-b last:border-0 hover:bg-gray-50">
+                            <td className="py-2 pr-4">{a.subject_name}</td>
+                            <td className="py-2 pr-4">{a.strand_name || '–'}</td>
+                            <td className="py-2 pr-4">{a.term} · {a.academic_year}</td>
+                            <td className="py-2 pr-4">{a.score != null ? `${a.score}/${a.max_score}` : '–'}</td>
+                            <td className="py-2">
+                              <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBEGradeBadgeClass(grade)}`}>{grade}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Award, TrendingUp, BookOpen } from 'lucide-react';
+import { Award, TrendingUp, BookOpen, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import { getCBEGradeBadgeClass } from '@/utils/cbeGrades';
 
 export function MyResultsPage() {
   const { user } = useAuthStore();
   const [results, setResults] = useState<any[]>([]);
+  const [cbeAssessments, setCbeAssessments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +27,7 @@ export function MyResultsPage() {
       console.log('My results:', response);
       const res = response as any;
       setResults(Array.isArray(res?.data?.results) ? res.data.results : (Array.isArray(res?.data) ? res.data : []));
+      setCbeAssessments(Array.isArray(res?.cbe_assessments) ? res.cbe_assessments : []);
     } catch (error: any) {
       console.error('Error loading results:', error);
       setError(error?.message || 'Failed to load exam results');
@@ -114,6 +117,46 @@ export function MyResultsPage() {
               </CardContent>
             </Card>
           ))
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-xl font-bold flex items-center gap-2"><Target className="h-5 w-5 text-primary" /> CBE Assessments</h3>
+        {cbeAssessments.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center text-gray-500">No CBE assessments recorded yet</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50"><tr className="text-left text-gray-500 border-b">
+                  <th className="px-4 py-2">Subject</th><th className="px-4 py-2">Strand</th>
+                  <th className="px-4 py-2">Type</th><th className="px-4 py-2">Term</th>
+                  <th className="px-4 py-2">Score</th><th className="px-4 py-2">Grade</th>
+                </tr></thead>
+                <tbody>
+                  {cbeAssessments.map((a: any) => {
+                    const grade = a.cbc_grade || a.pre_primary_grade || a.result_code || '—';
+                    return (
+                      <tr key={a.id} className="border-b last:border-0">
+                        <td className="px-4 py-2 font-medium">{a.subject_name}</td>
+                        <td className="px-4 py-2 text-gray-500">{a.strand_name || '—'}</td>
+                        <td className="px-4 py-2 capitalize text-gray-500">{a.assessment_type}</td>
+                        <td className="px-4 py-2 text-gray-500">{a.term} · {a.academic_year}</td>
+                        <td className="px-4 py-2">{a.score != null ? `${a.score}/${a.max_score}` : '—'}</td>
+                        <td className="px-4 py-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getCBEGradeBadgeClass(grade)}`}>{grade}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

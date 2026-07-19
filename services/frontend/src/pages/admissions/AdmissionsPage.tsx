@@ -331,9 +331,12 @@ export function AdmissionsPage() {
 
                   {selected.status === 'offered' && (
                     <div className="space-y-2 border rounded-lg p-3">
-                      <p className="text-xs font-semibold text-gray-600">Enroll — Class ID</p>
-                      <Input placeholder="class_id (see Classes & Rooms)" value={enrollClassId} onChange={e => setEnrollClassId(e.target.value)} />
-                      <Button size="sm" className="w-full" onClick={enroll}>Enroll Student</Button>
+                      <p className="text-xs font-semibold text-gray-600">Enroll — Select Class</p>
+                      <select className="w-full border rounded px-3 py-2 text-sm" value={enrollClassId} onChange={e => setEnrollClassId(e.target.value)}>
+                        <option value="">Select class...</option>
+                        {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name} {c.section || ''}</option>)}
+                      </select>
+                      <Button size="sm" className="w-full" onClick={enroll} disabled={!enrollClassId}>Enroll Student</Button>
                     </div>
                   )}
 

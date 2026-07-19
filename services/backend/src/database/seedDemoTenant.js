@@ -72,10 +72,9 @@ async function wipeDemoTenantData(tenantId) {
   await query('DELETE FROM exam_results WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM exams WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM attendance WHERE tenant_id = $1', [tenantId]);
-  // A DB trigger auto-creates income_records from fee_payments (finance_settings'
-  // auto_generate_journal_entries) but leaves income_records.tenant_id NULL, so
-  // it has to be found via the student join, not a tenant_id filter — and it
-  // must go before students are deleted, since that FK has no ON DELETE CASCADE.
+  // A DB trigger (trigger_sync_fee_to_income) auto-creates income_records from
+  // fee_payments; delete via the student join since this must run before
+  // students are deleted (that FK has no ON DELETE CASCADE).
   await query(
     'DELETE FROM income_records WHERE student_id IN (SELECT id FROM students WHERE tenant_id = $1)',
     [tenantId]

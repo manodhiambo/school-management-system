@@ -3,7 +3,6 @@ import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { verifyWithSafaricom } from '../services/mpesaService.js';
-import { recordFeeIncome } from '../utils/incomeRecords.js';
 
 const router = express.Router();
 
@@ -74,13 +73,13 @@ router.post('/callback', async (req, res) => {
       `INSERT INTO fee_payments
          (id, invoice_id, student_id, tenant_id, amount, payment_method,
           transaction_id, payment_date, description, status)
-       VALUES ($1,$2,$3,$4,$5,'mpesa',$6,NOW(),'M-Pesa STK payment','completed')
+       VALUES ($1,$2,$3,$4,$5,'mpesa',$6,NOW(),'M-Pesa STK payment','success')
        ON CONFLICT DO NOTHING`,
       [uuidv4(), inv.id, inv.student_id, inv.tenant_id, amount, mpesaRef]
     );
 
-    await recordFeeIncome({ tid: inv.tenant_id, studentId: inv.student_id, amount, paymentMethod: 'mpesa', receiptNumber: mpesaRef, paymentDate: null, userId: null });
-
+    // income_records is kept in sync automatically by the
+    // trigger_sync_fee_to_income DB trigger on fee_payments.
     logger.info(`M-Pesa payment confirmed: ${mpesaRef} KES ${amount} for invoice ${inv.id}`);
   } catch (err) {
     logger.error('M-Pesa callback processing error:', err);

@@ -6,7 +6,6 @@ import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
-import { recordFeeIncome } from '../utils/incomeRecords.js';
 
 const router = express.Router();
 
@@ -720,7 +719,8 @@ router.post('/payment', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, 'success', COALESCE($7::timestamptz, NOW()), $8, $9)`,
         [paymentId, actualStudentId, amount, actualPaymentMethod, actualTransactionId, remarks, actualPaymentDate, receiptNumber, tid]
       );
-      await recordFeeIncome({ tid, studentId: actualStudentId, amount, paymentMethod: actualPaymentMethod, receiptNumber, paymentDate: actualPaymentDate, userId: req.user.id });
+      // income_records is kept in sync automatically by the
+      // trigger_sync_fee_to_income DB trigger on fee_payments.
       return res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
     }
 
@@ -753,8 +753,6 @@ router.post('/payment', async (req, res) => {
        WHERE id = $2 AND tenant_id = $3`,
       [amount, actualInvoiceId, tid]
     );
-
-    await recordFeeIncome({ tid, studentId: invStudentId, amount, paymentMethod: actualPaymentMethod, receiptNumber, paymentDate: actualPaymentDate, userId: req.user.id });
 
     res.json({ success: true, message: 'Payment recorded successfully', data: { id: paymentId } });
   } catch (error) {

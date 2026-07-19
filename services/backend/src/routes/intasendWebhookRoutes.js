@@ -3,7 +3,6 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
 import { verifyCheckoutStatus, getWebhookChallenge } from '../services/intasendService.js';
-import { recordFeeIncome } from '../utils/incomeRecords.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -89,13 +88,13 @@ router.post('/', async (req, res) => {
       `INSERT INTO fee_payments
          (id, invoice_id, student_id, tenant_id, amount, payment_method,
           transaction_id, payment_date, description, status)
-       VALUES ($1,$2,$3,$4,$5,'intasend',$6,NOW(),'IntaSend payment','completed')
+       VALUES ($1,$2,$3,$4,$5,'intasend',$6,NOW(),'IntaSend payment','success')
        ON CONFLICT DO NOTHING`,
       [uuidv4(), inv.id, inv.student_id, inv.tenant_id, amount, intasendInvoiceId]
     );
 
-    await recordFeeIncome({ tid: inv.tenant_id, studentId: inv.student_id, amount, paymentMethod: 'intasend', receiptNumber: intasendInvoiceId, paymentDate: null, userId: null });
-
+    // income_records is kept in sync automatically by the
+    // trigger_sync_fee_to_income DB trigger on fee_payments.
     logger.info(`IntaSend payment confirmed: ${intasendInvoiceId} KES ${amount} for invoice ${inv.id}`);
   } catch (err) {
     logger.error('IntaSend webhook processing error:', err);

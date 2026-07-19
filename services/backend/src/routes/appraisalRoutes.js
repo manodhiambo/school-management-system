@@ -44,7 +44,7 @@ router.get('/templates', requireAdmin, async (req, res) => {
 });
 
 // POST /api/v1/appraisals/templates
-// Body: {name, criteria: [{criterion, max_score, description}]}
+// Body: {name, criteria: [{name, max_score, description}]}
 router.post('/templates', requireAdmin, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
@@ -54,8 +54,8 @@ router.post('/templates', requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: 'criteria must be a non-empty array' });
     }
     for (const c of criteria) {
-      if (!c.criterion || c.max_score == null) {
-        return res.status(400).json({ success: false, message: 'Each criterion must have criterion and max_score' });
+      if (!c.name || c.max_score == null) {
+        return res.status(400).json({ success: false, message: 'Each criterion must have a name and max_score' });
       }
     }
 

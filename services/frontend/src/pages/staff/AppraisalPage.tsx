@@ -320,7 +320,7 @@ export function AppraisalPage() {
                     value={apprForm.staff_id}
                     onChange={e => setApprForm(f => ({ ...f, staff_id: e.target.value }))}>
                     <option value="">Select staff</option>
-                    {staffList.map(s => <option key={s.id} value={s.id}>{s.name || s.full_name}</option>)}
+                    {staffList.map(s => <option key={s.id} value={s.id}>{s.name || s.full_name || [s.first_name, s.last_name].filter(Boolean).join(' ')}</option>)}
                   </select>
                 </div>
                 <div>

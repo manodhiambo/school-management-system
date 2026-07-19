@@ -34,9 +34,13 @@ export function AlumniPage() {
   // Donations
   const [donations, setDonations] = useState<any[]>([]);
   const [donationsReport, setDonationsReport] = useState<any[]>([]);
+  const [showDonationForm, setShowDonationForm] = useState(false);
+  const [donationForm, setDonationForm] = useState({ alumni_id: '', donation_type: 'financial', amount: '', description: '', status: 'pledged' });
 
   // Jobs
   const [jobs, setJobs] = useState<any[]>([]);
+  const [showJobForm, setShowJobForm] = useState(false);
+  const [jobForm, setJobForm] = useState({ title: '', company: '', description: '', contact_info: '' });
 
   useEffect(() => { loadDirectory(); }, []);
   useEffect(() => {
@@ -154,6 +158,19 @@ export function AlumniPage() {
     }
   };
 
+  const recordDonation = async () => {
+    if (!donationForm.alumni_id) return toast({ title: 'Select an alumnus', variant: 'destructive' });
+    try {
+      await (api as any).recordAlumniDonation(donationForm);
+      toast({ title: 'Donation recorded' });
+      setShowDonationForm(false);
+      setDonationForm({ alumni_id: '', donation_type: 'financial', amount: '', description: '', status: 'pledged' });
+      loadDonations();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
   const loadJobs = async () => {
     try {
       const res: any = await api.getAlumniJobs();
@@ -167,6 +184,19 @@ export function AlumniPage() {
     try {
       await (api as any).deactivateAlumniJob(id);
       toast({ title: 'Job posting deactivated' });
+      loadJobs();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const postJob = async () => {
+    if (!jobForm.title) return toast({ title: 'Job title is required', variant: 'destructive' });
+    try {
+      await (api as any).createAlumniJob(jobForm);
+      toast({ title: 'Job posted' });
+      setShowJobForm(false);
+      setJobForm({ title: '', company: '', description: '', contact_info: '' });
       loadJobs();
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -334,6 +364,38 @@ export function AlumniPage() {
 
       {tab === 'donations' && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setShowDonationForm(!showDonationForm)}><Plus className="h-4 w-4 mr-1" /> Record Donation</Button>
+          </div>
+
+          {showDonationForm && (
+            <Card><CardContent className="pt-4 space-y-3">
+              <Label>Alumnus</Label>
+              <select className="w-full border rounded px-3 py-2 text-sm" value={donationForm.alumni_id} onChange={e => setDonationForm(f => ({ ...f, alumni_id: e.target.value }))}>
+                <option value="">Select an alumnus...</option>
+                {profiles.map((a: any) => <option key={a.id} value={a.id}>{a.first_name} {a.last_name}{a.graduation_year ? ` (Class of ${a.graduation_year})` : ''}</option>)}
+              </select>
+              <Label>Donation Type</Label>
+              <select className="w-full border rounded px-3 py-2 text-sm" value={donationForm.donation_type} onChange={e => setDonationForm(f => ({ ...f, donation_type: e.target.value }))}>
+                <option value="financial">Financial</option>
+                <option value="equipment">Equipment</option>
+                <option value="scholarship">Scholarship</option>
+                <option value="building_project">Building Project</option>
+              </select>
+              <Input type="number" placeholder="Amount (KES, optional)" value={donationForm.amount} onChange={e => setDonationForm(f => ({ ...f, amount: e.target.value }))} />
+              <Input placeholder="Description (optional)" value={donationForm.description} onChange={e => setDonationForm(f => ({ ...f, description: e.target.value }))} />
+              <Label>Status</Label>
+              <select className="w-full border rounded px-3 py-2 text-sm" value={donationForm.status} onChange={e => setDonationForm(f => ({ ...f, status: e.target.value }))}>
+                <option value="pledged">Pledged</option>
+                <option value="completed">Completed (already received)</option>
+              </select>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={recordDonation}>Save</Button>
+                <Button size="sm" variant="outline" onClick={() => setShowDonationForm(false)}>Cancel</Button>
+              </div>
+            </CardContent></Card>
+          )}
+
           <Card><CardContent className="p-0">
             <div className="px-4 py-3 border-b text-sm font-semibold text-gray-600">Donations by Type</div>
             <table className="w-full text-sm">
@@ -369,6 +431,23 @@ export function AlumniPage() {
 
       {tab === 'jobs' && (
         <div className="space-y-2">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setShowJobForm(!showJobForm)}><Plus className="h-4 w-4 mr-1" /> Post a Job</Button>
+          </div>
+
+          {showJobForm && (
+            <Card><CardContent className="pt-4 space-y-3">
+              <Input placeholder="Job title" value={jobForm.title} onChange={e => setJobForm(f => ({ ...f, title: e.target.value }))} />
+              <Input placeholder="Company" value={jobForm.company} onChange={e => setJobForm(f => ({ ...f, company: e.target.value }))} />
+              <Input placeholder="Description" value={jobForm.description} onChange={e => setJobForm(f => ({ ...f, description: e.target.value }))} />
+              <Input placeholder="Contact info (email/phone)" value={jobForm.contact_info} onChange={e => setJobForm(f => ({ ...f, contact_info: e.target.value }))} />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={postJob}>Post</Button>
+                <Button size="sm" variant="outline" onClick={() => setShowJobForm(false)}>Cancel</Button>
+              </div>
+            </CardContent></Card>
+          )}
+
           {jobs.length === 0 ? (
             <div className="text-center py-12 text-gray-400">No job postings</div>
           ) : (

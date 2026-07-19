@@ -69,6 +69,13 @@ function alumniOnly(req, res, next) {
   next();
 }
 
+function alumniOrOfficeOnly(req, res, next) {
+  if (!['alumni', 'admin', 'superadmin'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Alumni or admin only' });
+  }
+  next();
+}
+
 async function getOwnProfile(req) {
   const rows = await query(`SELECT * FROM alumni_profiles WHERE user_id = $1 AND tenant_id = $2`, [req.user.id, req.user.tenant_id]);
   return rows[0] || null;
@@ -396,7 +403,7 @@ router.get('/jobs', async (req, res) => {
   }
 });
 
-router.post('/jobs', alumniOnly, async (req, res) => {
+router.post('/jobs', alumniOrOfficeOnly, async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { title, company, description, contact_info } = req.body;
@@ -424,6 +431,33 @@ router.put('/jobs/:id/deactivate', officeOnly, async (req, res) => {
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     logger.error('Deactivate alumni job posting error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Office records a donation on an alumnus's behalf (e.g. a cheque/cash gift
+// received directly, or a pledge phoned in) — the self-service POST
+// /donations below can only ever record a donation against the caller's own
+// alumni_profiles row, so there was previously no way for the school's
+// alumni office to log a donation at all.
+router.post('/donations/record', officeOnly, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { alumni_id, donation_type, amount, description, status } = req.body;
+    if (!alumni_id) return res.status(400).json({ success: false, message: 'alumni_id is required' });
+    if (!donation_type) return res.status(400).json({ success: false, message: 'donation_type is required' });
+
+    const profile = await query(`SELECT id FROM alumni_profiles WHERE id = $1 AND tenant_id = $2`, [alumni_id, tid]);
+    if (!profile.length) return res.status(404).json({ success: false, message: 'Alumni profile not found' });
+
+    const rows = await query(
+      `INSERT INTO alumni_donations (id, tenant_id, alumni_id, donation_type, amount, description, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [uuidv4(), tid, alumni_id, donation_type, amount || null, description || null, status === 'completed' ? 'completed' : 'pledged']
+    );
+    res.json({ success: true, message: 'Donation recorded', data: rows[0] });
+  } catch (err) {
+    logger.error('Record alumni donation error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

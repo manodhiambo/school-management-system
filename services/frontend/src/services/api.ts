@@ -1850,6 +1850,7 @@ class ApiService {
   getAlumniEventRegistrations(eventId: string) { return this.api.get('/alumni/events/' + eventId + '/registrations'); }
   markAlumniAttended(eventId: string, alumniId: string) { return this.api.put('/alumni/events/' + eventId + '/registrations/' + alumniId + '/attended', {}); }
   getAlumniDonations(params?: any) { return this.api.get('/alumni/donations', { params }); }
+  recordAlumniDonation(data: any) { return this.api.post('/alumni/donations/record', data); }
   completeAlumniDonation(id: string) { return this.api.put('/alumni/donations/' + id + '/complete', {}); }
   deactivateAlumniJob(id: string) { return this.api.put('/alumni/jobs/' + id + '/deactivate', {}); }
   getAlumniDonationsReport() { return this.api.get('/alumni/reports/donations'); }

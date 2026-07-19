@@ -10,14 +10,18 @@ import { useSEO } from '@/hooks/useSEO';
 
 type Step = 'form' | 'success';
 
+// All 47 counties of Kenya (Constitution 2010, Fourth Schedule), alphabetical.
 const COUNTIES = [
-  'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika',
-  'Kiambu', 'Machakos', 'Meru', 'Nyeri', 'Kakamega', 'Kisii',
-  'Bungoma', 'Embu', 'Garissa', 'Isiolo', 'Lamu', 'Mandera',
-  'Marsabit', 'Migori', 'Muranga', 'Samburu', 'Siaya',
-  'Taita Taveta', 'Tana River', 'Tharaka Nithi', 'Trans Nzoia',
-  'Turkana', 'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot', 'Other'
+  'Baringo', 'Bomet', 'Bungoma', 'Busia', 'Elgeyo-Marakwet', 'Embu',
+  'Garissa', 'Homa Bay', 'Isiolo', 'Kajiado', 'Kakamega', 'Kericho',
+  'Kiambu', 'Kilifi', 'Kirinyaga', 'Kisii', 'Kisumu', 'Kitui', 'Kwale',
+  'Laikipia', 'Lamu', 'Machakos', 'Makueni', 'Mandera', 'Marsabit',
+  'Meru', 'Migori', 'Mombasa', "Murang'a", 'Nairobi', 'Nakuru', 'Nandi',
+  'Narok', 'Nyamira', 'Nyandarua', 'Nyeri', 'Samburu', 'Siaya',
+  'Taita-Taveta', 'Tana River', 'Tharaka-Nithi', 'Trans Nzoia', 'Turkana',
+  'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot',
 ];
+const OTHER_COUNTY = 'Other';
 
 interface FormData {
   schoolName: string;
@@ -52,6 +56,7 @@ export function SchoolRegistrationPage() {
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [otherCounty, setOtherCounty] = useState('');
 
   const [form, setForm] = useState<FormData>({
     schoolName: '',
@@ -98,7 +103,7 @@ export function SchoolRegistrationPage() {
         schoolEmail:        form.schoolEmail,
         schoolPhone:        form.schoolPhone,
         schoolAddress:      form.schoolAddress || undefined,
-        county:             form.county || undefined,
+        county:             (form.county === OTHER_COUNTY ? otherCounty.trim() : form.county) || undefined,
         contactPerson:      form.contactPerson,
         registrationNumber: form.registrationNumber || undefined,
         adminEmail:         form.adminEmail,
@@ -217,7 +222,16 @@ export function SchoolRegistrationPage() {
                         className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         <option value="">Select county...</option>
                         {COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value={OTHER_COUNTY}>Other (not listed)</option>
                       </select>
+                      {form.county === OTHER_COUNTY && (
+                        <input
+                          value={otherCounty}
+                          onChange={e => setOtherCounty(e.target.value)}
+                          placeholder="Type your county"
+                          className="w-full mt-2 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      )}
                     </div>
 
                     <div>

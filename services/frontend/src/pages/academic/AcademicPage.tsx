@@ -854,7 +854,7 @@ function SbaMarksModal({ sba, onClose, onSaved }: any) {
 
   useEffect(() => {
     Promise.all([
-      (api as any).getStudentsByClass ? (api as any).getStudentsByClass(sba.class_id) : (api as any).getStudents({ class_id: sba.class_id }).catch(() => ({ data: [] })),
+      api.getStudents({ classId: sba.class_id }).catch(() => ({ data: [] })),
       api.getSbaRecords(sba.id),
     ]).then(([studRes, recRes]: any) => {
       const studs = studRes.data || [];

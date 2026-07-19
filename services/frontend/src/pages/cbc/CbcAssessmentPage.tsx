@@ -96,7 +96,16 @@ export function CbcAssessmentPage() {
   // Delete confirm
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => api.getClasses() });
+  // Teachers must only see classes they actually teach — the student list
+  // below is already scoped to a teacher's assigned classes on the backend,
+  // so an unrestricted class list here let a teacher pick a class they
+  // don't teach: the class would show up, but its student list would
+  // silently come back empty ("class appears, but no student in the list").
+  const { data: classesData } = useQuery({
+    queryKey: ['classes', isAdmin, user?.id],
+    queryFn: () => (isAdmin ? api.getClasses() : api.getTeacherClasses(user?.id || '')),
+    enabled: isAdmin || !!user?.id,
+  });
   const { data: subjectsData } = useQuery({ queryKey: ['subjects'], queryFn: () => api.getSubjects() });
   const { data: assessmentsData, isLoading } = useQuery({
     queryKey: ['cbc-assessments', filters],

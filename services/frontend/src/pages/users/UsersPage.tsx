@@ -100,6 +100,8 @@ export function UsersPage() {
       finance_officer: 'bg-amber-100 text-amber-800',
       driver: 'bg-orange-100 text-orange-800',
       security: 'bg-slate-100 text-slate-800',
+      technician: 'bg-cyan-100 text-cyan-800',
+      alumni: 'bg-indigo-100 text-indigo-800',
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
@@ -119,6 +121,8 @@ export function UsersPage() {
     finance_officer: users.filter(u => u.role === 'finance_officer').length,
     driver: users.filter(u => u.role === 'driver').length,
     security: users.filter(u => u.role === 'security').length,
+    technician: users.filter(u => u.role === 'technician').length,
+    alumni: users.filter(u => u.role === 'alumni').length,
   };
 
   if (loading) {
@@ -149,8 +153,8 @@ export function UsersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
-        {['all', 'admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security'].map((role) => (
+      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
+        {['all', 'admin', 'teacher', 'student', 'parent', 'finance_officer', 'driver', 'security', 'technician', 'alumni'].map((role) => (
           <Card
             key={role}
             className={`cursor-pointer transition-all ${roleFilter === role ? 'ring-2 ring-blue-500' : 'hover:shadow-md'}`}
@@ -170,7 +174,9 @@ export function UsersPage() {
                   role === 'teacher' ? 'bg-purple-100' :
                   role === 'student' ? 'bg-green-100' :
                   role === 'finance_officer' ? 'bg-amber-100' :
-                  role === 'driver' ? 'bg-orange-100' : 'bg-blue-100'
+                  role === 'driver' ? 'bg-orange-100' :
+                  role === 'technician' ? 'bg-cyan-100' :
+                  role === 'alumni' ? 'bg-indigo-100' : 'bg-blue-100'
                 }`}>
                   {role === 'all' ? <Users className="h-5 w-5 text-gray-600" /> :
                    role === 'admin' ? <Shield className="h-5 w-5 text-red-600" /> :
@@ -178,7 +184,9 @@ export function UsersPage() {
                      role === 'teacher' ? 'text-purple-600' :
                      role === 'student' ? 'text-green-600' :
                      role === 'finance_officer' ? 'text-amber-600' :
-                     role === 'driver' ? 'text-orange-600' : 'text-blue-600'
+                     role === 'driver' ? 'text-orange-600' :
+                     role === 'technician' ? 'text-cyan-600' :
+                     role === 'alumni' ? 'text-indigo-600' : 'text-blue-600'
                    }`} />}
                 </div>
               </div>

@@ -119,7 +119,7 @@ function addCoverPage(doc: jsPDF, schoolName: string) {
   const stats = [
     { val: '30+', lbl: 'Modules' },
     { val: '700+', lbl: 'Features' },
-    { val: '7', lbl: 'User Roles' },
+    { val: '10', lbl: 'User Roles' },
     { val: '100%', lbl: 'CBE Ready' },
   ];
   const boxW = (COL - 12) / 4;
@@ -263,13 +263,21 @@ function addTOC(doc: jsPDF) {
     { num: '14c', title: 'Bursary & Inventory',                  pg: 19 },
     { num: '14d', title: 'Teacher Check-in & Counseling',        pg: 19 },
     { num: '14e', title: 'NEMIS Export & Audit Log',             pg: 20 },
-    { num: '15',  title: 'Dashboards & Analytics',               pg: 20 },
-    { num: '16',  title: 'User Roles & Permissions',             pg: 21 },
-    { num: '17',  title: 'CBE Grading Reference',                pg: 22 },
-    { num: '18',  title: 'Kenya Education Structure',            pg: 22 },
-    { num: '19',  title: 'Payment Methods Supported',            pg: 23 },
-    { num: '20',  title: 'Technical Specifications',             pg: 23 },
-    { num: '21',  title: 'Getting Started Checklist',            pg: 24 },
+    { num: '15',  title: 'Dashboards & Analytics',               pg: 14 },
+    { num: '15b', title: 'Procurement & Asset Management',       pg: 15 },
+    { num: '15c', title: 'Boarding & Hostel Inventory',          pg: 15 },
+    { num: '15d', title: 'Kitchen & Feeding Management',         pg: 15 },
+    { num: '15e', title: 'School Store (POS)',                   pg: 16 },
+    { num: '15f', title: 'Maintenance Management',               pg: 16 },
+    { num: '15g', title: 'Online Admission',                     pg: 16 },
+    { num: '15h', title: 'School CRM',                           pg: 16 },
+    { num: '15i', title: 'Alumni Management',                    pg: 17 },
+    { num: '16',  title: 'User Roles & Permissions',             pg: 18 },
+    { num: '17',  title: 'CBE Grading Reference',                pg: 20 },
+    { num: '18',  title: 'Kenya Education Structure',            pg: 20 },
+    { num: '19',  title: 'Payment Methods Supported',            pg: 21 },
+    { num: '20',  title: 'Technical Specifications',             pg: 21 },
+    { num: '21',  title: 'Getting Started Checklist',            pg: 23 },
   ];
 
   sections.forEach((s, i) => {
@@ -423,21 +431,29 @@ function addModuleOverview(doc: jsPDF, pageNum: { n: number }) {
     { icon: '📋', title: 'NEMIS & Audit Log',       desc: 'NEMIS data export, validation, audit trail of all user actions, CSV export',           color: C.slate  },
     { icon: '⚙️', title: 'Settings & Admin',        desc: 'School profile, user roles, logo branding, account management, multi-tenant admin',    color: C.slate  },
     { icon: '🛒', title: 'Procurement',             desc: 'Full procurement lifecycle: PR→RFQ→Quotation→PO→GRN→Invoice→Payment, asset management', color: C.green  },
+    { icon: '🏨', title: 'Boarding & Hostel Inventory', desc: 'Dorms, room allocation, roll calls, leave/outpass approval, laundry, unit-level asset tracking', color: C.slate },
+    { icon: '🍽️', title: 'Kitchen & Feeding',       desc: 'Menu planning, meal attendance, stock movements, diet/allergy alerts, kitchen requisitions', color: C.amber },
+    { icon: '🏪', title: 'School Store (POS)',       desc: 'Point-of-sale checkout, product catalogue, wallet payments, cash sales, refunds',           color: C.teal   },
+    { icon: '🔧', title: 'Maintenance Management',   desc: 'Repair request workflow, technician assignment, inspection, asset service history',        color: C.blue   },
+    { icon: '📝', title: 'Online Admission',         desc: 'Public application form, document review, interview scheduling, offer & enrollment',       color: C.purple },
+    { icon: '🤝', title: 'School CRM',               desc: 'Lead capture, follow-up tracking, SMS/Email/WhatsApp campaigns, conversion to admission',  color: C.red    },
+    { icon: '🎓', title: 'Alumni Management',        desc: 'Alumni directory, mentorship, job board, events & reunions, donations & scholarships',      color: C.navy   },
   ];
 
-  const y = 36;
   const cols    = 3;
   const cellW   = (COL - (cols - 1) * 4) / cols;
   const cellH   = 34;
   const rowGap  = 4;
+  const rowH    = cellH + rowGap;
 
+  let y = 36;
   modules.forEach((m, i) => {
     const col = i % cols;
-    const row = Math.floor(i / cols);
-    const bx  = M + col * (cellW + 4);
-    const by  = y + row * (cellH + rowGap);
-
-    if (by + cellH > PAGE_H - 20) return;
+    if (col === 0) {
+      y = guard(doc, y, rowH, pageNum);
+    }
+    const bx = M + col * (cellW + 4);
+    const by = y;
 
     // Card
     setFill(doc, C.light);
@@ -454,6 +470,10 @@ function addModuleOverview(doc: jsPDF, pageNum: { n: number }) {
     descLines.slice(0, 3).forEach((l: string, li: number) => {
       doc.text(l, bx + 7, by + 16 + li * 5);
     });
+
+    if (col === cols - 1 || i === modules.length - 1) {
+      y += rowH;
+    }
   });
 }
 
@@ -676,19 +696,21 @@ const MODULES: ModuleData[] = [
   },
   {
     num: '15', title: 'Dashboards & Analytics', color: C.teal,
-    description: 'Seven role-specific dashboards giving every stakeholder a personalised view of the metrics and actions most relevant to their responsibilities.',
+    description: 'Ten role-specific dashboards giving every stakeholder a personalised view of the metrics and actions most relevant to their responsibilities.',
     features: [
       'Admin: full school metrics + quick actions',  'Teacher: class and check-in dashboard',
       'Student: personal academic hub',              'Parent: children\'s progress & transport',
       'Finance Officer: financial overview',         'Driver: route & pickup dashboard',
-      'SuperAdmin: multi-school SaaS panel',         'Live attendance rates',
-      'Fee collection rates & trends',               'CBE analytics with broadsheet',
-      'Monthly income/expense charts',               'Exam analytics & class rankings',
-      'Exportable PDF reports per role',             'User manual & blueprint downloads',
+      'Security: gate & visitor dashboard',          'Technician: assigned maintenance jobs',
+      'Alumni: profile, events & job board',         'SuperAdmin: multi-school SaaS panel',
+      'Live attendance rates',                       'Fee collection rates & trends',
+      'CBE analytics with broadsheet',               'Monthly income/expense charts',
+      'Exam analytics & class rankings',             'Exportable PDF reports per role',
+      'User manual & blueprint downloads',
     ],
   },
   {
-    num: '16', title: 'Procurement & Asset Management', color: C.green,
+    num: '15b', title: 'Procurement & Asset Management', color: C.green,
     description: 'Full Kenya public procurement compliance workflow — from supplier prequalification through requisition, RFQ, quotation evaluation, purchase orders, 3-way matching, and contract management to asset depreciation tracking.',
     features: [
       'Supplier register & prequalification',        'Annual procurement planning',
@@ -701,6 +723,81 @@ const MODULES: ModuleData[] = [
       'Immutable procurement audit trail',           'Asset register with depreciation',
       'Asset disposal recording',                    'Procurement dashboard overview',
       'Export reports to CSV',                       'Admin + Finance Officer access control',
+    ],
+  },
+  {
+    num: '15c', title: 'Boarding Management & Hostel Inventory', color: C.slate,
+    description: 'End-to-end boarding operations — dormitory setup, room allocation, roll calls, two-stage leave/outpass approval, laundry tracking, and unit-level (QR/barcode) inventory of mattresses, bedding and other boarding assets.',
+    features: [
+      'Dorm & room setup with capacity',              'Student allocation & transfer',
+      'Waiting list when full',                       'Digital roll calls with absentee flags',
+      'Two-stage leave/outpass approval',              'Parent approval + gate verification',
+      'Laundry batch tracking',                        'Dormitory inspection checklists',
+      'Per-unit QR/barcode asset registration',        'Issue/return tracking to students',
+      'Lost & damaged item liability charges',         'Replacement-cost reporting',
+    ],
+  },
+  {
+    num: '15d', title: 'Kitchen & Feeding Management', color: C.amber,
+    description: 'Menu planning, meal attendance, and stock control for the school kitchen, integrated with the health module for allergy/diet alerts and with Procurement for kitchen requisitions.',
+    features: [
+      'Daily/weekly/monthly menu planning',            'QR & manual meal attendance marking',
+      'Stock receive, waste & audit trail',            'Batch number & expiry tracking',
+      'Diet & allergy alerts from health records',      'Kitchen requisitions via Procurement',
+      'Student prepaid wallet for meals',               'Daily sales & consumption reports',
+    ],
+  },
+  {
+    num: '15e', title: 'School Store (POS)', color: C.teal,
+    description: 'A point-of-sale checkout for the school shop, sharing one prepaid wallet with the Canteen so a single pocket-money balance covers both food and stationery/supplies purchases.',
+    features: [
+      'Product catalogue with barcode/QR',              'Cart-based POS checkout',
+      'Wallet, cash & M-Pesa payment options',          'Partial & full refunds',
+      'Automatic stock deduction on sale',              'Daily sales & profit reports',
+      'Low-stock valuation report',                     'Sales history & receipts',
+    ],
+  },
+  {
+    num: '15f', title: 'Maintenance Management', color: C.blue,
+    description: 'A full repair-ticket workflow from request to close-out, with a dedicated Technician role, optional linkage to registered assets, and preventive maintenance scheduling.',
+    features: [
+      'Staff/teacher submits a repair request',         'Category, priority & photo attachments',
+      'Office assigns a technician',                    'Technician start/complete workflow',
+      'Office inspection pass/rework loop',             'Linked asset auto-flips to "in maintenance"',
+      'Preventive maintenance schedules',               'Cost-by-asset & technician performance reports',
+    ],
+  },
+  {
+    num: '15g', title: 'Online Admission', color: C.purple,
+    description: 'A public application form for prospective students, taking a family from first enquiry through document verification, an application fee (M-Pesa), interview scheduling, decision, and enrollment into a real student record.',
+    features: [
+      'Public per-school application form',             'Required-document links (birth cert, KCPE, etc.)',
+      'Application tracking by phone/email',            'Document verification workflow',
+      'M-Pesa application fee (STK push)',              'Interview scheduling & outcome notes',
+      'Offer / reject decision with notes',              'One-click enrollment into Students',
+      'Admissions funnel report',                        'Configurable fee amount & open/closed toggle',
+    ],
+  },
+  {
+    num: '15h', title: 'School CRM', color: C.red,
+    description: 'Lead capture and nurturing for prospective families — walk-ins, website enquiries, referrals and social-media leads — with a follow-up timeline and one-click conversion into an Online Admission application.',
+    features: [
+      'Lead capture by source (walk-in, referral, etc.)', 'Follow-up activity timeline',
+      'Convert a lead directly into an application',      'Lost-lead tracking with reason',
+      'SMS / Email / WhatsApp campaigns to leads',         'Open day & school tour records',
+      'Lead source & conversion-rate reports',             'Campaign send reports',
+    ],
+  },
+  {
+    num: '15i', title: 'Alumni Management', color: C.navy,
+    description: 'A dedicated Alumni role and self-service portal for graduates — directory & mentorship matching, a job board, event registration with attendance, and donation pledges (including M-Pesa for financial gifts).',
+    features: [
+      'Convert an existing student to alumni',            'Add legacy alumni never in the system',
+      'Editable profile: occupation, employer, university', 'Public directory with mentor filter',
+      'Reunions, fundraisers & networking events',         'Self-service event registration',
+      'Admin-marked event attendance',                     'Alumni-posted job board',
+      'Financial, equipment, scholarship & building donations', 'M-Pesa STK push for cash donations',
+      'Donation & directory statistics reports',
     ],
   },
 ];
@@ -722,46 +819,57 @@ function addRolesPage(doc: jsPDF, pageNum: { n: number }) {
   setTxt(doc, C.slate);
   y = wrapText(doc,
     'SkulManager enforces strict role-based access control. Each user sees only the modules and data relevant to their role. ' +
-    'Below is a complete permissions matrix across all 18 system modules.',
+    'Below is a complete permissions matrix across all system modules.',
     M, y, COL, 5);
   y += 6;
 
-  const roles   = ['Admin', 'Finance', 'Teacher', 'Student', 'Parent', 'Driver'];
+  const roles   = ['Admin', 'Finance', 'Teacher', 'Student', 'Parent', 'Driver', 'Security', 'Technician', 'Alumni'];
   const modules2 = [
-    { name: 'People Management',      perms: ['Full',  'View',  'View',  '–',     'Own',   '–'    ] },
-    { name: 'CBE Academics',           perms: ['Full',  '–',     'Full',  'View',  'View',  '–'    ] },
-    { name: 'Attendance',              perms: ['Full',  '–',     'Mark',  'Own',   'Own',   '–'    ] },
-    { name: 'Exams & Results',         perms: ['Full',  '–',     'Full',  'Own',   'Own',   '–'    ] },
-    { name: 'Fee Management',          perms: ['Full',  'Full',  '–',     'Own',   'Own',   '–'    ] },
-    { name: 'Finance Module',          perms: ['Full',  'Full',  '–',     '–',     '–',     '–'    ] },
-    { name: 'Library',                 perms: ['Full',  '–',     'Full',  'Own',   '–',     '–'    ] },
-    { name: 'SMS & WhatsApp',          perms: ['Full',  '–',     'View',  '–',     '–',     '–'    ] },
-    { name: 'Transport & Driver',      perms: ['Full',  '–',     '–',     '–',     'View',  'Full' ] },
-    { name: 'Gate Management',         perms: ['Full',  '–',     '–',     '–',     '–',     '–'    ] },
-    { name: 'Hostel & Canteen',        perms: ['Full',  '–',     '–',     'Own',   '–',     '–'    ] },
-    { name: 'Payroll & Appraisals',    perms: ['Full',  'Full',  'Own',   '–',     '–',     '–'    ] },
-    { name: 'Bursary & Inventory',     perms: ['Full',  'Full',  '–',     '–',     '–',     '–'    ] },
-    { name: 'Health & Welfare',        perms: ['Full',  '–',     'Log',   '–',     '–',     '–'    ] },
-    { name: 'IGCSE Module',            perms: ['Full',  '–',     'Full',  'Own',   '–',     '–'    ] },
-    { name: 'Dashboards',              perms: ['Full',  'Own',   'Own',   'Own',   'Own',   'Own'  ] },
-    { name: 'NEMIS & Audit Log',       perms: ['Full',  '–',     '–',     '–',     '–',     '–'    ] },
-    { name: 'Procurement',             perms: ['Full',  'Full',  '–',     '–',     '–',     '–'    ] },
+    { name: 'People Management',      perms: ['Full',  'View',  'View',  '–',     'Own',   '–',    '–',     '–',     '–'    ] },
+    { name: 'CBE Academics',           perms: ['Full',  '–',     'Full',  'View',  'View',  '–',    '–',     '–',     '–'    ] },
+    { name: 'Attendance',              perms: ['Full',  '–',     'Mark',  'Own',   'Own',   '–',    '–',     '–',     '–'    ] },
+    { name: 'Exams & Results',         perms: ['Full',  '–',     'Full',  'Own',   'Own',   '–',    '–',     '–',     '–'    ] },
+    { name: 'Fee Management',          perms: ['Full',  'Full',  '–',     'Own',   'Own',   '–',    '–',     '–',     '–'    ] },
+    { name: 'Finance Module',          perms: ['Full',  'Full',  '–',     '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Library',                 perms: ['Full',  '–',     'Full',  'Own',   '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'SMS & WhatsApp',          perms: ['Full',  '–',     'View',  '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Transport & Driver',      perms: ['Full',  '–',     '–',     '–',     'View',  'Full', '–',     '–',     '–'    ] },
+    { name: 'Gate Management',         perms: ['Full',  '–',     '–',     '–',     '–',     '–',    'Full',  '–',     '–'    ] },
+    { name: 'Boarding & Hostel Inv.',  perms: ['Full',  '–',     '–',     'Own',   '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Kitchen & Canteen',       perms: ['Full',  'View',  '–',     'Own',   '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'School Store (POS)',      perms: ['Full',  'View',  '–',     'Own',   '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Maintenance',             perms: ['Full',  '–',     'Log',   '–',     '–',     '–',    '–',     'Own',   '–'    ] },
+    { name: 'Online Admission',        perms: ['Full',  '–',     '–',     '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'School CRM',              perms: ['Full',  '–',     '–',     '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Alumni Management',       perms: ['Full',  '–',     '–',     '–',     '–',     '–',    '–',     '–',     'Own'  ] },
+    { name: 'Payroll & Appraisals',    perms: ['Full',  'Full',  'Own',   '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Bursary & Inventory',     perms: ['Full',  'Full',  '–',     '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Health & Welfare',        perms: ['Full',  '–',     'Log',   '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'IGCSE Module',            perms: ['Full',  '–',     'Full',  'Own',   '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Dashboards',              perms: ['Full',  'Own',   'Own',   'Own',   'Own',   'Own',  'Own',   'Own',   'Own'  ] },
+    { name: 'NEMIS & Audit Log',       perms: ['Full',  '–',     '–',     '–',     '–',     '–',    '–',     '–',     '–'    ] },
+    { name: 'Procurement',             perms: ['Full',  'Full',  '–',     '–',     '–',     '–',    '–',     '–',     '–'    ] },
   ];
 
   const hdrH   = 8;
   const rowH   = 7;
-  const colW   = (COL - 40) / roles.length;
+  const nameW  = 34;
+  const colW   = (COL - nameW) / roles.length;
+  const badgeW = Math.min(17, colW - 2);
 
-  // Header
-  setFill(doc, C.navy);
-  doc.rect(M, y, COL, hdrH, 'F');
-  bold(doc, 7.5);
-  setTxt(doc, C.white);
-  doc.text('Module', M + 2, y + 5.5);
-  roles.forEach((r, i) => {
-    doc.text(r, M + 40 + i * colW + colW / 2, y + 5.5, { align: 'center' });
-  });
-  y += hdrH;
+  const drawHeader = () => {
+    setFill(doc, C.navy);
+    doc.rect(M, y, COL, hdrH, 'F');
+    bold(doc, 7);
+    setTxt(doc, C.white);
+    doc.text('Module', M + 2, y + 5.5);
+    roles.forEach((r, i) => {
+      doc.text(r, M + nameW + i * colW + colW / 2, y + 5.5, { align: 'center' });
+    });
+    y += hdrH;
+  };
+
+  drawHeader();
 
   // Permission colour map
   const permColor: Record<string, RGB> = {
@@ -770,18 +878,21 @@ function addRolesPage(doc: jsPDF, pageNum: { n: number }) {
   };
 
   modules2.forEach((row, ri) => {
+    const before = y;
+    y = guard(doc, y, rowH, pageNum);
+    if (y !== before) drawHeader();
     setFill(doc, ri % 2 === 0 ? C.white : C.light);
     doc.rect(M, y, COL, rowH, 'F');
-    normal(doc, 7.5);
+    normal(doc, 7);
     setTxt(doc, C.black);
     doc.text(row.name, M + 2, y + 4.8);
     row.perms.forEach((p, pi) => {
-      const cx = M + 40 + pi * colW + colW / 2;
+      const cx = M + nameW + pi * colW + colW / 2;
       const pc = permColor[p] ?? C.muted;
       if (p !== '–') {
         setFill(doc, pc);
-        doc.roundedRect(cx - 10, y + 1, 20, 5, 1, 1, 'F');
-        bold(doc, 6.5);
+        doc.roundedRect(cx - badgeW / 2, y + 1, badgeW, 5, 1, 1, 'F');
+        bold(doc, 6);
         setTxt(doc, C.white);
         doc.text(p, cx, y + 4.8, { align: 'center' });
       } else {
@@ -794,6 +905,7 @@ function addRolesPage(doc: jsPDF, pageNum: { n: number }) {
   });
 
   y += 8;
+  y = guard(doc, y, 50, pageNum);
   // Legend
   bold(doc, 8);
   setTxt(doc, C.navy);

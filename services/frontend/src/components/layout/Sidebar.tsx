@@ -89,6 +89,7 @@ const navigationItems: NavItem[] = [
   { name: 'User Management', href: '/app/users',          icon: Shield,        roles: ['admin'],            section: 'People' },
   { name: 'Admissions',      href: '/app/admissions',     icon: UserPlus,      roles: ['admin'],            section: 'People', module: 'admissions' },
   { name: 'CRM / Leads',     href: '/app/crm',            icon: Megaphone,     roles: ['admin'],            section: 'People', module: 'crm' },
+  { name: 'Alumni',          href: '/app/alumni',         icon: GraduationCap, roles: ['admin'],            section: 'People', module: 'alumni' },
   { name: 'Appraisals',      href: '/app/appraisals',     icon: Award,         roles: ['admin'],            section: 'People', module: 'staff' },
   { name: 'Substitutes',     href: '/app/substitutes',    icon: Users,         roles: ['admin', 'teacher'], section: 'People', module: 'staff' },
 
@@ -208,6 +209,7 @@ const navigationItems: NavItem[] = [
   { name: 'School Store (POS)', href: '/app/school-store',       icon: ShoppingCart,  roles: ['admin'],                              section: 'Welfare', module: 'school_store' },
   { name: 'Maintenance Requests', href: '/app/maintenance-requests', icon: Wrench,    roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'maintenance' },
   { name: 'My Jobs',            href: '/app/dashboard',          icon: Wrench,        roles: ['technician'],                         section: 'Welfare', module: 'maintenance' },
+  { name: 'Alumni Portal',      href: '/app/alumni-portal',      icon: GraduationCap, roles: ['alumni'],                             section: 'Welfare', module: 'alumni' },
 
   // ── Gate Management / Security ───────────────────────────────────────────
   { name: 'Gate Manager',   href: '/app/gate-manager', icon: ShieldCheck, roles: ['admin'],    section: 'Security' },
@@ -269,6 +271,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       parent:          'bg-purple-500',
       finance_officer: 'bg-amber-500',
       superadmin:      'bg-yellow-400',
+      driver:          'bg-orange-500',
+      security:        'bg-slate-500',
+      technician:      'bg-cyan-500',
+      alumni:          'bg-indigo-500',
     };
     return map[role] ?? 'bg-gray-500';
   };
@@ -276,6 +282,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const getRoleLabel = (role: string) => {
     if (role === 'finance_officer') return 'Finance Officer';
     if (role === 'superadmin') return 'Super Admin';
+    if (role === 'security') return 'Security Officer';
     return role.charAt(0).toUpperCase() + role.slice(1);
   };
 

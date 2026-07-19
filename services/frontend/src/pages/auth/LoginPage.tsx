@@ -9,11 +9,11 @@ import api from '@/services/api';
 import { useSEO } from '@/hooks/useSEO';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
-  BookOpen, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound, Sparkles, Loader2, Wrench,
+  BookOpen, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound, Sparkles, Loader2, Wrench, Award,
 } from 'lucide-react';
 
 type View = 'role' | 'login' | '2fa' | 'forgot' | 'forgot-success';
-type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver' | 'security' | 'technician';
+type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver' | 'security' | 'technician' | 'alumni';
 
 const ROLES: { key: Role; label: string; description: string; icon: React.ElementType; color: string; bg: string; border: string }[] = [
   {
@@ -79,6 +79,15 @@ const ROLES: { key: Role; label: string; description: string; icon: React.Elemen
     bg: 'bg-cyan-50 hover:bg-cyan-100',
     border: 'border-cyan-200 hover:border-cyan-400',
   },
+  {
+    key: 'alumni',
+    label: 'Alumni',
+    description: 'Connect with your school, mentor and give back',
+    icon: Award,
+    color: 'text-indigo-700',
+    bg: 'bg-indigo-50 hover:bg-indigo-100',
+    border: 'border-indigo-200 hover:border-indigo-400',
+  },
 ];
 
 export function LoginPage() {
@@ -139,7 +148,8 @@ export function LoginPage() {
 
     // "Autofill": show the picked account's credentials on the login form for
     // a moment before signing in, so it's visibly not a silent teleport.
-    setSelectedRole((['teacher', 'student', 'parent', 'admin', 'finance_officer'].includes(demoUser.role) ? demoUser.role : 'admin') as Role);
+    const knownRole = ROLES.some(r => r.key === demoUser.role) || demoUser.role === 'admin';
+    setSelectedRole((knownRole ? demoUser.role : 'admin') as Role);
     setEmail(demoUser.email);
     setPassword('••••••••••••');
     setLoginError('');

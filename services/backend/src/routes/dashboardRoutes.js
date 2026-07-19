@@ -50,7 +50,8 @@ router.get('/dashboard', authenticate, async (req, res) => {
       SELECT
         COALESCE(SUM(net_amount), 0)::numeric as total_amount,
         COALESCE(SUM(paid_amount), 0)::numeric as total_collected,
-        COALESCE(SUM(balance_amount), 0)::numeric as total_pending
+        COALESCE(SUM(balance_amount), 0)::numeric as total_pending,
+        COUNT(*) FILTER (WHERE balance_amount > 0)::int as pending_count
       FROM fee_invoices
       WHERE tenant_id = $1
     `, [tid]);
@@ -110,7 +111,8 @@ router.get('/dashboard', authenticate, async (req, res) => {
       fees: {
         total_amount: Number(feeData.total_amount) || 0,
         total_collected: Number(feeData.total_collected) || 0,
-        total_pending: Number(feeData.total_pending) || 0
+        total_pending: Number(feeData.total_pending) || 0,
+        pending_count: Number(feeData.pending_count) || 0
       },
       attendance: {
         total: attendanceData.total || 0,

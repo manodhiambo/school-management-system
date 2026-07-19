@@ -7,6 +7,7 @@ import { FinanceOfficerDashboard } from './FinanceOfficerDashboard';
 import { DriverDashboard } from '../driver/DriverDashboard';
 import { SecurityDashboard } from '../gate/SecurityDashboard';
 import { TechnicianDashboard } from '../maintenance/TechnicianDashboard';
+import { AlumniDashboard } from '../alumni/AlumniDashboard';
 
 export function DashboardPage() {
   const { user } = useAuthStore();
@@ -28,6 +29,8 @@ export function DashboardPage() {
       return <SecurityDashboard />;
     case 'technician':
       return <TechnicianDashboard />;
+    case 'alumni':
+      return <AlumniDashboard />;
     default:
       return <StudentDashboard />;
   }

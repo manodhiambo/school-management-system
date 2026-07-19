@@ -1815,6 +1815,31 @@ class ApiService {
   getCrmConversionReport() { return this.api.get('/crm/reports/conversion'); }
   getCrmCampaignsReport() { return this.api.get('/crm/reports/campaigns'); }
 
+  // ── Alumni — admin ────────────────────────────────────────────────────────
+  convertStudentToAlumni(studentId: string, data: any) { return this.api.post('/alumni/convert/' + studentId, data); }
+  createAlumniProfile(data: any) { return this.api.post('/alumni/profiles', data); }
+  getAlumniProfiles() { return this.api.get('/alumni/profiles'); }
+  updateAlumniProfile(id: string, data: any) { return this.api.put('/alumni/profiles/' + id, data); }
+  getAlumniEvents() { return this.api.get('/alumni/events'); }
+  createAlumniEvent(data: any) { return this.api.post('/alumni/events', data); }
+  updateAlumniEvent(id: string, data: any) { return this.api.put('/alumni/events/' + id, data); }
+  getAlumniEventRegistrations(eventId: string) { return this.api.get('/alumni/events/' + eventId + '/registrations'); }
+  markAlumniAttended(eventId: string, alumniId: string) { return this.api.put('/alumni/events/' + eventId + '/registrations/' + alumniId + '/attended', {}); }
+  getAlumniDonations(params?: any) { return this.api.get('/alumni/donations', { params }); }
+  completeAlumniDonation(id: string) { return this.api.put('/alumni/donations/' + id + '/complete', {}); }
+  deactivateAlumniJob(id: string) { return this.api.put('/alumni/jobs/' + id + '/deactivate', {}); }
+  getAlumniDonationsReport() { return this.api.get('/alumni/reports/donations'); }
+  getAlumniDirectoryStats() { return this.api.get('/alumni/reports/directory-stats'); }
+
+  // ── Alumni — self-service ────────────────────────────────────────────────
+  getMyAlumniProfile() { return this.api.get('/alumni/me'); }
+  updateMyAlumniProfile(data: any) { return this.api.put('/alumni/me', data); }
+  getAlumniDirectory(params?: any) { return this.api.get('/alumni/directory', { params }); }
+  registerForAlumniEvent(eventId: string) { return this.api.post('/alumni/events/' + eventId + '/register', {}); }
+  getAlumniJobs() { return this.api.get('/alumni/jobs'); }
+  createAlumniJob(data: any) { return this.api.post('/alumni/jobs', data); }
+  createAlumniDonation(data: any) { return this.api.post('/alumni/donations', data); }
+
   // ── Bursary ───────────────────────────────────────────────────────────────
   getBursaryFunders() { return this.api.get('/bursary/funders'); }
   createBursaryFunder(data: any) { return this.api.post('/bursary/funders', data); }

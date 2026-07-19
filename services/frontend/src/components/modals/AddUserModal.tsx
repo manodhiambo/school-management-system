@@ -20,10 +20,14 @@ const ROLES = [
   { value: 'finance_officer', label: 'Finance Officer' },
   { value: 'driver', label: 'Driver' },
   { value: 'security', label: 'Security Officer' },
+  { value: 'technician', label: 'Technician' },
   { value: 'admin', label: 'Admin' },
+  // 'alumni' deliberately excluded — an alumni account needs a paired
+  // alumni_profiles row, which only the Alumni Management page's own
+  // "Convert Student" / "Add Legacy Alumni" actions create correctly.
 ];
 
-const ROLES_WITH_NAMES = ['student', 'teacher', 'parent', 'finance_officer', 'driver', 'security'];
+const ROLES_WITH_NAMES = ['student', 'teacher', 'parent', 'finance_officer', 'driver', 'security', 'technician'];
 
 export function AddUserModal({ open, onOpenChange, onSuccess }: AddUserModalProps) {
   const [loading, setLoading] = useState(false);

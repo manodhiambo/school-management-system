@@ -108,6 +108,11 @@ export function EditUserModal({ open, onOpenChange, onSuccess, user }: EditUserM
                 <option value="finance_officer">Finance Officer</option>
                 <option value="driver">Driver</option>
                 <option value="security">Security Officer</option>
+                <option value="technician">Technician</option>
+                {/* 'alumni' deliberately excluded here too — switching an
+                    existing user's role to alumni via this generic dropdown
+                    would leave them without the required alumni_profiles
+                    row; use Alumni Management's own conversion action. */}
               </Select>
             </div>
 

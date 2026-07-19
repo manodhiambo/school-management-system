@@ -93,6 +93,8 @@ import { MaintenanceRequestsPage } from './pages/welfare/MaintenanceRequestsPage
 import { ApplyPage } from './pages/admissions/ApplyPage';
 import { AdmissionsPage } from './pages/admissions/AdmissionsPage';
 import { CRMPage } from './pages/crm/CRMPage';
+import { AlumniPage } from './pages/alumni/AlumniPage';
+import { AlumniPortalPage } from './pages/alumni/AlumniPortalPage';
 import { WhatsAppPage } from './pages/communication/WhatsAppPage';
 import { SmsKeywordsPage } from './pages/communication/SmsKeywordsPage';
 import { PortfolioPage } from './pages/student/PortfolioPage';
@@ -328,6 +330,8 @@ function App() {
               <Route path="maintenance-requests" element={<RoleRoute allowedRoles={['admin', 'teacher']}><MaintenanceRequestsPage /></RoleRoute>} />
               <Route path="admissions" element={<RoleRoute allowedRoles={['admin']}><AdmissionsPage /></RoleRoute>} />
               <Route path="crm" element={<RoleRoute allowedRoles={['admin']}><CRMPage /></RoleRoute>} />
+              <Route path="alumni" element={<RoleRoute allowedRoles={['admin']}><AlumniPage /></RoleRoute>} />
+              <Route path="alumni-portal" element={<RoleRoute allowedRoles={['alumni']}><AlumniPortalPage /></RoleRoute>} />
               <Route path="whatsapp" element={<RoleRoute allowedRoles={['admin']}><WhatsAppPage /></RoleRoute>} />
               <Route path="sms-keywords" element={<RoleRoute allowedRoles={['admin']}><SmsKeywordsPage /></RoleRoute>} />
               <Route path="portfolio" element={<PortfolioPage />} />

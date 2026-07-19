@@ -79,7 +79,7 @@ router.post('/', requireRole(['admin']), async (req, res) => {
     const userId = uuidv4();
 
     // For roles without a profile table store names directly on users row
-    const storeNameOnUser = ['admin', 'finance_officer', 'driver', 'security'].includes(role);
+    const storeNameOnUser = ['admin', 'finance_officer', 'driver', 'security', 'technician'].includes(role);
     await query(
       `INSERT INTO users (id, email, password, role, tenant_id, is_active, is_verified, first_name, last_name)
        VALUES ($1, $2, $3, $4, $5, TRUE, TRUE, $6, $7)`,

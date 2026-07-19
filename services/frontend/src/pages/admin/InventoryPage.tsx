@@ -383,7 +383,7 @@ export function InventoryPage() {
                           <td className="px-4 py-2 flex gap-1">
                             <button className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Edit" onClick={() => {
                               setEditItem(item);
-                              setItemForm({ category_id: item.category_id || '', name: item.name, sku: item.sku || '', quantity: item.quantity, unit_cost: item.unit_cost, reorder_level: item.reorder_level || '', location: item.location || '', condition: item.condition || 'good' });
+                              setItemForm({ category_id: item.category_id || '', name: item.name, unit: item.unit || '', sku: item.sku || '', quantity: item.quantity, unit_cost: item.unit_cost, reorder_level: item.reorder_level || '', location: item.location || '', condition: item.condition || 'good' });
                               setItemModal(true);
                             }}>
                               <Edit2 className="h-3 w-3" />
@@ -579,6 +579,7 @@ export function InventoryPage() {
                 </select>
               </div>
               <div className="col-span-2"><Label>Name</Label><Input value={itemForm.name} onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div><Label>Unit (e.g. pieces, kg, litres)</Label><Input value={itemForm.unit} onChange={e => setItemForm(f => ({ ...f, unit: e.target.value }))} /></div>
               <div><Label>SKU</Label><Input value={itemForm.sku} onChange={e => setItemForm(f => ({ ...f, sku: e.target.value }))} /></div>
               <div><Label>Location</Label><Input value={itemForm.location} onChange={e => setItemForm(f => ({ ...f, location: e.target.value }))} /></div>
               <div><Label>Quantity</Label><Input type="number" value={itemForm.quantity} onChange={e => setItemForm(f => ({ ...f, quantity: e.target.value }))} /></div>

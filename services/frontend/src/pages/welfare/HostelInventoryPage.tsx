@@ -36,6 +36,8 @@ export function HostelInventoryPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [selectedItemId, setSelectedItemId] = useState('');
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [itemForm, setItemForm] = useState({ category_id: '', name: '', unit: 'pieces', quantity: '', reorder_level: '', unit_cost: '' });
   const [units, setUnits] = useState<any[]>([]);
   const [showUnitForm, setShowUnitForm] = useState(false);
   const [unitForm, setUnitForm] = useState({ serial_number: '', condition: 'new', purchase_cost: '' });
@@ -77,6 +79,24 @@ export function HostelInventoryPage() {
       await (api as any).seedHostelInventoryCategories();
       toast({ title: 'Hostel categories added' });
       loadCategoriesAndItems();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const createItem = async () => {
+    if (!itemForm.name || !itemForm.unit) {
+      toast({ title: 'Name and unit are required', variant: 'destructive' });
+      return;
+    }
+    try {
+      const res: any = await (api as any).createInventoryItem(itemForm);
+      toast({ title: 'Item added' });
+      setShowItemForm(false);
+      const newItemId = res?.data?.id;
+      setItemForm({ category_id: '', name: '', unit: 'pieces', quantity: '', reorder_level: '', unit_cost: '' });
+      await loadCategoriesAndItems();
+      if (newItemId) loadUnits(newItemId);
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
@@ -184,10 +204,55 @@ export function HostelInventoryPage() {
           <h1 className="text-2xl font-bold text-gray-900">Hostel Inventory & Asset Issuing</h1>
           <p className="text-sm text-gray-500 mt-1">Track lockers, mattresses, bedding and other boarding assets by unit</p>
         </div>
-        {categories.length === 0 && (
-          <Button variant="outline" onClick={seedCategories}>Set up hostel categories</Button>
-        )}
+        <div className="flex gap-2">
+          {categories.length === 0 && (
+            <Button variant="outline" onClick={seedCategories}>Set up hostel categories</Button>
+          )}
+          <Button onClick={() => setShowItemForm(!showItemForm)}>
+            <Plus className="h-4 w-4 mr-2" /> Add Item
+          </Button>
+        </div>
       </div>
+
+      {showItemForm && (
+        <Card><CardContent className="pt-6">
+          <h3 className="font-semibold mb-3">New Inventory Item</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label>Category</Label>
+              <select className="w-full mt-1 border rounded px-3 py-2 text-sm"
+                value={itemForm.category_id} onChange={e => setItemForm(f => ({ ...f, category_id: e.target.value }))}>
+                <option value="">No category</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Item Name</Label>
+              <Input className="mt-1" value={itemForm.name} onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mattress, Blanket" />
+            </div>
+            <div>
+              <Label>Unit</Label>
+              <Input className="mt-1" value={itemForm.unit} onChange={e => setItemForm(f => ({ ...f, unit: e.target.value }))} placeholder="pieces, pairs, sets..." />
+            </div>
+            <div>
+              <Label>Starting Quantity</Label>
+              <Input type="number" className="mt-1" value={itemForm.quantity} onChange={e => setItemForm(f => ({ ...f, quantity: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Reorder Level</Label>
+              <Input type="number" className="mt-1" value={itemForm.reorder_level} onChange={e => setItemForm(f => ({ ...f, reorder_level: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Unit Cost (KES)</Label>
+              <Input type="number" className="mt-1" value={itemForm.unit_cost} onChange={e => setItemForm(f => ({ ...f, unit_cost: e.target.value }))} />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <Button onClick={createItem}>Save Item</Button>
+            <Button variant="outline" onClick={() => setShowItemForm(false)}>Cancel</Button>
+          </div>
+        </CardContent></Card>
+      )}
 
       <div className="flex gap-2 border-b overflow-x-auto">
         {TABS.map(t => (

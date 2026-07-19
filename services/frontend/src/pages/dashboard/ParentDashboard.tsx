@@ -244,7 +244,7 @@ export function ParentDashboard() {
             <Button
               variant="outline"
               className="h-auto py-6 flex flex-col items-center hover:bg-green-50 hover:border-green-300"
-              onClick={() => navigate('/app/my-fees')}
+              onClick={() => navigate('/app/fee-payments')}
             >
               <DollarSign className="h-8 w-8 mb-2 text-green-600" />
               <span>{t('Pay Fees')}</span>

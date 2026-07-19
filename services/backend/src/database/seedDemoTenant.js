@@ -30,6 +30,7 @@ const DEMO_FINANCE_EMAIL = 'finance@demo.skulmanager.org';
 const DEMO_DRIVER_EMAIL = 'driver@demo.skulmanager.org';
 const DEMO_SECURITY_EMAIL = 'security@demo.skulmanager.org';
 const DEMO_TECHNICIAN_EMAIL = 'technician@demo.skulmanager.org';
+const DEMO_ALUMNI_EMAIL = 'alumni@demo.skulmanager.org';
 
 function cbeGrade(percentage) {
   if (percentage >= 75) return 'EE';
@@ -95,6 +96,14 @@ async function wipeDemoTenantData(tenantId) {
   await query('DELETE FROM chart_of_accounts WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM finance_settings WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM settings WHERE tenant_id = $1', [tenantId]);
+  // alumni_profiles/donations/event_registrations cascade off users.id, but
+  // alumni_events/alumni_job_postings only SET NULL their creator FK, so
+  // they'd otherwise survive as orphans across resets — delete explicitly.
+  await query('DELETE FROM alumni_event_registrations WHERE tenant_id = $1', [tenantId]);
+  await query('DELETE FROM alumni_events WHERE tenant_id = $1', [tenantId]);
+  await query('DELETE FROM alumni_job_postings WHERE tenant_id = $1', [tenantId]);
+  await query('DELETE FROM alumni_donations WHERE tenant_id = $1', [tenantId]);
+  await query('DELETE FROM alumni_profiles WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM users WHERE tenant_id = $1', [tenantId]);
 }
 
@@ -146,6 +155,13 @@ async function seedShowcaseData(tenant) {
   await createUser({ email: DEMO_DRIVER_EMAIL, role: 'driver', tenantId, firstName: 'Moses', lastName: 'Kiptoo' });
   await createUser({ email: DEMO_SECURITY_EMAIL, role: 'security', tenantId, firstName: 'James', lastName: 'Mwangi' });
   await createUser({ email: DEMO_TECHNICIAN_EMAIL, role: 'technician', tenantId, firstName: 'David', lastName: 'Mutua' });
+
+  const alumniUserId = await createUser({ email: DEMO_ALUMNI_EMAIL, role: 'alumni', tenantId, firstName: 'Esther', lastName: 'Wambui' });
+  await query(
+    `INSERT INTO alumni_profiles (id, tenant_id, user_id, first_name, last_name, graduation_year, current_occupation, employer, university, is_mentor, is_public)
+     VALUES ($1,$2,$3,'Esther','Wambui',2020,'Software Engineer','Acme Kenya Ltd','University of Nairobi',true,true)`,
+    [uuidv4(), tenantId, alumniUserId]
+  );
 
   // ── Academics: classes + subjects ──────────────────────────────────────
   const classLowerId = uuidv4();

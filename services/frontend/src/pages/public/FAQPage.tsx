@@ -8,7 +8,7 @@ const FAQS = [
   {
     category: 'Pricing & Payment',
     items: [
-      { q: 'How much does Skul Manager cost?', a: 'Skul Manager has a one-time setup fee of KSh 50,000 and an annual licence renewal of KSh 20,000 per year. Your first year\'s licence is included in the setup fee, so the total first-year cost is KSh 70,000.' },
+      { q: 'How much does Skul Manager cost?', a: 'Skul Manager has a one-time setup fee of KSh 100,000, which covers your full first year of access. From Year 2 onwards, an annual renewal of KSh 40,000 per year keeps your system maintained and your database active.' },
       { q: 'Is there a free trial?', a: 'Yes — every school gets a 5-day free trial when they register. No payment is needed to start. You get full access to all modules during the trial so you can explore the system before committing.' },
       { q: 'How do I pay?', a: 'Payments are made via M-Pesa:\n• Paybill: 522533\n• Account Number: 8071524\n\nAfter paying, call us on 0110 421 320 or email info@helvino.org with your school name and M-Pesa transaction code to activate your account.' },
       { q: 'What happens when the trial ends?', a: 'At the end of your 5-day trial you will be prompted to activate your account. Your school data is preserved — you do not need to re-enter anything. Pay via M-Pesa and contact us to activate.' },

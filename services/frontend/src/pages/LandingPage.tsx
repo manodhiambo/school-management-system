@@ -679,10 +679,10 @@ export function LandingPage() {
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Setup & Onboarding</h3>
               <div className="flex items-end gap-2 mb-2">
-                <span className="text-5xl font-extrabold text-gray-900">50,000</span>
+                <span className="text-5xl font-extrabold text-gray-900">100,000</span>
                 <span className="text-gray-500 mb-1">KSH</span>
               </div>
-              <p className="text-gray-400 text-sm mb-8">Paid once. Covers full system setup, data migration, and staff training.</p>
+              <p className="text-gray-400 text-sm mb-8">Paid once. Covers full system setup, data migration, staff training — and your first full year of access.</p>
               <Button className="w-full bg-gray-900 hover:bg-gray-800 text-white mb-8"
                 onClick={() => navigate('/register')}>
                 Register Your School
@@ -711,12 +711,12 @@ export function LandingPage() {
               <div className="inline-block bg-white/20 text-blue-100 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
                 Yearly Renewal
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Annual Licence</h3>
+              <h3 className="text-lg font-bold text-white mb-2">Annual Licence — From Year 2</h3>
               <div className="flex items-end gap-2 mb-2">
-                <span className="text-5xl font-extrabold">20,000</span>
+                <span className="text-5xl font-extrabold">40,000</span>
                 <span className="text-blue-200 mb-1">KSH / year</span>
               </div>
-              <p className="text-blue-100 text-sm mb-2">Renewed every year to keep your system active and updated.</p>
+              <p className="text-blue-100 text-sm mb-2">Your first year is already covered by the setup fee — from Year 2 onwards, renew annually for KSh 40,000 to keep your system active, maintained, and updated.</p>
               <p className="text-blue-200 text-xs mb-8">Pay via M-Pesa Paybill 522533 · A/C 8071524</p>
               <Button className="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold mb-8"
                 onClick={() => navigate('/register')}>
@@ -743,8 +743,8 @@ export function LandingPage() {
           <div className="mt-10 max-w-2xl mx-auto grid sm:grid-cols-2 gap-4">
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-center">
               <p className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-1">Total First Year</p>
-              <p className="text-3xl font-extrabold text-gray-900">KSH 70,000</p>
-              <p className="text-xs text-gray-500 mt-1">Setup (50,000) + Year 1 licence (20,000)</p>
+              <p className="text-3xl font-extrabold text-gray-900">KSH 100,000</p>
+              <p className="text-xs text-gray-500 mt-1">One-time setup fee — your first year is fully included. KSh 40,000/year from Year 2.</p>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
               <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">Pay via M-Pesa</p>
@@ -871,11 +871,11 @@ export function LandingPage() {
                   </div>
                   <div className="flex items-center justify-between pt-1 border-t border-green-900/50">
                     <span className="text-gray-400">Setup</span>
-                    <span className="text-green-400 font-bold">KSH 50,000</span>
+                    <span className="text-green-400 font-bold">KSH 100,000</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Annual</span>
-                    <span className="text-green-400 font-bold">KSH 20,000/yr</span>
+                    <span className="text-green-400 font-bold">KSH 40,000/yr</span>
                   </div>
                 </div>
               </div>

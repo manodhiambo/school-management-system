@@ -19,9 +19,9 @@ The service is provided on a subscription basis following a one-time setup payme
   },
   {
     title: '3. Subscription & Payment',
-    body: `Setup Fee: KSh 50,000 — a one-time payment required to activate your school after the free trial.
+    body: `Setup Fee: KSh 100,000 — a one-time payment required to activate your school after the free trial. This covers your full first year of access.
 
-Annual Renewal: KSh 20,000 per year — payable annually to maintain access to the platform.
+Annual Renewal: KSh 40,000 per year, payable from Year 2 onwards, to maintain and update your system and database.
 
 Trial Period: New schools receive a 5-day free trial with full access to all features. No payment is required during the trial.
 

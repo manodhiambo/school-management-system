@@ -10,8 +10,8 @@ import { seedTenantData } from '../utils/seedTenantData.js';
 
 const router = express.Router();
 
-const REGISTRATION_FEE = 50000; // KES 50,000
-const RENEWAL_FEE = 10000;      // KES 10,000
+const REGISTRATION_FEE = 100000; // KES 100,000
+const RENEWAL_FEE = 40000;       // KES 40,000
 const TRIAL_DAYS = 5;
 
 // Helper: generate unique school_code

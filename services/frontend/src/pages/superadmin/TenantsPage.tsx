@@ -551,11 +551,11 @@ export function TenantsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Extension Period</label>
               <select value={extendMonths} onChange={e => setExtendMonths(Number(e.target.value))}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-yellow-400">
-                <option value={1}>1 month — KSh 833</option>
-                <option value={3}>3 months — KSh 2,500</option>
-                <option value={6}>6 months — KSh 5,000</option>
-                <option value={12}>12 months — KSh 20,000</option>
-                <option value={24}>24 months — KSh 40,000</option>
+                <option value={1}>1 month — KSh 1,666</option>
+                <option value={3}>3 months — KSh 5,000</option>
+                <option value={6}>6 months — KSh 10,000</option>
+                <option value={12}>12 months — KSh 40,000</option>
+                <option value={24}>24 months — KSh 80,000</option>
               </select>
             </div>
             <div className="bg-blue-50 rounded-lg p-3 mb-5">

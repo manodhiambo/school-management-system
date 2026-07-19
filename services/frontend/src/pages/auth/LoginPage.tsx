@@ -9,11 +9,11 @@ import api from '@/services/api';
 import { useSEO } from '@/hooks/useSEO';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
-  BookOpen, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound, Sparkles, Loader2,
+  BookOpen, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound, Sparkles, Loader2, Wrench,
 } from 'lucide-react';
 
 type View = 'role' | 'login' | '2fa' | 'forgot' | 'forgot-success';
-type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver' | 'security';
+type Role = 'teacher' | 'student' | 'parent' | 'admin' | 'finance_officer' | 'driver' | 'security' | 'technician';
 
 const ROLES: { key: Role; label: string; description: string; icon: React.ElementType; color: string; bg: string; border: string }[] = [
   {
@@ -69,6 +69,15 @@ const ROLES: { key: Role; label: string; description: string; icon: React.Elemen
     color: 'text-slate-700',
     bg: 'bg-slate-50 hover:bg-slate-100',
     border: 'border-slate-200 hover:border-slate-400',
+  },
+  {
+    key: 'technician',
+    label: 'Technician',
+    description: 'Handle assigned maintenance & repair jobs',
+    icon: Wrench,
+    color: 'text-cyan-700',
+    bg: 'bg-cyan-50 hover:bg-cyan-100',
+    border: 'border-cyan-200 hover:border-cyan-400',
   },
 ];
 

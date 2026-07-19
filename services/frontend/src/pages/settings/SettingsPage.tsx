@@ -66,6 +66,7 @@ export function SettingsPage() {
   const [showDisableForm, setShowDisableForm] = useState(false);
   const [showDisablePassword, setShowDisablePassword] = useState(false);
   const [copiedCodes, setCopiedCodes] = useState(false);
+  const [copiedApplyLink, setCopiedApplyLink] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -165,6 +166,13 @@ export function SettingsPage() {
     navigator.clipboard.writeText(backupCodes.join('\n'));
     setCopiedCodes(true);
     setTimeout(() => setCopiedCodes(false), 2000);
+  };
+
+  const copyApplyLink = () => {
+    if (!settings?.school_code) return;
+    navigator.clipboard.writeText(`${window.location.origin}/apply/${settings.school_code}`);
+    setCopiedApplyLink(true);
+    setTimeout(() => setCopiedApplyLink(false), 2000);
   };
 
   const loadSettings = async () => {
@@ -332,6 +340,18 @@ export function SettingsPage() {
                   placeholder="e.g., SCH001"
                 />
               </div>
+              {settings?.school_code && (
+                <div className="md:col-span-2">
+                  <Label>Public Application Link</Label>
+                  <p className="text-xs text-gray-500 mb-1">Share this link so applicants can apply online — applications submitted here go straight to your school's Admissions list.</p>
+                  <div className="flex gap-2">
+                    <Input readOnly value={`${window.location.origin}/apply/${settings.school_code}`} className="font-mono text-sm" />
+                    <Button type="button" variant="outline" onClick={copyApplyLink}>
+                      {copiedApplyLink ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="md:col-span-2">
                 <Label>{t('School Logo')}</Label>
                 <div className="mt-2 flex items-start gap-4">

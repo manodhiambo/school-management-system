@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Search, Plus, CheckCircle, XCircle, LogIn, Trash2, Edit2,
   X, Loader2, AlertCircle, DollarSign, Calendar, Phone, Mail, Clock,
-  RefreshCw, MoreVertical, ToggleLeft, ToggleRight, SlidersHorizontal
+  RefreshCw, MoreVertical, ToggleLeft, ToggleRight, SlidersHorizontal, Link2
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/components/ui/use-toast';
 
 type Tenant = {
   id: string;
@@ -46,6 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function TenantsPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { setAuth, user: currentUser } = useAuthStore();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,6 +177,22 @@ export function TenantsPage() {
       await loadTenants();
     } catch (err: any) { alert(err?.message || 'Failed to permanently delete'); }
     finally { setActionLoading(''); }
+  };
+
+  const copyApplicationLink = async (t: Tenant) => {
+    if (!t.school_code) {
+      toast({ title: 'This school has no school_code set', variant: 'destructive' });
+      setOpenMenu(null);
+      return;
+    }
+    const link = `${window.location.origin}/apply/${t.school_code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: 'Application link copied', description: link });
+    } catch {
+      toast({ title: 'Could not copy — here is the link', description: link });
+    }
+    setOpenMenu(null);
   };
 
   const handleLoginAs = async (t: Tenant) => {
@@ -350,6 +368,10 @@ export function TenantsPage() {
                         <button onClick={() => openPayments(t)}
                           className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                           <DollarSign className="h-4 w-4 mr-2" /> View Payments
+                        </button>
+                        <button onClick={() => copyApplicationLink(t)}
+                          className="w-full flex items-center px-4 py-2.5 text-sm text-teal-600 hover:bg-teal-50">
+                          <Link2 className="h-4 w-4 mr-2" /> Copy Application Link
                         </button>
                         <button onClick={() => { setSelectedTenant(t); setExtendMonths(12); setModal('extend'); setOpenMenu(null); }}
                           className="w-full flex items-center px-4 py-2.5 text-sm text-purple-600 hover:bg-purple-50">

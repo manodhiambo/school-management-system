@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
 import { verifyCheckoutStatus, getWebhookChallenge } from '../services/intasendService.js';
+import { recordFeeIncome } from '../utils/incomeRecords.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -92,6 +93,8 @@ router.post('/', async (req, res) => {
        ON CONFLICT DO NOTHING`,
       [uuidv4(), inv.id, inv.student_id, inv.tenant_id, amount, intasendInvoiceId]
     );
+
+    await recordFeeIncome({ tid: inv.tenant_id, studentId: inv.student_id, amount, paymentMethod: 'intasend', receiptNumber: intasendInvoiceId, paymentDate: null, userId: null });
 
     logger.info(`IntaSend payment confirmed: ${intasendInvoiceId} KES ${amount} for invoice ${inv.id}`);
   } catch (err) {

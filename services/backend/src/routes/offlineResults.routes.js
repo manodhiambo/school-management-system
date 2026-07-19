@@ -3,6 +3,7 @@ import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { isAssignedToClass, isClassTeacher, canGradeSubject } from '../utils/teacherAssignment.js';
 
 const router = express.Router();
 
@@ -57,6 +58,10 @@ router.post('/bulk', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Exam not found' });
     }
 
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, exams[0].class_id, tenantId))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
+
     const educationLevel = exams[0].education_level || 'lower_primary';
 
     let successCount = 0;
@@ -68,6 +73,11 @@ router.post('/bulk', async (req, res) => {
 
         if (!student_id) {
           errors.push({ student_id, error: 'student_id is required' });
+          continue;
+        }
+
+        if (req.user.role === 'teacher' && !(await canGradeSubject(req.user.id, exams[0].class_id, subject_id || null, tenantId))) {
+          errors.push({ student_id, error: 'You are not assigned to grade this subject' });
           continue;
         }
 
@@ -126,9 +136,13 @@ router.get('/:examId', async (req, res) => {
     const tenantId = req.tenantId;
 
     // Verify exam belongs to this tenant
-    const examCheck = await query('SELECT id FROM exams WHERE id = $1 AND tenant_id = $2', [req.params.examId, tenantId]);
+    const examCheck = await query('SELECT id, class_id FROM exams WHERE id = $1 AND tenant_id = $2', [req.params.examId, tenantId]);
     if (examCheck.length === 0) {
       return res.status(404).json({ success: false, message: 'Exam not found' });
+    }
+
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, examCheck[0].class_id, tenantId))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
     }
 
     const results = await query(`
@@ -170,6 +184,11 @@ router.put('/:examId/:studentId/:subjectId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Exam not found' });
     }
 
+    const putSubjectId = req.params.subjectId === 'null' ? null : req.params.subjectId;
+    if (req.user.role === 'teacher' && !(await canGradeSubject(req.user.id, exams[0].class_id, putSubjectId, tenantId))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to grade this subject' });
+    }
+
     const educationLevel = exams[0].education_level || 'lower_primary';
     const percentage = max_marks > 0 ? (marks_obtained / max_marks) * 100 : 0;
     const cbeGrade = is_absent ? null : computeCBEGrade(percentage, educationLevel);
@@ -199,14 +218,19 @@ router.post('/:examId/publish', async (req, res) => {
     }
     const tenantId = req.tenantId;
 
+    const examCheck = await query('SELECT id, class_id FROM exams WHERE id = $1 AND tenant_id = $2', [req.params.examId, tenantId]);
+    if (examCheck.length === 0) {
+      return res.status(404).json({ success: false, message: 'Exam not found' });
+    }
+
+    if (req.user.role === 'teacher' && !(await isClassTeacher(req.user.id, examCheck[0].class_id, tenantId))) {
+      return res.status(403).json({ success: false, message: 'Only the class teacher can publish results for this class' });
+    }
+
     const result = await query(
       'UPDATE exams SET is_results_published = true, updated_at = NOW() WHERE id = $1 AND tenant_id = $2 RETURNING id',
       [req.params.examId, tenantId]
     );
-
-    if (result.length === 0) {
-      return res.status(404).json({ success: false, message: 'Exam not found' });
-    }
 
     res.json({ success: true, message: 'Results published successfully' });
   } catch (error) {

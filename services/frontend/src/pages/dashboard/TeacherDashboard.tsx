@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users, BookOpen, Calendar, Clock, FileText, CheckCircle,
-  GraduationCap, Bell, ArrowRight
+  GraduationCap, Bell, ArrowRight, PlayCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
@@ -20,12 +20,19 @@ export function TeacherDashboard() {
   const [classes, setClasses] = useState<any[]>([]);
   const [timetable, setTimetable] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     if (user?.id) {
       loadDashboard();
     }
   }, [user?.id]);
+
+  // Ticks the "now teaching / starting in Nm" banner without a full data reload
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadDashboard = async () => {
     try {
@@ -82,6 +89,39 @@ export function TeacherDashboard() {
     return time.substring(0, 5);
   };
 
+  // Builds a today-anchored Date from a "HH:MM:SS" timetable time string.
+  const toTodayDate = (time: string, base: Date) => {
+    if (!time) return null;
+    const [h, m, s] = time.split(':').map(Number);
+    const d = new Date(base);
+    d.setHours(h || 0, m || 0, s || 0, 0);
+    return d;
+  };
+
+  // Finds the period happening right now, and the next one coming up today —
+  // this is what drives the "Now teaching" / "Starting in Nm" banner.
+  const getPeriodStatus = () => {
+    const today = getTodayClasses();
+    let current: any = null;
+    let next: any = null;
+    let minutesToNext: number | null = null;
+
+    for (const item of today) {
+      const start = toTodayDate(item.start_time, now);
+      const end = toTodayDate(item.end_time, now);
+      if (!start || !end) continue;
+
+      if (now >= start && now <= end) {
+        current = item;
+      } else if (start > now && (!next || start < toTodayDate(next.start_time, now)!)) {
+        next = item;
+        minutesToNext = Math.round((start.getTime() - now.getTime()) / 60000);
+      }
+    }
+
+    return { current, next, minutesToNext };
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
@@ -94,9 +134,36 @@ export function TeacherDashboard() {
   }
 
   const todayClasses = getTodayClasses();
+  const { current: currentPeriod, next: nextPeriod, minutesToNext } = getPeriodStatus();
 
   return (
     <div className="space-y-8 pb-8">
+      {/* Now Teaching / Starting Soon Banner */}
+      {currentPeriod && (
+        <div className="flex items-center p-4 rounded-2xl bg-green-600 text-white shadow-lg">
+          <span className="relative flex h-3 w-3 mr-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+          </span>
+          <PlayCircle className="h-6 w-6 mr-3" />
+          <div className="flex-1">
+            <p className="font-semibold">{t('Now teaching')}: {currentPeriod.subject_name || 'Subject'} — {currentPeriod.class_name || 'Class'}</p>
+            <p className="text-sm text-green-100">{formatTime(currentPeriod.start_time)} - {formatTime(currentPeriod.end_time)}{currentPeriod.room ? ` · ${t('Room')} ${currentPeriod.room}` : ''}</p>
+          </div>
+        </div>
+      )}
+      {!currentPeriod && nextPeriod && minutesToNext !== null && minutesToNext <= 15 && (
+        <div className="flex items-center p-4 rounded-2xl bg-amber-500 text-white shadow-lg">
+          <Bell className="h-6 w-6 mr-3" />
+          <div className="flex-1">
+            <p className="font-semibold">
+              {t('Starting in')} {minutesToNext} {minutesToNext === 1 ? t('minute') : t('minutes')}: {nextPeriod.subject_name || 'Subject'} — {nextPeriod.class_name || 'Class'}
+            </p>
+            <p className="text-sm text-amber-100">{formatTime(nextPeriod.start_time)} - {formatTime(nextPeriod.end_time)}{nextPeriod.room ? ` · ${t('Room')} ${nextPeriod.room}` : ''}</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">

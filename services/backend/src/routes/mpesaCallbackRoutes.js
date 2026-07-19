@@ -3,6 +3,7 @@ import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { verifyWithSafaricom } from '../services/mpesaService.js';
+import { recordFeeIncome } from '../utils/incomeRecords.js';
 
 const router = express.Router();
 
@@ -77,6 +78,8 @@ router.post('/callback', async (req, res) => {
        ON CONFLICT DO NOTHING`,
       [uuidv4(), inv.id, inv.student_id, inv.tenant_id, amount, mpesaRef]
     );
+
+    await recordFeeIncome({ tid: inv.tenant_id, studentId: inv.student_id, amount, paymentMethod: 'mpesa', receiptNumber: mpesaRef, paymentDate: null, userId: null });
 
     logger.info(`M-Pesa payment confirmed: ${mpesaRef} KES ${amount} for invoice ${inv.id}`);
   } catch (err) {

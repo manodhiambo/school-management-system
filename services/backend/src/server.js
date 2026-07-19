@@ -7,6 +7,7 @@ import { runMigrations } from './database/runMigrations.js';
 import { authLimiter, apiLimiter, registrationLimiter } from './middleware/rateLimiter.js';
 import { startTenantExpiryJob } from './jobs/tenantExpiryJob.js';
 import { startDemoResetJob } from './jobs/demoResetJob.js';
+import { startPeriodReminderJob } from './jobs/periodReminderJob.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -269,6 +270,7 @@ async function startServer() {
   }
   startTenantExpiryJob();
   startDemoResetJob();
+  startPeriodReminderJob();
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

@@ -6,6 +6,7 @@ import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+import { recordFeeIncome } from '../utils/incomeRecords.js';
 
 const router = express.Router();
 
@@ -661,27 +662,6 @@ router.get('/payment', async (req, res) => {
     res.status(500).json({ success: false, message: 'Error fetching payments' });
   }
 });
-
-// Mirrors a successful fee_payments row into income_records — nothing else in
-// the fee-payment write path ever did this, so the Finance dashboard's
-// monthly collection chart (which reads income_records WHERE
-// income_category = 'Student Fees') was always empty regardless of how many
-// payments were recorded. Best-effort: a failure here must not roll back the
-// payment itself, since fee_payments/fee_invoices are the source of truth.
-async function recordFeeIncome({ tid, studentId, amount, paymentMethod, receiptNumber, paymentDate, userId }) {
-  try {
-    await query(
-      `INSERT INTO income_records (
-         tenant_id, income_number, income_date, income_category,
-         student_id, amount, vat_rate, vat_amount, total_amount,
-         payment_method, payment_reference, description, status, created_by
-       ) VALUES ($1,$2,COALESCE($3::timestamptz, NOW()),'Student Fees',$4,$5,0,0,$5,$6,$7,'Fee payment',$8,$9)`,
-      [tid, 'INC-FEE-' + Date.now().toString(36).toUpperCase(), paymentDate, studentId, amount, paymentMethod, receiptNumber, 'completed', userId]
-    );
-  } catch (err) {
-    logger.error('Record fee income error (payment itself already saved):', err);
-  }
-}
 
 // Record payment
 router.post('/payment', async (req, res) => {

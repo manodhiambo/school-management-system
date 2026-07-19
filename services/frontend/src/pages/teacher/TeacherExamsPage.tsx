@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Award, Plus, Trash2, Save, Upload } from 'lucide-react';
 import api from '@/services/api';
 import { computeCBEGrade, getCBEGradeBadgeClass } from '@/utils/cbeGrades';
+import { useAuthStore } from '@/store/authStore';
 
 type Tab = 'my-exams' | 'create' | 'offline-results';
 
@@ -17,6 +18,7 @@ interface Question {
 }
 
 export function TeacherExamsPage() {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>('my-exams');
   const [exams, setExams] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -37,6 +39,9 @@ export function TeacherExamsPage() {
   const [offlineStudents, setOfflineStudents] = useState<any[]>([]);
   const [offlineResults, setOfflineResults] = useState<Record<string, { marks: number; max_marks: number; absent: boolean }>>({});
   const [selectedOfflineClass, setSelectedOfflineClass] = useState('');
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [offlineSubjects, setOfflineSubjects] = useState<any[]>([]);
+  const [selectedOfflineSubject, setSelectedOfflineSubject] = useState('');
 
   useEffect(() => {
     loadData();
@@ -44,12 +49,14 @@ export function TeacherExamsPage() {
 
   const loadData = async () => {
     try {
-      const [examsRes, classesRes]: any[] = await Promise.all([
+      const [examsRes, classesRes, assignmentsRes]: any[] = await Promise.all([
         api.getExams(),
-        api.getClasses()
+        api.getTeacherClasses(user?.id || ''),
+        api.getTeacherSubjectAssignments(user?.id || '')
       ]);
       setExams(examsRes.data || examsRes || []);
       setClasses(classesRes.data || classesRes || []);
+      setAssignments(assignmentsRes.data || assignmentsRes || []);
     } catch { /* silent */ }
     setLoading(false);
   };
@@ -107,6 +114,7 @@ export function TeacherExamsPage() {
   const loadOfflineStudents = async (classId: string) => {
     if (!classId) return;
     setSelectedOfflineClass(classId);
+    setSelectedOfflineSubject('');
     try {
       const res: any = await api.getClassStudents(classId);
       const students = res.data || res || [];
@@ -116,15 +124,30 @@ export function TeacherExamsPage() {
         initial[s.id] = { marks: 0, max_marks: 100, absent: false };
       }
       setOfflineResults(initial);
+
+      const isClassTeacher = classes.find(c => c.id === classId)?.is_class_teacher;
+      if (isClassTeacher) {
+        const subjectsRes: any = await api.getClassSubjects(classId);
+        const rows = subjectsRes.data || subjectsRes || [];
+        setOfflineSubjects(rows.map((r: any) => ({ id: r.subject_id, name: r.subject_name })));
+      } else {
+        setOfflineSubjects(
+          assignments
+            .filter(a => a.class_id === classId)
+            .map(a => ({ id: a.subject_id, name: a.subject_name }))
+        );
+      }
     } catch { /* silent */ }
   };
 
   const handleSaveOfflineResults = async () => {
     if (!selectedExamId) { setMessage('Please select an exam'); return; }
+    if (!selectedOfflineSubject) { setMessage('Please select a subject'); return; }
     setSaving(true);
     try {
       const results = offlineStudents.map(s => ({
         student_id: s.id,
+        subject_id: selectedOfflineSubject,
         marks_obtained: offlineResults[s.id]?.marks || 0,
         max_marks: offlineResults[s.id]?.max_marks || 100,
         is_absent: offlineResults[s.id]?.absent || false
@@ -371,6 +394,13 @@ export function TeacherExamsPage() {
                   {classes.map(c => <option key={c.id} value={c.id}>{c.name} {c.section && `(${c.section})`}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Select Subject</label>
+                <select value={selectedOfflineSubject} onChange={e => setSelectedOfflineSubject(e.target.value)} disabled={!selectedOfflineClass} className="mt-1 w-full border rounded-md px-3 py-2 text-sm">
+                  <option value="">-- Select subject --</option>
+                  {offlineSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
             </CardContent>
           </Card>
 
@@ -442,7 +472,7 @@ export function TeacherExamsPage() {
                   </table>
                 </div>
                 <div className="flex gap-3 mt-4">
-                  <Button onClick={handleSaveOfflineResults} disabled={saving || !selectedExamId} className="flex-1">
+                  <Button onClick={handleSaveOfflineResults} disabled={saving || !selectedExamId || !selectedOfflineSubject} className="flex-1">
                     <Save className="h-4 w-4 mr-2" />
                     {saving ? 'Saving...' : 'Save Results'}
                   </Button>

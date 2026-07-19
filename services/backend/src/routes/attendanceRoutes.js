@@ -5,6 +5,8 @@ import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { sendStudentAlert } from './parentAlertsRoutes.js';
+import requireRole from '../middleware/roleMiddleware.js';
+import { isAssignedToClass } from '../utils/teacherAssignment.js';
 
 const router = express.Router();
 
@@ -139,7 +141,7 @@ router.get('/student/:studentId', async (req, res) => {
 });
 
 // Mark attendance (single)
-router.post('/', async (req, res) => {
+router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     logger.info('Mark attendance request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -155,11 +157,15 @@ router.post('/', async (req, res) => {
 
     // Verify student belongs to this tenant
     const studentCheck = await query(
-      'SELECT id FROM students WHERE id = $1 AND tenant_id = $2',
+      'SELECT id, class_id FROM students WHERE id = $1 AND tenant_id = $2',
       [actualStudentId, tid]
     );
     if (studentCheck.length === 0) {
       return res.status(403).json({ success: false, message: 'Student not found' });
+    }
+
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, studentCheck[0].class_id, tid))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
     }
 
     const existing = await query(
@@ -189,7 +195,7 @@ router.post('/', async (req, res) => {
 });
 
 // Mark bulk attendance
-router.post('/bulk', async (req, res) => {
+router.post('/bulk', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     logger.info('Bulk attendance request:', JSON.stringify(req.body));
     const tid = req.user.tenant_id;
@@ -201,12 +207,23 @@ router.post('/bulk', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Attendances array is required' });
     }
 
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, classId, tid))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
+
     let processed = 0;
     for (const record of attendances) {
       const studentId = record.studentId || record.student_id;
       const status = record.status || 'present';
 
       if (!studentId) continue;
+
+      // Only mark students who actually belong to the declared, authorized class
+      const studentCheck = await query(
+        'SELECT id FROM students WHERE id = $1 AND tenant_id = $2' + (classId ? ' AND class_id = $3' : ''),
+        classId ? [studentId, tid, classId] : [studentId, tid]
+      );
+      if (studentCheck.length === 0) continue;
 
       const existing = await query(
         'SELECT id FROM attendance WHERE student_id = $1 AND DATE(date) = $2',
@@ -238,13 +255,24 @@ router.post('/bulk', async (req, res) => {
 });
 
 // Legacy route for marking attendance
-router.post('/mark', async (req, res) => {
+router.post('/mark', requireRole(['admin', 'teacher']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const { studentId, date, status } = req.body;
 
     if (!studentId) {
       return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const studentCheck = await query(
+      'SELECT id, class_id FROM students WHERE id = $1 AND tenant_id = $2',
+      [studentId, tid]
+    );
+    if (studentCheck.length === 0) {
+      return res.status(403).json({ success: false, message: 'Student not found' });
+    }
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, studentCheck[0].class_id, tid))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
     }
 
     const actualDate = date || new Date().toISOString().split('T')[0];

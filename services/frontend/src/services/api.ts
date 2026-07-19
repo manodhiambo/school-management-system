@@ -1750,6 +1750,28 @@ class ApiService {
   getStoreProfitReport() { return this.api.get('/school-store/reports/profit'); }
   getStoreValuationReport() { return this.api.get('/school-store/reports/valuation'); }
 
+  // ── Maintenance Management ──────────────────────────────────────────────
+  getMaintenanceRequests(params?: any) { return this.api.get('/maintenance/requests', { params }); }
+  getMaintenanceRequest(id: string) { return this.api.get('/maintenance/requests/' + id); }
+  createMaintenanceRequest(data: any) { return this.api.post('/maintenance/requests', data); }
+  assignMaintenanceRequest(id: string, technicianId: string) {
+    return this.api.put('/maintenance/requests/' + id + '/assign', { technician_id: technicianId });
+  }
+  startMaintenanceJob(id: string) { return this.api.put('/maintenance/requests/' + id + '/start', {}); }
+  completeMaintenanceJob(id: string, data: any) { return this.api.put('/maintenance/requests/' + id + '/complete', data); }
+  inspectMaintenanceRequest(id: string, data: any) { return this.api.put('/maintenance/requests/' + id + '/inspect', data); }
+  verifyMaintenanceRequest(id: string) { return this.api.put('/maintenance/requests/' + id + '/verify', {}); }
+  rejectMaintenanceRequest(id: string, reason: string) { return this.api.put('/maintenance/requests/' + id + '/reject', { reason }); }
+  getMyMaintenanceJobs() { return this.api.get('/maintenance/my-jobs'); }
+  getMaintenanceSchedules() { return this.api.get('/maintenance/schedules'); }
+  createMaintenanceSchedule(data: any) { return this.api.post('/maintenance/schedules', data); }
+  updateMaintenanceSchedule(id: string, data: any) { return this.api.put('/maintenance/schedules/' + id, data); }
+  getMaintenancePendingReport() { return this.api.get('/maintenance/reports/pending'); }
+  getMaintenanceCompletedReport() { return this.api.get('/maintenance/reports/completed'); }
+  getMaintenanceCostByAssetReport() { return this.api.get('/maintenance/reports/cost-by-asset'); }
+  getMaintenanceTechnicianPerformanceReport() { return this.api.get('/maintenance/reports/technician-performance'); }
+  getMaintenanceTrendsReport() { return this.api.get('/maintenance/reports/trends'); }
+
   // ── Bursary ───────────────────────────────────────────────────────────────
   getBursaryFunders() { return this.api.get('/bursary/funders'); }
   createBursaryFunder(data: any) { return this.api.post('/bursary/funders', data); }

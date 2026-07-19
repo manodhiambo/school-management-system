@@ -89,6 +89,7 @@ import { RollCallPage } from './pages/welfare/RollCallPage';
 import { LaundryPage } from './pages/welfare/LaundryPage';
 import { DormitoryInspectionPage } from './pages/welfare/DormitoryInspectionPage';
 import { HostelInventoryPage } from './pages/welfare/HostelInventoryPage';
+import { MaintenanceRequestsPage } from './pages/welfare/MaintenanceRequestsPage';
 import { WhatsAppPage } from './pages/communication/WhatsAppPage';
 import { SmsKeywordsPage } from './pages/communication/SmsKeywordsPage';
 import { PortfolioPage } from './pages/student/PortfolioPage';
@@ -320,6 +321,7 @@ function App() {
               <Route path="hostel-laundry" element={<RoleRoute allowedRoles={['admin']}><LaundryPage /></RoleRoute>} />
               <Route path="hostel-inspections" element={<RoleRoute allowedRoles={['admin']}><DormitoryInspectionPage /></RoleRoute>} />
               <Route path="hostel-inventory" element={<RoleRoute allowedRoles={['admin']}><HostelInventoryPage /></RoleRoute>} />
+              <Route path="maintenance-requests" element={<RoleRoute allowedRoles={['admin', 'teacher']}><MaintenanceRequestsPage /></RoleRoute>} />
               <Route path="whatsapp" element={<RoleRoute allowedRoles={['admin']}><WhatsAppPage /></RoleRoute>} />
               <Route path="sms-keywords" element={<RoleRoute allowedRoles={['admin']}><SmsKeywordsPage /></RoleRoute>} />
               <Route path="portfolio" element={<PortfolioPage />} />

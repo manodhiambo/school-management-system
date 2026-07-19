@@ -54,6 +54,7 @@ import {
   FileSearch,
   Shirt,
   Utensils,
+  Wrench,
 } from 'lucide-react';
 
 type NavItem = {
@@ -193,6 +194,8 @@ const navigationItems: NavItem[] = [
   { name: 'Meal Attendance',    href: '/app/canteen-attendance', icon: Utensils,      roles: ['admin'],                              section: 'Welfare', module: 'canteen' },
   { name: 'Kitchen Requisitions', href: '/app/canteen-requisitions', icon: ClipboardList, roles: ['admin'],                          section: 'Welfare', module: 'canteen' },
   { name: 'School Store (POS)', href: '/app/school-store',       icon: ShoppingCart,  roles: ['admin'],                              section: 'Welfare', module: 'school_store' },
+  { name: 'Maintenance Requests', href: '/app/maintenance-requests', icon: Wrench,    roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'maintenance' },
+  { name: 'My Jobs',            href: '/app/dashboard',          icon: Wrench,        roles: ['technician'],                         section: 'Welfare', module: 'maintenance' },
 
   // ── HR & Staff Extended ───────────────────────────────────────────────────
   { name: 'Payroll',            href: '/app/payroll',            icon: Wallet,        roles: ['admin', 'finance_officer'],           section: 'Finance', module: 'staff' },

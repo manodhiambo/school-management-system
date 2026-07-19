@@ -71,6 +71,7 @@ import nemisRoutes from './routes/nemisRoutes.js';
 import hostelMgmtRoutes from './routes/hostelMgmtRoutes.js';
 import canteenRoutes from './routes/canteenRoutes.js';
 import storeRoutes from './routes/storeRoutes.js';
+import maintenanceRoutes from './routes/maintenanceRoutes.js';
 import bursaryRoutes from './routes/bursaryRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
@@ -222,6 +223,7 @@ app.use('/api/v1/nemis', nemisRoutes);
 app.use('/api/v1/hostel-mgmt', hostelMgmtRoutes);
 app.use('/api/v1/canteen', canteenRoutes);
 app.use('/api/v1/school-store', storeRoutes);
+app.use('/api/v1/maintenance', maintenanceRoutes);
 app.use('/api/v1/bursary', bursaryRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
 

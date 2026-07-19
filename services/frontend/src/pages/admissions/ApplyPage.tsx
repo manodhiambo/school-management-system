@@ -242,7 +242,13 @@ export function ApplyPage() {
                         </div>
                         <div className="space-y-1.5">
                           <Label htmlFor="guardian_relationship">Relationship</Label>
-                          <Input id="guardian_relationship" name="guardian_relationship" placeholder="Mother, Father..." value={form.guardian_relationship} onChange={handleChange} />
+                          <select id="guardian_relationship" name="guardian_relationship" value={form.guardian_relationship} onChange={handleChange} className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm">
+                            <option value="">Select...</option>
+                            <option value="mother">Mother</option>
+                            <option value="father">Father</option>
+                            <option value="guardian">Guardian</option>
+                            <option value="other">Other</option>
+                          </select>
                         </div>
                       </div>
                       <div className="space-y-1.5">

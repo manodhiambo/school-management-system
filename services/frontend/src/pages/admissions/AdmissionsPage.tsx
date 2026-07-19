@@ -222,7 +222,13 @@ export function AdmissionsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Input placeholder="Guardian name" value={newApp.guardian_name} onChange={e => setNewApp(f => ({ ...f, guardian_name: e.target.value }))} />
-                  <Input placeholder="Guardian relationship" value={newApp.guardian_relationship} onChange={e => setNewApp(f => ({ ...f, guardian_relationship: e.target.value }))} />
+                  <select className="w-full border rounded px-3 py-2 text-sm" value={newApp.guardian_relationship} onChange={e => setNewApp(f => ({ ...f, guardian_relationship: e.target.value }))}>
+                    <option value="">Guardian relationship...</option>
+                    <option value="mother">Mother</option>
+                    <option value="father">Father</option>
+                    <option value="guardian">Guardian</option>
+                    <option value="other">Other</option>
+                  </select>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Input placeholder="Guardian phone" value={newApp.guardian_phone} onChange={e => setNewApp(f => ({ ...f, guardian_phone: e.target.value }))} />

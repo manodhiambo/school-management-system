@@ -31,6 +31,18 @@ async function generateApplicationNumber(tenantId) {
   return `ADM-${year}-${String(next).padStart(5, '0')}`;
 }
 
+// parents.relationship has a CHECK constraint allowing only
+// father/mother/guardian/other, but guardian_relationship on an application
+// is free text typed by the applicant (e.g. "Mum", "Auntie", "Dad") — map it
+// to a valid value instead of letting the INSERT fail at enroll time.
+function normalizeRelationship(value) {
+  const v = (value || '').trim().toLowerCase();
+  if (['father', 'dad', 'daddy'].includes(v)) return 'father';
+  if (['mother', 'mum', 'mom', 'mummy', 'mommy'].includes(v)) return 'mother';
+  if (!v || v === 'guardian') return 'guardian';
+  return 'other';
+}
+
 async function getTenantByCode(schoolCode) {
   const rows = await query(
     `SELECT id, school_name, school_code, status FROM tenants WHERE school_code = $1 OR subdomain = $1`,
@@ -488,7 +500,7 @@ router.put('/applications/:id/enroll', officeOnly, async (req, res) => {
         await query(
           `INSERT INTO parents (id, user_id, first_name, last_name, relationship, phone_primary, tenant_id)
            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [resolvedParentId, parentUserId, gFirst, gLast, application.guardian_relationship || 'guardian', application.guardian_phone, tid]
+          [resolvedParentId, parentUserId, gFirst, gLast, normalizeRelationship(application.guardian_relationship), application.guardian_phone, tid]
         );
       }
     }

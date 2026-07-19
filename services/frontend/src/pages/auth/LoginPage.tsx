@@ -99,6 +99,7 @@ export function LoginPage() {
   });
   const [view, setView] = useState<View>('role');
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [roleDropdownSelection, setRoleDropdownSelection] = useState('');
 
   // Login form state
   const [email, setEmail] = useState('');
@@ -255,6 +256,7 @@ export function LoginPage() {
 
   const goBackToRoles = () => {
     setSelectedRole(null);
+    setRoleDropdownSelection('');
     setLoginError('');
     setDemoError('');
     setDemoLoading(false);
@@ -288,31 +290,32 @@ export function LoginPage() {
                 <CardDescription>Select your role to continue</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 pt-2">
-                {ROLES.map((role) => (
-                  <button
-                    key={role.key}
-                    onClick={() => handleRoleSelect(role.key)}
-                    className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-150 text-left ${role.bg} ${role.border}`}
+                <div className="space-y-2">
+                  <Label htmlFor="roleSelect">Your role</Label>
+                  <select
+                    id="roleSelect"
+                    value={roleDropdownSelection}
+                    onChange={(e) => setRoleDropdownSelection(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
-                    <div className={`flex-shrink-0 h-11 w-11 rounded-full bg-white flex items-center justify-center shadow-sm`}>
-                      <role.icon className={`h-5 w-5 ${role.color}`} />
-                    </div>
-                    <div>
-                      <p className={`font-semibold text-sm ${role.color}`}>{role.label}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{role.description}</p>
-                    </div>
-                  </button>
-                ))}
-
-                {/* Admin link — subtle, not a prominent card */}
-                <div className="pt-2 text-center">
-                  <button
-                    onClick={() => handleRoleSelect('admin')}
-                    className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                    <option value="">Select your role...</option>
+                    {ROLES.map((role) => (
+                      <option key={role.key} value={role.key}>{role.label}</option>
+                    ))}
+                    <option value="admin">Administrator</option>
+                  </select>
+                  {roleDropdownSelection && roleDropdownSelection !== 'admin' && (
+                    <p className="text-xs text-gray-500">
+                      {ROLES.find((r) => r.key === roleDropdownSelection)?.description}
+                    </p>
+                  )}
+                  <Button
+                    className="w-full"
+                    disabled={!roleDropdownSelection}
+                    onClick={() => handleRoleSelect(roleDropdownSelection as Role)}
                   >
-                    <Shield className="h-3 w-3" />
-                    Sign in as Administrator
-                  </button>
+                    Continue
+                  </Button>
                 </div>
 
                 {demoUsers.length > 0 && (

@@ -15,6 +15,20 @@ router.use(requireModule('finance'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
+// Resolves a term/academic_year default from the tenant's current academic_terms
+// row when an invoice-creation call doesn't specify one — invoices created with
+// term left NULL are invisible to any report filtered by a specific term (the
+// financial reports' term filter does an exact match), so leaving this unset
+// silently breaks "Defaulters"/"Fee Collection" once a finance officer narrows
+// by term.
+async function resolveCurrentTerm(tenantId) {
+  const rows = await query(
+    `SELECT term, academic_year FROM academic_terms WHERE tenant_id = $1 AND is_current = true LIMIT 1`,
+    [tenantId]
+  );
+  return rows[0] || { term: null, academic_year: new Date().getFullYear().toString() };
+}
+
 // ============== FEE STRUCTURE ROUTES ==============
 
 // Get all fee structures
@@ -330,7 +344,7 @@ router.post('/invoice', requireRole(['admin']), async (req, res) => {
       student_id, studentId,
       total_amount, totalAmount, amount,
       discount_amount, discountAmount, discount,
-      due_date, dueDate, status
+      due_date, dueDate, status, term, academic_year
     } = req.body;
 
     const actualStudentId = student_id || studentId;
@@ -348,16 +362,18 @@ router.post('/invoice', requireRole(['admin']), async (req, res) => {
 
     const invoiceId = uuidv4();
     const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    const currentTerm = await resolveCurrentTerm(tid);
 
     await query(
       `INSERT INTO fee_invoices (
         id, invoice_number, student_id, total_amount,
-        discount_amount, net_amount, balance_amount, due_date, status, tenant_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9)`,
+        discount_amount, net_amount, balance_amount, due_date, status, tenant_id, term, academic_year
+      ) VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10, $11)`,
       [
         invoiceId, invoiceNumber, actualStudentId, actualTotalAmount,
         actualDiscount, actualNetAmount, actualDueDate,
-        status || 'pending', tid
+        status || 'pending', tid,
+        term || currentTerm.term, academic_year || currentTerm.academic_year
       ]
     );
 
@@ -401,6 +417,9 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
     }
 
     const structure = structures[0];
+    const currentTerm = await resolveCurrentTerm(tid);
+    const actualTerm = term || currentTerm.term;
+    const actualAcademicYear = academic_year || currentTerm.academic_year;
     const created = [];
     const errors = [];
 
@@ -415,7 +434,7 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
             net_amount, balance_amount, due_date, status, tenant_id, description, fee_structure_id,
             term, academic_year
           ) VALUES ($1, $2, $3, $4, $4, $4, $5, 'pending', $6, $7, $8, $9, $10)`,
-          [invoiceId, invoiceNumber, studentId, structure.amount, actualDueDate, tid, structure.name, structure.id, term || null, academic_year || null]
+          [invoiceId, invoiceNumber, studentId, structure.amount, actualDueDate, tid, structure.name, structure.id, actualTerm, actualAcademicYear]
         );
 
         created.push({ studentId, invoiceId, invoiceNumber });
@@ -1353,10 +1372,13 @@ router.get('/students-summary', async (req, res) => {
 router.post('/invoice/generate-for-student', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { student_id, academic_year, term, due_date } = req.body;
+    const { student_id, academic_year, due_date } = req.body;
+    let { term } = req.body;
     if (!student_id) return res.status(400).json({ success: false, message: 'student_id required' });
 
-    const year = academic_year || new Date().getFullYear().toString();
+    const currentTerm = await resolveCurrentTerm(tid);
+    const year = academic_year || currentTerm.academic_year;
+    term = term || currentTerm.term;
 
     // Get student
     const stdRows = await query(
@@ -1497,11 +1519,11 @@ router.get('/report/summary', async (req, res) => {
       FROM fee_invoices fi
       JOIN students s ON s.id = fi.student_id AND s.tenant_id = $1
       WHERE fi.tenant_id = $1 AND fi.status NOT IN ('cancelled')
-        AND fi.academic_year = $2`;
+        AND (fi.academic_year = $2 OR fi.academic_year IS NULL)`;
     const params = [tid, year];
     let pi = 3;
 
-    if (term)     { sql += ` AND fi.term = $${pi}`;      params.push(term);     pi++; }
+    if (term)     { sql += ` AND (fi.term = $${pi} OR fi.term IS NULL)`;      params.push(term);     pi++; }
     if (class_id) { sql += ` AND s.class_id = $${pi}`;  params.push(class_id); pi++; }
 
     const rows = await query(sql, params);
@@ -1535,11 +1557,11 @@ router.get('/report/collection-by-class', async (req, res) => {
       LEFT JOIN fee_invoices fi
              ON fi.student_id = s.id AND fi.tenant_id = $1
             AND fi.status NOT IN ('cancelled')
-            AND fi.academic_year = $2`;
+            AND (fi.academic_year = $2 OR fi.academic_year IS NULL)`;
     const params = [tid, year];
     let pi = 3;
 
-    if (term) { sql += ` AND fi.term = $${pi}`; params.push(term); pi++; }
+    if (term) { sql += ` AND (fi.term = $${pi} OR fi.term IS NULL)`; params.push(term); pi++; }
 
     sql += `
       WHERE c.tenant_id = $1
@@ -1628,13 +1650,13 @@ router.get('/report/defaulters', async (req, res) => {
       FROM students s
       JOIN fee_invoices fi ON fi.student_id = s.id AND fi.tenant_id = $1
         AND fi.balance_amount > 0 AND fi.status NOT IN ('paid','cancelled')
-        AND fi.academic_year = $2
+        AND (fi.academic_year = $2 OR fi.academic_year IS NULL)
       LEFT JOIN classes c ON c.id = s.class_id
       WHERE s.tenant_id = $1 AND s.status = 'active'`;
     const params = [tid, year];
     let pi = 3;
 
-    if (term)     { sql += ` AND fi.term = $${pi}`;    params.push(term);     pi++; }
+    if (term)     { sql += ` AND (fi.term = $${pi} OR fi.term IS NULL)`;    params.push(term);     pi++; }
     if (class_id) { sql += ` AND s.class_id = $${pi}`; params.push(class_id); pi++; }
 
     sql += `

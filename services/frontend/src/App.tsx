@@ -79,6 +79,9 @@ import { AppraisalPage } from './pages/staff/AppraisalPage';
 import { SubstitutePage } from './pages/staff/SubstitutePage';
 import { BursaryPage } from './pages/finance/BursaryPage';
 import { CanteenPage } from './pages/welfare/CanteenPage';
+import { MenuPlanningPage } from './pages/welfare/MenuPlanningPage';
+import { MealAttendancePage } from './pages/welfare/MealAttendancePage';
+import { KitchenRequisitionsPage } from './pages/welfare/KitchenRequisitionsPage';
 import { CounselingPage } from './pages/welfare/CounselingPage';
 import { HostelManagementPage } from './pages/welfare/HostelManagementPage';
 import { RollCallPage } from './pages/welfare/RollCallPage';
@@ -306,6 +309,9 @@ function App() {
               <Route path="substitutes" element={<RoleRoute allowedRoles={['admin']}><SubstitutePage /></RoleRoute>} />
               <Route path="bursary" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><BursaryPage /></RoleRoute>} />
               <Route path="canteen" element={<CanteenPage />} />
+              <Route path="canteen-menu-planning" element={<RoleRoute allowedRoles={['admin']}><MenuPlanningPage /></RoleRoute>} />
+              <Route path="canteen-attendance" element={<RoleRoute allowedRoles={['admin']}><MealAttendancePage /></RoleRoute>} />
+              <Route path="canteen-requisitions" element={<RoleRoute allowedRoles={['admin']}><KitchenRequisitionsPage /></RoleRoute>} />
               <Route path="counseling" element={<CounselingPage />} />
               <Route path="hostel-management" element={<RoleRoute allowedRoles={['admin']}><HostelManagementPage /></RoleRoute>} />
               <Route path="hostel-roll-call" element={<RoleRoute allowedRoles={['admin']}><RollCallPage /></RoleRoute>} />

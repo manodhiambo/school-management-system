@@ -8,12 +8,15 @@ import { useAuthStore } from '@/store/authStore';
 import {
   UtensilsCrossed, Wallet, Package, BarChart2,
   Plus, Edit2, RefreshCw, Search, X, AlertTriangle,
-  TrendingUp, ShoppingCart
+  TrendingUp, ShoppingCart, Truck, Trash2, History,
 } from 'lucide-react';
 
 type Tab = 'meals' | 'accounts' | 'stock' | 'reports';
+type ReportView = 'daily' | 'consumption' | 'wastage';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'supper', 'snack'];
+
+const EMPTY_STOCK = { item_name: '', unit: '', quantity: '', reorder_level: '', unit_cost: '', category_id: '', batch_number: '', expiry_date: '', warehouse_location: '' };
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
@@ -52,15 +55,23 @@ export function CanteenPage() {
 
   // Stock
   const [stock, setStock] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [stockModal, setStockModal] = useState(false);
-  const [adjustModal, setAdjustModal] = useState(false);
+  const [editStock, setEditStock] = useState<any>(null);
+  const [stockForm, setStockForm] = useState({ ...EMPTY_STOCK });
+  const [receiveModal, setReceiveModal] = useState(false);
+  const [wasteModal, setWasteModal] = useState(false);
+  const [historyModal, setHistoryModal] = useState(false);
   const [selectedStock, setSelectedStock] = useState<any>(null);
-  const [stockForm, setStockForm] = useState({ name: '', unit: '', quantity: '', reorder_level: '', unit_cost: '' });
-  const [adjustForm, setAdjustForm] = useState({ quantity: '', notes: '' });
+  const [movements, setMovements] = useState<any[]>([]);
+  const [movementForm, setMovementForm] = useState({ quantity: '', reference: '', notes: '' });
 
   // Reports
+  const [reportView, setReportView] = useState<ReportView>('daily');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [report, setReport] = useState<any>(null);
+  const [consumption, setConsumption] = useState<any>(null);
+  const [wastage, setWastage] = useState<any>(null);
 
   useEffect(() => {
     if (isStudent) {
@@ -110,17 +121,36 @@ export function CanteenPage() {
   const loadStock = async () => {
     setLoading(true);
     try {
-      const res: any = await (api as any).getCanteenStock();
-      setStock(res?.data || []);
+      const [sRes, cRes]: any[] = await Promise.all([
+        (api as any).getCanteenStock(),
+        api.getInventoryCategories(),
+      ]);
+      setStock(sRes?.data || []);
+      setCategories(cRes?.data || []);
     } catch { setError('Failed to load stock'); }
     setLoading(false);
+  };
+
+  const seedCategories = async () => {
+    try {
+      await (api as any).seedFoodCategories();
+      loadStock();
+    } catch { setError('Failed to seed food categories'); }
   };
 
   const loadReport = async () => {
     setLoading(true);
     try {
-      const res: any = await (api as any).getCanteenDailyReport(reportDate);
-      setReport(res?.data || null);
+      if (reportView === 'daily') {
+        const res: any = await (api as any).getCanteenDailyReport(reportDate);
+        setReport(res?.data || null);
+      } else if (reportView === 'consumption') {
+        const res: any = await (api as any).getCanteenConsumptionReport();
+        setConsumption(res?.data || null);
+      } else {
+        const res: any = await (api as any).getCanteenWastageReport();
+        setWastage(res?.data || null);
+      }
     } catch { setError('Failed to load report'); }
     setLoading(false);
   };
@@ -159,23 +189,47 @@ export function CanteenPage() {
     } catch { setError('Purchase failed'); }
   };
 
-  const doAddStock = async () => {
+  const doSaveStock = async () => {
     try {
-      await (api as any).addCanteenStock(stockForm);
+      if (editStock) {
+        await (api as any).updateCanteenStock(editStock.id, stockForm);
+      } else {
+        await (api as any).addCanteenStock(stockForm);
+      }
       setStockModal(false);
-      setStockForm({ name: '', unit: '', quantity: '', reorder_level: '', unit_cost: '' });
+      setEditStock(null);
+      setStockForm({ ...EMPTY_STOCK });
       loadStock();
-    } catch { setError('Failed to add stock'); }
+    } catch { setError('Failed to save stock item'); }
   };
 
-  const doAdjustStock = async () => {
+  const doReceive = async () => {
     if (!selectedStock) return;
     try {
-      await (api as any).adjustCanteenStock(selectedStock.id, adjustForm);
-      setAdjustModal(false);
-      setAdjustForm({ quantity: '', notes: '' });
+      await (api as any).receiveCanteenStock(selectedStock.id, movementForm);
+      setReceiveModal(false);
+      setMovementForm({ quantity: '', reference: '', notes: '' });
       loadStock();
-    } catch { setError('Adjustment failed'); }
+    } catch { setError('Failed to record delivery'); }
+  };
+
+  const doWaste = async () => {
+    if (!selectedStock) return;
+    try {
+      await (api as any).wasteCanteenStock(selectedStock.id, movementForm);
+      setWasteModal(false);
+      setMovementForm({ quantity: '', reference: '', notes: '' });
+      loadStock();
+    } catch { setError('Failed to record wastage'); }
+  };
+
+  const openHistory = async (s: any) => {
+    setSelectedStock(s);
+    setHistoryModal(true);
+    try {
+      const res: any = await (api as any).getCanteenStockMovements(s.id);
+      setMovements(res?.data || []);
+    } catch { setMovements([]); }
   };
 
   const filteredAccounts = accounts.filter(a =>
@@ -215,19 +269,22 @@ export function CanteenPage() {
                   <th className="py-1">Date</th><th>Type</th><th>Amount</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
-                  {myTx.slice(0, 10).map((tx: any, i: number) => (
-                    <tr key={i} className="border-b hover:bg-gray-50">
-                      <td className="py-2">{tx.created_at?.split('T')[0]}</td>
-                      <td>
-                        <Badge label={tx.transaction_type || tx.type || '-'}
-                          color={tx.transaction_type === 'credit' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} />
-                      </td>
-                      <td className={tx.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}>
-                        {tx.transaction_type === 'credit' ? '+' : '-'}KES {Number(tx.amount || 0).toFixed(2)}
-                      </td>
-                      <td className="text-gray-600">{tx.notes || '-'}</td>
-                    </tr>
-                  ))}
+                  {myTx.slice(0, 10).map((tx: any, i: number) => {
+                    const isCredit = tx.type === 'topup' || tx.type === 'refund';
+                    return (
+                      <tr key={i} className="border-b hover:bg-gray-50">
+                        <td className="py-2">{tx.created_at?.split('T')[0]}</td>
+                        <td>
+                          <Badge label={tx.type || '-'}
+                            color={isCredit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} />
+                        </td>
+                        <td className={isCredit ? 'text-green-600' : 'text-red-600'}>
+                          {isCredit ? '+' : '-'}KES {Number(tx.amount || 0).toFixed(2)}
+                        </td>
+                        <td className="text-gray-600">{tx.meal_plan_name || tx.notes || '-'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -240,14 +297,14 @@ export function CanteenPage() {
   const TABS = [
     { id: 'meals', label: 'Meal Plans', icon: UtensilsCrossed },
     { id: 'accounts', label: 'Student Accounts', icon: Wallet },
-    { id: 'stock', label: 'Stock', icon: Package },
+    { id: 'stock', label: 'Kitchen Stock', icon: Package },
     { id: 'reports', label: 'Reports', icon: BarChart2 },
   ];
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold flex items-center gap-2">
-        <UtensilsCrossed className="h-6 w-6 text-green-600" /> Canteen Management
+        <UtensilsCrossed className="h-6 w-6 text-green-600" /> Kitchen & Feeding
       </h1>
 
       {error && (
@@ -258,12 +315,12 @@ export function CanteenPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b overflow-x-auto">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id as Tab)}
-            className={`flex items-center gap-1 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1 px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
               tab === t.id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
@@ -342,7 +399,7 @@ export function CanteenPage() {
                     <tr className="text-left text-gray-500 border-b">
                       <th className="px-4 py-2">Student</th>
                       <th className="px-4 py-2">Balance (KES)</th>
-                      <th className="px-4 py-2">Last Activity</th>
+                      <th className="px-4 py-2">Class</th>
                       <th className="px-4 py-2">Actions</th>
                     </tr>
                   </thead>
@@ -355,7 +412,7 @@ export function CanteenPage() {
                         <td className={`px-4 py-2 font-bold ${Number(a.balance) > 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {Number(a.balance || 0).toFixed(2)}
                         </td>
-                        <td className="px-4 py-2 text-gray-500">{a.last_activity?.split('T')[0] || '-'}</td>
+                        <td className="px-4 py-2 text-gray-500">{a.class_name || '-'}</td>
                         <td className="px-4 py-2 flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => { setSelectedAcct(a); setTopUpModal(true); }}>
                             Top Up
@@ -378,10 +435,15 @@ export function CanteenPage() {
       {tab === 'stock' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <p className="text-gray-600 text-sm">Manage canteen inventory. Amber rows are low stock.</p>
-            <Button size="sm" onClick={() => { setStockModal(true); setStockForm({ name: '', unit: '', quantity: '', reorder_level: '', unit_cost: '' }); }}>
-              <Plus className="h-4 w-4 mr-1" /> Add Item
-            </Button>
+            <p className="text-gray-600 text-sm">Kitchen inventory. Amber rows are low stock, red badges are expiring within 7 days.</p>
+            <div className="flex gap-2">
+              {categories.length === 0 && (
+                <Button size="sm" variant="outline" onClick={seedCategories}>Set up food categories</Button>
+              )}
+              <Button size="sm" onClick={() => { setEditStock(null); setStockForm({ ...EMPTY_STOCK }); setStockModal(true); }}>
+                <Plus className="h-4 w-4 mr-1" /> Add Item
+              </Button>
+            </div>
           </div>
           {loading ? <p className="text-gray-500">Loading...</p> : (
             <Card>
@@ -390,35 +452,56 @@ export function CanteenPage() {
                   <thead className="bg-gray-50">
                     <tr className="text-left text-gray-500 border-b">
                       <th className="px-4 py-2">Name</th>
-                      <th className="px-4 py-2">Unit</th>
+                      <th className="px-4 py-2">Category</th>
                       <th className="px-4 py-2">Qty</th>
-                      <th className="px-4 py-2">Reorder</th>
-                      <th className="px-4 py-2">Unit Cost</th>
+                      <th className="px-4 py-2">Batch / Expiry</th>
+                      <th className="px-4 py-2">Location</th>
                       <th className="px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stock.length === 0 ? (
                       <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No stock items.</td></tr>
-                    ) : stock.map((s: any) => {
-                      const isLow = Number(s.quantity) <= Number(s.reorder_level);
-                      return (
-                        <tr key={s.id} className={`border-b hover:bg-gray-50 ${isLow ? 'bg-amber-50' : ''}`}>
-                          <td className="px-4 py-2 font-medium flex items-center gap-1">
-                            {isLow && <AlertTriangle className="h-3 w-3 text-amber-500" />} {s.name}
-                          </td>
-                          <td className="px-4 py-2">{s.unit}</td>
-                          <td className={`px-4 py-2 font-bold ${isLow ? 'text-amber-600' : ''}`}>{s.quantity}</td>
-                          <td className="px-4 py-2">{s.reorder_level}</td>
-                          <td className="px-4 py-2">KES {Number(s.unit_cost || 0).toFixed(2)}</td>
-                          <td className="px-4 py-2">
-                            <Button size="sm" variant="outline" onClick={() => { setSelectedStock(s); setAdjustModal(true); }}>
-                              Adjust
+                    ) : stock.map((s: any) => (
+                      <tr key={s.id} className={`border-b hover:bg-gray-50 ${s.is_low_stock ? 'bg-amber-50' : ''}`}>
+                        <td className="px-4 py-2 font-medium flex items-center gap-1">
+                          {s.is_low_stock && <AlertTriangle className="h-3 w-3 text-amber-500" />} {s.item_name}
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">{s.category_name || '-'}</td>
+                        <td className={`px-4 py-2 font-bold ${s.is_low_stock ? 'text-amber-600' : ''}`}>{s.quantity} {s.unit}</td>
+                        <td className="px-4 py-2 text-xs">
+                          {s.batch_number && <div className="text-gray-500">{s.batch_number}</div>}
+                          {s.expiry_date && (
+                            <Badge label={s.expiry_date.slice(0, 10)} color={s.is_expiring_soon ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'} />
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">{s.warehouse_location || '-'}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex gap-1.5 flex-wrap">
+                            <Button size="sm" variant="outline" onClick={() => { setSelectedStock(s); setMovementForm({ quantity: '', reference: '', notes: '' }); setReceiveModal(true); }}>
+                              <Truck className="h-3 w-3" />
                             </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => { setSelectedStock(s); setMovementForm({ quantity: '', reference: '', notes: '' }); setWasteModal(true); }}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => openHistory(s)}>
+                              <History className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setEditStock(s);
+                              setStockForm({
+                                item_name: s.item_name, unit: s.unit, quantity: s.quantity, reorder_level: s.reorder_level,
+                                unit_cost: s.unit_cost, category_id: s.category_id || '', batch_number: s.batch_number || '',
+                                expiry_date: s.expiry_date ? s.expiry_date.slice(0, 10) : '', warehouse_location: s.warehouse_location || '',
+                              });
+                              setStockModal(true);
+                            }}>
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </CardContent>
@@ -430,46 +513,110 @@ export function CanteenPage() {
       {/* Reports */}
       {tab === 'reports' && (
         <div className="space-y-4">
-          <div className="flex gap-2 items-end">
-            <div>
-              <Label>Date</Label>
-              <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} />
-            </div>
-            <Button onClick={loadReport}><TrendingUp className="h-4 w-4 mr-1" /> Load Report</Button>
+          <div className="flex gap-2">
+            {(['daily', 'consumption', 'wastage'] as ReportView[]).map(v => (
+              <button key={v} onClick={() => { setReportView(v); }}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize ${reportView === v ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                {v}
+              </button>
+            ))}
           </div>
-          {loading ? <p className="text-gray-500">Loading...</p> : report ? (
+
+          {reportView === 'daily' && (
+            <div className="flex gap-2 items-end">
+              <div>
+                <Label>Date</Label>
+                <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} />
+              </div>
+              <Button onClick={loadReport}><TrendingUp className="h-4 w-4 mr-1" /> Load Report</Button>
+            </div>
+          )}
+          {reportView !== 'daily' && (
+            <Button onClick={loadReport}><TrendingUp className="h-4 w-4 mr-1" /> Load Report</Button>
+          )}
+
+          {loading ? <p className="text-gray-500">Loading...</p> : reportView === 'daily' && report ? (
             <div className="space-y-4">
-              <Card>
-                <CardHeader><CardTitle>Total Revenue — {reportDate}</CardTitle></CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold text-green-600">KES {Number(report.total_revenue || 0).toFixed(2)}</p>
-                  <p className="text-sm text-gray-500 mt-1">{report.total_transactions || 0} transactions</p>
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card><CardHeader><CardTitle className="text-sm">Total Sales — {reportDate}</CardTitle></CardHeader>
+                  <CardContent><p className="text-2xl font-bold text-green-600">KES {Number(report.totals?.total_sales || 0).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500 mt-1">{report.totals?.total_transactions || 0} transactions</p></CardContent></Card>
+                <Card><CardHeader><CardTitle className="text-sm">Cost per Meal</CardTitle></CardHeader>
+                  <CardContent><p className="text-2xl font-bold text-blue-600">{report.totals?.cost_per_meal != null ? `KES ${report.totals.cost_per_meal}` : '—'}</p>
+                    <p className="text-xs text-gray-500 mt-1">{report.totals?.meals_served || 0} meals served</p></CardContent></Card>
+                <Card><CardHeader><CardTitle className="text-sm">Cost per Student</CardTitle></CardHeader>
+                  <CardContent><p className="text-2xl font-bold text-purple-600">{report.totals?.cost_per_student != null ? `KES ${report.totals.cost_per_student}` : '—'}</p>
+                    <p className="text-xs text-gray-500 mt-1">{report.totals?.distinct_students || 0} students</p></CardContent></Card>
+              </div>
               <Card>
                 <CardHeader><CardTitle>Meal Type Breakdown</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  {(report.breakdown || []).map((b: any) => (
-                    <div key={b.meal_type} className="flex items-center gap-3">
-                      <span className="w-20 text-sm capitalize text-gray-600">{b.meal_type}</span>
+                  {(report.by_meal_type || []).map((b: any) => (
+                    <div key={b.meal_type || 'unknown'} className="flex items-center gap-3">
+                      <span className="w-20 text-sm capitalize text-gray-600">{b.meal_type || 'Other'}</span>
                       <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
                         <div
                           className="h-4 bg-green-500 rounded-full"
-                          style={{ width: `${Math.min(100, (b.revenue / (report.total_revenue || 1)) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (Number(b.total_amount) / (Number(report.totals?.total_sales) || 1)) * 100)}%` }}
                         />
                       </div>
-                      <span className="text-sm font-medium">KES {Number(b.revenue || 0).toFixed(2)}</span>
-                      <span className="text-xs text-gray-400">{b.count} sales</span>
+                      <span className="text-sm font-medium">KES {Number(b.total_amount || 0).toFixed(2)}</span>
+                      <span className="text-xs text-gray-400">{b.transaction_count} sales</span>
                     </div>
                   ))}
-                  {(!report.breakdown || report.breakdown.length === 0) && (
+                  {(!report.by_meal_type || report.by_meal_type.length === 0) && (
                     <p className="text-gray-400 text-sm">No sales data for this date.</p>
                   )}
                 </CardContent>
               </Card>
             </div>
+          ) : reportView === 'consumption' && consumption ? (
+            <Card><CardContent className="p-0">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50"><tr className="text-left text-gray-500 border-b">
+                  <th className="px-4 py-2">Item</th><th className="px-4 py-2">Type</th><th className="px-4 py-2">Quantity</th><th className="px-4 py-2">Value</th>
+                </tr></thead>
+                <tbody>
+                  {(consumption.movements || []).length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No stock movements in this period.</td></tr>
+                  ) : consumption.movements.map((m: any, i: number) => (
+                    <tr key={i} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{m.item_name}</td>
+                      <td className="px-4 py-2 capitalize">{m.type}</td>
+                      <td className="px-4 py-2">{m.total_quantity} {m.unit}</td>
+                      <td className="px-4 py-2">KES {Number(m.total_value || 0).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent></Card>
+          ) : reportView === 'wastage' && wastage ? (
+            <div className="space-y-4">
+              <Card><CardContent className="pt-6">
+                <p className="text-sm text-gray-500">Total Value Lost to Wastage</p>
+                <p className="text-3xl font-bold text-red-600">KES {Number(wastage.grand_total_lost || 0).toFixed(2)}</p>
+              </CardContent></Card>
+              <Card><CardContent className="p-0">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50"><tr className="text-left text-gray-500 border-b">
+                    <th className="px-4 py-2">Item</th><th className="px-4 py-2">Wasted</th><th className="px-4 py-2">Value Lost</th>
+                  </tr></thead>
+                  <tbody>
+                    {(wastage.items || []).length === 0 ? (
+                      <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">No wastage recorded in this period.</td></tr>
+                    ) : wastage.items.map((w: any, i: number) => (
+                      <tr key={i} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium">{w.item_name}</td>
+                        <td className="px-4 py-2">{w.total_wasted} {w.unit}</td>
+                        <td className="px-4 py-2 text-red-600">KES {Number(w.total_value_lost || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent></Card>
+            </div>
           ) : (
-            <p className="text-gray-400">Select a date and click Load Report.</p>
+            <p className="text-gray-400">Click Load Report.</p>
           )}
         </div>
       )}
@@ -550,48 +697,115 @@ export function CanteenPage() {
         </div>
       )}
 
-      {/* Add Stock Modal */}
+      {/* Add/Edit Stock Modal */}
       {stockModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold">Add Stock Item</h2>
+              <h2 className="text-lg font-bold">{editStock ? 'Edit Stock Item' : 'Add Stock Item'}</h2>
               <button onClick={() => setStockModal(false)}><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-3">
-              <div><Label>Name</Label><Input value={stockForm.name} onChange={e => setStockForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div><Label>Name</Label><Input value={stockForm.item_name} onChange={e => setStockForm(f => ({ ...f, item_name: e.target.value }))} /></div>
+              <div>
+                <Label>Category</Label>
+                <select className="w-full border rounded px-3 py-2 text-sm mt-1" value={stockForm.category_id} onChange={e => setStockForm(f => ({ ...f, category_id: e.target.value }))}>
+                  <option value="">Uncategorized</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
               <div><Label>Unit</Label><Input placeholder="kg, litres, pieces..." value={stockForm.unit} onChange={e => setStockForm(f => ({ ...f, unit: e.target.value }))} /></div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Quantity</Label><Input type="number" value={stockForm.quantity} onChange={e => setStockForm(f => ({ ...f, quantity: e.target.value }))} /></div>
                 <div><Label>Reorder Level</Label><Input type="number" value={stockForm.reorder_level} onChange={e => setStockForm(f => ({ ...f, reorder_level: e.target.value }))} /></div>
               </div>
               <div><Label>Unit Cost (KES)</Label><Input type="number" value={stockForm.unit_cost} onChange={e => setStockForm(f => ({ ...f, unit_cost: e.target.value }))} /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label>Batch Number</Label><Input value={stockForm.batch_number} onChange={e => setStockForm(f => ({ ...f, batch_number: e.target.value }))} /></div>
+                <div><Label>Expiry Date</Label><Input type="date" value={stockForm.expiry_date} onChange={e => setStockForm(f => ({ ...f, expiry_date: e.target.value }))} /></div>
+              </div>
+              <div><Label>Warehouse Location</Label><Input value={stockForm.warehouse_location} onChange={e => setStockForm(f => ({ ...f, warehouse_location: e.target.value }))} /></div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setStockModal(false)}>Cancel</Button>
-              <Button onClick={doAddStock}>Save</Button>
+              <Button onClick={doSaveStock}>Save</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Adjust Stock Modal */}
-      {adjustModal && selectedStock && (
+      {/* Receive Delivery Modal */}
+      {receiveModal && selectedStock && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold">Adjust Stock — {selectedStock.name}</h2>
-              <button onClick={() => setAdjustModal(false)}><X className="h-5 w-5" /></button>
+              <h2 className="text-lg font-bold">Receive Delivery — {selectedStock.item_name}</h2>
+              <button onClick={() => setReceiveModal(false)}><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-3">
-              <p className="text-sm text-gray-500">Current qty: <strong>{selectedStock.quantity}</strong> {selectedStock.unit}</p>
-              <div><Label>Adjustment Quantity (+ to add, - to deduct)</Label><Input type="number" value={adjustForm.quantity} onChange={e => setAdjustForm(f => ({ ...f, quantity: e.target.value }))} /></div>
-              <div><Label>Notes</Label><Input value={adjustForm.notes} onChange={e => setAdjustForm(f => ({ ...f, notes: e.target.value }))} /></div>
+              <p className="text-sm text-gray-500">Current: <strong>{selectedStock.quantity}</strong> {selectedStock.unit}</p>
+              <div><Label>Quantity Received</Label><Input type="number" value={movementForm.quantity} onChange={e => setMovementForm(f => ({ ...f, quantity: e.target.value }))} /></div>
+              <div><Label>Reference (supplier / delivery note)</Label><Input value={movementForm.reference} onChange={e => setMovementForm(f => ({ ...f, reference: e.target.value }))} /></div>
+              <div><Label>Notes</Label><Input value={movementForm.notes} onChange={e => setMovementForm(f => ({ ...f, notes: e.target.value }))} /></div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setAdjustModal(false)}>Cancel</Button>
-              <Button onClick={doAdjustStock}>Save Adjustment</Button>
+              <Button variant="outline" onClick={() => setReceiveModal(false)}>Cancel</Button>
+              <Button onClick={doReceive} disabled={!movementForm.quantity}>Record Delivery</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waste Modal */}
+      {wasteModal && selectedStock && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold">Record Wastage — {selectedStock.item_name}</h2>
+              <button onClick={() => setWasteModal(false)}><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">Current: <strong>{selectedStock.quantity}</strong> {selectedStock.unit}</p>
+              <div><Label>Quantity Wasted</Label><Input type="number" value={movementForm.quantity} onChange={e => setMovementForm(f => ({ ...f, quantity: e.target.value }))} /></div>
+              <div><Label>Reason</Label><Input value={movementForm.notes} onChange={e => setMovementForm(f => ({ ...f, notes: e.target.value }))} /></div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setWasteModal(false)}>Cancel</Button>
+              <Button onClick={doWaste} disabled={!movementForm.quantity} className="bg-red-600 hover:bg-red-700">Record Wastage</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Movement History Modal */}
+      {historyModal && selectedStock && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold">Movement History — {selectedStock.item_name}</h2>
+              <button onClick={() => setHistoryModal(false)}><X className="h-5 w-5" /></button>
+            </div>
+            {movements.length === 0 ? (
+              <p className="text-gray-400 text-sm">No movements recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {movements.map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between text-sm border-b pb-2">
+                    <div>
+                      <Badge label={m.type} color={
+                        m.type === 'received' ? 'bg-green-100 text-green-700' :
+                        m.type === 'wasted' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                      } />
+                      <span className="text-gray-500 ml-2">{m.created_at?.slice(0, 10)} · {m.created_by_name || 'System'}</span>
+                      {m.notes && <div className="text-xs text-gray-400 mt-0.5">{m.notes}</div>}
+                    </div>
+                    <span className={`font-bold ${Number(m.quantity) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {Number(m.quantity) >= 0 ? '+' : ''}{m.quantity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

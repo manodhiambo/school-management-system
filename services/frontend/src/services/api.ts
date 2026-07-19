@@ -1710,8 +1710,31 @@ class ApiService {
   canteenPurchase(data: any) { return this.api.post('/canteen/accounts/purchase', data); }
   getCanteenStock() { return this.api.get('/canteen/stock'); }
   addCanteenStock(data: any) { return this.api.post('/canteen/stock', data); }
+  updateCanteenStock(id: string, data: any) { return this.api.put('/canteen/stock/' + id, data); }
   adjustCanteenStock(id: string, data: any) { return this.api.post('/canteen/stock/' + id + '/adjust', data); }
+  receiveCanteenStock(id: string, data: any) { return this.api.post('/canteen/stock/' + id + '/receive', data); }
+  wasteCanteenStock(id: string, data: any) { return this.api.post('/canteen/stock/' + id + '/waste', data); }
+  getCanteenStockMovements(id: string) { return this.api.get('/canteen/stock/' + id + '/movements'); }
+  seedFoodCategories() { return this.api.post('/canteen/seed-food-categories', {}); }
   getCanteenDailyReport(date?: string) { return this.api.get('/canteen/reports/daily', { params: { date } }); }
+  getCanteenConsumptionReport(params?: any) { return this.api.get('/canteen/reports/consumption', { params }); }
+  getCanteenWastageReport(params?: any) { return this.api.get('/canteen/reports/wastage', { params }); }
+
+  // ── Menu Planning ────────────────────────────────────────────────────────
+  getCanteenMenus(params?: any) { return this.api.get('/canteen/menus', { params }); }
+  createCanteenMenu(data: any) { return this.api.post('/canteen/menus', data); }
+  updateCanteenMenu(id: string, data: any) { return this.api.put('/canteen/menus/' + id, data); }
+  deleteCanteenMenu(id: string) { return this.api.delete('/canteen/menus/' + id); }
+
+  // ── Meal Attendance & Diet ───────────────────────────────────────────────
+  getMealAttendance(params?: any) { return this.api.get('/canteen/attendance', { params }); }
+  markMealAttendance(data: any) { return this.api.post('/canteen/attendance', data); }
+  getDietInfo(studentId: string) { return this.api.get('/canteen/diet-info/' + studentId); }
+  getDietAlerts() { return this.api.get('/canteen/diet-alerts'); }
+
+  // ── Kitchen Requisitions (procurement pipeline, department='Kitchen') ────
+  getKitchenRequisitions() { return this.api.get('/canteen/requisitions'); }
+  createKitchenRequisition(data: any) { return this.api.post('/canteen/requisitions', data); }
 
   // ── Bursary ───────────────────────────────────────────────────────────────
   getBursaryFunders() { return this.api.get('/bursary/funders'); }

@@ -53,6 +53,7 @@ import {
   ClipboardCheck,
   FileSearch,
   Shirt,
+  Utensils,
 } from 'lucide-react';
 
 type NavItem = {
@@ -188,6 +189,9 @@ const navigationItems: NavItem[] = [
   { name: 'Hostel Inventory',   href: '/app/hostel-inventory',   icon: Boxes,         roles: ['admin'],                              section: 'Welfare', module: 'inventory' },
   { name: 'Canteen',            href: '/app/canteen',            icon: Star,          roles: ['admin', 'finance_officer'],           section: 'Welfare', module: 'canteen' },
   { name: 'Canteen Balance',    href: '/app/canteen',            icon: DollarSign,    roles: ['student'],                            section: 'Welfare', module: 'canteen' },
+  { name: 'Menu Planning',      href: '/app/canteen-menu-planning', icon: CalendarDays, roles: ['admin'],                            section: 'Welfare', module: 'canteen' },
+  { name: 'Meal Attendance',    href: '/app/canteen-attendance', icon: Utensils,      roles: ['admin'],                              section: 'Welfare', module: 'canteen' },
+  { name: 'Kitchen Requisitions', href: '/app/canteen-requisitions', icon: ClipboardList, roles: ['admin'],                          section: 'Welfare', module: 'canteen' },
 
   // ── HR & Staff Extended ───────────────────────────────────────────────────
   { name: 'Payroll',            href: '/app/payroll',            icon: Wallet,        roles: ['admin', 'finance_officer'],           section: 'Finance', module: 'staff' },

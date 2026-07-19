@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Search, Printer, Share2, Download, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { Search, Printer, Share2, Download, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '@/services/api';
 import jsPDF from 'jspdf';
 

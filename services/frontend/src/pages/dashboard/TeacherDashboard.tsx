@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users, BookOpen, Calendar, Clock, FileText, CheckCircle,
-  GraduationCap, Bell, ArrowRight, Activity
+  GraduationCap, Bell, ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
@@ -18,7 +18,6 @@ export function TeacherDashboard() {
   const { t, language } = useLanguageStore();
   const [stats, setStats] = useState<any>({});
   const [classes, setClasses] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
   const [timetable, setTimetable] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +37,6 @@ export function TeacherDashboard() {
       ]);
 
       setClasses(classesRes?.data || classesRes?.classes || []);
-      setAssignments(assignmentsRes?.data || []);
       setTimetable(timetableRes?.data || []);
 
       // Calculate stats

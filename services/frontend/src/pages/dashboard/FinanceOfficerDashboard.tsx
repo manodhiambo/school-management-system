@@ -5,7 +5,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, CreditCard, Receipt,
   Building2, AlertTriangle, CheckCircle, Clock, Wallet,
   ArrowUpRight, ArrowDownRight, FileText, BarChart2, Calendar,
-  Activity, Users, AlertCircle,
+  Activity,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';

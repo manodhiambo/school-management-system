@@ -7,9 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
-import {
-  ClipboardList, Star, Plus, RefreshCw, Search, CheckCircle,
-  Trash2, ChevronRight, Award
+import { Plus, RefreshCw, Search, CheckCircle,
+  Trash2, Award
 } from 'lucide-react';
 
 type Tab = 'templates' | 'appraisals' | 'history';

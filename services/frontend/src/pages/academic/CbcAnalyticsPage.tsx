@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer
+  LineChart, Line, ResponsiveContainer
 } from 'recharts';
 import api from '@/services/api';
 import { getCBEGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbeGrades';
@@ -30,7 +30,6 @@ export function CbcAnalyticsPage() {
   // Student view
   const [studentSearch, setStudentSearch] = useState('');
   const [students, setStudents] = useState<any[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentAnalytics, setStudentAnalytics] = useState<any>(null);
 
   // Subject view
@@ -311,7 +310,7 @@ export function CbcAnalyticsPage() {
                           value: parseInt(l.student_count)
                         }))}
                         cx="50%" cy="50%" outerRadius={80}
-                        dataKey="value" label={({ name, value }) => `${value}`}
+                        dataKey="value" label={({ value }) => `${value}`}
                       >
                         {overview.students_by_level.map((_: any, i: number) => (
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -440,7 +439,7 @@ export function CbcAnalyticsPage() {
                   {filteredStudents.slice(0, 10).map(s => (
                     <button
                       key={s.id}
-                      onClick={() => { setSelectedStudentId(s.id); setStudentSearch(''); loadStudentAnalytics(s.id); }}
+                      onClick={() => { setStudentSearch(''); loadStudentAnalytics(s.id); }}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors"
                     >
                       {s.first_name} {s.last_name} <span className="text-gray-400">({s.admission_number})</span>
@@ -602,7 +601,7 @@ export function CbcAnalyticsPage() {
                   <Card>
                     <CardHeader><CardTitle className="text-red-700">Need Support</CardTitle></CardHeader>
                     <CardContent>
-                      {subjectAnalytics.bottom_students.map((s: any, i: number) => (
+                      {subjectAnalytics.bottom_students.map((s: any) => (
                         <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0 text-sm">
                           <span className="font-medium">{s.first_name} {s.last_name}</span>
                           <span className="text-red-600 font-semibold">{s.avg_percentage}%</span>

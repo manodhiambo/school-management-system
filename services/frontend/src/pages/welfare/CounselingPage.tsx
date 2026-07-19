@@ -7,9 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
-import {
-  Heart, AlertTriangle, Users, Search, Plus, RefreshCw,
-  CheckCircle, Clock, Shield, Filter
+import { Search, Plus, RefreshCw,
+  CheckCircle, Shield
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'sessions' | 'interventions' | 'student';

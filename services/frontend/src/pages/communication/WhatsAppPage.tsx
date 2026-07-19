@@ -38,7 +38,6 @@ export function WhatsAppPage() {
   const [success, setSuccess] = useState('');
 
   // Config
-  const [config, setConfig] = useState<any>(null);
   const [configForm, setConfigForm] = useState({ phone_number_id: '', access_token: '', is_enabled: false });
   const [showToken, setShowToken] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
@@ -93,16 +92,15 @@ export function WhatsAppPage() {
     try {
       const res: any = await (api as any).getWhatsAppConfig();
       const d = res?.data || {};
-      setConfig(d);
       setConfigForm({ phone_number_id: d.phone_number_id || '', access_token: d.access_token || '', is_enabled: d.is_enabled || false });
-    } catch {}
+    } catch { /* config not set up yet */ }
   };
 
   const loadClasses = async () => {
     try {
       const res: any = await (api as any).getClasses?.();
       setClasses(res?.data || []);
-    } catch {}
+    } catch { /* classes optional — leave list empty */ }
   };
 
   const loadLog = async () => {
@@ -110,7 +108,7 @@ export function WhatsAppPage() {
     try {
       const res: any = await (api as any).getWhatsAppLog();
       setLog(res?.data || []);
-    } catch {}
+    } catch { /* log optional — leave list empty */ }
     setLogLoading(false);
   };
 

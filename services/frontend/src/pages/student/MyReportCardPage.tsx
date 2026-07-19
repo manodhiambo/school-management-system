@@ -69,7 +69,7 @@ export function MyReportCardPage() {
     try {
       const res: any = await api.getSettings();
       setSettings(res?.data || res);
-    } catch {}
+    } catch { /* settings optional — leave defaults */ }
   };
 
   const openCard = async (card: any) => {

@@ -78,11 +78,11 @@ export const PurchaseRequisitions: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[['Draft', 'draft', 'gray'], ['Pending', 'pending_approval', 'yellow'], ['Approved', 'approved', 'green'], ['Rejected', 'rejected', 'red']].map(([label, s, color]) => (
-          <button key={s} onClick={() => setStatusFilter(statusFilter === s ? '' : s as string)}
+        {[['Draft', 'draft'], ['Pending', 'pending_approval'], ['Approved', 'approved'], ['Rejected', 'rejected']].map(([label, s]) => (
+          <button key={s} onClick={() => setStatusFilter(statusFilter === s ? '' : s)}
             className={`p-4 rounded-lg border text-left transition ${statusFilter === s ? 'ring-2 ring-blue-500' : 'hover:border-blue-300'} bg-white`}>
             <div className="text-xs text-gray-500">{label}</div>
-            <div className="text-xl font-bold text-gray-900">{list.filter(r => r.status === s).length}</div>
+            <div className={`inline-block mt-1 px-2 py-0.5 rounded text-xl font-bold ${statusColor(s)}`}>{list.filter(r => r.status === s).length}</div>
           </button>
         ))}
       </div>

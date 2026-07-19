@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
-import { useAuthStore } from '@/store/authStore';
 import {
   MessageSquare, Hash, BookOpen, Info, Plus, X,
   AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Clock
@@ -18,7 +17,6 @@ const HANDLERS = [
 ];
 
 export function SmsKeywordsPage() {
-  const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -50,7 +48,7 @@ export function SmsKeywordsPage() {
     try {
       const res: any = await (api as any).getInboundSmsLog();
       setInboundLog(res?.data || []);
-    } catch {}
+    } catch { /* log optional — leave list empty */ }
     setLogLoading(false);
   };
 

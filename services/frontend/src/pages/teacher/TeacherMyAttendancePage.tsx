@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle2, LogIn, LogOut, MapPin, Clock, AlertTriangle,
-  Calendar, TrendingUp, History,
+  Calendar, History,
 } from 'lucide-react';
 import api from '@/services/api';
 

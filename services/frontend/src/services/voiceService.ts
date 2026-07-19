@@ -76,7 +76,7 @@ class VoiceService {
     if (!utter) return;
     try {
       window.speechSynthesis.speak(utter);
-    } catch {}
+    } catch { /* speech synthesis unavailable — non-critical */ }
   }
 
   preview(text: string, volume = 1): void {
@@ -86,7 +86,7 @@ class VoiceService {
     try {
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utter);
-    } catch {}
+    } catch { /* speech synthesis unavailable — non-critical */ }
   }
 }
 

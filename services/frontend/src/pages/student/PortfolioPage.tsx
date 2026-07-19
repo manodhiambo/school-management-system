@@ -38,7 +38,6 @@ export function PortfolioPage() {
   const { user } = useAuthStore();
   const isStudent = user?.role === 'student';
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'superadmin';
-  const isParent = user?.role === 'parent';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -74,7 +73,7 @@ export function PortfolioPage() {
     try {
       const res: any = await (api as any).getStudents?.();
       setStudents(res?.data || []);
-    } catch {}
+    } catch { /* students optional — leave list empty */ }
   };
 
   const loadPortfolio = async (studentId: string) => {

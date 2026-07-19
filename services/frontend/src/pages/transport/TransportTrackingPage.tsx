@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import api from '@/services/api';
 import {
-  Bus, CheckCircle2, XCircle, AlertTriangle, Clock, RefreshCw,
+  Bus, CheckCircle2, XCircle, Clock, RefreshCw,
   MapPin, Navigation, User, Phone, Users
 } from 'lucide-react';
 

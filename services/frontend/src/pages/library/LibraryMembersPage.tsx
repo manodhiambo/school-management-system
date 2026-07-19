@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Users, UserPlus, Edit, Trash2, Search, Ban, CheckCircle } from 'lucide-react';
+import { Users, UserPlus, Edit, Trash2, Search, CheckCircle } from 'lucide-react';
 import libraryAPI from '@/services/library-api';
 
 export function LibraryMembersPage() {

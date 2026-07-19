@@ -34,7 +34,7 @@ export function MyAttendancePage() {
           if (students.length > 0) {
             studentId = students[0].id;
           }
-        } catch (e) {
+        } catch {
           console.log('Could not fetch student by userId, using user.id');
         }
       }

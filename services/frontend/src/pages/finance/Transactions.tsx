@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Filter, Download, Check, X, Eye, XCircle, Search, Trash2, Printer, FileText, FileSpreadsheet } from 'lucide-react';
+import { Plus, Download, Check, X, Eye, XCircle, Search, Trash2, Printer, FileText, FileSpreadsheet } from 'lucide-react';
 import financeService, { IncomeRecord, ExpenseRecord } from '@/services/financeService';
 import api from '@/services/api';
 import jsPDF from 'jspdf';
@@ -28,7 +28,7 @@ type TransactionType = 'income' | 'expense';
 export default function Transactions() {
   const { user } = useAuthStore();
   const isFinanceOfficer = user?.role === 'finance_officer';
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TransactionType>(
     (searchParams.get('type') as TransactionType) || 'income'
   );
@@ -157,7 +157,7 @@ export default function Transactions() {
       schoolName = settings.school_name || 'School';
       schoolAddress = [settings.address, settings.city].filter(Boolean).join(', ');
       schoolPhone = settings.phone || '';
-    } catch (_) { /* use defaults */ }
+    } catch { /* use defaults */ }
 
     const doc = new jsPDF({ unit: 'mm', format: 'a5' });
     const pageW = doc.internal.pageSize.getWidth();
@@ -273,7 +273,7 @@ export default function Transactions() {
     try {
       const amount = parseFloat(formData.amount);
       let vat_amount = 0;
-      let final_amount = amount;
+      const final_amount = amount;
       
       if (formData.include_vat) {
         vat_amount = financeService.calculateVAT(amount);
@@ -494,7 +494,7 @@ export default function Transactions() {
     try {
       const s: any = await api.getSettings();
       schoolName = (s?.data || s)?.school_name || 'School';
-    } catch (_) {}
+    } catch { /* fall back to default school name */ }
 
     const isIncome = activeTab === 'income';
     const doc = new jsPDF({ orientation: 'landscape' });
@@ -549,6 +549,7 @@ export default function Transactions() {
 
   return (
     <>
+      {/* eslint-disable no-useless-escape -- CSS class-name escapes (e.g. `print\:hidden`) inside this stylesheet string, not JS */}
       <style>
         {`
           @media print {
@@ -575,6 +576,7 @@ export default function Transactions() {
           }
         `}
       </style>
+      {/* eslint-enable no-useless-escape */}
       <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">

@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  BookOpen, GraduationCap, FileText, Calendar, Plus, CheckCircle,
+  BookOpen, FileText, Calendar, Plus, CheckCircle,
   ClipboardList, Users, Award, Edit2, Trash2, X, Save, Eye,
-  BarChart2, Settings, Lock, Unlock, RefreshCw, AlertCircle,
-  ChevronDown, ChevronRight, Download, Globe, Layers, Star,
+  BarChart2, Settings, Lock, RefreshCw, AlertCircle,
+  ChevronDown, ChevronRight, Globe, Star,
 } from 'lucide-react';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
@@ -117,7 +117,6 @@ export function IgcsePage() {
   const [syllabi, setSyllabi] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<any[]>([]);
 
   // Mark Entry
   const [markSyllabusId, setMarkSyllabusId] = useState('');
@@ -154,6 +153,7 @@ export function IgcsePage() {
   const [componentForm, setComponentForm] = useState({ name: '', component_code: '', type: 'written', tier: 'both', weight: '', max_marks: '', duration_minutes: '', sort_order: '0' });
   const [enrollForm, setEnrollForm] = useState({ student_id: '', syllabus_id: '', exam_session_id: '', tier: 'extended', candidate_number: '', centre_number: '' });
   const [bulkEnrollForm, setBulkEnrollForm] = useState({ syllabus_id: '', exam_session_id: '', tier: 'extended', class_id: '' });
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
   const [boundaryRows, setBoundaryRows] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
 
@@ -209,13 +209,6 @@ export function IgcsePage() {
     try {
       const r: any = await (api as any).api.get('/students?limit=500');
       setStudents(r.data?.students || r.data || []);
-    } catch { /* ignore */ }
-  }, []);
-
-  const loadTeachers = useCallback(async () => {
-    try {
-      const r: any = await (api as any).api.get('/teachers');
-      setTeachers(r.data || []);
     } catch { /* ignore */ }
   }, []);
 
@@ -417,6 +410,24 @@ export function IgcsePage() {
     try {
       await (api as any).api.delete(`/igcse/enrollments/${id}`);
       flash('Enrollment removed'); loadEnrollments();
+    } catch (e: any) { flash(e.response?.data?.error || 'Error', 'error'); }
+  };
+
+  const toggleBulkStudent = (id: string) => {
+    setBulkSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const saveBulkEnroll = async () => {
+    if (!bulkEnrollForm.class_id || !bulkEnrollForm.syllabus_id || !bulkEnrollForm.exam_session_id || !bulkSelectedIds.length) {
+      return flash('Class, syllabus, session, and at least one student required', 'error');
+    }
+    try {
+      const r: any = await (api as any).api.post('/igcse/enrollments/bulk', { ...bulkEnrollForm, student_ids: bulkSelectedIds });
+      flash(`Enrolled ${r.data?.enrolled ?? bulkSelectedIds.length} student(s)`);
+      setShowBulkEnroll(false);
+      setBulkEnrollForm({ syllabus_id: '', exam_session_id: '', tier: 'extended', class_id: '' });
+      setBulkSelectedIds([]);
+      loadEnrollments();
     } catch (e: any) { flash(e.response?.data?.error || 'Error', 'error'); }
   };
 
@@ -1088,6 +1099,58 @@ export function IgcsePage() {
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={() => setShowEnroll(false)}>Cancel</Button>
                   <Button onClick={saveEnrollment}>Enroll</Button>
+                </div>
+              </div>
+            </Modal>
+          )}
+
+          {/* Bulk Enroll Modal */}
+          {showBulkEnroll && (
+            <Modal title="Bulk Enroll Students" onClose={() => { setShowBulkEnroll(false); setBulkSelectedIds([]); }}>
+              <div className="space-y-4">
+                <Field label="Class">
+                  <Select value={bulkEnrollForm.class_id} onChange={(e: any) => { setBulkEnrollForm(f => ({...f, class_id: e.target.value})); setBulkSelectedIds([]); }}>
+                    <option value="">Select class…</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Syllabus">
+                  <Select value={bulkEnrollForm.syllabus_id} onChange={(e: any) => setBulkEnrollForm(f => ({...f, syllabus_id: e.target.value}))}>
+                    <option value="">Select syllabus…</option>
+                    {syllabi.map(sy => <option key={sy.id} value={sy.id}>{sy.subject_name} ({sy.syllabus_code}) {sy.version}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Exam Session">
+                  <Select value={bulkEnrollForm.exam_session_id} onChange={(e: any) => setBulkEnrollForm(f => ({...f, exam_session_id: e.target.value}))}>
+                    <option value="">Select session…</option>
+                    {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Tier">
+                  <Select value={bulkEnrollForm.tier} onChange={(e: any) => setBulkEnrollForm(f => ({...f, tier: e.target.value}))}>
+                    <option value="extended">Extended</option>
+                    <option value="core">Core</option>
+                  </Select>
+                </Field>
+                <Field label={`Students in class${bulkSelectedIds.length ? ` (${bulkSelectedIds.length} selected)` : ''}`}>
+                  <div className="max-h-48 overflow-y-auto border rounded-lg divide-y">
+                    {!bulkEnrollForm.class_id ? (
+                      <p className="text-sm text-gray-400 p-3">Select a class first.</p>
+                    ) : students.filter(s => String(s.class_id) === String(bulkEnrollForm.class_id)).length === 0 ? (
+                      <p className="text-sm text-gray-400 p-3">No students in this class.</p>
+                    ) : students.filter(s => String(s.class_id) === String(bulkEnrollForm.class_id)).map(s => (
+                      <label key={s.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                        <input type="checkbox" checked={bulkSelectedIds.includes(s.id)} onChange={() => toggleBulkStudent(s.id)} />
+                        {s.first_name} {s.last_name} ({s.admission_number})
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => { setShowBulkEnroll(false); setBulkSelectedIds([]); }}>Cancel</Button>
+                  <Button onClick={saveBulkEnroll} disabled={!bulkSelectedIds.length}>
+                    Enroll {bulkSelectedIds.length || ''} Student{bulkSelectedIds.length === 1 ? '' : 's'}
+                  </Button>
                 </div>
               </div>
             </Modal>

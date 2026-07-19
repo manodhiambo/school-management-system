@@ -9,7 +9,7 @@ import api from '@/services/api';
 import { useSEO } from '@/hooks/useSEO';
 import {
   GraduationCap, Eye, EyeOff, ArrowLeft, CheckCircle,
-  BookOpen, Users, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound,
+  BookOpen, UserCheck, Shield, Wallet, Bus, ShieldCheck, KeyRound,
 } from 'lucide-react';
 
 type View = 'role' | 'login' | '2fa' | 'forgot' | 'forgot-success';

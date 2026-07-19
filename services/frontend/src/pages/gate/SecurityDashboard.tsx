@@ -6,9 +6,8 @@ import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import {
-  Shield, Users, UserCheck, UserX, Clock, CheckCircle2, XCircle,
-  Search, Plus, LogOut, RefreshCw, Eye, AlertTriangle, Ban,
-  Phone, Building2, Car, KeyRound, UserCircle2
+  Shield, Users, UserCheck, Clock, CheckCircle2, XCircle,
+  Search, Plus, LogOut, RefreshCw, Eye, AlertTriangle, Ban, UserCircle2
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'checkin' | 'register' | 'pickup' | 'live' | 'history';
@@ -30,7 +29,6 @@ export function SecurityDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [recentVisits, setRecentVisits] = useState<any[]>([]);
   const [recentPickups, setRecentPickups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -70,14 +68,12 @@ export function SecurityDashboard() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const loadDashboard = useCallback(async () => {
-    setLoading(true);
     try {
       const res: any = await (api as any).getGateDashboard();
       setStats(res.data?.stats);
       setRecentVisits(res.data?.recent_visits || []);
       setRecentPickups(res.data?.recent_pickups || []);
     } catch { /* silent */ }
-    setLoading(false);
   }, []);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);

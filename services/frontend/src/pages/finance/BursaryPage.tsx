@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
-import { useAuthStore } from '@/store/authStore';
 import {
   GraduationCap, Users, FileText, BarChart2,
   Plus, X, AlertTriangle, CheckCircle, XCircle,
@@ -37,7 +36,6 @@ function StatusBadge({ status }: { status: AppStatus }) {
 }
 
 export function BursaryPage() {
-  const { user } = useAuthStore();
   const [tab, setTab] = useState<Tab>('funders');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

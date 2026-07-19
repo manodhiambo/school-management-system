@@ -4,7 +4,7 @@ import { TrendingUp, Award, BookOpen, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import api from '@/services/api';
 import { getCBEGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbeGrades';

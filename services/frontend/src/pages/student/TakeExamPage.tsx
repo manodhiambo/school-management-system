@@ -101,7 +101,7 @@ export function TakeExamPage() {
     }, 500);
   }, [examId]);
 
-  const handleSubmit = async (auto = false) => {
+  const handleSubmit = async (_auto = false) => {
     if (submitting) return;
     setShowConfirm(false);
     setSubmitting(true);

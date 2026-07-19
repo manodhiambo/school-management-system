@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
 import {
-  Shield, Users, UserCheck, Ban, Clock, CheckCircle2, XCircle,
-  Search, Plus, RefreshCw, AlertTriangle, UserCircle2, Trash2,
-  BarChart3, FileText, Edit2
+  Shield, Users, UserCheck, Ban, Clock, CheckCircle2, XCircle, Plus, RefreshCw, AlertTriangle, UserCircle2, Trash2,
+  BarChart3, FileText
 } from 'lucide-react';
 
 type Tab = 'overview' | 'visits' | 'pickups' | 'authorized' | 'blacklist' | 'reports';
@@ -140,7 +139,7 @@ export function GateManagerPage() {
       }
       setMsg('Added to blacklist');
       setBlForm({ full_name: '', national_id: '', phone: '', reason: '', student_id: '', visitor_id: '' });
-      blacklistTab === 'visitors' ? loadVisitorBL() : loadGuardianBL();
+      if (blacklistTab === 'visitors') loadVisitorBL(); else loadGuardianBL();
     } catch (e: any) { setErr(e?.response?.data?.message || 'Failed'); }
     setBlLoading(false);
   };
@@ -151,7 +150,7 @@ export function GateManagerPage() {
       if (blacklistTab === 'visitors') await (api as any).removeVisitorBlacklist(id);
       else await (api as any).removeGuardianBlacklist(id);
       setMsg('Removed from blacklist');
-      blacklistTab === 'visitors' ? loadVisitorBL() : loadGuardianBL();
+      if (blacklistTab === 'visitors') loadVisitorBL(); else loadGuardianBL();
     } catch (e: any) { setErr(e?.response?.data?.message || 'Failed'); }
   };
 

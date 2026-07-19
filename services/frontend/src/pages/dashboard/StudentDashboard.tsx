@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  BookOpen, Calendar, Clock, FileText, CheckCircle, Award,
-  TrendingUp, Bell, ArrowRight, DollarSign, AlertCircle
+  BookOpen, Calendar, Clock, FileText, CheckCircle, Award, Bell, ArrowRight, DollarSign, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
@@ -18,7 +17,6 @@ export function StudentDashboard() {
   const [stats, setStats] = useState<any>({});
   const [assignments, setAssignments] = useState<any[]>([]);
   const [timetable, setTimetable] = useState<any[]>([]);
-  const [fees, setFees] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,7 +37,6 @@ export function StudentDashboard() {
 
       setAssignments(assignmentsRes?.data || []);
       setTimetable(timetableRes?.data || []);
-      setFees(feesRes?.data || {});
 
       const attendance = attendanceRes?.data || [];
       const presentCount = attendance.filter((a: any) => a.status === 'present').length;

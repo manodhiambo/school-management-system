@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Award, Calendar, Clock, CheckCircle, PlayCircle } from 'lucide-react';
 import api from '@/services/api';
-import { getCBEGradeBadgeClass, getEducationLevelLabel } from '@/utils/cbeGrades';
+import { getEducationLevelLabel } from '@/utils/cbeGrades';
 
 type Tab = 'upcoming' | 'online' | 'results';
 

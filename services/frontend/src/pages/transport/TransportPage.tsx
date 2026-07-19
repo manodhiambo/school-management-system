@@ -9,6 +9,10 @@ import { Bus, Plus, Edit, Trash2, Search, Users, X, CheckSquare, Square, Link2, 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Stable reference so `allStudents` doesn't change identity every render while
+// studentsData is still loading (that would invalidate the filteredStudents memo below).
+const EMPTY_STUDENTS: any[] = [];
+
 export function TransportPage() {
   const qc = useQueryClient();
   const [showRouteForm, setShowRouteForm] = useState(false);
@@ -100,7 +104,7 @@ export function TransportPage() {
 
   const routes = (routesData as any)?.data || [];
   const routeDetail = (routeDetailData as any)?.data;
-  const allStudents = (studentsData as any)?.data || [];
+  const allStudents = (studentsData as any)?.data || EMPTY_STUDENTS;
   const drivers = (driversData as any)?.data || [];
 
   async function downloadTransportPDF(routeFilter?: string) {

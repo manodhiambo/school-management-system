@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
@@ -25,7 +25,7 @@ export function DriverDashboard() {
   const { user } = useAuthStore();
   const [routeData, setRouteData]     = useState<any>(null);
   const [session, setSession]         = useState<any>(null);
-  const [tripType, setTripType]       = useState<TripType>('morning');
+  const [tripType, setTripType]       = useState<TripType>(() => (new Date().getHours() < 12 ? 'morning' : 'afternoon'));
   const [loading, setLoading]         = useState(true);
   const [marking, setMarking]         = useState<string | null>(null);
   const [gpsError, setGpsError]       = useState('');
@@ -116,7 +116,6 @@ export function DriverDashboard() {
   const stops = Array.from(new Set(students.map((s: any) => s.pickup_stop || 'Unassigned')));
 
   const hour = new Date().getHours();
-  const defaultTrip: TripType = hour < 12 ? 'morning' : 'afternoon';
 
   if (loading) {
     return (

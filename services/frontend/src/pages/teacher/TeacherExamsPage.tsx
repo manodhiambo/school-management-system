@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Award, Plus, Trash2, Check, X, Save, Eye, Upload } from 'lucide-react';
+import { Award, Plus, Trash2, Save, Upload } from 'lucide-react';
 import api from '@/services/api';
-import { computeCBEGrade, getCBEGradeBadgeClass, EDUCATION_LEVELS } from '@/utils/cbeGrades';
+import { computeCBEGrade, getCBEGradeBadgeClass } from '@/utils/cbeGrades';
 
 type Tab = 'my-exams' | 'create' | 'offline-results';
 
@@ -20,7 +20,6 @@ export function TeacherExamsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('my-exams');
   const [exams, setExams] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -45,14 +44,12 @@ export function TeacherExamsPage() {
 
   const loadData = async () => {
     try {
-      const [examsRes, classesRes, subjectsRes]: any[] = await Promise.all([
+      const [examsRes, classesRes]: any[] = await Promise.all([
         api.getExams(),
-        api.getClasses(),
-        api.getSubjects()
+        api.getClasses()
       ]);
       setExams(examsRes.data || examsRes || []);
       setClasses(classesRes.data || classesRes || []);
-      setSubjects(subjectsRes.data || subjectsRes || []);
     } catch { /* silent */ }
     setLoading(false);
   };

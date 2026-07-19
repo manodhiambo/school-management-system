@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Users, GraduationCap, DollarSign, Calendar, TrendingUp, TrendingDown,
-  UserPlus, CreditCard, BookOpen, Bell, ArrowUpRight, ArrowDownRight,
+  Users, GraduationCap, DollarSign, Calendar, TrendingUp,
+  UserPlus, CreditCard, BookOpen, Bell, ArrowUpRight,
   Clock, CheckCircle, AlertTriangle, Activity
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';

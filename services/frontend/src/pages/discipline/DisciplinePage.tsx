@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
-import { AlertTriangle, Plus, CheckCircle, X } from 'lucide-react';
+import { Plus, CheckCircle, X } from 'lucide-react';
 
 const SEVERITY_COLORS: Record<string, string> = {
   minor: 'bg-blue-100 text-blue-800',

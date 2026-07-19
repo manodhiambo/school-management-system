@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { jsPDF } from 'jspdf';
 import {
   BarChart2, DollarSign, TrendingUp, TrendingDown, Users, AlertTriangle,
-  Download, RefreshCw, FileText, CreditCard, Calendar, ChevronRight,
-  CheckCircle, Clock, XCircle, Filter, Printer,
+  Download, RefreshCw, FileText, ChevronRight,
+  CheckCircle, Filter,
 } from 'lucide-react';
 import apiService from '../../services/api';
 import financeService from '../../services/financeService';

@@ -7,7 +7,6 @@ import {
   EyeIcon,
   ChartBarIcon,
   DocumentChartBarIcon,
-  PencilIcon,
   ArchiveBoxIcon,
 } from '@heroicons/react/24/outline';
 import budgetService, { Budget, BudgetItem, BudgetSummary, BudgetVariance } from '../../services/budgetService';

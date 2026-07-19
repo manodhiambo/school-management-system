@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard, Volume2, VolumeX, Bell, MessageSquare, DollarSign, Play, Mic, MicOff } from 'lucide-react';
+import { Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard, Volume2, VolumeX, Bell, MessageSquare, DollarSign, Play, Mic, MicOff } from 'lucide-react';
 import { useSoundSettings } from '@/components/notifications/SoundNotificationProvider';
 import { voiceService } from '@/services/voiceService';
 import api from '@/services/api';
@@ -112,7 +112,7 @@ export function SettingsPage() {
     try {
       const res: any = await api.get2FAStatus();
       setTwoFAEnabled(res.data?.enabled || false);
-    } catch {}
+    } catch { /* default to disabled */ }
   };
 
   const start2FASetup = async () => {

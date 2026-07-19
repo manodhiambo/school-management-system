@@ -14,18 +14,8 @@ const GRADE_COLORS_HEX: Record<string, [number, number, number]> = {
   BE: [220, 38, 38],   BE1: [185, 28, 28],  BE2: [220, 38, 38],
   WD: [22, 163, 74], D: [202, 138, 4], B: [220, 38, 38],
 };
-const GRADE_POINTS: Record<string, number> = {
-  EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
-};
 const GRADE_POINTS_PRIMARY: Record<string, number> = {
   EE: 4, ME: 3, AE: 2, BE: 1,
-};
-const AUTO_COMMENTS: Record<string, string> = {
-  EE: 'EXCELLENT', EE1: 'EXCELLENT', EE2: 'EXCELLENT',
-  ME: 'GOOD',      ME1: 'GOOD',      ME2: 'GOOD',
-  AE: 'Can do better', AE1: 'Can do better', AE2: 'Can do better',
-  BE: 'Put More Effort', BE1: 'Put More Effort', BE2: 'Put More Effort',
-  WD: 'EXCELLENT', D: 'Can do better', B: 'Put More Effort',
 };
 
 // Facilitator comment based on average points per subject (JSS scale: 1–8)

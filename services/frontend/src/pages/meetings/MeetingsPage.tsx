@@ -8,8 +8,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import {
-  Calendar, Clock, Users, User, Plus, CheckCircle, XCircle,
-  AlertCircle, BookOpen, RefreshCw, ChevronRight
+  Calendar, Plus, CheckCircle,
+  AlertCircle, RefreshCw
 } from 'lucide-react';
 
 type Tab = 'admin' | 'teacher' | 'parent';

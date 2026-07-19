@@ -29,7 +29,7 @@ export function TrialBanner() {
 
   if (!canShow || !trialInfo || dismissed) return null;
 
-  const { isTrial, trialDaysLeft, status } = trialInfo;
+  const { trialDaysLeft, status } = trialInfo;
 
   // Only show banner for trial status or expired
   if (status !== 'trial' && status !== 'expired') return null;

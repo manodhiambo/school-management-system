@@ -394,9 +394,6 @@ export function AssignmentsPage() {
             const overdue = isOverdue(assignment.due_date) && status === 'pending';
             const subCount = Number(assignment.submission_count) || 0;
             const totalStudents = Number(assignment.total_students) || 0;
-            const ungradedCount = submissions
-              .filter(s => s.status === 'submitted')
-              .length;
 
             return (
               <Card key={assignment.id} className={overdue ? 'border-red-200' : ''}>

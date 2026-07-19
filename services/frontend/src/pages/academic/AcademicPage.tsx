@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  BookOpen, GraduationCap, FileText, Calendar, Plus, CheckCircle,
-  ClipboardList, FolderOpen, Star, Lightbulb, Target, Users,
-  BookMarked, TrendingUp, Award, ChevronDown, ChevronRight,
+  BookOpen, Plus, CheckCircle,
+  ClipboardList, FolderOpen, Star, Lightbulb, Target,
+  BookMarked, ChevronDown, ChevronRight,
   Edit2, Trash2, X, Save, Eye, ArrowUpCircle, BarChart2,
   Building2, Layers, AlertCircle, RefreshCw,
 } from 'lucide-react';
@@ -555,7 +555,7 @@ function SchemeDetailModal({ scheme, onClose, onSaved }: any) {
 }
 
 // ── LESSON PLANS TAB ─────────────────────────────────────────
-function LessonPlansTab({ classes, subjects, strands, currentYear, isAdmin, isTeacher }: any) {
+function LessonPlansTab({ classes, subjects, currentYear, isAdmin, isTeacher }: any) {
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -722,7 +722,7 @@ function LessonPlansTab({ classes, subjects, strands, currentYear, isAdmin, isTe
 }
 
 // ── SBA TAB ──────────────────────────────────────────────────
-function SbaTab({ classes, subjects, strands, currentYear, isAdmin, isTeacher }: any) {
+function SbaTab({ classes, subjects, currentYear, isAdmin, isTeacher }: any) {
   const [sbas, setSbas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -843,13 +843,12 @@ function SbaTab({ classes, subjects, strands, currentYear, isAdmin, isTeacher }:
         </div>
       )}
 
-      {selected && <SbaMarksModal sba={selected} onClose={() => setSelected(null)} onSaved={load} classes={classes} />}
+      {selected && <SbaMarksModal sba={selected} onClose={() => setSelected(null)} onSaved={load} />}
     </div>
   );
 }
 
-function SbaMarksModal({ sba, onClose, onSaved, classes }: any) {
-  const [students, setStudents] = useState<any[]>([]);
+function SbaMarksModal({ sba, onClose, onSaved }: any) {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -861,7 +860,6 @@ function SbaMarksModal({ sba, onClose, onSaved, classes }: any) {
       const studs = studRes.data || [];
       const recs = recRes.data || [];
       const map = Object.fromEntries(recs.map((r: any) => [r.student_id, r]));
-      setStudents(studs);
       setRecords(studs.map((s: any) => ({
         student_id: s.id,
         student_name: `${s.first_name} ${s.last_name}`,
@@ -947,7 +945,7 @@ function SbaMarksModal({ sba, onClose, onSaved, classes }: any) {
 }
 
 // ── PROJECTS TAB ─────────────────────────────────────────────
-function ProjectsTab({ classes, subjects, strands, currentYear, isAdmin, isTeacher }: any) {
+function ProjectsTab({ classes, subjects, currentYear, isAdmin, isTeacher }: any) {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -1433,7 +1431,7 @@ function CareerTab({ classes, currentYear, isAdmin }: any) {
 }
 
 // ── LEARNING MATERIALS TAB ───────────────────────────────────
-function MaterialsTab({ classes, subjects, strands, isAdmin, isTeacher }: any) {
+function MaterialsTab({ subjects, isAdmin, isTeacher }: any) {
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -1705,9 +1703,11 @@ function BulkPromotePanel({ classes, currentYear, onSaved }: any) {
 
   useEffect(() => {
     if (selectedClass) {
-      (api as any).getStudents
-        ? (api as any).getStudents({ class_id: selectedClass }).then((res: any) => setStudents(res.data || []))
-        : setStudents([]);
+      if ((api as any).getStudents) {
+        (api as any).getStudents({ class_id: selectedClass }).then((res: any) => setStudents(res.data || []));
+      } else {
+        setStudents([]);
+      }
     }
   }, [selectedClass]);
 
@@ -1810,7 +1810,7 @@ const LEVEL_COLORS: Record<string, string> = {
   senior_secondary: 'bg-orange-50 border-orange-200 text-orange-700',
 };
 
-function ClassesRoomsTab({ classes, subjects, isAdmin, onRefresh }: any) {
+function ClassesRoomsTab({ classes, isAdmin, onRefresh }: any) {
   const [rooms, setRooms] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [activeView, setActiveView] = useState<'classes' | 'rooms'>('classes');
@@ -1833,7 +1833,9 @@ function ClassesRoomsTab({ classes, subjects, isAdmin, onRefresh }: any) {
   useEffect(() => {
     loadRooms();
     // Load teachers
-    (api as any).getTeachers ? (api as any).getTeachers().then((r: any) => setTeachers(r.data || [])).catch(() => {}) : null;
+    if ((api as any).getTeachers) {
+      (api as any).getTeachers().then((r: any) => setTeachers(r.data || [])).catch(() => {});
+    }
   }, []);
 
   const loadRooms = () => {
@@ -2225,6 +2227,17 @@ function ClassSubjectsModal({ cls, onClose, isAdmin }: any) {
                 <option value="">Select subject to add...</option>
                 {unlinkedSubjects.map((s: any) => (
                   <option key={s.id} value={s.id}>{s.name} {s.is_elective ? '(Elective)' : ''}</option>
+                ))}
+              </select>
+              <select
+                className="flex-1 border rounded px-2 py-1.5 text-sm"
+                value={teacherMap[addingId] || ''}
+                onChange={e => setTeacherMap(prev => ({ ...prev, [addingId]: e.target.value }))}
+                disabled={!addingId}
+              >
+                <option value="">No teacher assigned</option>
+                {teachers.map((t: any) => (
+                  <option key={t.id} value={t.user_id}>{t.first_name} {t.last_name}</option>
                 ))}
               </select>
               <Button size="sm" onClick={addSubject} disabled={!addingId}><Plus className="h-4 w-4" /></Button>

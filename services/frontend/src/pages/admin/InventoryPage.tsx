@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
-import { useAuthStore } from '@/store/authStore';
 import {
   Package, Tag, ArrowLeftRight, AlertTriangle,
   Plus, Edit2, X, RefreshCw, TrendingDown, Download
@@ -25,7 +24,6 @@ const TX_TYPES: { value: TxType; label: string; color: string }[] = [
 const CONDITIONS = ['new', 'good', 'fair', 'poor', 'damaged'];
 
 export function InventoryPage() {
-  const { user } = useAuthStore();
   const [tab, setTab] = useState<Tab>('items');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,7 +69,7 @@ export function InventoryPage() {
     try {
       const res: any = await (api as any).getInventoryCategories();
       setCategories(res?.data || []);
-    } catch {}
+    } catch { /* categories optional — leave list empty */ }
   };
 
   const loadItems = async () => {

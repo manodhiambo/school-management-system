@@ -32,6 +32,14 @@ pool.on('connect', (client) => {
   // database default search_path to a stale tenant_* schema (a leftover
   // from an abandoned schema-per-tenant approach) which shadows newer
   // columns/tables that only exist in public, causing silent query failures.
+  //
+  // This is dispatched synchronously here (not awaited) so it queues ahead
+  // of whatever query the caller who requested this connection issues next
+  // on the same client — node-postgres guarantees FIFO execution order per
+  // client, so the search_path is always set before any other query runs.
+  // (Setting this via Pool's `options` startup parameter instead would avoid
+  // relying on that ordering, but Neon's pooled/PgBouncer endpoint rejects
+  // startup-packet options outright — confirmed by testing against it.)
   client.query('SET search_path TO public').catch((err) => {
     console.error('Failed to set search_path:', err.message);
   });

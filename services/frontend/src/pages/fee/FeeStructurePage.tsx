@@ -166,7 +166,7 @@ export function FeeStructurePage() {
 
   const runBulk = async (dryRun: boolean) => {
     if (!bulkForm.fee_structure_ids.length) { alert('Select at least one fee structure.'); return; }
-    dryRun ? setBulkPreviewing(true) : setBulkGenerating(true);
+    if (dryRun) setBulkPreviewing(true); else setBulkGenerating(true);
     try {
       const res: any = await api.bulkSmartGenerateInvoices({ ...bulkForm, dry_run: dryRun });
       if (dryRun) {

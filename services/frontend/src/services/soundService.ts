@@ -58,7 +58,7 @@ class SoundService {
   private async getCtx(): Promise<AudioContext | null> {
     if (!this.ctx) return null;
     if (this.ctx.state === 'suspended') {
-      try { await this.ctx.resume(); } catch {}
+      try { await this.ctx.resume(); } catch { /* stays suspended — caller checks state */ }
     }
     return this.ctx.state === 'running' ? this.ctx : null;
   }
@@ -118,7 +118,7 @@ class SoundService {
       if (type === 'fee')     this.playFeeTone(ctx, vol);
       if (type === 'alert')   this.playAlertTone(ctx, vol);
       if (type === 'success') this.playSuccessTone(ctx, vol);
-    } catch {}
+    } catch { /* audio playback failed — non-critical */ }
   }
 
   async preview(type: SoundType): Promise<void> {
@@ -132,7 +132,7 @@ class SoundService {
       if (type === 'fee')     this.playFeeTone(ctx, vol);
       if (type === 'alert')   this.playAlertTone(ctx, vol);
       if (type === 'success') this.playSuccessTone(ctx, vol);
-    } catch {}
+    } catch { /* audio playback failed — non-critical */ }
   }
 }
 

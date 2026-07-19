@@ -5,17 +5,6 @@
 
 const memoryFallback = new Map<string, string>();
 
-function isStorageAvailable(): boolean {
-  try {
-    const test = '__skulmanager_test__';
-    localStorage.setItem(test, '1');
-    localStorage.removeItem(test);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export const safeLocalStorage = {
   getItem(key: string): string | null {
     try {

@@ -2,12 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DollarSign, TrendingUp, AlertCircle, FileText, Plus, Users,
-  Search, Download, Trash2, Eye, RefreshCw, X, CheckCircle, Printer,
+  Search, Download, Trash2, Eye, RefreshCw, CheckCircle, Printer,
   Send, XCircle
 } from 'lucide-react';
 import { RecordPaymentModal } from '@/components/modals/RecordPaymentModal';
@@ -48,7 +46,6 @@ function downloadFeeStatement(
 ) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pw = doc.internal.pageSize.getWidth();
-  let y = 15;
 
   // Header
   doc.setFillColor(37, 99, 235);
@@ -60,7 +57,7 @@ function downloadFeeStatement(
   doc.text('FEE STATEMENT', pw / 2, 20, { align: 'center' });
   doc.text(`Generated: ${new Date().toLocaleDateString('en-KE')}`, pw / 2, 26, { align: 'center' });
 
-  y = 36;
+  let y = 36;
   doc.setTextColor(30, 30, 30);
 
   // Student info
@@ -207,7 +204,6 @@ function printPaymentReceipt(p: any, studentName?: string, admNo?: string, class
   const doc = new jsPDF({ unit: 'mm', format: 'a5' });
   const margin = 15;
   const pageW = 148;
-  let y = margin;
 
   doc.setFillColor(37, 99, 235);
   doc.rect(0, 0, pageW, 22, 'F');
@@ -217,7 +213,7 @@ function printPaymentReceipt(p: any, studentName?: string, admNo?: string, class
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.text('PAYMENT RECEIPT', pageW / 2, 17, { align: 'center' });
 
-  y = 30;
+  let y = 30;
   doc.setTextColor(30, 30, 30);
   doc.setDrawColor(180, 180, 180);
   doc.line(margin, y, pageW - margin, y);

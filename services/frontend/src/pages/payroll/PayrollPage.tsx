@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import {
   DollarSign, Users, FileText, CreditCard, Plus, RefreshCw,
-  CheckCircle, Clock, Printer, ChevronLeft, Edit2, Trash2, ClipboardList, Download
+  CheckCircle, Clock, ChevronLeft, Edit2, ClipboardList, Download
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
@@ -237,13 +237,13 @@ export function PayrollPage() {
               const b64 = canvas.toDataURL('image/png');
               doc.addImage(b64, 'PNG', 8, 3, 26, 26);
               logoLoaded = true;
-            } catch (_) {}
+            } catch { /* logo render failed — continue without it */ }
             resolve();
           };
           img.onerror = () => resolve();
           img.src = s.school_logo_url;
         });
-      } catch (_) {}
+      } catch { /* logo unavailable — continue without it */ }
     }
 
     // School name & motto in header
@@ -409,7 +409,6 @@ export function PayrollPage() {
     doc.line(pw - 70, y + 10, pw - 14, y + 10);
     doc.text('Authorised By', pw - 70, y + 14);
     doc.text('Head Teacher / Principal', pw - 70, y + 19);
-    y += 28;
 
     // ── Footer ─────────────────────────────────────────────────────────────
     doc.setFillColor(...BLUE);
@@ -446,7 +445,6 @@ export function PayrollPage() {
     const tots  = p9Data.totals;
     const doc   = new jsPDF({ unit: 'mm', format: 'a4' });
     const pw    = doc.internal.pageSize.getWidth();
-    let y = 10;
 
     // Header
     doc.setFillColor(30, 58, 138);
@@ -458,7 +456,7 @@ export function PayrollPage() {
     doc.text('P9 FORM — EMPLOYEE TAX DEDUCTION CARD', pw / 2, 18, { align: 'center' });
     doc.setFontSize(8); doc.setFont('helvetica', 'normal');
     doc.text(`Year of Income: ${p9Data.year}`, pw / 2, 24, { align: 'center' });
-    y = 32;
+    let y = 32;
     doc.setTextColor(30, 30, 30);
 
     // Employee details
@@ -790,7 +788,7 @@ export function PayrollPage() {
 
                       {/* Workflow steps */}
                       <div className="flex items-center gap-1 mt-3 text-xs text-gray-400">
-                        <span className={`px-2 py-0.5 rounded-full ${true ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>1. Created</span>
+                        <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700">1. Created</span>
                         <span>→</span>
                         <span className={`px-2 py-0.5 rounded-full ${isProcessed ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>2. Process</span>
                         <span>→</span>

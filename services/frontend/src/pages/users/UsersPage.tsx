@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Key, Mail, Users, Shield, Bell } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Key, Users, Shield, Bell } from 'lucide-react';
 import { AddUserModal } from '@/components/modals/AddUserModal';
 import { EditUserModal } from '@/components/modals/EditUserModal';
 import { ResetPasswordModal } from '@/components/modals/ResetPasswordModal';

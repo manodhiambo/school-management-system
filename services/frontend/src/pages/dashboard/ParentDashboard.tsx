@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users, Calendar, Clock, CheckCircle, Award,
-  Bell, ArrowRight, DollarSign, AlertCircle, TrendingUp, XCircle, HelpCircle, FileText
+  Bell, DollarSign, TrendingUp, XCircle, HelpCircle, FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';

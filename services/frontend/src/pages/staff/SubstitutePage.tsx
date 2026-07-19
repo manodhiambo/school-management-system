@@ -7,8 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
-import {
-  UserCheck, Calendar, Plus, RefreshCw, Filter, CheckCircle,
+import { Plus, RefreshCw, Filter, CheckCircle,
   XCircle, Users, AlertTriangle
 } from 'lucide-react';
 

@@ -3215,23 +3215,6 @@ export function generateUserManual(role: Role, schoolName: string = 'Your School
     if (y + needed > H - 20) addPage();
   };
 
-  const text = (
-    txt: string,
-    x: number,
-    maxW: number,
-    size: number,
-    style: 'normal' | 'bold' | 'italic',
-    rgb: [number, number, number],
-  ): number => {
-    doc.setFont('helvetica', style);
-    doc.setFontSize(size);
-    doc.setTextColor(...rgb);
-    const lines = doc.splitTextToSize(txt, maxW);
-    doc.text(lines, x, y);
-    const lineH = size * 0.4;
-    return lines.length * lineH;
-  };
-
   // ── Cover Page ────────────────────────────────────────────────────────────
 
   // Background gradient block

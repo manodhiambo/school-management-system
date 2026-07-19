@@ -193,7 +193,7 @@ export const AdvancedReports: React.FC = () => {
     try {
       const res: any = await api.getJournalDetail(je.id);
       setJournalDetail(res?.data || null);
-    } catch {}
+    } catch { /* detail optional — leave unset */ }
   };
 
   const addJournalLine = () => {

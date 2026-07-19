@@ -4,15 +4,6 @@ import { BookOpen, ChevronDown, ChevronUp, GraduationCap, Users } from 'lucide-r
 import api from '@/services/api';
 import { EDUCATION_LEVELS, getGradingScale } from '@/utils/cbeGrades';
 
-interface LevelInfo {
-  value: string;
-  label: string;
-  ageRange: string;
-  gradeScale: string;
-  subjects: string[];
-  classCount: number;
-}
-
 export function CurriculumPage() {
   const [classCountByLevel, setClassCountByLevel] = useState<Record<string, number>>({});
   const [subjectsByLevel, setSubjectsByLevel] = useState<Record<string, string[]>>({});

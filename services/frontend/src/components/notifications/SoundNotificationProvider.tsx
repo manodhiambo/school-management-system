@@ -169,7 +169,7 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
         const body   = m.subject || m.preview?.slice(0, 80) || 'New message';
         addToast('message', `Message from ${sender}`, body, '/app/messages');
       });
-    } catch {}
+    } catch { /* poll failure — retried on next interval */ }
   }, [user?.id, enabled, messagesEnabled, addToast]);
 
   // ── notifications + parent-alerts polling (every 30 s) ──────────────────
@@ -186,7 +186,7 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
         addToast('alert', 'New Notification', `You have ${diff} new notification${diff > 1 ? 's' : ''}`, '/app/notifications');
       }
       prevNotifCount.current = count;
-    } catch {}
+    } catch { /* poll failure — retried on next interval */ }
 
     // Parent-only: fee / school alerts
     if (user.role === 'parent' && feeEnabled) {
@@ -198,7 +198,7 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
           addToast('fee', 'Fee / School Alert', `${diff} new alert${diff > 1 ? 's' : ''} from school`, '/app/parent-alerts');
         }
         prevAlertCount.current = count;
-      } catch {}
+      } catch { /* poll failure — retried on next interval */ }
     }
   }, [user?.id, user?.role, enabled, alertsEnabled, feeEnabled, addToast]);
 

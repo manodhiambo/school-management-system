@@ -8,7 +8,6 @@ export const GoodsReceiptManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [detail, setDetail] = useState<any>(null);
-  const [selectedPO, setSelectedPO] = useState<any>(null);
   const [form, setForm] = useState({ po_id: '', delivery_date: '', delivery_note_number: '', remarks: '' });
   const [grItems, setGrItems] = useState<any[]>([]);
 
@@ -24,9 +23,8 @@ export const GoodsReceiptManagement: React.FC = () => {
 
   const handlePOSelect = async (poId: string) => {
     setForm({ ...form, po_id: poId });
-    if (!poId) { setSelectedPO(null); setGrItems([]); return; }
+    if (!poId) { setGrItems([]); return; }
     const po = await procurementService.getOrder(poId);
-    setSelectedPO(po);
     setGrItems(po.items.map((i: any) => ({
       po_item_id: i.id, item_name: i.item_name, ordered_qty: i.quantity,
       received_qty: i.quantity - i.received_qty, rejected_qty: 0, unit: i.unit, condition: 'good', remarks: '',
@@ -39,7 +37,7 @@ export const GoodsReceiptManagement: React.FC = () => {
     e.preventDefault();
     try {
       await procurementService.createGRN({ ...form, items: grItems });
-      setShowModal(false); setForm({ po_id: '', delivery_date: '', delivery_note_number: '', remarks: '' }); setGrItems([]); setSelectedPO(null); load();
+      setShowModal(false); setForm({ po_id: '', delivery_date: '', delivery_note_number: '', remarks: '' }); setGrItems([]); load();
     } catch (err: any) { alert(err.response?.data?.error || 'Failed'); }
   };
 

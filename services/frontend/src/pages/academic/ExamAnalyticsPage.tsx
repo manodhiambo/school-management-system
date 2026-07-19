@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
-import { BarChart2, TrendingUp, Users, Award, AlertCircle } from 'lucide-react';
+import { BarChart2, TrendingUp, Users, Award } from 'lucide-react';
 import api from '@/services/api';
 
 type Tab = 'exam' | 'student' | 'class';

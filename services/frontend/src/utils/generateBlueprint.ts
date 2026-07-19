@@ -230,7 +230,6 @@ function moduleCard(doc: jsPDF, y: number, mod: ModuleData, pageNum: { n: number
 // ─── Table of Contents ───────────────────────────────────────────────────────
 function addTOC(doc: jsPDF) {
   doc.addPage();
-  const pageNum = { n: 2 };
   addPageFooter(doc, 2);
 
   // Header
@@ -243,7 +242,7 @@ function addTOC(doc: jsPDF) {
   setTxt(doc, C.teal);
   doc.text('Click any section header to navigate', M, 24);
 
-  let y = 38;
+  const y = 38;
   const sections = [
     { num: '1',   title: 'Executive Summary',                    pg: 3  },
     { num: '2',   title: 'System Modules At a Glance',           pg: 4  },
@@ -426,7 +425,7 @@ function addModuleOverview(doc: jsPDF, pageNum: { n: number }) {
     { icon: '🛒', title: 'Procurement',             desc: 'Full procurement lifecycle: PR→RFQ→Quotation→PO→GRN→Invoice→Payment, asset management', color: C.green  },
   ];
 
-  let y = 36;
+  const y = 36;
   const cols    = 3;
   const cellW   = (COL - (cols - 1) * 4) / cols;
   const cellH   = 34;
@@ -1147,11 +1146,6 @@ export function generateBlueprint(schoolName: string = 'Your School') {
 
   // Detailed modules — each is a new page section
   let y = 28;
-  const sectionColors: Record<string, RGB> = {
-    '3': C.blue, '4': C.teal, '5': C.green, '6': C.purple,
-    '7': C.amber, '8': C.teal, '9': C.blue, '10': C.red,
-    '11': C.green, '12': C.navy, '13': C.purple, '14': C.amber, '15': C.teal,
-  };
 
   MODULES.forEach((mod, mi) => {
     // New page for major sections

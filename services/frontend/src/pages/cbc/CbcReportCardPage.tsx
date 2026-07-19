@@ -17,13 +17,6 @@ const GRADE_HEX: Record<string, [number, number, number]> = {
   BE: [220, 38, 38],   BE1: [185, 28, 28],  BE2: [220, 38, 38],
   WD: [22, 163, 74],   D:   [202, 138, 4],  B:   [220, 38, 38],
 };
-const GRADE_LABEL_FULL: Record<string, string> = {
-  EE: 'Exceeding Expectations',  EE1: 'Exceeding Expectations', EE2: 'Exceeding Expectations',
-  ME: 'Meeting Expectations',    ME1: 'Meeting Expectations',   ME2: 'Meeting Expectations',
-  AE: 'Approaching Expectations',AE1: 'Approaching Expectations',AE2: 'Approaching Expectations',
-  BE: 'Below Expectations',      BE1: 'Below Expectations',     BE2: 'Below Expectations',
-  WD: 'Well Developed', D: 'Developing', B: 'Beginning',
-};
 const GRADE_POINTS: Record<string, number> = {
   EE: 4, ME: 3, AE: 2, BE: 1,
   WD: 4, D: 2, B: 1,

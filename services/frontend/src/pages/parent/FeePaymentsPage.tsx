@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  DollarSign, CheckCircle, AlertCircle, Clock, Loader2,
+import { CheckCircle, AlertCircle, Clock, Loader2,
   Printer, Building2, Send, XCircle, Phone, CreditCard,
-  ChevronRight, Info, RefreshCw
+  ChevronRight, RefreshCw
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';

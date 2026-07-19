@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, DollarSign, ArrowUpRight, ArrowDownRight, User, XCircle, Trash2, Calendar } from 'lucide-react';
+import { Plus, DollarSign, ArrowUpRight, ArrowDownRight, User, XCircle, Trash2 } from 'lucide-react';
 import financeService, { PettyCashTransaction, PettyCashSummary } from '@/services/financeService';
 
 export default function PettyCash() {

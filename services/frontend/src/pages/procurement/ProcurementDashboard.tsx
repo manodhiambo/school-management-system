@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShoppingCart, FileText, Truck, Receipt, CreditCard, TrendingUp,
-  Clock, CheckCircle, AlertCircle, Building2, BarChart2, Package
+  Clock, CheckCircle, AlertCircle, Building2
 } from 'lucide-react';
 import procurementService from '../../services/procurementService';
 
@@ -17,15 +17,6 @@ const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }: any) => (
     </div>
   </div>
 );
-
-const statusColor = (s: string) => {
-  const m: Record<string, string> = {
-    approved: 'bg-green-100 text-green-800', completed: 'bg-green-100 text-green-800',
-    draft: 'bg-gray-100 text-gray-700', cancelled: 'bg-red-100 text-red-800',
-    pending_approval: 'bg-yellow-100 text-yellow-800', sent: 'bg-blue-100 text-blue-800',
-  };
-  return m[s] || 'bg-gray-100 text-gray-700';
-};
 
 export const ProcurementDashboard: React.FC = () => {
   const [data, setData] = useState<any>(null);

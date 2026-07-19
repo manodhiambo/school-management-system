@@ -133,7 +133,10 @@ router.get('/', async (req, res) => {
                WHERE sa.tenant_id = $1`;
     const params = [tid];
 
-    if (role === 'teacher') {
+    // Anyone who isn't an admin only ever sees their own appraisals — this used
+    // to only scope 'teacher', which meant any other authenticated role calling
+    // this endpoint directly would see every staff member's appraisal records.
+    if (role !== 'admin' && role !== 'superadmin') {
       sql += ` AND sa.staff_id = $2`;
       params.push(req.user.id);
     }

@@ -52,6 +52,7 @@ import {
   Boxes,
   ClipboardCheck,
   FileSearch,
+  Shirt,
 } from 'lucide-react';
 
 type NavItem = {
@@ -181,6 +182,10 @@ const navigationItems: NavItem[] = [
   // ── Welfare Extended ─────────────────────────────────────────────────────
   { name: 'Counseling',         href: '/app/counseling',         icon: Heart,         roles: ['admin', 'teacher'],                   section: 'Welfare', module: 'discipline' },
   { name: 'Hostel Management',  href: '/app/hostel-management',  icon: Building2,     roles: ['admin'],                              section: 'Welfare', module: 'hostel' },
+  { name: 'Roll Call',          href: '/app/hostel-roll-call',   icon: ClipboardCheck, roles: ['admin'],                             section: 'Welfare', module: 'hostel' },
+  { name: 'Laundry',            href: '/app/hostel-laundry',     icon: Shirt,         roles: ['admin'],                              section: 'Welfare', module: 'hostel' },
+  { name: 'Dorm Inspections',   href: '/app/hostel-inspections', icon: ClipboardList, roles: ['admin'],                              section: 'Welfare', module: 'hostel' },
+  { name: 'Hostel Inventory',   href: '/app/hostel-inventory',   icon: Boxes,         roles: ['admin'],                              section: 'Welfare', module: 'inventory' },
   { name: 'Canteen',            href: '/app/canteen',            icon: Star,          roles: ['admin', 'finance_officer'],           section: 'Welfare', module: 'canteen' },
   { name: 'Canteen Balance',    href: '/app/canteen',            icon: DollarSign,    roles: ['student'],                            section: 'Welfare', module: 'canteen' },
 

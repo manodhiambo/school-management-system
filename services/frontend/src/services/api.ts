@@ -1653,16 +1653,52 @@ class ApiService {
   // ── Hostel Management ─────────────────────────────────────────────────────
   getHostels() { return this.api.get('/hostel-mgmt/hostels'); }
   createHostel(data: any) { return this.api.post('/hostel-mgmt/hostels', data); }
+  updateHostel(id: string, data: any) { return this.api.put('/hostel-mgmt/hostels/' + id, data); }
   getHostelRooms(hostelId: string) { return this.api.get('/hostel-mgmt/hostels/' + hostelId + '/rooms'); }
   addHostelRoom(hostelId: string, data: any) { return this.api.post('/hostel-mgmt/hostels/' + hostelId + '/rooms', data); }
   getAllocations(params?: any) { return this.api.get('/hostel-mgmt/allocations', { params }); }
   allocateStudent(data: any) { return this.api.post('/hostel-mgmt/allocations', data); }
+  transferAllocation(id: string, data: any) { return this.api.post('/hostel-mgmt/allocations/' + id + '/transfer', data); }
   checkoutStudent(id: string) { return this.api.put('/hostel-mgmt/allocations/' + id + '/checkout', {}); }
   getMovements(params?: any) { return this.api.get('/hostel-mgmt/movements', { params }); }
   logMovement(data: any) { return this.api.post('/hostel-mgmt/movements', data); }
+  parentApproveMovement(id: string, data?: any) { return this.api.put('/hostel-mgmt/movements/' + id + '/parent-approve', data || {}); }
   approveMovement(id: string) { return this.api.put('/hostel-mgmt/movements/' + id + '/approve', {}); }
+  gateVerifyOutMovement(id: string) { return this.api.put('/hostel-mgmt/movements/' + id + '/gate-verify-out', {}); }
+  gateVerifyInMovement(id: string) { return this.api.put('/hostel-mgmt/movements/' + id + '/gate-verify-in', {}); }
   returnMovement(id: string) { return this.api.put('/hostel-mgmt/movements/' + id + '/return', {}); }
   getHostelOccupancy() { return this.api.get('/hostel-mgmt/occupancy'); }
+  getHostelOverdue() { return this.api.get('/hostel-mgmt/overdue'); }
+  getWaitingList(params?: any) { return this.api.get('/hostel-mgmt/waiting-list', { params }); }
+  addToWaitingList(data: any) { return this.api.post('/hostel-mgmt/waiting-list', data); }
+  updateWaitingList(id: string, data: any) { return this.api.put('/hostel-mgmt/waiting-list/' + id, data); }
+  getVacantBeds(params?: any) { return this.api.get('/hostel-mgmt/vacant-beds', { params }); }
+  getRollCalls(params?: any) { return this.api.get('/hostel-mgmt/roll-calls', { params }); }
+  createRollCall(data: any) { return this.api.post('/hostel-mgmt/roll-calls', data); }
+  getRollCall(id: string) { return this.api.get('/hostel-mgmt/roll-calls/' + id); }
+  markRollCallEntry(rollCallId: string, studentId: string, data: any) {
+    return this.api.put('/hostel-mgmt/roll-calls/' + rollCallId + '/entries/' + studentId, data);
+  }
+  getMissingStudentsToday() { return this.api.get('/hostel-mgmt/roll-calls/missing/today'); }
+  getLaundryBatches(params?: any) { return this.api.get('/hostel-mgmt/laundry', { params }); }
+  createLaundryBatch(data: any) { return this.api.post('/hostel-mgmt/laundry', data); }
+  updateLaundryBatch(id: string, data: any) { return this.api.put('/hostel-mgmt/laundry/' + id, data); }
+  getInspections(params?: any) { return this.api.get('/hostel-mgmt/inspections', { params }); }
+  createInspection(data: any) { return this.api.post('/hostel-mgmt/inspections', data); }
+
+  // ── Hostel/Asset Inventory (item units + issuance) ──────────────────────────
+  seedHostelInventoryCategories() { return this.api.post('/inventory/seed-hostel-categories', {}); }
+  getInventoryItemUnits(itemId: string) { return this.api.get('/inventory/items/' + itemId + '/units'); }
+  createInventoryItemUnit(itemId: string, data: any) { return this.api.post('/inventory/items/' + itemId + '/units', data); }
+  lookupInventoryUnitByBarcode(barcode: string) { return this.api.get('/inventory/units/' + barcode); }
+  getIssuances(params?: any) { return this.api.get('/inventory/issuances', { params }); }
+  createIssuance(data: any) { return this.api.post('/inventory/issuances', data); }
+  returnIssuance(id: string, data?: any) { return this.api.put('/inventory/issuances/' + id + '/return', data || {}); }
+  markIssuanceLost(id: string, data: any) { return this.api.put('/inventory/issuances/' + id + '/lost', data); }
+  markIssuanceDamaged(id: string, data: any) { return this.api.put('/inventory/issuances/' + id + '/damaged', data); }
+  transferIssuance(id: string, data: any) { return this.api.post('/inventory/issuances/' + id + '/transfer', data); }
+  getStudentInventoryReport(studentId: string) { return this.api.get('/inventory/issuances/student/' + studentId); }
+  getReplacementCharges() { return this.api.get('/inventory/issuances/replacement-charges'); }
 
   // ── Canteen ───────────────────────────────────────────────────────────────
   getMealPlans() { return this.api.get('/canteen/meal-plans'); }

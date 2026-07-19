@@ -202,6 +202,7 @@ router.post('/visits', requireRole(GATE_ROLES), async (req, res) => {
     const {
       visitor_id, purpose, purpose_details, department, host_user_id, host_name,
       vehicle_registration, items_brought, expected_duration_mins, gate, security_notes,
+      student_id,
     } = req.body;
     if (!visitor_id || !purpose) {
       return res.status(400).json({ success: false, message: 'visitor_id and purpose are required' });
@@ -227,12 +228,12 @@ router.post('/visits', requireRole(GATE_ROLES), async (req, res) => {
       `INSERT INTO visitor_visits
          (id,tenant_id,visitor_id,purpose,purpose_details,department,host_user_id,host_name,
           vehicle_registration,items_brought,expected_duration_mins,pass_number,
-          status,check_in_time,expected_out_time,registered_by,gate,security_notes)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'checked_in',NOW(),$13,$14,$15,$16) RETURNING *`,
+          status,check_in_time,expected_out_time,registered_by,gate,security_notes,student_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'checked_in',NOW(),$13,$14,$15,$16,$17) RETURNING *`,
       [id, tenant_id, visitor_id, purpose, purpose_details || null, department || null,
        host_user_id || null, host_name || null, vehicle_registration || null,
        items_brought || null, expected_duration_mins || 60, passNumber, expectedOut,
-       userId, gate || 'Main Gate', security_notes || null]
+       userId, gate || 'Main Gate', security_notes || null, student_id || null]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -261,7 +262,7 @@ router.post('/visits/:id/checkout', requireRole(GATE_ROLES), async (req, res) =>
 router.get('/visits', requireRole(GATE_ROLES), async (req, res) => {
   try {
     const { tenant_id } = req.user;
-    const { status, date, search, page = 1, limit = 50 } = req.query;
+    const { status, date, search, student_id, page = 1, limit = 50 } = req.query;
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
     const safePage = Math.max(parseInt(page, 10) || 1, 1);
     const offset = (safePage - 1) * safeLimit;
@@ -269,6 +270,7 @@ router.get('/visits', requireRole(GATE_ROLES), async (req, res) => {
     let where = 'WHERE vv.tenant_id=$1';
     if (status) { params.push(status); where += ` AND vv.status=$${params.length}`; }
     if (date) { params.push(date); where += ` AND vv.check_in_time::date=$${params.length}`; }
+    if (student_id) { params.push(student_id); where += ` AND vv.student_id=$${params.length}`; }
     if (search) {
       params.push(`%${search}%`);
       where += ` AND (v.full_name ILIKE $${params.length} OR v.national_id ILIKE $${params.length} OR v.phone ILIKE $${params.length} OR vv.pass_number ILIKE $${params.length})`;
@@ -276,10 +278,12 @@ router.get('/visits', requireRole(GATE_ROLES), async (req, res) => {
     params.push(safeLimit, offset);
     const rows = await query(
       `SELECT vv.*, v.full_name, v.phone, v.national_id, v.organization, v.photo_url,
-              u.first_name||' '||u.last_name AS registered_by_name
+              u.first_name||' '||u.last_name AS registered_by_name,
+              s.first_name||' '||s.last_name AS student_name, s.admission_number AS student_admission_number
        FROM visitor_visits vv
        JOIN visitors v ON v.id=vv.visitor_id
        LEFT JOIN users u ON u.id=vv.registered_by
+       LEFT JOIN students s ON s.id=vv.student_id
        ${where}
        ORDER BY vv.check_in_time DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params

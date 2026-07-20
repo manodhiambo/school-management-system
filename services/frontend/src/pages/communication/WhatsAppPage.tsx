@@ -69,6 +69,7 @@ export function WhatsAppPage() {
   const [directMsg, setDirectMsg] = useState('');
   const [directTarget, setDirectTarget] = useState<'custom' | 'all_parents' | 'by_class'>('custom');
   const [directClassId, setDirectClassId] = useState('');
+  const [phoneOverrides, setPhoneOverrides] = useState<Record<string, string>>({});
 
   const fetchDirectPhones = async () => {
     if (directTarget === 'custom') return;
@@ -78,6 +79,7 @@ export function WhatsAppPage() {
       if (directTarget === 'by_class' && directClassId) params.class_id = directClassId;
       const res: any = await (api as any).getWhatsAppPhones(params);
       setDirectPhones(Array.isArray(res?.data) ? res.data : []);
+      setPhoneOverrides({});
     } catch { setDirectPhones([]); }
     setDirectLoading(false);
   };
@@ -377,22 +379,41 @@ export function WhatsAppPage() {
               </Button>
               {directPhones.length > 0 && (
                 <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                  {directPhones.map((p: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
-                      <span className="text-gray-700">
-                        {p.first_name || p.last_name ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : p.email || p.phone}
-                        <span className="text-gray-400 ml-2 font-mono text-xs">{p.phone}</span>
-                      </span>
-                      <a
-                        href={waLink(p.phone, directMsg)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-semibold ${!directMsg.trim() ? 'pointer-events-none opacity-50' : ''}`}
-                      >
-                        <ExternalLink className="h-3 w-3" /> Send
-                      </a>
-                    </div>
-                  ))}
+                  {directPhones.map((p: any) => {
+                    const key = p.id || p.phone;
+                    const effectivePhone = phoneOverrides[key] ?? p.phone;
+                    const needsCountryCode = p.needs_country_code && !effectivePhone.trim().startsWith('+');
+                    return (
+                      <div key={key} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-gray-700 block truncate">
+                            {p.first_name || p.last_name ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : p.email || 'Parent'}
+                          </span>
+                          {needsCountryCode ? (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                              <Input
+                                value={effectivePhone}
+                                onChange={e => setPhoneOverrides(prev => ({ ...prev, [key]: e.target.value }))}
+                                placeholder="+254 7XX XXX XXX"
+                                className="h-7 text-xs font-mono"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 font-mono text-xs">{effectivePhone}</span>
+                          )}
+                        </div>
+                        <a
+                          href={waLink(effectivePhone, directMsg)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-semibold shrink-0 ${(!directMsg.trim() || needsCountryCode) ? 'pointer-events-none opacity-50' : ''}`}
+                        >
+                          <ExternalLink className="h-3 w-3" /> Send
+                        </a>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

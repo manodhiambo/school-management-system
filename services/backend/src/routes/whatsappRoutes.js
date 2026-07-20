@@ -7,6 +7,23 @@ import axios from 'axios';
 
 const router = express.Router();
 
+// Kenya-specific normalization (matches smsRoutes.js's normalisePhone) — a
+// wa.me link only works with a full international number, so a locally
+// formatted number ("0712345678") must be expanded to "+254712345678" or
+// the chat link silently opens to a broken/nonexistent contact.
+function normalizeKenyanPhone(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.startsWith('254') && digits.length === 12) return { phone: '+' + digits, needsReview: false };
+  if (digits.startsWith('0') && digits.length === 10) return { phone: '+254' + digits.slice(1), needsReview: false };
+  if (digits.startsWith('7') && digits.length === 9) return { phone: '+254' + digits, needsReview: false };
+  if (digits.startsWith('1') && digits.length === 9) return { phone: '+254' + digits, needsReview: false };
+  // Already has some other country code (11+ digits starting with a code we
+  // don't recognize) — trust it. Anything shorter/malformed can't be turned
+  // into a working wa.me link automatically; flag it for the admin to fix.
+  if (digits.length >= 11) return { phone: '+' + digits, needsReview: false };
+  return { phone: raw, needsReview: true };
+}
+
 // ─── WhatsApp Business API helpers ───────────────────────────────────────────
 
 async function sendWhatsApp(phoneNumberId, accessToken, to, message) {
@@ -221,26 +238,34 @@ router.get('/phones', adminOnly, async (req, res) => {
     let rows = [];
     if (target === 'all') {
       rows = await query(
-        `SELECT u.phone, u.email, u.first_name, u.last_name
-         FROM users u
-         WHERE u.tenant_id = $1 AND u.role = 'parent'
-           AND u.phone IS NOT NULL AND u.phone != ''`,
+        `SELECT DISTINCT p.id, p.first_name, p.last_name,
+                COALESCE(NULLIF(p.phone_primary, ''), NULLIF(p.phone_secondary, '')) AS phone
+         FROM parents p
+         WHERE p.tenant_id = $1
+           AND (COALESCE(p.phone_primary, '') != '' OR COALESCE(p.phone_secondary, '') != '')`,
         [tid]
       );
     } else if (target === 'class' && class_id) {
       rows = await query(
-        `SELECT DISTINCT u.phone, u.email, u.first_name, u.last_name
-         FROM users u
-         JOIN students s ON s.parent_id = u.id
-         WHERE s.class_id = $1 AND s.tenant_id = $2
-           AND u.phone IS NOT NULL AND u.phone != ''`,
+        `SELECT DISTINCT p.id, p.first_name, p.last_name,
+                COALESCE(NULLIF(p.phone_primary, ''), NULLIF(p.phone_secondary, '')) AS phone
+         FROM parents p
+         JOIN parent_students ps ON ps.parent_id = p.id
+         JOIN students s ON s.id = ps.student_id
+         WHERE s.class_id = $1 AND s.tenant_id = $2 AND p.tenant_id = $2
+           AND (COALESCE(p.phone_primary, '') != '' OR COALESCE(p.phone_secondary, '') != '')`,
         [class_id, tid]
       );
     } else {
       return res.status(400).json({ success: false, message: "target must be 'all' or 'class'" });
     }
 
-    res.json({ success: true, data: rows });
+    const normalized = rows.map(r => {
+      const { phone, needsReview } = normalizeKenyanPhone(r.phone);
+      return { ...r, phone, needs_country_code: needsReview };
+    });
+
+    res.json({ success: true, data: normalized });
   } catch (err) {
     logger.error('Get WhatsApp phones error:', err);
     res.status(500).json({ success: false, message: err.message });

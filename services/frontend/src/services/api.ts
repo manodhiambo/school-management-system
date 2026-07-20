@@ -529,6 +529,10 @@ class ApiService {
     return this.api.post('/timetable', data);
   }
 
+  autoGenerateTimetable(data: any) {
+    return this.api.post('/timetable/auto-generate', data);
+  }
+
   getTeacherTimetable(teacherId: string) {
     return this.api.get('/timetable/teacher/' + teacherId);
   }

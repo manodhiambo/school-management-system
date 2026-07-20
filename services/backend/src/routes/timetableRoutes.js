@@ -264,6 +264,216 @@ router.post('/period', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-GENERATE — builds a full weekly timetable automatically from each
+// class's class_subjects (subject + assigned teacher + weekly_periods),
+// spreading periods across the week and avoiding teacher/class clashes —
+// similar in spirit to dedicated scheduling tools (e.g. ASC Timetables),
+// scoped to a practical greedy/backtracking heuristic rather than a full
+// constraint solver.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Builds the day's period slots as real clock times, inserting break/lunch
+// gaps so periods after a break start at the correct time.
+function buildDaySlots({ periods_per_day, period_duration_minutes, day_start_time, breaks }) {
+  const [startH, startM] = day_start_time.split(':').map(Number);
+  let cursorMinutes = startH * 60 + startM;
+  const breakAfter = new Map((breaks || []).map(b => [b.after_period, b.duration_minutes]));
+  const slots = [];
+  for (let p = 1; p <= periods_per_day; p++) {
+    const startMinutes = cursorMinutes;
+    const endMinutes = startMinutes + period_duration_minutes;
+    const toTime = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
+    slots.push({ period: p, start_time: toTime(startMinutes), end_time: toTime(endMinutes) });
+    cursorMinutes = endMinutes;
+    if (breakAfter.has(p)) cursorMinutes += breakAfter.get(p);
+  }
+  return slots;
+}
+
+// Fisher-Yates shuffle — used to avoid always filling the grid in the same
+// deterministic order, which otherwise skews every class's hardest-to-place
+// subject toward the same days.
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+router.post('/auto-generate', requireRole(['admin']), async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const {
+      class_ids,
+      days = [1, 2, 3, 4, 5],
+      periods_per_day = 9,
+      period_duration_minutes = 40,
+      day_start_time = '08:00',
+      breaks = [{ after_period: 2, duration_minutes: 20, label: 'Break' }, { after_period: 5, duration_minutes: 40, label: 'Lunch' }],
+      replace_existing = false,
+    } = req.body;
+
+    if (!Array.isArray(days) || days.length === 0) {
+      return res.status(400).json({ success: false, message: 'days must be a non-empty array' });
+    }
+
+    const classRows = await query(
+      `SELECT id, name, section, room_number FROM classes
+       WHERE tenant_id = $1 AND is_active = true
+         AND ($2::uuid[] IS NULL OR id = ANY($2::uuid[]))
+       ORDER BY name, section`,
+      [tid, class_ids && class_ids.length ? class_ids : null]
+    );
+    if (!classRows.length) {
+      return res.status(404).json({ success: false, message: 'No matching classes found' });
+    }
+
+    const daySlots = buildDaySlots({ periods_per_day, period_duration_minutes, day_start_time, breaks });
+    const gridCapacity = days.length * periods_per_day;
+
+    if (replace_existing) {
+      await query(
+        `DELETE FROM timetable WHERE tenant_id = $1 AND class_id = ANY($2::uuid[])`,
+        [tid, classRows.map(c => c.id)]
+      );
+    }
+
+    // Pre-load every class's existing (kept) slots and every teacher's
+    // existing bookings tenant-wide, so newly generated entries never clash
+    // with anything already on the timetable — including classes not being
+    // regenerated in this run.
+    const existing = await query(
+      `SELECT class_id, teacher_id, day_of_week, start_time FROM timetable WHERE tenant_id = $1 AND is_active = true`,
+      [tid]
+    );
+    const classBusy = new Set(existing.map(e => `${e.class_id}|${e.day_of_week}|${e.start_time}`));
+    const teacherBusy = new Set(existing.filter(e => e.teacher_id).map(e => `${e.teacher_id}|${e.day_of_week}|${e.start_time}`));
+
+    const classesToLoad = classRows.map(c => c.id);
+    const assignments = classesToLoad.length
+      ? await query(
+          `SELECT cs.class_id, cs.subject_id, cs.teacher_id, cs.weekly_periods,
+                  s.name AS subject_name
+           FROM class_subjects cs
+           JOIN subjects s ON s.id = cs.subject_id
+           WHERE cs.tenant_id = $1 AND cs.class_id = ANY($2::uuid[])`,
+          [tid, classesToLoad]
+        )
+      : [];
+
+    const byClass = new Map();
+    for (const a of assignments) {
+      if (!byClass.has(a.class_id)) byClass.set(a.class_id, []);
+      byClass.get(a.class_id).push(a);
+    }
+
+    const toInsert = [];
+    const report = { classes_scheduled: [], subjects_not_fully_placed: [], classes_with_no_subjects: [] };
+
+    // Classes needing the most periods go first — they have the least slack,
+    // so scheduling them while the grid is emptiest gives the best chance of
+    // fitting everything in.
+    const orderedClasses = [...classRows].sort((a, b) => {
+      const totalA = (byClass.get(a.id) || []).reduce((s, x) => s + (x.weekly_periods || 0), 0);
+      const totalB = (byClass.get(b.id) || []).reduce((s, x) => s + (x.weekly_periods || 0), 0);
+      return totalB - totalA;
+    });
+
+    for (const cls of orderedClasses) {
+      const subjectAssignments = byClass.get(cls.id) || [];
+      if (!subjectAssignments.length) {
+        report.classes_with_no_subjects.push(`${cls.name} ${cls.section || ''}`.trim());
+        continue;
+      }
+
+      const totalNeeded = subjectAssignments.reduce((s, a) => s + (a.weekly_periods || 1), 0);
+      if (totalNeeded > gridCapacity) {
+        report.subjects_not_fully_placed.push(
+          `${cls.name} ${cls.section || ''}: needs ${totalNeeded} periods/week but the grid only has ${gridCapacity} — increase periods_per_day or days`.trim()
+        );
+      }
+
+      // Per-subject count of how many times it's already been placed on each
+      // day this run, so the scheduler spreads a subject across different
+      // days instead of stacking it (e.g. Math shouldn't be Mon periods 1-5).
+      const subjectDayCount = new Map();
+
+      // Largest weekly_periods first within the class too, for the same
+      // least-slack-first reasoning.
+      const sortedSubjects = [...subjectAssignments].sort((a, b) => (b.weekly_periods || 0) - (a.weekly_periods || 0));
+
+      for (const a of sortedSubjects) {
+        const need = a.weekly_periods || 1;
+        let placed = 0;
+        subjectDayCount.set(a.subject_id, new Map());
+        const dayCounts = subjectDayCount.get(a.subject_id);
+
+        for (let attempt = 0; attempt < need; attempt++) {
+          // Rank candidate (day, slot) pairs: prefer days this subject hasn't
+          // used yet this week, and shuffle within that to avoid always
+          // filling the same corner of the grid first.
+          const candidates = [];
+          for (const day of days) {
+            for (const slot of daySlots) {
+              const classKey = `${cls.id}|${day}|${slot.start_time}`;
+              const teacherKey = a.teacher_id ? `${a.teacher_id}|${day}|${slot.start_time}` : null;
+              if (classBusy.has(classKey)) continue;
+              if (teacherKey && teacherBusy.has(teacherKey)) continue;
+              candidates.push({ day, slot, dayUsage: dayCounts.get(day) || 0 });
+            }
+          }
+          if (!candidates.length) break; // grid exhausted for this class
+
+          candidates.sort((x, y) => x.dayUsage - y.dayUsage);
+          const bestUsage = candidates[0].dayUsage;
+          const tied = shuffle(candidates.filter(c => c.dayUsage === bestUsage));
+          const chosen = tied[0];
+
+          const classKey = `${cls.id}|${chosen.day}|${chosen.slot.start_time}`;
+          classBusy.add(classKey);
+          if (a.teacher_id) teacherBusy.add(`${a.teacher_id}|${chosen.day}|${chosen.slot.start_time}`);
+          dayCounts.set(chosen.day, (dayCounts.get(chosen.day) || 0) + 1);
+
+          toInsert.push({
+            id: uuidv4(), class_id: cls.id, subject_id: a.subject_id, teacher_id: a.teacher_id,
+            day_of_week: chosen.day, start_time: chosen.slot.start_time, end_time: chosen.slot.end_time,
+            room: cls.room_number || null, tenant_id: tid,
+          });
+          placed++;
+        }
+
+        if (placed < need) {
+          report.subjects_not_fully_placed.push(
+            `${cls.name} ${cls.section || ''}: ${a.subject_name} placed ${placed}/${need} periods (teacher or grid conflict)`.trim()
+          );
+        }
+      }
+
+      report.classes_scheduled.push(`${cls.name} ${cls.section || ''}`.trim());
+    }
+
+    for (const row of toInsert) {
+      await query(
+        `INSERT INTO timetable (id, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room, tenant_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [row.id, row.class_id, row.subject_id, row.teacher_id, row.day_of_week, row.start_time, row.end_time, row.room, row.tenant_id]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `Auto-generated ${toInsert.length} timetable periods across ${report.classes_scheduled.length} class(es)`,
+      data: { periods_created: toInsert.length, ...report },
+    });
+  } catch (error) {
+    logger.error('Auto-generate timetable error:', error);
+    res.status(500).json({ success: false, message: 'Error auto-generating timetable', error: error.message });
+  }
+});
+
 // Assign substitute
 router.post('/substitute', async (req, res) => {
   try {

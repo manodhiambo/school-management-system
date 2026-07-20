@@ -5,7 +5,7 @@ import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Clock, Plus, Trash2, AlertTriangle, RefreshCw, Printer, Download } from 'lucide-react';
+import { Clock, Plus, Trash2, AlertTriangle, RefreshCw, Printer, Download, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import jsPDF from 'jspdf';
@@ -21,6 +21,17 @@ export function TimetablePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetType, setResetType] = useState<'all' | 'class' | 'teacher'>('all');
+  const [showAutoGenModal, setShowAutoGenModal] = useState(false);
+  const [autoGenScope, setAutoGenScope] = useState<'all' | 'class'>('all');
+  const [autoGenForm, setAutoGenForm] = useState({
+    days: [1, 2, 3, 4, 5] as number[],
+    periods_per_day: 9,
+    period_duration_minutes: 40,
+    day_start_time: '08:00',
+    replace_existing: false,
+  });
+  const [autoGenLoading, setAutoGenLoading] = useState(false);
+  const [autoGenResult, setAutoGenResult] = useState<any>(null);
   const [formData, setFormData] = useState({
     classId: '',
     subjectId: '',
@@ -146,6 +157,38 @@ export function TimetablePage() {
     }
   };
 
+  const handleAutoGenerate = async () => {
+    if (autoGenScope === 'class' && !selectedClass) {
+      alert('Select a class first, or choose "All Classes".');
+      return;
+    }
+    setAutoGenLoading(true);
+    setAutoGenResult(null);
+    try {
+      const res: any = await (api as any).autoGenerateTimetable({
+        class_ids: autoGenScope === 'class' ? [selectedClass] : undefined,
+        days: autoGenForm.days,
+        periods_per_day: autoGenForm.periods_per_day,
+        period_duration_minutes: autoGenForm.period_duration_minutes,
+        day_start_time: autoGenForm.day_start_time,
+        replace_existing: autoGenForm.replace_existing,
+      });
+      setAutoGenResult(res?.data || null);
+      if (selectedClass) loadTimetable();
+    } catch (error: any) {
+      alert(error?.response?.data?.message || error?.message || 'Auto-generation failed');
+    } finally {
+      setAutoGenLoading(false);
+    }
+  };
+
+  const toggleAutoGenDay = (day: number) => {
+    setAutoGenForm(f => ({
+      ...f,
+      days: f.days.includes(day) ? f.days.filter(d => d !== day) : [...f.days, day].sort(),
+    }));
+  };
+
   const resetForm = () => {
     setFormData({
       classId: '',
@@ -269,6 +312,10 @@ export function TimetablePage() {
           )}
           {isAdmin && (
             <>
+              <Button variant="outline" onClick={() => { setAutoGenResult(null); setShowAutoGenModal(true); }} className="text-indigo-600 border-indigo-300">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Auto-Generate
+              </Button>
               <Button variant="outline" onClick={() => setShowResetModal(true)} className="text-red-600">
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Reset Timetable
@@ -567,6 +614,120 @@ export function TimetablePage() {
               }
             >
               Reset Timetable
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-Generate Timetable Modal */}
+      <Dialog open={showAutoGenModal} onOpenChange={setShowAutoGenModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-indigo-600" />
+              Auto-Generate Timetable
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            <p className="text-sm text-gray-500">
+              Automatically builds a full weekly schedule from each class's assigned subjects and
+              teachers (weekly period counts), spreading periods across the week and avoiding
+              teacher/class clashes.
+            </p>
+
+            <div>
+              <Label>Scope</Label>
+              <Select value={autoGenScope} onChange={(e) => setAutoGenScope(e.target.value as any)}>
+                <option value="all">All Classes</option>
+                <option value="class">Selected Class Only{selectedClass ? '' : ' (select a class above first)'}</option>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Working Days</Label>
+              <div className="flex gap-2 flex-wrap mt-1">
+                {daysOfWeek.map(d => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() => toggleAutoGenDay(parseInt(d.value))}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                      autoGenForm.days.includes(parseInt(d.value))
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-gray-600 border-gray-300'
+                    }`}
+                  >
+                    {d.label.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Periods/Day</Label>
+                <Input type="number" min={1} max={15} value={autoGenForm.periods_per_day}
+                  onChange={(e) => setAutoGenForm(f => ({ ...f, periods_per_day: parseInt(e.target.value) || 1 }))} />
+              </div>
+              <div>
+                <Label>Period (min)</Label>
+                <Input type="number" min={20} max={90} value={autoGenForm.period_duration_minutes}
+                  onChange={(e) => setAutoGenForm(f => ({ ...f, period_duration_minutes: parseInt(e.target.value) || 40 }))} />
+              </div>
+              <div>
+                <Label>Day Starts</Label>
+                <Input type="time" value={autoGenForm.day_start_time}
+                  onChange={(e) => setAutoGenForm(f => ({ ...f, day_start_time: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="replace_existing"
+                checked={autoGenForm.replace_existing}
+                onChange={(e) => setAutoGenForm(f => ({ ...f, replace_existing: e.target.checked }))}
+                className="mt-0.5"
+              />
+              <label htmlFor="replace_existing" className="text-sm text-amber-800">
+                Replace existing timetable entries for the classes in scope before generating.
+                Leave unchecked to only fill in classes that don't have a timetable yet.
+              </label>
+            </div>
+
+            {autoGenResult && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm space-y-1">
+                <p className="font-medium text-green-800">
+                  Created {autoGenResult.periods_created} period(s) across {autoGenResult.classes_scheduled?.length || 0} class(es).
+                </p>
+                {autoGenResult.classes_with_no_subjects?.length > 0 && (
+                  <p className="text-gray-600">
+                    No subjects assigned yet: {autoGenResult.classes_with_no_subjects.join(', ')}
+                  </p>
+                )}
+                {autoGenResult.subjects_not_fully_placed?.length > 0 && (
+                  <div className="text-amber-700">
+                    <p className="font-medium flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Needs a look:</p>
+                    <ul className="list-disc list-inside">
+                      {autoGenResult.subjects_not_fully_placed.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={() => setShowAutoGenModal(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={handleAutoGenerate}
+              disabled={autoGenLoading || autoGenForm.days.length === 0}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {autoGenLoading ? 'Generating...' : 'Generate'}
             </Button>
           </DialogFooter>
         </DialogContent>

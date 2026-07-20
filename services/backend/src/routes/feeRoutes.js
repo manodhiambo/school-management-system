@@ -114,7 +114,7 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
       class_id, classId, academic_year, academicYear,
       is_mandatory, isMandatory, late_fee_amount, lateFeeAmount,
       late_fee_per_day, lateFeePerDay, grace_period_days, gracePeriodDays,
-      student_type, is_transport_fee, route_id
+      student_type, is_transport_fee, route_id, term
     } = req.body;
 
     if (!name || !amount || !frequency) {
@@ -132,6 +132,10 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
       });
     }
 
+    if (term && !['term1', 'term2', 'term3'].includes(term)) {
+      return res.status(400).json({ success: false, message: 'term must be term1, term2, term3, or omitted for all terms' });
+    }
+
     const structureId = uuidv4();
 
     await query(
@@ -139,8 +143,8 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
         id, name, amount, frequency, description, due_day,
         class_id, academic_year, is_mandatory,
         late_fee_amount, late_fee_per_day, grace_period_days,
-        student_type, is_transport_fee, route_id, tenant_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        student_type, is_transport_fee, route_id, tenant_id, term
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
       [
         structureId, name, amount, frequency, description || null,
         due_day || dueDay || 15, class_id || classId || null,
@@ -152,7 +156,8 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
         student_type || 'all',
         is_transport_fee ?? false,
         route_id || null,
-        tid
+        tid,
+        term || null
       ]
     );
 
@@ -179,7 +184,7 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
       is_mandatory, isMandatory, is_active, isActive,
       late_fee_amount, lateFeeAmount, late_fee_per_day, lateFeePerDay,
       grace_period_days, gracePeriodDays,
-      student_type, is_transport_fee, route_id
+      student_type, is_transport_fee, route_id, term
     } = req.body;
 
     if (frequency) {
@@ -191,6 +196,16 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
         });
       }
     }
+    if (term && !['term1', 'term2', 'term3'].includes(term)) {
+      return res.status(400).json({ success: false, message: 'term must be term1, term2, term3, or omitted for all terms' });
+    }
+    // term can't use COALESCE like the rest of these fields — an admin must
+    // be able to explicitly clear it back to "applies every term" by picking
+    // "All Terms", which sends an empty value. $18 tells the query whether
+    // the caller actually sent this field at all (same pattern as the
+    // transport driver_user_id fix — omitting a field must never be treated
+    // the same as explicitly clearing it).
+    const termProvided = Object.prototype.hasOwnProperty.call(req.body, 'term');
 
     await query(
       `UPDATE fee_structure SET
@@ -209,6 +224,7 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
         student_type = COALESCE($13, student_type),
         is_transport_fee = COALESCE($14, is_transport_fee),
         route_id = $15,
+        term = CASE WHEN $18::boolean THEN $19 ELSE term END,
         updated_at = NOW()
        WHERE id = $16 AND tenant_id = $17`,
       [
@@ -219,7 +235,8 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
         late_fee_per_day || lateFeePerDay, grace_period_days || gracePeriodDays,
         student_type || null, is_transport_fee ?? null,
         route_id || null,
-        req.params.id, tid
+        req.params.id, tid,
+        termProvided, term || null
       ]
     );
 
@@ -882,6 +899,7 @@ router.get('/student/:studentId', async (req, res) => {
         AND (fs.class_id = $2 OR fs.class_id IS NULL)
         AND (fs.student_type = 'all' OR fs.student_type = $3)
         AND fs.academic_year = $4
+        AND (fs.term IS NULL OR fs.term = $6)
         AND fs.extra_fee_id IS NULL
         AND (
           fs.is_transport_fee = FALSE
@@ -895,7 +913,7 @@ router.get('/student/:studentId', async (req, res) => {
           )
         )
       ORDER BY fs.name, fs.class_id NULLS LAST
-    `, [tid, std.class_id, std.student_type || 'all', year, std.id]);
+    `, [tid, std.class_id, std.student_type || 'all', year, std.id, term || null]);
 
     // Extra fees
     const extraFees = await query(`
@@ -1271,6 +1289,7 @@ router.get('/expected/:studentId', async (req, res) => {
          AND (fs.class_id = $2 OR fs.class_id IS NULL)
          AND (fs.student_type = 'all' OR fs.student_type = $3)
          AND fs.academic_year = $4
+         AND (fs.term IS NULL OR fs.term = $6)
          AND fs.extra_fee_id IS NULL
          AND (
            fs.is_transport_fee = FALSE
@@ -1284,7 +1303,7 @@ router.get('/expected/:studentId', async (req, res) => {
            )
          )
        ORDER BY fs.name, fs.class_id NULLS LAST`,
-      [tid, std.class_id, std.student_type || 'all', year, std.id]
+      [tid, std.class_id, std.student_type || 'all', year, std.id, term || null]
     );
 
     // Extra fees for this student's class and/or this specific student
@@ -1409,6 +1428,7 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
          AND (fs.class_id = $2 OR fs.class_id IS NULL)
          AND (fs.student_type = 'all' OR fs.student_type = $3)
          AND fs.academic_year = $4
+         AND (fs.term IS NULL OR fs.term = $6)
          AND (
            fs.is_transport_fee = FALSE
            OR (
@@ -1428,7 +1448,7 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
            )
          )
        ORDER BY fs.name, fs.class_id NULLS LAST, fs.extra_fee_id NULLS FIRST`,
-      [tid, std.class_id, std.student_type || 'all', year, std.id]
+      [tid, std.class_id, std.student_type || 'all', year, std.id, term || null]
     );
 
     if (!structures.length) {

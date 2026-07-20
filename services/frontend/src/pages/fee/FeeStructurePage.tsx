@@ -31,6 +31,7 @@ const EMPTY_FORM = {
   student_type: 'all',
   is_transport_fee: false,
   route_id: '',
+  term: '',
 };
 
 export function FeeStructurePage() {
@@ -99,6 +100,7 @@ export function FeeStructurePage() {
         student_type: formData.student_type,
         is_transport_fee: formData.is_transport_fee,
         route_id: formData.is_transport_fee ? (formData.route_id || null) : null,
+        term: formData.term || null,
       };
       if (editingStructure) {
         await api.updateFeeStructure(editingStructure.id, payload);
@@ -129,6 +131,7 @@ export function FeeStructurePage() {
       student_type: structure.student_type || 'all',
       is_transport_fee: structure.is_transport_fee ?? false,
       route_id: structure.route_id || '',
+      term: structure.term || '',
     });
     setShowModal(true);
   };
@@ -248,6 +251,7 @@ export function FeeStructurePage() {
                         <th className="text-left px-4 py-3 font-medium">{t('Name')}</th>
                         <th className="text-left px-4 py-3 font-medium">{t('Amount')}</th>
                         <th className="text-left px-4 py-3 font-medium">{t('Frequency')}</th>
+                        <th className="text-left px-4 py-3 font-medium">{t('Term')}</th>
                         <th className="text-left px-4 py-3 font-medium">{t('Applies To')}</th>
                         <th className="text-left px-4 py-3 font-medium">{t('Class')}</th>
                         <th className="text-left px-4 py-3 font-medium">{t('Type')}</th>
@@ -268,6 +272,13 @@ export function FeeStructurePage() {
                           </td>
                           <td className="px-4 py-3 font-semibold">{fmt(s.amount)}</td>
                           <td className="px-4 py-3 text-gray-600">{freqLabel[s.frequency] || s.frequency}</td>
+                          <td className="px-4 py-3">
+                            {s.term ? (
+                              <Badge className="bg-amber-100 text-amber-800">{s.term.replace('term', 'Term ')}</Badge>
+                            ) : (
+                              <span className="text-gray-400 text-xs">{t('All Terms')}</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             <Badge className={s.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : s.student_type === 'day_scholar' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}>
                               {STUDENT_TYPE_LABEL[s.student_type] || 'All Students'}
@@ -534,6 +545,20 @@ export function FeeStructurePage() {
                   <Label>{t('Academic Year')}</Label>
                   <Input value={formData.academicYear} onChange={e => handleChange('academicYear', e.target.value)} />
                 </div>
+              </div>
+
+              {/* Term */}
+              <div>
+                <Label>{t('Term')}</Label>
+                <Select value={formData.term} onChange={e => handleChange('term', e.target.value)}>
+                  <option value="">{t('All Terms (same amount every term)')}</option>
+                  <option value="term1">{t('Term 1 only')}</option>
+                  <option value="term2">{t('Term 2 only')}</option>
+                  <option value="term3">{t('Term 3 only')}</option>
+                </Select>
+                <p className="text-xs text-gray-400 mt-1">
+                  {t('Set this when a fee amount differs by term (e.g. tuition). Create one entry per term with its own amount. Leave as "All Terms" for fees like transport or lunch that don\'t change by term.')}
+                </p>
               </div>
 
               {/* Transport Fee */}

@@ -6,21 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Search, FileText, Loader2 } from 'lucide-react';
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
-
-const GRADE_COLORS_HEX: Record<string, [number, number, number]> = {
-  EE: [22, 163, 74],   EE1: [15, 118, 54],  EE2: [22, 163, 74],
-  ME: [37, 99, 235],   ME1: [29, 78, 216],  ME2: [37, 99, 235],
-  AE: [202, 138, 4],   AE1: [180, 120, 2],  AE2: [202, 138, 4],
-  BE: [220, 38, 38],   BE1: [185, 28, 28],  BE2: [220, 38, 38],
-  WD: [22, 163, 74], D: [202, 138, 4], B: [220, 38, 38],
-};
-const GRADE_POINTS_PRIMARY: Record<string, number> = {
-  EE: 4, ME: 3, AE: 2, BE: 1,
-};
+import { renderReportCardPage } from '@/pages/cbc/CbcReportCardPage';
 
 // Same CBE grading scheme as the backend's computeCBEGrade (cbcRoutes.js) — recomputed
 // here from raw exam marks so results shown on this report always match the school's
 // official CBE scale regardless of what was stored on the exam_results row.
+// (renderReportCardPage derives grade points/colors/descriptors from the grade code itself,
+// so this is the only piece of grading logic this page still needs.)
 function computeCBEGrade(percentage: number, level: string): string {
   if (['playgroup', 'pre_primary'].includes(level)) {
     if (percentage >= 75) return 'WD';
@@ -43,395 +35,9 @@ function computeCBEGrade(percentage: number, level: string): string {
   return 'BE';
 }
 
-const JSS_GRADE_POINTS: Record<string, number> = {
-  EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
-};
-
-// Facilitator comment based on average points per subject (JSS scale: 1–8)
-function getFacilitatorComment(avgPoints: number): { comment: string; color: [number, number, number] } {
-  const rounded = Math.round(avgPoints);
-  if (rounded >= 8) return { comment: 'Outstanding! You are a star performer. Keep it up!',               color: [22, 163, 74]  };
-  if (rounded === 7) return { comment: 'Excellent work! Your hard work is really showing.',                color: [34, 197, 94]  };
-  if (rounded === 6) return { comment: 'Good job! You are doing great, keep putting in the effort.',       color: [37, 99, 235]  };
-  if (rounded === 5) return { comment: 'Well done! You have mastered this. Stay focused.',                 color: [59, 130, 246] };
-  if (rounded === 4) return { comment: 'Nice effort! You are so close, just a little more practice.',      color: [202, 138, 4]  };
-  if (rounded === 3) return { comment: 'Nice effort! I believe you can do even better next time.',         color: [217, 119, 6]  };
-  if (rounded === 2) return { comment: "Don't give up! Keep trying until you get there.",                  color: [220, 38, 38]  };
-  return                    { comment: 'You can do it! Keep trying until you get it.',                     color: [185, 28, 28]  };
-}
-
-// Facilitator comment based on average points per subject (Primary scale: 1–4)
-function getFacilitatorCommentPrimary(avgPoints: number): { comment: string; color: [number, number, number] } {
-  const rounded = Math.round(avgPoints);
-  if (rounded >= 4) return { comment: 'Outstanding! You are a star performer. Keep it up!',         color: [22, 163, 74]  };
-  if (rounded === 3) return { comment: 'Good job! You are doing great, keep putting in the effort.', color: [37, 99, 235]  };
-  if (rounded === 2) return { comment: "Nice effort! I believe you can do even better next time.",   color: [202, 138, 4]  };
-  return                    { comment: 'You can do it! Keep trying until you get it.',               color: [220, 38, 38]  };
-}
-
-// Facilitator comment based on grade distribution (pre-primary)
-function getFacilitatorCommentFromGrades(grades: string[]): { comment: string; color: [number, number, number] } {
-  const total = grades.length;
-  if (total === 0) return { comment: 'No assessment data available for this term.', color: [150, 150, 150] };
-  const eeCount = grades.filter(g => g.startsWith('EE') || g === 'WD').length;
-  const meCount = grades.filter(g => g.startsWith('ME') || g === 'D').length;
-  const beCount = grades.filter(g => g.startsWith('BE') || g === 'B').length;
-  const pctHigh = (eeCount + meCount) / total;
-  if (pctHigh >= 0.85 && eeCount / total >= 0.5)
-    return { comment: 'Outstanding performance! Keep up the excellent work.', color: [22, 163, 74] };
-  if (pctHigh >= 0.7)
-    return { comment: 'Good performance. Continue working hard to achieve more.', color: [37, 99, 235] };
-  if (beCount / total < 0.3)
-    return { comment: 'Fair performance. More effort is needed to improve.', color: [202, 138, 4] };
-  if (beCount / total < 0.6)
-    return { comment: 'Below average. Put in more effort to catch up with the class.', color: [220, 38, 38] };
-  return { comment: 'Very poor performance. Urgent improvement required — please see the class teacher.', color: [185, 28, 28] };
-}
-
-async function generateStudentReportPDF(
-  student: any,
-  assessments: any[],
-  school: any,
-  term: string,
-  academicYear: string,
-  examName: string,
-  closingDate?: string,
-  openingDate?: string
-) {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const margin = 14;
-  let y = 0;
-
-  // ── School Header ───────────────────────────────────────────────────────────
-  const headerH = 40;
-  const imgSize = 28;
-  // White header background
-  doc.setFillColor(255, 255, 255);
-  doc.rect(0, 0, pageW, headerH, 'F');
-  // Bottom border line
-  doc.setDrawColor(37, 99, 235);
-  doc.setLineWidth(0.8);
-  doc.line(0, headerH, pageW, headerH);
-  doc.setLineWidth(0.2);
-
-  // School logo — LEFT
-  if (school.school_logo_url) {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise<void>((resolve) => {
-        img.onload = () => {
-          try {
-            const fmt = school.school_logo_url.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            doc.addImage(img, fmt, margin, (headerH - imgSize) / 2, imgSize, imgSize);
-          } catch { /* skip */ }
-          resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = school.school_logo_url;
-      });
-    } catch { /* skip */ }
-  } else {
-    doc.setDrawColor(180, 180, 180);
-    doc.rect(margin, (headerH - imgSize) / 2, imgSize, imgSize, 'D');
-    doc.setFontSize(5); doc.setTextColor(150, 150, 150);
-    doc.text('LOGO', margin + imgSize / 2, headerH / 2, { align: 'center' });
-  }
-
-  // Student passport photo — RIGHT
-  const photoX = pageW - margin - imgSize;
-  const studentPhotoUrl = student.profile_photo_url || null;
-  if (studentPhotoUrl) {
-    try {
-      const sImg = new Image();
-      sImg.crossOrigin = 'anonymous';
-      await new Promise<void>((resolve) => {
-        sImg.onload = () => {
-          try {
-            const fmt = studentPhotoUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            doc.addImage(sImg, fmt, photoX, (headerH - imgSize) / 2, imgSize, imgSize);
-          } catch { /* skip */ }
-          resolve();
-        };
-        sImg.onerror = () => resolve();
-        sImg.src = studentPhotoUrl;
-      });
-    } catch { /* skip */ }
-  } else {
-    doc.setDrawColor(180, 180, 180);
-    doc.rect(photoX, (headerH - imgSize) / 2, imgSize, imgSize, 'D');
-    doc.setFontSize(5); doc.setTextColor(150, 150, 150);
-    doc.text('PHOTO', photoX + imgSize / 2, headerH / 2, { align: 'center' });
-  }
-
-  // School info — centered between logo and photo
-  doc.setTextColor(37, 99, 235);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(school.school_name || 'School Management System', pageW / 2, 11, { align: 'center' });
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(60, 60, 60);
-  const addrLine = [school.address, school.city, school.state].filter(Boolean).join(', ');
-  if (addrLine) doc.text(addrLine, pageW / 2, 18, { align: 'center' });
-  const contactLine = [school.phone, school.email].filter(Boolean).join('  |  ');
-  if (contactLine) doc.text(contactLine, pageW / 2, 24, { align: 'center' });
-  if (school.motto) {
-    doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
-    doc.text(school.motto, pageW / 2, 30, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-  }
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(37, 99, 235);
-  const termLabel = term.replace('term', 'Term ');
-  doc.text(`STUDENT REPORT FORM — ${examName} · ${termLabel} ${academicYear}`, pageW / 2, 37, { align: 'center' });
-  y = headerH + 8;
-
-  // ── Student Details ─────────────────────────────────────────────────────────
-  doc.setTextColor(0, 0, 0);
-  doc.setFillColor(243, 244, 246);
-  doc.roundedRect(margin, y, pageW - 2 * margin, 18, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('STUDENT INFORMATION', margin + 4, y + 5);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  const leftCol = margin + 4;
-  const rightCol = pageW / 2 + 4;
-  doc.text(`Name: ${student.first_name} ${student.last_name}`, leftCol, y + 10);
-  doc.text(`Adm No: ${student.admission_number || '—'}`, rightCol, y + 10);
-  doc.text(`Class: ${student.class_name || '—'}`, leftCol, y + 16);
-  doc.text(`Category: ${student.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}`, rightCol, y + 16);
-  y += 22;
-
-  // ── Assessments Table ────────────────────────────────────────────────────────
-  if (assessments.length > 0) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setFillColor(37, 99, 235);
-    doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text('CBE ASSESSMENT RESULTS', margin + 4, y + 4.5);
-    y += 9;
-    doc.setTextColor(0, 0, 0);
-
-    // Table header
-    // Detect level: JSS (has grade_points), Primary (cbc_grade = EE/ME/AE/BE), Pre-primary (WD/D/B)
-    const hasJSS = assessments.some((a: any) => a.grade_points != null);
-    const hasPrimary = !hasJSS && assessments.some((a: any) => GRADE_POINTS_PRIMARY[a.cbc_grade] != null);
-    // JSS and Primary both get a Pts column; pre-primary does not
-    const colX = (hasJSS || hasPrimary)
-      ? [margin, margin + 48, margin + 80, margin + 100, margin + 116, margin + 128, margin + 148]
-      : [margin, margin + 52, margin + 88, margin + 110, margin + 124, margin + 140];
-    const colHeads = (hasJSS || hasPrimary)
-      ? ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Pts', 'Facilitator']
-      : ['Learning Area', 'Type / Period', 'Score', 'Grade', 'Facilitator'];
-    doc.setFillColor(219, 234, 254);
-    doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    colHeads.forEach((h, i) => doc.text(h, colX[i], y + 4));
-    y += 7;
-
-    doc.setFont('helvetica', 'normal');
-    assessments.forEach((a: any, idx: number) => {
-      if (y > 255) { doc.addPage(); y = 20; }
-      if (idx % 2 === 0) {
-        doc.setFillColor(249, 250, 251);
-        doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
-      }
-      const grade = a.cbc_grade || a.pre_primary_grade || '';
-      const score = a.result_code ? a.result_code : (a.score != null ? `${a.score}/${a.max_score}` : '—');
-      const facilitator = (a.teacher_name || '—');
-      const period = a.exam_period ? a.exam_period.replace('_', '-') : a.assessment_type || '';
-
-      doc.setFontSize(8);
-      doc.text((a.subject_name || '—').slice(0, 24), colX[0], y + 4);
-      doc.text(period.slice(0, 18), colX[1], y + 4);
-      doc.text(score, colX[2], y + 4);
-
-      // Grade badge
-      if (grade) {
-        const [r, g, b] = GRADE_COLORS_HEX[grade] || [100, 100, 100];
-        doc.setFillColor(r, g, b);
-        doc.setTextColor(255, 255, 255);
-        doc.roundedRect(colX[3], y + 0.5, hasJSS ? 14 : 12, 5, 1, 1, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.text(grade, colX[3] + 1.5, y + 4);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(0, 0, 0);
-      } else {
-        doc.text('—', colX[3], y + 4);
-      }
-
-      if (hasJSS) {
-        const pts = a.grade_points != null ? String(a.grade_points) : '—';
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.text(pts, colX[4], y + 4);
-        doc.setFont('helvetica', 'normal');
-        doc.text(facilitator.slice(0, 22), colX[5], y + 4);
-      } else if (hasPrimary) {
-        const pts = GRADE_POINTS_PRIMARY[a.cbc_grade] != null ? String(GRADE_POINTS_PRIMARY[a.cbc_grade]) : '—';
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.text(pts, colX[4], y + 4);
-        doc.setFont('helvetica', 'normal');
-        doc.text(facilitator.slice(0, 22), colX[5], y + 4);
-      } else {
-        doc.text(facilitator.slice(0, 24), colX[4], y + 4);
-      }
-      y += 6;
-    });
-
-    // ── Total Points & Facilitator Comment ────────────────────────────────────
-    if (y > 260) { doc.addPage(); y = 20; }
-    y += 2;
-
-    if (hasJSS) {
-      const validPts = assessments.filter((a: any) => a.grade_points != null);
-      const totalPts = validPts.reduce((s: number, a: any) => s + Number(a.grade_points), 0);
-      const avgPts = validPts.length > 0 ? totalPts / validPts.length : 0;
-      const maxPts = validPts.length * 8;
-      const { comment, color } = getFacilitatorComment(avgPts);
-
-      // Total Points row
-      doc.setFillColor(219, 234, 254);
-      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(0, 0, 0);
-      doc.text('TOTAL POINTS', margin + 4, y + 4.5);
-      doc.text(`${totalPts} / ${maxPts}`, pageW - margin - 4, y + 4.5, { align: 'right' });
-      y += 8;
-
-      // Average Points row
-      doc.setFillColor(239, 246, 255);
-      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.text('Average Points per Subject', margin + 4, y + 4);
-      doc.setFont('helvetica', 'bold');
-      doc.text(avgPts.toFixed(1), pageW - margin - 4, y + 4, { align: 'right' });
-      y += 7;
-
-      // Facilitator Comment row (two lines: label + comment)
-      doc.setFillColor(color[0], color[1], color[2]);
-      doc.rect(margin, y, pageW - 2 * margin, 12, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${avgPts.toFixed(1)} pts/subject)`, margin + 4, y + 4.5);
-      doc.setFont('helvetica', 'normal');
-      doc.text(comment, margin + 4, y + 9.5);
-      doc.setTextColor(0, 0, 0);
-      y += 14;
-    } else if (hasPrimary) {
-      // Primary (Grade 1–6): EE=4, ME=3, AE=2, BE=1
-      const validPts = assessments.filter((a: any) => GRADE_POINTS_PRIMARY[a.cbc_grade] != null);
-      const totalPts = validPts.reduce((s: number, a: any) => s + GRADE_POINTS_PRIMARY[a.cbc_grade], 0);
-      const avgPts = validPts.length > 0 ? totalPts / validPts.length : 0;
-      const maxPts = validPts.length * 4;
-      const { comment, color } = getFacilitatorCommentPrimary(avgPts);
-
-      // Total Points row
-      doc.setFillColor(219, 234, 254);
-      doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(0, 0, 0);
-      doc.text('TOTAL POINTS', margin + 4, y + 4.5);
-      doc.text(`${totalPts} / ${maxPts}`, pageW - margin - 4, y + 4.5, { align: 'right' });
-      y += 8;
-
-      // Average Points row
-      doc.setFillColor(239, 246, 255);
-      doc.rect(margin, y, pageW - 2 * margin, 6, 'F');
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0);
-      doc.text('Average Points per Subject', margin + 4, y + 4);
-      doc.setFont('helvetica', 'bold');
-      doc.text(avgPts.toFixed(1), pageW - margin - 4, y + 4, { align: 'right' });
-      y += 7;
-
-      // Facilitator Comment row (two lines)
-      doc.setFillColor(color[0], color[1], color[2]);
-      doc.rect(margin, y, pageW - 2 * margin, 12, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${avgPts.toFixed(1)} pts/subject)`, margin + 4, y + 4.5);
-      doc.setFont('helvetica', 'normal');
-      doc.text(comment, margin + 4, y + 9.5);
-      doc.setTextColor(0, 0, 0);
-      y += 14;
-    } else {
-      // Pre-primary (WD / D / B): grade distribution comment only
-      const grades = assessments.map((a: any) => a.pre_primary_grade || '');
-      const { comment, color } = getFacilitatorCommentFromGrades(grades);
-      const wdC = grades.filter((g: string) => g === 'WD').length;
-      const dC  = grades.filter((g: string) => g === 'D').length;
-      const bC  = grades.filter((g: string) => g === 'B').length;
-
-      doc.setFillColor(color[0], color[1], color[2]);
-      doc.rect(margin, y, pageW - 2 * margin, 12, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text(`FACILITATOR'S COMMENT:  (WD:${wdC}  D:${dC}  B:${bC})`, margin + 4, y + 4.5);
-      doc.setFont('helvetica', 'normal');
-      doc.text(comment, margin + 4, y + 9.5);
-      doc.setTextColor(0, 0, 0);
-      y += 14;
-    }
-
-    y += 2;
-  } else {
-    doc.setFontSize(9);
-    doc.setTextColor(150);
-    doc.text('No assessment records found for the selected term.', margin, y);
-    doc.setTextColor(0, 0, 0);
-    y += 10;
-  }
-
-  // ── Term Dates ──────────────────────────────────────────────────────────────
-  if (closingDate || openingDate) {
-    if (y > 265) { doc.addPage(); y = 20; }
-    const tdW = (pageW - 2 * margin - 4) / 2;
-    [
-      { label: 'TERM CLOSES', value: closingDate || '—' },
-      { label: 'NEXT TERM OPENS', value: openingDate || '—' },
-    ].forEach(({ label, value }, i) => {
-      const tx = margin + i * (tdW + 4);
-      doc.setFillColor(235, 235, 235);
-      doc.rect(tx, y, tdW, 6, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(80, 80, 80);
-      doc.text(label, tx + tdW / 2, y + 4, { align: 'center' });
-      doc.setFillColor(255, 255, 255);
-      doc.rect(tx, y + 6, tdW, 8);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
-      doc.text(value, tx + tdW / 2, y + 12, { align: 'center' });
-    });
-    y += 17;
-  }
-
-  // ── Footer ──────────────────────────────────────────────────────────────────
-  doc.setFontSize(7);
-  doc.setTextColor(150);
-  doc.text(
-    `Generated: ${new Date().toLocaleDateString()}  |  ${school.school_name || 'SkulManager'}  |  Confidential`,
-    pageW / 2, 290, { align: 'center' }
-  );
-
-  const safeFileName = `${student.first_name}_${student.last_name}_${termLabel}_${academicYear}_report.pdf`.replace(/\s+/g, '_');
-  doc.save(safeFileName);
+function formatDateKE(iso?: string): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 // ── Page Component ──────────────────────────────────────────────────────────
@@ -486,28 +92,46 @@ export function StudentReportPage() {
       const isPrePrimary = ['playgroup', 'pre_primary'].includes(level);
 
       const rows: any[] = (resultsRes?.data || []).filter((r: any) => r.student_id === selectedStudent.id);
-      const assessments = rows.map((r: any) => {
-        if (r.is_absent) {
-          return { subject_name: r.subject_name, result_code: 'ABS', assessment_type: selectedExam?.name || 'Exam' };
-        }
+      const competencies = rows.filter((r: any) => !r.is_absent).map((r: any) => {
         const maxScore = Number(r.max_marks) || 0;
         const score = Number(r.marks_obtained) || 0;
         const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
         const grade = computeCBEGrade(pct, level);
         return {
           subject_name: r.subject_name,
-          score, max_score: maxScore,
-          assessment_type: selectedExam?.name || 'Exam',
-          cbc_grade: isPrePrimary ? null : grade,
+          total_score: score,
+          max_score: maxScore,
+          percentage: pct,
+          overall_cbc_grade: isPrePrimary ? null : grade,
           pre_primary_grade: isPrePrimary ? grade : null,
-          grade_points: level === 'junior_secondary' ? (JSS_GRADE_POINTS[grade] ?? null) : null,
+          teacher_name: null,
         };
       });
 
-      await generateStudentReportPDF(
-        selectedStudent, assessments, school, term, academicYear, selectedExam?.name || 'Exam',
-        closingDate || undefined, openingDate || undefined
-      );
+      // Reuse the exact same renderer as the CBC Report Card page so both produce
+      // an identical official report — this page just supplies a single exam's
+      // results instead of a whole term's CBC assessment aggregate.
+      const detail = {
+        student_name: `${selectedStudent.first_name} ${selectedStudent.last_name}`,
+        admission_number: selectedStudent.admission_number,
+        class_name: selectedStudent.class_name,
+        profile_photo_url: selectedStudent.profile_photo_url,
+        education_level: level,
+        period: selectedExam?.name || 'Exam',
+        competencies,
+        class_rank: null,
+        total_in_class: null,
+        class_teacher_name: null,
+        head_teacher_name: null,
+        term_end_date: formatDateKE(closingDate),
+        next_term_start_date: formatDateKE(openingDate),
+      };
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      await renderReportCardPage(doc, detail, school, term, academicYear, true);
+      const safeName = `${selectedStudent.first_name}_${selectedStudent.last_name}`.replace(/\s+/g, '_');
+      const termLabel = (term || 'term').replace('term', 'T');
+      doc.save(`ReportCard_${safeName}_${termLabel}_${academicYear}.pdf`);
     } catch (err: any) {
       alert('Failed to generate report: ' + (err.message || 'Unknown error'));
     } finally {
@@ -652,9 +276,10 @@ export function StudentReportPage() {
 
           {/* Info note */}
           <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
-            <p>The PDF report will include:</p>
-            <p>• School logo, name, address and contact</p>
-            <p>• Student details and the selected exam's results, with auto-comments</p>
+            <p>Generates the same official CBE Report Card format used elsewhere in the system, for this one exam:</p>
+            <p>• School logo, name, address, contact and student photo</p>
+            <p>• Learning areas performance table with grades and points</p>
+            <p>• Performance level, total marks/points and grade descriptors</p>
             <p>• Term closing and next term opening dates (if set)</p>
           </div>
 

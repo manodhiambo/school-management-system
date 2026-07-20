@@ -447,100 +447,27 @@ export async function renderReportCardPage(
     y += dH + 3;
   }
 
-  // ── 7. FEES + TERM DATES ──────────────────────────────────────────────────
-  const feeRows: any[] = detail.fee_breakdown || [];
-  const totalFees = feeRows.reduce((s: number, r: any) => s + Number(r.total_amount || 0), 0);
-  const totalPaid = feeRows.reduce((s: number, r: any) => s + Number(r.paid_amount || 0), 0);
-  const totalBalance = feeRows.reduce((s: number, r: any) => s + Number(r.balance_amount || 0), 0);
+  // ── 7. TERM DATES ─────────────────────────────────────────────────────────
+  if (y + 22 > 284) { doc.addPage(); y = 10; }
 
-  const feeW = CW * 0.56;
-  const dateW = CW - feeW - 4;
-  const feeX = M;
-  const dateX = M + feeW + 4;
-
-  const feeSectionHeight = Math.max(27, 7 + feeRows.length * 5 + 16);
-  if (y + feeSectionHeight > 284) { doc.addPage(); y = 10; }
-  const feeSectionStartY = y;
-
-  // FEES header
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-  doc.text('FEES', feeX, y + 5);
-  doc.text('TERM DATES', dateX, y + 5);
+  doc.text('TERM DATES', M, y + 5);
   y += 7;
 
-  // Fee list header row — FEE ITEM | CHARGED | PAID | BALANCE
-  cell(doc, feeX, y, feeW * 0.46, 6, [235, 235, 235]);
-  cell(doc, feeX + feeW * 0.46, y, feeW * 0.18, 6, [235, 235, 235]);
-  cell(doc, feeX + feeW * 0.64, y, feeW * 0.18, 6, [235, 235, 235]);
-  cell(doc, feeX + feeW * 0.82, y, feeW * 0.18, 6, [235, 235, 235]);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(0, 0, 0);
-  doc.text('FEE ITEM', feeX + 2, y + 4);
-  doc.text('CHARGED', feeX + feeW * 0.46 + 2, y + 4);
-  doc.text('PAID', feeX + feeW * 0.64 + 2, y + 4);
-  doc.text('BALANCE', feeX + feeW * 0.82 + 2, y + 4);
-  y += 6;
-
-  // Individual fee rows
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
-  feeRows.forEach((r: any, i: number) => {
-    const bg: [number, number, number] = i % 2 === 0 ? [250, 250, 250] : [255, 255, 255];
-    cell(doc, feeX, y, feeW * 0.46, 5, bg);
-    cell(doc, feeX + feeW * 0.46, y, feeW * 0.18, 5, bg);
-    cell(doc, feeX + feeW * 0.64, y, feeW * 0.18, 5, bg);
-    cell(doc, feeX + feeW * 0.82, y, feeW * 0.18, 5, bg);
-    doc.setTextColor(0, 0, 0);
-    const label = r.is_transport_fee
-      ? `Transport${r.route_name ? ` (${r.route_name})` : ''}`
-      : r.fee_name;
-    doc.text((label || 'Fee').slice(0, 22), feeX + 2, y + 3.5);
-    doc.text(Number(r.total_amount || 0).toLocaleString('en-KE'), feeX + feeW * 0.46 + 2, y + 3.5);
-    const paid = Number(r.paid_amount || 0);
-    if (paid > 0) doc.setTextColor(22, 163, 74);
-    doc.text(paid.toLocaleString('en-KE'), feeX + feeW * 0.64 + 2, y + 3.5);
-    const bal = Number(r.balance_amount || 0);
-    if (bal > 0) doc.setTextColor(200, 40, 40); else doc.setTextColor(0, 0, 0);
-    doc.text(bal.toLocaleString('en-KE'), feeX + feeW * 0.82 + 2, y + 3.5);
-    doc.setTextColor(0, 0, 0);
-    y += 5;
-  });
-
-  if (feeRows.length === 0) {
-    cell(doc, feeX, y, feeW, 5, [250, 250, 250]);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(150, 150, 150);
-    doc.text('No fee invoices found', feeX + 2, y + 3.5);
-    y += 5;
-  }
-
-  // Total row
-  cell(doc, feeX, y, feeW * 0.46, 6, [220, 235, 255]);
-  cell(doc, feeX + feeW * 0.46, y, feeW * 0.18, 6, [220, 235, 255]);
-  cell(doc, feeX + feeW * 0.64, y, feeW * 0.18, 6, [220, 235, 255]);
-  cell(doc, feeX + feeW * 0.82, y, feeW * 0.18, 6, [220, 235, 255]);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
-  doc.text('TOTAL', feeX + 2, y + 4.5);
-  doc.text(totalFees.toLocaleString('en-KE'), feeX + feeW * 0.46 + 2, y + 4.5);
-  doc.setTextColor(22, 163, 74);
-  doc.text(totalPaid.toLocaleString('en-KE'), feeX + feeW * 0.64 + 2, y + 4.5);
-  if (totalBalance > 0) doc.setTextColor(200, 40, 40); else doc.setTextColor(0, 0, 0);
-  doc.text(totalBalance.toLocaleString('en-KE'), feeX + feeW * 0.82 + 2, y + 4.5);
-  doc.setTextColor(0, 0, 0);
-  y += 6;
-
-  // Term dates table (positioned to the right, aligned with fee list header)
-  const termY = feeSectionStartY + 7;
-  const dColW = dateW / 2;
+  const dColW = CW / 2;
   ['TERM ENDS', 'NEXT TERM BEGINS'].forEach((h, i) => {
-    cell(doc, dateX + i * dColW, termY, dColW, 7, [235, 235, 235]);
+    cell(doc, M + i * dColW, y, dColW, 7, [235, 235, 235]);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
-    doc.text(h, dateX + i * dColW + dColW / 2, termY + 4.5, { align: 'center' });
+    doc.text(h, M + i * dColW + dColW / 2, y + 4.5, { align: 'center' });
   });
   const termEndStr = detail.term_end_date || '—';
   const nextTermStr = detail.next_term_start_date || '—';
   [termEndStr, nextTermStr].forEach((v, i) => {
-    cell(doc, dateX + i * dColW, termY + 7, dColW, 8);
+    cell(doc, M + i * dColW, y + 7, dColW, 8);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
-    doc.text(v, dateX + i * dColW + dColW / 2, termY + 13, { align: 'center' });
+    doc.text(v, M + i * dColW + dColW / 2, y + 13, { align: 'center' });
   });
+  y += 15;
 
   // ── 8. FOOTER ─────────────────────────────────────────────────────────────
   const footerY = 287;
@@ -1275,60 +1202,6 @@ export function CbcReportCardPage() {
                         <p className="text-sm font-bold text-teal-900">{detail.next_term_start_date}</p>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Fee Breakdown — includes standard fees, extra fees and transport */}
-                {detail.fee_breakdown && detail.fee_breakdown.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-sm text-gray-700 mb-2">Fee Account</h3>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-gray-100 text-gray-600">
-                            <th className="text-left px-3 py-1.5 font-semibold">Fee Item</th>
-                            <th className="text-right px-3 py-1.5 font-semibold">Charged</th>
-                            <th className="text-right px-3 py-1.5 font-semibold">Paid</th>
-                            <th className="text-right px-3 py-1.5 font-semibold">Balance</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detail.fee_breakdown.map((f: any, i: number) => (
-                            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-3 py-1.5 text-gray-800">
-                                {f.is_transport_fee
-                                  ? `Transport${f.route_name ? ` (${f.route_name})` : ''}`
-                                  : f.fee_name}
-                                {f.is_extra_fee && <span className="ml-1 text-purple-500 font-medium">(Extra)</span>}
-                              </td>
-                              <td className="px-3 py-1.5 text-right text-gray-700">
-                                {Number(f.total_amount || 0).toLocaleString('en-KE')}
-                              </td>
-                              <td className="px-3 py-1.5 text-right text-green-700">
-                                {Number(f.paid_amount || 0).toLocaleString('en-KE')}
-                              </td>
-                              <td className={`px-3 py-1.5 text-right font-medium ${Number(f.balance_amount) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                {Number(f.balance_amount || 0).toLocaleString('en-KE')}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-blue-50 font-semibold border-t">
-                            <td className="px-3 py-1.5 text-gray-800">TOTAL</td>
-                            <td className="px-3 py-1.5 text-right text-gray-800">
-                              {detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.total_amount || 0), 0).toLocaleString('en-KE')}
-                            </td>
-                            <td className="px-3 py-1.5 text-right text-green-700">
-                              {detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.paid_amount || 0), 0).toLocaleString('en-KE')}
-                            </td>
-                            <td className={`px-3 py-1.5 text-right ${detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.balance_amount || 0), 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {detail.fee_breakdown.reduce((s: number, f: any) => s + Number(f.balance_amount || 0), 0).toLocaleString('en-KE')}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
                   </div>
                 )}
 

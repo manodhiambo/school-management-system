@@ -10,7 +10,7 @@ import {
   Star, Award, Globe, Zap, Play, X, Bus, Heart, Package,
   MessageSquare, Library, ClipboardList, Briefcase, DollarSign,
   Bell, MapPin, Activity, FileText, Layers, Clock, ChevronRight,
-  Loader2,
+  Loader2, Users2,
 } from 'lucide-react';
 
 /* ── Pexels photo helpers ── */
@@ -39,6 +39,7 @@ const FEATURE_CATS = [
     color: 'blue',
     items: [
       { icon: <Users className="h-5 w-5" />,        title: 'Student Admissions',       desc: 'Full CBE onboarding — NEMIS, birth cert, county, special needs, parent linking, transport in one wizard.' },
+      { icon: <Globe className="h-5 w-5" />,        title: 'Online Admissions Portal', desc: 'A shareable public application link for parents — document upload, M-Pesa fee, interview scheduling, and one-click enrolment.' },
       { icon: <GraduationCap className="h-5 w-5" />, title: 'Kenya CBE Curriculum',     desc: 'Strand-based grading (EE/ME/AE/BE), competency tracking, CBC report cards for all levels.' },
       { icon: <ClipboardList className="h-5 w-5" />, title: 'Schemes & Lesson Plans',   desc: 'Weekly schemes of work and lesson plans with objectives, methods, and approval workflow.' },
       { icon: <Activity className="h-5 w-5" />,      title: 'School-Based Assessments', desc: 'SBA mark entry with auto CBE grade computation; mid-term and end-term per strand.' },
@@ -64,6 +65,7 @@ const FEATURE_CATS = [
       { icon: <Award className="h-5 w-5" />,         title: 'Clubs & Activities',       desc: 'School clubs management with student enrolment and activity tracking.' },
       { icon: <Package className="h-5 w-5" />,       title: 'Hostel / Boarding',        desc: 'Hostel rooms, boarder assignments, and boarding fee tracking.' },
       { icon: <Briefcase className="h-5 w-5" />,     title: 'Procurement & Assets',     desc: 'Full procurement lifecycle: PR → RFQ → Quotation → PO → GRN → Invoice → Payment + Asset register.' },
+      { icon: <Users2 className="h-5 w-5" />,        title: 'Alumni Network',           desc: 'Graduate directory, mentorship, reunions, a job board, and donation tracking with M-Pesa.' },
     ],
   },
   {
@@ -169,6 +171,10 @@ const HOMEPAGE_FAQS = [
   {
     q: 'Who developed SkulManager?',
     a: 'SkulManager is developed and maintained by Helvino Technologies Limited, based in Siaya, Kenya. Website: helvino.org, Email: info@helvino.org, Phone: 0110 421 320.',
+  },
+  {
+    q: 'Can parents apply to a school online in Kenya using SkulManager?',
+    a: 'Yes. Every school on SkulManager gets its own shareable online application link. Parents fill in the applicant\'s details, upload documents like the birth certificate and KCPE results, pay the application fee via M-Pesa, and track the application status — entirely online, with no need to visit the school in person.',
   },
 ];
 

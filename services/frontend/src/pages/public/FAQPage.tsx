@@ -32,6 +32,14 @@ const FAQS = [
     ],
   },
   {
+    category: 'Admissions, Alumni & Timetable',
+    items: [
+      { q: 'Can parents apply online without visiting the school?', a: 'Yes. Every school gets a unique, shareable application link (e.g. skulmanager.org/apply/YOURCODE). Parents fill in the applicant\'s details, upload documents like the birth certificate and KCPE results directly from their phone, pay the application fee via M-Pesa, and track their application status — all without visiting the school. Walk-in or phoned-in applicants can also be entered by staff directly.' },
+      { q: 'Can the timetable be generated automatically?', a: 'Yes. Skul Manager can auto-generate a full weekly timetable for every class in one click, based on each class\'s assigned subjects, teachers, and weekly period counts. It automatically avoids double-booking any teacher or class and spreads subjects across the week — similar to dedicated timetabling software, without the manual setup.' },
+      { q: 'Does Skul Manager support alumni management?', a: 'Yes. Schools can build an alumni directory, run reunions and networking events, host a job board, and track donations (including M-Pesa for cash gifts) — with a self-service portal so alumni can update their own profile and connect with the school.' },
+    ],
+  },
+  {
     category: 'Data & Security',
     items: [
       { q: 'Is my school\'s data safe?', a: 'Yes. Each school\'s data is fully isolated in a separate database tenant — no other school can access your data. All connections are encrypted (HTTPS). Role-based access ensures each user only sees what is relevant to them.' },

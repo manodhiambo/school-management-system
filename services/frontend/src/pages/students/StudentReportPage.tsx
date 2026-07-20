@@ -18,6 +18,35 @@ const GRADE_POINTS_PRIMARY: Record<string, number> = {
   EE: 4, ME: 3, AE: 2, BE: 1,
 };
 
+// Same CBE grading scheme as the backend's computeCBEGrade (cbcRoutes.js) — recomputed
+// here from raw exam marks so results shown on this report always match the school's
+// official CBE scale regardless of what was stored on the exam_results row.
+function computeCBEGrade(percentage: number, level: string): string {
+  if (['playgroup', 'pre_primary'].includes(level)) {
+    if (percentage >= 75) return 'WD';
+    if (percentage >= 40) return 'D';
+    return 'B';
+  }
+  if (level === 'junior_secondary') {
+    if (percentage >= 90) return 'EE1';
+    if (percentage >= 75) return 'EE2';
+    if (percentage >= 58) return 'ME1';
+    if (percentage >= 41) return 'ME2';
+    if (percentage >= 31) return 'AE1';
+    if (percentage >= 21) return 'AE2';
+    if (percentage >= 11) return 'BE1';
+    return 'BE2';
+  }
+  if (percentage >= 80) return 'EE';
+  if (percentage >= 60) return 'ME';
+  if (percentage >= 40) return 'AE';
+  return 'BE';
+}
+
+const JSS_GRADE_POINTS: Record<string, number> = {
+  EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
+};
+
 // Facilitator comment based on average points per subject (JSS scale: 1–8)
 function getFacilitatorComment(avgPoints: number): { comment: string; color: [number, number, number] } {
   const rounded = Math.round(avgPoints);
@@ -62,13 +91,10 @@ function getFacilitatorCommentFromGrades(grades: string[]): { comment: string; c
 async function generateStudentReportPDF(
   student: any,
   assessments: any[],
-  feeAccount: any,
   school: any,
-  feeStructures: any[],
   term: string,
   academicYear: string,
-  transportAssignment?: any,
-  extraFees: any[] = [],
+  examName: string,
   closingDate?: string,
   openingDate?: string
 ) {
@@ -161,7 +187,7 @@ async function generateStudentReportPDF(
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(37, 99, 235);
   const termLabel = term.replace('term', 'Term ');
-  doc.text(`STUDENT REPORT FORM — ${termLabel} ${academicYear}`, pageW / 2, 37, { align: 'center' });
+  doc.text(`STUDENT REPORT FORM — ${examName} · ${termLabel} ${academicYear}`, pageW / 2, 37, { align: 'center' });
   y = headerH + 8;
 
   // ── Student Details ─────────────────────────────────────────────────────────
@@ -375,147 +401,9 @@ async function generateStudentReportPDF(
     y += 10;
   }
 
-  // ── Fees Section ─────────────────────────────────────────────────────────────
-  if (y > 240) { doc.addPage(); y = 20; }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setFillColor(16, 185, 129);
-  doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.text('FEES ACCOUNT', margin + 4, y + 4.5);
-  y += 9;
-  doc.setTextColor(0, 0, 0);
-
-  // Correct field paths: API returns summary.total_paid / summary.total_balance
-  const totalPaid = Number(feeAccount?.summary?.total_paid) || 0;
-  const balance   = Number(feeAccount?.summary?.total_balance) || 0;
-
-  // Use actual invoices (filtered to this term/year) so payment data is visible.
-  // Fall back to fee structures when no invoices exist yet.
-  const rawInvoices: any[] = feeAccount?.invoices || [];
-  const termInvoices = rawInvoices.filter((inv: any) => {
-    if (inv.term && inv.term !== term) return false;
-    if (inv.academic_year && inv.academic_year !== academicYear) return false;
-    return true;
-  });
-
-  type FeeItem = { label: string; charged: number; paid: number; balance: number };
-  let feeItems: FeeItem[];
-
-  if (termInvoices.length > 0) {
-    feeItems = termInvoices.map((inv: any) => ({
-      label:   inv.structure_name || inv.description || 'School Fee',
-      charged: Number(inv.net_amount) || 0,
-      paid:    Number(inv.paid_amount) || 0,
-      balance: Number(inv.balance_amount) || 0,
-    }));
-  } else {
-    // No invoices yet — show expected fee structures so section isn't blank
-    const nonTransport = (feeStructures as any[]).filter((f: any) => {
-      if (f.is_transport_fee) return false;
-      if (f.extra_fee_id) return false;
-      const st = f.student_type || 'all';
-      return st === 'all' || st === student.student_type;
-    });
-    feeItems = nonTransport.map((f: any) => ({
-      label: f.name, charged: Number(f.amount) || 0, paid: 0, balance: Number(f.amount) || 0,
-    }));
-    if (transportAssignment) {
-      const rf = Number(transportAssignment.term_fee) || 0;
-      feeItems.push({ label: `Transport — ${transportAssignment.route_name || 'Route'}`, charged: rf, paid: 0, balance: rf });
-    } else {
-      const tStruct = (feeStructures as any[]).find((f: any) => f.is_transport_fee && student.uses_transport);
-      if (tStruct) feeItems.push({ label: `Transport — ${tStruct.route_name || tStruct.name}`, charged: Number(tStruct.amount) || 0, paid: 0, balance: Number(tStruct.amount) || 0 });
-    }
-    const existingLabels = new Set(feeItems.map((f) => f.label.toLowerCase().trim()));
-    for (const ef of (extraFees as any[])) {
-      if (!existingLabels.has((ef.name || '').toLowerCase().trim())) {
-        const amt = Number(ef.amount) || 0;
-        feeItems.push({ label: ef.name, charged: amt, paid: 0, balance: amt });
-      }
-    }
-  }
-
-  const totalCharged = feeItems.reduce((s, f) => s + f.charged, 0);
-
-  // Column layout: FEE ITEM (57%) | CHARGED (21%) | BALANCE (22%)
-  const colW = pageW - 2 * margin;
-  const labelColW = colW * 0.57;
-  const numColW   = colW * 0.215;
-  const chargedX  = margin + labelColW;
-  const balX      = chargedX + numColW;
-
-  // Column header row
-  doc.setFillColor(220, 240, 255);
-  doc.rect(margin, y, colW, 6, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(30, 60, 130);
-  doc.text('FEE ITEM', margin + 2, y + 4);
-  doc.text('CHARGED', chargedX + numColW - 2, y + 4, { align: 'right' });
-  doc.text('BALANCE', balX + numColW - 2, y + 4, { align: 'right' });
-  y += 6;
-  doc.setTextColor(0, 0, 0);
-
-  // Fee rows
-  doc.setFontSize(8.5);
-  feeItems.forEach((f, idx) => {
-    if (y > 278) { doc.addPage(); y = 20; }
-    if (idx % 2 === 0) {
-      doc.setFillColor(240, 253, 244);
-      doc.rect(margin, y, colW, 6, 'F');
-    }
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0, 0, 0);
-    doc.text(f.label.slice(0, 34), margin + 2, y + 4);
-    doc.text(f.charged.toLocaleString(), chargedX + numColW - 2, y + 4, { align: 'right' });
-    if (f.balance > 0) doc.setTextColor(200, 40, 40);
-    doc.text(f.balance.toLocaleString(), balX + numColW - 2, y + 4, { align: 'right' });
-    doc.setTextColor(0, 0, 0);
-    y += 6;
-  });
-
-  if (feeItems.length === 0) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(150, 150, 150);
-    doc.text('No fee invoices or structure configured for this student.', margin + 2, y + 4);
-    y += 6;
-  }
-
-  // Totals row
-  doc.setDrawColor(180, 180, 180);
-  doc.line(margin, y + 1, pageW - margin, y + 1);
-  y += 3;
-  doc.setFillColor(220, 240, 255);
-  doc.rect(margin, y, colW, 6, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(0, 0, 0);
-  doc.text('TOTAL', margin + 2, y + 4);
-  doc.text(`KES ${totalCharged.toLocaleString()}`, chargedX + numColW - 2, y + 4, { align: 'right' });
-  const totBal = termInvoices.length > 0 ? balance : feeItems.reduce((s, f) => s + f.balance, 0);
-  if (totBal > 0) doc.setTextColor(200, 40, 40);
-  doc.text(`KES ${totBal.toLocaleString()}`, balX + numColW - 2, y + 4, { align: 'right' });
-  doc.setTextColor(0, 0, 0);
-  y += 6;
-
-  // Amount Paid row
-  doc.setFillColor(240, 255, 245);
-  doc.rect(margin, y, colW, 6, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Amount Paid', margin + 2, y + 4);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(22, 163, 74);
-  doc.text(`KES ${totalPaid.toLocaleString()}`, pageW - margin - 2, y + 4, { align: 'right' });
-  doc.setTextColor(0, 0, 0);
-  y += 9;
-
   // ── Term Dates ──────────────────────────────────────────────────────────────
   if (closingDate || openingDate) {
+    if (y > 265) { doc.addPage(); y = 20; }
     const tdW = (pageW - 2 * margin - 4) / 2;
     [
       { label: 'TERM CLOSES', value: closingDate || '—' },
@@ -558,38 +446,66 @@ export function StudentReportPage() {
   const [closingDate, setClosingDate] = useState('');
   const [openingDate, setOpeningDate] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [examOptions, setExamOptions] = useState<any[]>([]);
+  const [examsLoading, setExamsLoading] = useState(false);
+  const [examId, setExamId] = useState('');
 
   useEffect(() => {
     api.getStudents().then((res: any) => setStudents(res?.data || [])).catch(() => {});
   }, []);
+
+  // Exams must always be re-picked whenever the student/term/year selection changes —
+  // a report can never be generated without choosing a specific exam.
+  useEffect(() => {
+    setExamId('');
+    setExamOptions([]);
+    if (!selectedStudent?.class_id) return;
+    setExamsLoading(true);
+    api.getCbcReportCardPeriods({ class_id: selectedStudent.class_id, term, academic_year: academicYear })
+      .then((res: any) => setExamOptions(res?.data?.exams || []))
+      .catch(() => setExamOptions([]))
+      .finally(() => setExamsLoading(false));
+  }, [selectedStudent?.class_id, term, academicYear]);
 
   const filteredStudents = students.filter(s =>
     !searchTerm || `${s.first_name} ${s.last_name} ${s.admission_number} ${s.class_name || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleGenerate = async () => {
-    if (!selectedStudent) return;
+    if (!selectedStudent || !examId) return;
     setGenerating(true);
     try {
-      const [schoolRes, assessRes, feeRes, feeStructRes, transportRes, extraFeesRes]: any[] = await Promise.all([
+      const selectedExam = examOptions.find((e: any) => e.id === examId);
+      const [schoolRes, resultsRes]: any[] = await Promise.all([
         api.getSettings(),
-        api.getCbcAssessments({ student_id: selectedStudent.id, term, academic_year: academicYear }),
-        api.getStudentFeeAccount(selectedStudent.id).catch(() => null),
-        api.getFeeStructures({ classId: selectedStudent.class_id }).catch(() => ({ data: [] })),
-        api.getTransportStudents({ student_id: selectedStudent.id }).catch(() => ({ data: [] })),
-        api.getExtraFeesForReport({ student_id: selectedStudent.id, class_id: selectedStudent.class_id, term, academic_year: academicYear }).catch(() => ({ data: [] })),
+        api.getOfflineResults(examId),
       ]);
 
       const school = schoolRes?.data || schoolRes || {};
-      const assessments = assessRes?.data || [];
-      const feeAccount = feeRes?.data || feeRes || null;
-      const feeStructures = feeStructRes?.data || [];
-      const transportList: any[] = transportRes?.data || [];
-      const transportAssignment = transportList.length > 0 ? transportList[0] : null;
-      const extraFees: any[] = extraFeesRes?.data || [];
+      const level = selectedStudent.education_level || 'lower_primary';
+      const isPrePrimary = ['playgroup', 'pre_primary'].includes(level);
+
+      const rows: any[] = (resultsRes?.data || []).filter((r: any) => r.student_id === selectedStudent.id);
+      const assessments = rows.map((r: any) => {
+        if (r.is_absent) {
+          return { subject_name: r.subject_name, result_code: 'ABS', assessment_type: selectedExam?.name || 'Exam' };
+        }
+        const maxScore = Number(r.max_marks) || 0;
+        const score = Number(r.marks_obtained) || 0;
+        const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+        const grade = computeCBEGrade(pct, level);
+        return {
+          subject_name: r.subject_name,
+          score, max_score: maxScore,
+          assessment_type: selectedExam?.name || 'Exam',
+          cbc_grade: isPrePrimary ? null : grade,
+          pre_primary_grade: isPrePrimary ? grade : null,
+          grade_points: level === 'junior_secondary' ? (JSS_GRADE_POINTS[grade] ?? null) : null,
+        };
+      });
 
       await generateStudentReportPDF(
-        selectedStudent, assessments, feeAccount, school, feeStructures, term, academicYear, transportAssignment, extraFees,
+        selectedStudent, assessments, school, term, academicYear, selectedExam?.name || 'Exam',
         closingDate || undefined, openingDate || undefined
       );
     } catch (err: any) {
@@ -691,17 +607,58 @@ export function StudentReportPage() {
             </div>
           </div>
 
+          {/* Exam — required. A report can never be generated without picking a real exam. */}
+          {selectedStudent && (
+            <div>
+              <Label>Select Exam (required)</Label>
+              {examsLoading ? (
+                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading exams…
+                </p>
+              ) : examOptions.length > 0 ? (
+                <div className="mt-1">
+                  <p className="text-xs font-medium text-gray-600 mb-1">
+                    Choose the exam whose results should appear on the report (Mid-Term, First-Term, End-Term, CAT, etc.):
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {examOptions.map((ex: any) => (
+                      <button
+                        key={ex.id}
+                        type="button"
+                        onClick={() => setExamId(ex.id)}
+                        title={ex.start_date ? new Date(ex.start_date).toLocaleDateString() : undefined}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors
+                          ${examId === ex.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        {ex.name}
+                        {ex.start_date ? <span className="opacity-70"> · {new Date(ex.start_date).toLocaleDateString()}</span> : ''}
+                      </button>
+                    ))}
+                  </div>
+                  {!examId && (
+                    <p className="text-xs text-red-600 mt-2">Pick one of the exams above to enable report generation.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-red-600 mt-1">
+                  No exams found for this class/term/year yet. Create the exam (e.g. Mid-Term, First-Term, CAT) in the
+                  Exams module first — a report cannot be generated without one.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Info note */}
           <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
             <p>The PDF report will include:</p>
             <p>• School logo, name, address and contact</p>
-            <p>• Student details and CBE assessment grades with auto-comments</p>
-            <p>• Fees section: amount billed, paid, outstanding balance</p>
-            <p>• Transport charges and next term expected fees</p>
+            <p>• Student details and the selected exam's results, with auto-comments</p>
             <p>• Term closing and next term opening dates (if set)</p>
           </div>
 
-          <Button className="w-full" onClick={handleGenerate} disabled={!selectedStudent || generating}>
+          <Button className="w-full" onClick={handleGenerate} disabled={!selectedStudent || !examId || generating}>
             {generating ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating PDF...</>
             ) : (

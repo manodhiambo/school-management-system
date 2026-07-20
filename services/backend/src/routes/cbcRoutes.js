@@ -596,6 +596,9 @@ router.post('/report-cards/generate', authenticate, requireModule('academics'), 
     if (!class_id || !term || !academic_year) {
       return res.status(400).json({ success: false, message: 'class_id, term and academic_year are required' });
     }
+    if (!exam_id) {
+      return res.status(400).json({ success: false, message: 'An exam must be selected before report cards can be generated' });
+    }
     const tid = req.user.tenant_id;
     const { v4: uuidv4 } = await import('uuid');
 
@@ -1103,14 +1106,14 @@ router.put('/report-cards/bulk-publish', authenticate, requireModule('academics'
       const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
       rows = await query(
         `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
-         WHERE id IN (${placeholders}) AND tenant_id=$1 AND status='draft' RETURNING id`,
+         WHERE id IN (${placeholders}) AND tenant_id=$1 AND status='draft' AND exam_id IS NOT NULL RETURNING id`,
         [tid, ...ids]
       );
     } else if (class_id && term && academic_year) {
       // Publish all drafts for a class/term/year
       rows = await query(
         `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
-         WHERE class_id=$2 AND term=$3 AND academic_year=$4 AND tenant_id=$1 AND status='draft' RETURNING id`,
+         WHERE class_id=$2 AND term=$3 AND academic_year=$4 AND tenant_id=$1 AND status='draft' AND exam_id IS NOT NULL RETURNING id`,
         [tid, class_id, term, academic_year]
       );
     } else {
@@ -1127,6 +1130,14 @@ router.put('/report-cards/bulk-publish', authenticate, requireModule('academics'
 // PUT /api/v1/cbe/report-cards/:id/publish
 router.put('/report-cards/:id/publish', authenticate, requireModule('academics'), async (req, res) => {
   try {
+    const existing = await query(
+      `SELECT exam_id FROM cbc_report_cards WHERE id=$1 AND tenant_id=$2`,
+      [req.params.id, req.user.tenant_id]
+    );
+    if (!existing.length) return res.status(404).json({ success: false, message: 'Not found' });
+    if (!existing[0].exam_id) {
+      return res.status(400).json({ success: false, message: 'This report card has no exam selected. Regenerate it with an exam chosen before publishing.' });
+    }
     const rows = await query(
       `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
        WHERE id=$1 AND tenant_id=$2 RETURNING *`,

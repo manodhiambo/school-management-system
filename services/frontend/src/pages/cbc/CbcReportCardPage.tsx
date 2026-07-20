@@ -591,7 +591,6 @@ export function CbcReportCardPage() {
 
   const classes = (classesData as any)?.data || [];
   const examOptions: any[] = (periodsData as any)?.data?.exams || [];
-  const labelSuggestions: string[] = (periodsData as any)?.data?.labels || ['Mid-Term', 'End-Term'];
   const batches: any[] = (batchesData as any)?.data || [];
   const cards = (cardsData as any)?.data || [];
   const detail = (cardDetail as any)?.data;
@@ -603,6 +602,12 @@ export function CbcReportCardPage() {
   // ── Download handler ────────────────────────────────────────────────────────
   const handleDownload = async (scope: 'class' | 'selected' | 'published') => {
     setShowDownloadMenu(false);
+
+    if (scope === 'selected' && detail && !detail.exam_id) {
+      alert('This report card has no exam selected. Regenerate it with an exam chosen (Mid-Term, First-Term, CAT, etc.) before printing.');
+      return;
+    }
+
     setDownloading(true);
     try {
       const school = (await api.getSettings() as any)?.data || {};
@@ -620,7 +625,20 @@ export function CbcReportCardPage() {
         targetCards = results.map((r: any) => r?.data).filter(Boolean);
       }
 
-      if (targetCards.length === 0) { alert('No report cards available.'); return; }
+      // Never print a report card that has no exam attached — regenerate it with an exam picked first.
+      const skipped = targetCards.filter((c: any) => !c.exam_id).length;
+      targetCards = targetCards.filter((c: any) => c.exam_id);
+
+      if (targetCards.length === 0) {
+        alert(skipped > 0
+          ? 'None of the selected report cards have an exam selected. Regenerate them with an exam chosen first.'
+          : 'No report cards available.');
+        return;
+      }
+      if (skipped > 0) {
+        alert(`${skipped} report card(s) were skipped because no exam was selected for them. Regenerate those with an exam chosen first.`);
+      }
+
       await downloadReportCardsPDF(
         targetCards,
         school,
@@ -847,15 +865,17 @@ export function CbcReportCardPage() {
             </div>
           </div>
 
-          {/* Period — pick which exam's results to print, or a generic Mid-Term/End-Term label. */}
+          {/* Exam — required. Report cards may only be generated against a real exam's results. */}
           <div className="mt-4">
-            <Label>Period (optional)</Label>
+            <Label>Select Exam (required)</Label>
 
             {!filters.class_id ? (
-              <p className="text-xs text-gray-400 mt-1">Select a class above to see exams already done for this term/year.</p>
+              <p className="text-xs text-gray-400 mt-1">Select a class above to see exams done for this term/year.</p>
             ) : examOptions.length > 0 ? (
               <div className="mt-1">
-                <p className="text-xs font-medium text-gray-600 mb-1">Exams done for this class/term/year — pick one to print its results:</p>
+                <p className="text-xs font-medium text-gray-600 mb-1">
+                  Choose the exam whose results should appear on the report card (Mid-Term, First-Term, End-Term, CAT, etc.):
+                </p>
                 <div className="flex flex-wrap items-center gap-2">
                   {examOptions.map(ex => (
                     <button
@@ -873,62 +893,29 @@ export function CbcReportCardPage() {
                     </button>
                   ))}
                 </div>
+                {!examId && (
+                  <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                    <AlertCircle className="h-3.5 w-3.5" /> Pick one of the exams above to enable report card generation.
+                  </p>
+                )}
               </div>
             ) : (
-              <p className="text-xs text-amber-600 mt-1">
-                No exams found for this class/term/year yet. Create one in the Exams module, or use a generic label below.
+              <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                No exams found for this class/term/year yet. Create the exam (e.g. Mid-Term, First-Term, CAT) in the
+                Exams module first — report cards cannot be generated without one.
               </p>
             )}
-
-            <p className="text-xs font-medium text-gray-600 mt-3 mb-1">Or use a generic label (no specific exam):</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {labelSuggestions.map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => { setPeriod(p); setExamId(''); }}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors
-                    ${period === p && !examId
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                >
-                  {p}
-                </button>
-              ))}
-              {period && (
-                <button
-                  type="button"
-                  onClick={() => { setPeriod(''); setExamId(''); }}
-                  className="text-xs px-3 py-1.5 rounded-full border bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
-                >
-                  Clear "{period}"
-                </button>
-              )}
-            </div>
-            <Input
-              list="report-card-period-suggestions"
-              className="mt-2"
-              value={period}
-              onChange={e => { setPeriod(e.target.value); setExamId(''); }}
-              placeholder="Or type a custom period name…"
-            />
-            <datalist id="report-card-period-suggestions">
-              {labelSuggestions.map(p => <option key={p} value={p} />)}
-            </datalist>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Picking an exam prints that exam's actual results. A generic label (or custom text) is just printed on
-              the card — Mid-Term/End-Term also filter grades to that period's assessment scores when generating.
-            </p>
           </div>
 
-          {/* Generate button — shown when a class is selected */}
+          {/* Generate button — shown when a class is selected; requires an exam to be picked */}
           {filters.class_id && (
             <div className="mt-4 flex items-center gap-3">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => generateMutation.mutate()}
-                disabled={generateMutation.isPending}
+                disabled={generateMutation.isPending || !examId}
                 className="flex items-center gap-2"
               >
                 <PlusCircle className="h-4 w-4" />
@@ -939,6 +926,11 @@ export function CbcReportCardPage() {
                   {(generateMutation.data as any)?.data?.created === 0
                     ? 'All students already have report cards.'
                     : `Created ${(generateMutation.data as any)?.data?.created} new report card(s).`}
+                </span>
+              )}
+              {generateMutation.isError && (
+                <span className="text-xs text-red-600">
+                  {(generateMutation.error as any)?.response?.data?.message || (generateMutation.error as any)?.message || 'Failed to generate report cards.'}
                 </span>
               )}
             </div>
@@ -1082,10 +1074,20 @@ export function CbcReportCardPage() {
                   <div className="flex flex-wrap gap-2">
                     {statusBadge(detail.status)}
                     {detail.status === 'draft' && (
-                      <Button size="sm" onClick={() => publishMutation.mutate(detail.id)} disabled={publishMutation.isPending}>
+                      <Button
+                        size="sm"
+                        onClick={() => publishMutation.mutate(detail.id)}
+                        disabled={publishMutation.isPending || !detail.exam_id}
+                        title={!detail.exam_id ? 'Regenerate this report card with an exam selected before publishing' : undefined}
+                      >
                         <CheckCircle className="h-4 w-4 mr-1" />
                         {publishMutation.isPending ? 'Publishing...' : 'Publish'}
                       </Button>
+                    )}
+                    {detail.status === 'draft' && !detail.exam_id && (
+                      <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                        <AlertCircle className="h-3.5 w-3.5" /> No exam selected — cannot publish yet
+                      </span>
                     )}
                     {detail.status === 'published' || detail.status === 'acknowledged' ? (
                       <Button size="sm" variant="outline" onClick={() => {

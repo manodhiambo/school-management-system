@@ -110,6 +110,10 @@ export function ParentReportCardsPage() {
 
   const handleDownload = async () => {
     if (!detail || !selected) return;
+    if (!detail.exam_id) {
+      alert('This report card has no exam selected yet. Please contact the school to regenerate it.');
+      return;
+    }
     setDownloading(true);
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -310,6 +314,7 @@ export function ParentReportCardsPage() {
                             variant="outline"
                             size="sm"
                             onClick={handlePrint}
+                            disabled={!detail.exam_id}
                             className="no-print"
                           >
                             <Printer className="h-4 w-4 mr-1" /> Print
@@ -317,7 +322,7 @@ export function ParentReportCardsPage() {
                           <Button
                             size="sm"
                             onClick={handleDownload}
-                            disabled={downloading}
+                            disabled={downloading || !detail.exam_id}
                             className="no-print bg-teal-600 hover:bg-teal-700"
                           >
                             {downloading
@@ -327,6 +332,11 @@ export function ParentReportCardsPage() {
                           </Button>
                         </div>
                       </div>
+                      {!detail.exam_id && (
+                        <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                          <AlertCircle className="h-3.5 w-3.5" /> No exam selected for this report card yet — printing is disabled. Contact the school.
+                        </p>
+                      )}
                     </CardHeader>
 
                     <CardContent className="space-y-5">

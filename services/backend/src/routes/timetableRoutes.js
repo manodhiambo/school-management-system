@@ -128,12 +128,32 @@ router.get('/student/:studentId', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
     const student = await query(
-      'SELECT class_id FROM students WHERE (id = $1 OR user_id = $1) AND tenant_id = $2',
+      'SELECT id, class_id FROM students WHERE (id = $1 OR user_id = $1) AND tenant_id = $2',
       [req.params.studentId, tid]
     );
 
     if (student.length === 0 || !student[0].class_id) {
       return res.json({ success: true, data: [] });
+    }
+    const actualStudentId = student[0].id;
+
+    // A student may only view their own timetable; a parent only their
+    // own child's — this endpoint previously had no ownership check at all,
+    // so any authenticated user could view any student's schedule.
+    if (req.user.role === 'student') {
+      const own = await query(
+        'SELECT 1 FROM students WHERE id = $1 AND user_id = $2 AND tenant_id = $3',
+        [actualStudentId, req.user.id, tid]
+      );
+      if (!own.length) return res.status(403).json({ success: false, message: 'Access denied' });
+    } else if (req.user.role === 'parent') {
+      const access = await query(
+        `SELECT 1 FROM parent_students ps
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [actualStudentId, req.user.id]
+      );
+      if (!access.length) return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     const timetable = await query(

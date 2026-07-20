@@ -166,6 +166,7 @@ const navigationItems: NavItem[] = [
   // ── Family (parent) ───────────────────────────────────────────────────────
   { name: 'My Children',       href: '/app/my-children',       icon: Users,         roles: ['parent'], section: 'Family' },
   { name: 'Children Progress', href: '/app/children-progress', icon: TrendingUp,    roles: ['parent'], section: 'Family' },
+  { name: 'Children Timetable', href: '/app/my-timetable',     icon: Clock,         roles: ['parent'], section: 'Family', module: 'timetable' },
   { name: 'Report Cards',      href: '/app/report-cards',      icon: FileText,      roles: ['parent'], section: 'Family', module: 'academics' },
   { name: 'Fee Payments',      href: '/app/fee-payments',      icon: DollarSign,    roles: ['parent'], section: 'Family', module: 'finance' },
   { name: 'My Alerts',         href: '/app/my-alerts',         icon: Bell,          roles: ['parent'], section: 'Family', module: 'communication' },

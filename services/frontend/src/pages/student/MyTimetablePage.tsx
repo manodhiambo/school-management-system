@@ -10,6 +10,8 @@ export function MyTimetablePage() {
   const [timetable, setTimetable] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [children, setChildren] = useState<any[]>([]);
+  const [selectedChildId, setSelectedChildId] = useState('');
 
   const days = [
     { value: 1, name: 'Monday' },
@@ -21,25 +23,53 @@ export function MyTimetablePage() {
   ];
 
   useEffect(() => {
-    if (user?.id) {
+    if (!user?.id) return;
+    if (user.role === 'parent') {
+      loadChildren();
+    } else {
       loadTimetable();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.role === 'parent' && selectedChildId) {
+      loadTimetable();
+    }
+  }, [selectedChildId]);
+
+  const loadChildren = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response: any = await api.getParentByUserId(user?.id || '');
+      const parentData = response?.data || response;
+      const kids = parentData?.children || [];
+      setChildren(kids);
+      if (kids.length > 0) setSelectedChildId(kids[0].student_id || kids[0].id);
+      else setLoading(false);
+    } catch (error: any) {
+      console.error('Error loading children:', error);
+      setError(error?.message || 'Failed to load children');
+      setLoading(false);
+    }
+  };
 
   const loadTimetable = async () => {
     try {
       setLoading(true);
       setError(null);
       let response: any;
-      
+
       if (user?.role === 'teacher') {
         response = await api.getTeacherTimetable(user?.id || '');
+      } else if (user?.role === 'parent') {
+        response = await api.getStudentTimetable(selectedChildId);
       } else {
         response = await api.getStudentTimetable(user?.id || '');
       }
-      
+
       console.log('My timetable response:', response);
-      
+
       // Handle different response formats
       const data = response?.data || response || [];
       setTimetable(Array.isArray(data) ? data : []);
@@ -99,7 +129,7 @@ export function MyTimetablePage() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600">{error}</p>
-            <Button onClick={loadTimetable} className="mt-4">Retry</Button>
+            <Button onClick={() => (user?.role === 'parent' ? loadChildren() : loadTimetable())} className="mt-4">Retry</Button>
           </CardContent>
         </Card>
       </div>
@@ -108,19 +138,49 @@ export function MyTimetablePage() {
 
   const groupedTimetable = groupByDay(timetable);
   const hasAnyClasses = timetable.length > 0;
+  const isParent = user?.role === 'parent';
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold">My Timetable</h2>
-        <p className="text-gray-500">
-          {user?.role === 'teacher' 
-            ? 'View your teaching schedule' 
-            : 'View your weekly class schedule'}
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-3xl font-bold">{isParent ? 'Children Timetable' : 'My Timetable'}</h2>
+          <p className="text-gray-500">
+            {user?.role === 'teacher'
+              ? 'View your teaching schedule'
+              : isParent
+                ? "View your child's weekly class schedule"
+                : 'View your weekly class schedule'}
+          </p>
+        </div>
+        {isParent && children.length > 1 && (
+          <div className="flex gap-2 flex-wrap">
+            {children.map((child: any) => {
+              const childId = child.student_id || child.id;
+              return (
+                <Button
+                  key={childId}
+                  variant={selectedChildId === childId ? 'default' : 'outline'}
+                  onClick={() => setSelectedChildId(childId)}
+                >
+                  {child.first_name} {child.last_name}
+                </Button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {!hasAnyClasses ? (
+      {isParent && children.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <Clock className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No children linked to your account</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : !hasAnyClasses ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-12">

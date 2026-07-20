@@ -372,13 +372,21 @@ router.post('/auto-generate', requireRole(['admin']), async (req, res) => {
     const classBusy = new Set(existing.map(e => `${e.class_id}|${e.day_of_week}|${e.start_time}`));
     const teacherBusy = new Set(existing.filter(e => e.teacher_id).map(e => `${e.teacher_id}|${e.day_of_week}|${e.start_time}`));
 
+    // class_subjects.teacher_id references users(id) (the teacher's login),
+    // but timetable.teacher_id references teachers(id) (their staff profile
+    // row) — a different id space. Translate via teachers.user_id here so
+    // every downstream use of a.teacher_id in this handler is already the
+    // correct id for inserting into timetable. A subject teacher with no
+    // teachers profile row (te.id IS NULL) is scheduled with no teacher_id
+    // rather than failing the whole run.
     const classesToLoad = classRows.map(c => c.id);
     const assignments = classesToLoad.length
       ? await query(
-          `SELECT cs.class_id, cs.subject_id, cs.teacher_id, cs.weekly_periods,
+          `SELECT cs.class_id, cs.subject_id, te.id AS teacher_id, cs.weekly_periods,
                   s.name AS subject_name
            FROM class_subjects cs
            JOIN subjects s ON s.id = cs.subject_id
+           LEFT JOIN teachers te ON te.user_id = cs.teacher_id AND te.tenant_id = cs.tenant_id
            WHERE cs.tenant_id = $1 AND cs.class_id = ANY($2::uuid[])`,
           [tid, classesToLoad]
         )
@@ -475,11 +483,26 @@ router.post('/auto-generate', requireRole(['admin']), async (req, res) => {
       report.classes_scheduled.push(`${cls.name} ${cls.section || ''}`.trim());
     }
 
-    for (const row of toInsert) {
+    // Bulk insert in chunks — a full-school generation can be 400+ rows, and
+    // awaiting one INSERT per row (one network round trip each) was slow
+    // enough to time out the request. One multi-row INSERT per chunk cuts
+    // that to a handful of round trips.
+    const CHUNK_SIZE = 200;
+    for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
+      const chunk = toInsert.slice(i, i + CHUNK_SIZE);
+      const cols = 9;
+      const valuesSql = chunk.map((_, idx) => {
+        const base = idx * cols;
+        return `(${Array.from({ length: cols }, (_, k) => `$${base + k + 1}`).join(',')})`;
+      }).join(',');
+      const params = chunk.flatMap(row => [
+        row.id, row.class_id, row.subject_id, row.teacher_id,
+        row.day_of_week, row.start_time, row.end_time, row.room, row.tenant_id,
+      ]);
       await query(
         `INSERT INTO timetable (id, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room, tenant_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [row.id, row.class_id, row.subject_id, row.teacher_id, row.day_of_week, row.start_time, row.end_time, row.room, row.tenant_id]
+         VALUES ${valuesSql}`,
+        params
       );
     }
 

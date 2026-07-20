@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
 import { FileText, CheckCircle, Download, PlusCircle, Users, Share2, Mail, MessageCircle, X, Phone, AtSign, AlertCircle, Loader2, History } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────
 const GRADE_HEX: Record<string, [number, number, number]> = {
@@ -517,6 +518,8 @@ const GRADE_COLORS: Record<string, string> = {
 
 export function CbcReportCardPage() {
   const qc = useQueryClient();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const [filters, setFilters] = useState({ class_id: '', term: 'term1', academic_year: new Date().getFullYear().toString() });
   const [termDates, setTermDates] = useState({ closing_date: '', opening_date: '' });
   const [period, setPeriod] = useState('');
@@ -529,7 +532,13 @@ export function CbcReportCardPage() {
   const [downloading, setDownloading] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
-  const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => api.getClasses() });
+  // Teachers only ever see/generate report cards for the classes they actually teach
+  // (homeroom or subject) — mirrors the same scoping used in CbcAssessmentPage.tsx.
+  const { data: classesData } = useQuery({
+    queryKey: ['classes-for-report-cards', user?.id, isAdmin],
+    queryFn: () => (isAdmin ? api.getClasses() : api.getTeacherClasses(user?.id || '')),
+    enabled: !!user,
+  });
   const { data: periodsData } = useQuery({
     queryKey: ['cbc-report-card-periods', filters.class_id, filters.term, filters.academic_year],
     queryFn: () => api.getCbcReportCardPeriods({

@@ -4,6 +4,7 @@ import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../services/emailService.js';
+import { isAssignedToClass } from '../utils/teacherAssignment.js';
 
 const router = express.Router();
 
@@ -529,6 +530,9 @@ router.get('/report-cards', authenticate, requireModule('academics'), async (req
     }
     const { student_id, term, academic_year, class_id, status } = req.query;
     const tid = req.user.tenant_id;
+    if (req.user.role === 'teacher' && class_id && !(await isAssignedToClass(req.user.id, class_id, tid))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
     let sql, params;
 
     if (class_id) {
@@ -600,6 +604,9 @@ router.post('/report-cards/generate', authenticate, requireModule('academics'), 
       return res.status(400).json({ success: false, message: 'An exam must be selected before report cards can be generated' });
     }
     const tid = req.user.tenant_id;
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, class_id, tid))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
     const { v4: uuidv4 } = await import('uuid');
 
     // Fetch all active students in the class
@@ -725,6 +732,11 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
       if (!ownsChild.length || !['published','acknowledged'].includes(rows[0].status)) {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
+    }
+
+    // Teachers may only view report cards for classes they're actually assigned to
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, rows[0].class_id, req.user.tenant_id))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
     }
     const rc = rows[0];
 
@@ -970,6 +982,9 @@ router.post('/report-cards/:id/share', authenticate, requireModule('academics'),
     if (!rows.length) return res.status(404).json({ success: false, message: 'Report card not found' });
 
     const rc = rows[0];
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, rc.class_id, tid))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
     // Use override contacts if provided, fall back to registered parent contacts
     const toName  = (override_name  || '').trim() || rc.guardian_name  || 'Parent/Guardian';
     const toEmail = (override_email || '').trim() || rc.guardian_email || null;
@@ -1102,7 +1117,19 @@ router.put('/report-cards/bulk-publish', authenticate, requireModule('academics'
     let rows;
 
     if (Array.isArray(ids) && ids.length > 0) {
-      // Publish a specific list of IDs
+      // Publish a specific list of IDs — teachers may only publish cards belonging
+      // to classes they're actually assigned to.
+      if (req.user.role === 'teacher') {
+        const classRows = await query(
+          `SELECT DISTINCT class_id FROM cbc_report_cards WHERE id = ANY($1::uuid[]) AND tenant_id = $2`,
+          [ids, tid]
+        );
+        for (const { class_id: cid } of classRows) {
+          if (!(await isAssignedToClass(req.user.id, cid, tid))) {
+            return res.status(403).json({ success: false, message: 'You are not assigned to one or more of these classes' });
+          }
+        }
+      }
       const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
       rows = await query(
         `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
@@ -1110,6 +1137,9 @@ router.put('/report-cards/bulk-publish', authenticate, requireModule('academics'
         [tid, ...ids]
       );
     } else if (class_id && term && academic_year) {
+      if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, class_id, tid))) {
+        return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+      }
       // Publish all drafts for a class/term/year
       rows = await query(
         `UPDATE cbc_report_cards SET status='published', published_at=NOW(), updated_at=NOW()
@@ -1131,10 +1161,13 @@ router.put('/report-cards/bulk-publish', authenticate, requireModule('academics'
 router.put('/report-cards/:id/publish', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const existing = await query(
-      `SELECT exam_id FROM cbc_report_cards WHERE id=$1 AND tenant_id=$2`,
+      `SELECT exam_id, class_id FROM cbc_report_cards WHERE id=$1 AND tenant_id=$2`,
       [req.params.id, req.user.tenant_id]
     );
     if (!existing.length) return res.status(404).json({ success: false, message: 'Not found' });
+    if (req.user.role === 'teacher' && !(await isAssignedToClass(req.user.id, existing[0].class_id, req.user.tenant_id))) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
     if (!existing[0].exam_id) {
       return res.status(400).json({ success: false, message: 'This report card has no exam selected. Regenerate it with an exam chosen before publishing.' });
     }

@@ -91,7 +91,8 @@ export function StudentReportPage() {
       const level = selectedStudent.education_level || 'lower_primary';
       const isPrePrimary = ['playgroup', 'pre_primary'].includes(level);
 
-      const rows: any[] = (resultsRes?.data || []).filter((r: any) => r.student_id === selectedStudent.id);
+      const allRows: any[] = resultsRes?.data || [];
+      const rows = allRows.filter((r: any) => r.student_id === selectedStudent.id);
       const competencies = rows.filter((r: any) => !r.is_absent).map((r: any) => {
         const maxScore = Number(r.max_marks) || 0;
         const score = Number(r.marks_obtained) || 0;
@@ -108,6 +109,29 @@ export function StudentReportPage() {
         };
       });
 
+      // Class rank — computed from the same exam's results across the whole class
+      // (getOfflineResults returns every student in the exam), using the same
+      // standard-competition ranking (ties share a rank) as the CBC Report Card page.
+      const byStudent = new Map<string, { totalScore: number; totalMax: number }>();
+      for (const r of allRows) {
+        if (r.is_absent) continue;
+        const entry = byStudent.get(r.student_id) || { totalScore: 0, totalMax: 0 };
+        entry.totalScore += Number(r.marks_obtained) || 0;
+        entry.totalMax += Number(r.max_marks) || 0;
+        byStudent.set(r.student_id, entry);
+      }
+      const ranked = Array.from(byStudent.entries())
+        .map(([student_id, { totalScore, totalMax }]) => ({
+          student_id, pct: totalMax > 0 ? (totalScore / totalMax) * 100 : 0,
+        }))
+        .sort((a, b) => b.pct - a.pct);
+      let classRank: number | null = null;
+      let rank = 1;
+      for (let i = 0; i < ranked.length; i++) {
+        if (i > 0 && ranked[i].pct < ranked[i - 1].pct) rank = i + 1;
+        if (ranked[i].student_id === selectedStudent.id) { classRank = rank; break; }
+      }
+
       // Reuse the exact same renderer as the CBC Report Card page so both produce
       // an identical official report — this page just supplies a single exam's
       // results instead of a whole term's CBC assessment aggregate.
@@ -119,8 +143,8 @@ export function StudentReportPage() {
         education_level: level,
         period: selectedExam?.name || 'Exam',
         competencies,
-        class_rank: null,
-        total_in_class: null,
+        class_rank: classRank,
+        total_in_class: ranked.length || null,
         class_teacher_name: null,
         head_teacher_name: null,
         term_end_date: formatDateKE(closingDate),

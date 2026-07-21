@@ -283,8 +283,23 @@ async function seedShowcaseData(tenant) {
   }
 }
 
-export async function resetDemoTenant() {
-  const tenant = await findOrCreateDemoTenant();
+// force=true always wipes and reseeds (the nightly 03:00 cron — "fresh every
+// day" is the whole point). force=false (server startup) only creates the
+// tenant if it's missing and otherwise leaves existing data alone — every
+// backend restart calling this unconditionally used to wipe out anything an
+// admin had set up (e.g. teacher class/subject assignments) or a visitor had
+// done, which looked like changes silently "undoing themselves".
+export async function resetDemoTenant(force = false) {
+  const existingRows = await query('SELECT * FROM tenants WHERE is_demo = TRUE LIMIT 1');
+  const alreadyExists = existingRows.length > 0;
+  const tenant = alreadyExists ? existingRows[0] : await findOrCreateDemoTenant();
+
+  if (alreadyExists && !force) {
+    setDemoTenantId(tenant.id);
+    logger.info(`Demo tenant already initialized (tenant=${tenant.id}) — skipping startup wipe`);
+    return tenant.id;
+  }
+
   try {
     await wipeDemoTenantData(tenant.id);
     await seedShowcaseData(tenant);

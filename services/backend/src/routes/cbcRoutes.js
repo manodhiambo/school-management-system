@@ -783,7 +783,9 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
     // term and has no period breakdown, so a period-specific report skips straight to the
     // cbc_assessments fallback below, filtered by exam_period.
     const normalizedPeriod = (rc.period || '').toLowerCase().replace(/[\s-]+/g, '_');
-    const examPeriodFilter = ['mid_term', 'end_term'].includes(normalizedPeriod) ? normalizedPeriod : null;
+    const examPeriodFilter = normalizedPeriod.includes('mid') ? 'mid_term'
+      : normalizedPeriod.includes('end') ? 'end_term'
+      : null;
 
     // Tier 1: student_competency_summary (whole-term aggregate) — skipped entirely when Tier 0
     // already found exam-specific results, or when a mid/end-term period filter is in effect

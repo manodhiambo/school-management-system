@@ -1584,6 +1584,8 @@ class ApiService {
   reviewStaffLeaveRequest(id: string, data: any) { return this.api.put('/staff-leave/' + id + '/review', data); }
   cancelStaffLeaveRequest(id: string) { return this.api.put('/staff-leave/' + id + '/cancel', {}); }
   deleteStaffLeaveRequest(id: string) { return this.api.delete('/staff-leave/' + id); }
+  respondToLeaveCoverRequest(id: string, data: { status: 'accepted' | 'declined'; note?: string }) { return this.api.put('/staff-leave/' + id + '/cover-response', data); }
+  reassignLeaveCover(id: string, data: { covering_staff_id: string }) { return this.api.put('/staff-leave/' + id + '/reassign-cover', data); }
 
   // ── Announcements ──────────────────────────────────────────────────────────
   getAnnouncements(params?: any) { return this.api.get('/announcements', { params }); }

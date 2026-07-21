@@ -27,14 +27,35 @@ const GRADE_POINTS_JSS: Record<string, number> = {
   EE1: 8, EE2: 7, ME1: 6, ME2: 5, AE1: 4, AE2: 3, BE1: 2, BE2: 1,
 };
 
-// Draw a bordered cell
-function cell(doc: jsPDF, x: number, y: number, w: number, h: number, fill?: [number,number,number]) {
-  if (fill) { doc.setFillColor(...fill); doc.rect(x, y, w, h, 'F'); }
-  doc.setDrawColor(180, 180, 180);
-  doc.rect(x, y, w, h, 'D');
+// "day_scholar" / "boarder" → "Day Scholar" / "Boarder"
+function studentTypeLabel(v: string | null | undefined): string {
+  if (!v) return '—';
+  return String(v).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-// ── Generate a single report card page (Kenya CBE format) ────────────────────
+// Exam/period name → short lowercase label ("end-term", "mid-term") matching the
+// official Student Report Form wording; unrecognized custom labels pass through as-is.
+function formatPeriodLabel(period: string | null | undefined, term: string): string {
+  if (period) {
+    const p = String(period).toLowerCase();
+    if (p.includes('mid')) return 'mid-term';
+    if (p.includes('end')) return 'end-term';
+    return p;
+  }
+  return 'end-term';
+}
+
+// Friendly performance summary shown under FACILITATOR'S COMMENT, scaled to the
+// grading system in use (4-level standard vs 8-level JSS points).
+function buildFacilitatorComment(meanPts: number, isJSS: boolean): string {
+  const norm = meanPts / (isJSS ? 8 : 4);
+  if (norm >= 0.875) return 'Excellent work! Keep up the outstanding performance.';
+  if (norm >= 0.7) return 'Good job! You are doing great, keep putting in the effort.';
+  if (norm >= 0.5) return 'Fair performance. With more effort, great results are within reach.';
+  return 'Needs improvement. Extra support and practice are recommended.';
+}
+
+// ── Generate a single report card page (Kenya CBE Student Report Form format) ─
 export async function renderReportCardPage(
   doc: jsPDF,
   detail: any,
@@ -52,9 +73,8 @@ export async function renderReportCardPage(
   doc.setTextColor(0, 0, 0);
 
   // ── 1. SCHOOL HEADER ───────────────────────────────────────────────────────
-  const logoSize = 26;
-  const photoSize = 26;
-  const headerH = 32;
+  const logoSize = 22;
+  const photoSize = 22;
 
   // School logo — LEFT corner
   if (school?.school_logo_url) {
@@ -68,7 +88,6 @@ export async function renderReportCardPage(
       });
     } catch { /* skip */ }
   } else {
-    // Logo placeholder box
     doc.setFillColor(230, 230, 230); doc.setDrawColor(180, 180, 180);
     doc.rect(M, 3, logoSize, logoSize, 'FD');
     doc.setFontSize(5); doc.setTextColor(160, 160, 160);
@@ -80,20 +99,20 @@ export async function renderReportCardPage(
   const hTextX = M + logoSize + 2;
   const hTextW = W - M - logoSize - 2 - photoSize - 2 - M;
   const hCenterX = hTextX + hTextW / 2;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
-  doc.text((school?.school_name || 'SCHOOL NAME').toUpperCase(), hCenterX, 10, { align: 'center' });
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.setTextColor(21, 101, 192);
+  doc.text((school?.school_name || 'SCHOOL NAME').toUpperCase(), hCenterX, 9, { align: 'center' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(60, 60, 60);
   const addrParts = [school?.address, school?.city, school?.state].filter(Boolean).join(', ');
-  let hy = 16;
-  if (addrParts) { doc.text(addrParts, hCenterX, hy, { align: 'center' }); hy += 5; }
-  if (school?.phone) { doc.text(`Tel: ${school.phone}`, hCenterX, hy, { align: 'center' }); hy += 5; }
-  if (school?.email) { doc.text(school.email, hCenterX, hy, { align: 'center' }); hy += 5; }
-  if (school?.motto) {
-    doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(7);
-    doc.text(school.motto, hCenterX, hy, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-  }
+  let hy = 14.5;
+  if (addrParts) { doc.text(addrParts, hCenterX, hy, { align: 'center' }); hy += 4.5; }
+  const contactParts = [school?.phone, school?.email].filter(Boolean).join(' | ');
+  if (contactParts) { doc.text(contactParts, hCenterX, hy, { align: 'center' }); hy += 4.5; }
+
+  const termNum = term === 'term1' ? '1' : term === 'term2' ? '2' : '3';
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(21, 101, 192);
+  doc.text(`STUDENT REPORT FORM — Term ${termNum} ${academicYear}`, hCenterX, hy, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
 
   // Student photo — RIGHT corner
   const photoX = W - M - photoSize;
@@ -122,28 +141,45 @@ export async function renderReportCardPage(
     doc.setTextColor(0, 0, 0);
   }
 
-  // "LEARNER ASSESSMENT REPORT CARD" title banner
-  const termRoman = term === 'term1' ? 'I' : term === 'term2' ? 'II' : 'III';
-  const termLabel = detail.period ? `${String(detail.period).toUpperCase()} – TERM ${termRoman}` : `END TERM ${termRoman}`;
-  doc.setFillColor(21, 101, 192);
-  doc.rect(M, headerH + 2, CW, 7, 'F');
-  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-  doc.text('LEARNER ASSESSMENT REPORT CARD', W / 2, headerH + 7, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
+  y = 3 + Math.max(logoSize, photoSize) + 4;
+  doc.setDrawColor(21, 101, 192); doc.setLineWidth(0.8);
+  doc.line(M, y, M + CW, y);
+  doc.setLineWidth(0.2); doc.setDrawColor(0, 0, 0);
+  y += 4;
 
-  // Thin blue sub-banner with term/class info
-  doc.setFillColor(189, 214, 238);
-  doc.rect(M, headerH + 10, CW, 6, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(21, 101, 192);
-  doc.text(
-    `${(detail.class_name || '').toUpperCase()} – ${termLabel} – ${academicYear}`,
-    W / 2, headerH + 14.5, { align: 'center' }
-  );
-  doc.setTextColor(0, 0, 0);
-  y = headerH + 18;
+  // ── 2. STUDENT INFORMATION ────────────────────────────────────────────────
+  doc.setFillColor(224, 224, 224);
+  doc.rect(M, y, CW, 6, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(30, 30, 30);
+  doc.text('STUDENT INFORMATION', M + 3, y + 4.2);
+  y += 6;
 
-  // ── 2. STUDENT INFO ROW ───────────────────────────────────────────────────
-  // Full-width student details (no photo here — photo is in header)
+  const infoRowH = 7;
+  const infoBoxH = infoRowH * 2;
+  doc.setFillColor(247, 247, 247); doc.setDrawColor(220, 220, 220);
+  doc.rect(M, y, CW, infoBoxH, 'FD');
+  const leftLabelX = M + 4;
+  const rightLabelX = M + CW / 2 + 4;
+  const category = studentTypeLabel(detail.student_type || detail.category);
+
+  const infoRows: [string, string, string, string][] = [
+    ['Name:', detail.student_name || '—', 'Adm No:', String(detail.admission_number || '—')],
+    ['Class:', detail.class_name || '—', 'Category:', category],
+  ];
+  infoRows.forEach(([lLabel, lVal, rLabel, rVal], ri) => {
+    const ry = y + ri * infoRowH + 4.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+    doc.text(lLabel, leftLabelX, ry);
+    doc.setFont('helvetica', 'normal');
+    doc.text(lVal, leftLabelX + doc.getTextWidth(lLabel) + 2, ry);
+    doc.setFont('helvetica', 'bold');
+    doc.text(rLabel, rightLabelX, ry);
+    doc.setFont('helvetica', 'normal');
+    doc.text(rVal, rightLabelX + doc.getTextWidth(rLabel) + 2, ry);
+  });
+  y += infoBoxH + 4;
+
+  // ── 3. CBE ASSESSMENT RESULTS TABLE ───────────────────────────────────────
   const isJSS = detail.education_level === 'junior_secondary';
   const comps: any[] = detail.competencies || [];
   const gradePointLookup = (grade: string) =>
@@ -151,334 +187,154 @@ export async function renderReportCardPage(
   const totalPts = comps.reduce((s: number, c: any) => s + gradePointLookup(c.overall_cbc_grade || c.pre_primary_grade || ''), 0);
   const maxPts = comps.length * (isJSS ? 8 : 4);
   const meanPts = comps.length ? totalPts / comps.length : 0;
-  const perfLevel = isJSS
-    ? (meanPts >= 7 ? 'Exceeding Expectations (EE1)' : meanPts >= 6 ? 'Exceeding Expectations (EE2)' : meanPts >= 5 ? 'Meeting Expectations (ME1)' : meanPts >= 4 ? 'Meeting Expectations (ME2)' : meanPts >= 3 ? 'Approaching Expectations (AE1)' : meanPts >= 2 ? 'Approaching Expectations (AE2)' : meanPts >= 1 ? 'Below Expectations (BE1)' : 'Below Expectations (BE2)')
-    : (meanPts >= 3.5 ? 'Exceeding Expectations' : meanPts >= 2.5 ? 'Meeting Expectations' : meanPts >= 1.5 ? 'Approaching Expectations' : 'Below Expectations');
 
-  // Name / Adm / Grade / Stream / Term / Year info grid
-  const infoRowH = 6;
-  const infoCol = [M, M + 20, M + 80, M + 110, M + 140, M + 160];
-  const infoW   = [20, 60,     30,     30,      20,      CW - 150];
-  const row1Labels = ['NAME', detail.student_name || '', 'GRADE', detail.class_name || '', 'ADMNO', detail.admission_number || ''];
-  const row2Labels = ['STREAM', detail.class_name || '', 'TERM', termLabel, 'YEAR', academicYear];
-
-  [row1Labels, row2Labels].forEach((rowData, ri) => {
-    const ry = y + ri * infoRowH;
-    doc.setFillColor(ri === 0 ? 240 : 248, ri === 0 ? 240 : 248, ri === 0 ? 240 : 248);
-    doc.rect(M, ry, CW, infoRowH, 'F');
-    doc.setDrawColor(200, 200, 200); doc.rect(M, ry, CW, infoRowH, 'D');
-    rowData.forEach((txt, ci) => {
-      if (ci > 0 && infoCol[ci]) {
-        doc.setDrawColor(200, 200, 200);
-        doc.line(infoCol[ci], ry, infoCol[ci], ry + infoRowH);
-      }
-      const isBold = ci % 2 === 0;
-      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-      doc.setFontSize(isBold ? 6.5 : 8);
-      doc.setTextColor(isBold ? 80 : 0, isBold ? 80 : 0, isBold ? 80 : 0);
-      const cx = infoCol[ci] + (infoW[ci] || 30) / 2;
-      doc.text(String(txt).slice(0, 20), cx, ry + 4.2, { align: 'center' });
-    });
-  });
-  doc.setTextColor(0, 0, 0);
-  y += 2 * infoRowH + 2;
-
-  // ── 3. STATS BAR ─────────────────────────────────────────────────────────
-  const hasRank = detail.class_rank != null;
-  const statCount = hasRank ? 5 : 4;
-  const statW = CW / statCount;
-  doc.setFillColor(240, 240, 240);
-  doc.rect(M, y, CW, 15, 'F');
-  doc.setDrawColor(200, 200, 200);
-  doc.rect(M, y, CW, 15, 'D');
-
-  const totalMarksSum = comps.reduce((s: number, c: any) => s + (Number(c.score) || 0), 0);
-  const totalMaxSum = comps.reduce((s: number, c: any) => s + (Number(c.max_score) || 0), 0);
-  const statsData: { label: string; val: string; small: boolean }[] = [
-    { label: 'Performance Level', val: perfLevel, small: true },
-    { label: 'Total Marks', val: totalMaxSum > 0 ? `${totalMarksSum}/${totalMaxSum}` : `${comps.reduce((s: number, c: any) => s + (Number(c.percentage) || 0), 0).toFixed(0)}%`, small: false },
-    { label: 'Total Points', val: `${totalPts}/${maxPts}`, small: false },
-    { label: 'Mean Points', val: meanPts.toFixed(2), small: false },
-  ];
-  if (hasRank) {
-    statsData.push({ label: 'Class Rank', val: `${detail.class_rank}/${detail.total_in_class}`, small: false });
-  }
-  statsData.forEach((s, i) => {
-    const sx = M + i * statW;
-    if (i > 0) { doc.setDrawColor(200, 200, 200); doc.line(sx, y, sx, y + 15); }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(80, 80, 80);
-    doc.text(s.label, sx + statW / 2, y + 4, { align: 'center' });
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(s.small ? 7.5 : 10); doc.setTextColor(0, 0, 0);
-    // Color performance level
-    if (i === 0) {
-      const [pr, pg, pb] = isJSS
-        ? (meanPts >= 6 ? [22, 163, 74] : meanPts >= 4 ? [37, 99, 235] : meanPts >= 2 ? [202, 138, 4] : [220, 38, 38])
-        : (meanPts >= 3.5 ? [22, 163, 74] : meanPts >= 2.5 ? [37, 99, 235] : meanPts >= 1.5 ? [202, 138, 4] : [220, 38, 38]);
-      doc.setTextColor(pr, pg, pb);
-    }
-    // Color rank (gold for top 3)
-    if (hasRank && i === statCount - 1 && detail.class_rank <= 3) {
-      doc.setTextColor(180, 120, 0);
-    }
-    doc.text(s.val, sx + statW / 2, y + 11, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-  });
-  y += 17;
-
-  // ── 4. LEARNING AREAS TABLE ────────────────────────────────────────────────
-  // Section header
   doc.setFillColor(21, 101, 192);
   doc.rect(M, y, CW, 7, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-  doc.text('LEARNING AREAS PERFORMANCE', W / 2, y + 4.5, { align: 'center' });
-  y += 8; doc.setTextColor(0, 0, 0);
+  doc.text('CBE ASSESSMENT RESULTS', M + 3, y + 4.8);
+  y += 7; doc.setTextColor(0, 0, 0);
 
-  // Column config: LEARNING AREA | TYPE/PERIOD | SCORE | GRADE | POINTS | FACILITATOR
+  // Column config: LEARNING AREA | TYPE/PERIOD | SCORE | GRADE | PTS | FACILITATOR
   const COL = {
-    subject:     { x: M,        w: 55 },
-    period:      { x: M + 55,   w: 28 },
-    score:       { x: M + 83,   w: 22 },
-    grade:       { x: M + 105,  w: 16 },
-    points:      { x: M + 121,  w: 16 },
-    facilitator: { x: M + 137,  w: CW - 137 },
+    subject:     { x: M,        w: 46 },
+    period:      { x: M + 46,   w: 26 },
+    score:       { x: M + 72,   w: 26 },
+    grade:       { x: M + 98,   w: 18 },
+    points:      { x: M + 116,  w: 14 },
+    facilitator: { x: M + 130,  w: CW - 130 },
   };
 
-  const termPeriod = detail.period
-    ? String(detail.period).toUpperCase()
-    : (term === 'term1' ? 'END TERM 1' : term === 'term2' ? 'END TERM 2' : 'END TERM 3');
+  const periodLabel = formatPeriodLabel(detail.period, term);
 
   // Column header row
-  doc.setFillColor(189, 214, 238);
-  doc.rect(M, y, CW, 7, 'F');
-  doc.setDrawColor(160, 160, 160);
-  doc.rect(M, y, CW, 7, 'D');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
+  doc.setFillColor(220, 230, 247);
+  doc.rect(M, y, CW, 6, 'F');
+  doc.setDrawColor(180, 180, 180);
+  doc.rect(M, y, CW, 6, 'D');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(40, 40, 40);
   [
-    { k: 'subject',     t: 'LEARNING AREA' },
-    { k: 'period',      t: 'TYPE/PERIOD' },
-    { k: 'score',       t: 'SCORE' },
-    { k: 'grade',       t: 'GRADE' },
-    { k: 'points',      t: 'PTS' },
-    { k: 'facilitator', t: 'FACILITATOR' },
+    { k: 'subject',     t: 'Learning Area' },
+    { k: 'period',      t: 'Type / Period' },
+    { k: 'score',       t: 'Score' },
+    { k: 'grade',       t: 'Grade' },
+    { k: 'points',      t: 'Pts' },
+    { k: 'facilitator', t: 'Facilitator' },
   ].forEach(({ k, t }) => {
     const c = COL[k as keyof typeof COL];
-    doc.text(t, c.x + 2, y + 4.5);
-    doc.setDrawColor(160, 160, 160);
-    doc.line(c.x, y, c.x, y + 7);
+    doc.text(t, c.x + 2, y + 4);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(c.x, y, c.x, y + 6);
   });
-  y += 7;
+  y += 6;
 
   // Data rows
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  const rowH = 7;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  const rowH = 6.5;
   comps.forEach((c: any, idx: number) => {
     if (y + rowH > 264) { doc.addPage(); y = 10; }
-    const bg: [number,number,number] = idx % 2 === 1 ? [245, 245, 245] : [255, 255, 255];
+    const bg: [number, number, number] = idx % 2 === 1 ? [246, 246, 246] : [255, 255, 255];
     doc.setFillColor(...bg); doc.rect(M, y, CW, rowH, 'F');
-    doc.setDrawColor(200, 200, 200); doc.rect(M, y, CW, rowH, 'D');
+    doc.setDrawColor(220, 220, 220); doc.rect(M, y, CW, rowH, 'D');
 
     const grade = c.overall_cbc_grade || c.pre_primary_grade || '';
     const pct = c.percentage != null ? `${Math.round(Number(c.percentage))}%` : '—';
 
-    // vertical dividers
     Object.values(COL).forEach(col => {
-      doc.setDrawColor(200, 200, 200);
+      doc.setDrawColor(220, 220, 220);
       doc.line(col.x, y, col.x, y + rowH);
     });
 
     const scoreStr = c.total_score != null && c.max_score != null
-      ? `${Number(c.total_score).toFixed(0)}/${Number(c.max_score).toFixed(0)}`
+      ? `${Number(c.total_score).toFixed(2)}/${Number(c.max_score).toFixed(2)}`
       : pct;
     const computedPts = gradePointLookup(grade);
     const pts = c.grade_points != null ? String(c.grade_points) : (computedPts > 0 ? String(computedPts) : '—');
 
     doc.setTextColor(0, 0, 0);
-    doc.text((c.subject_name || '').slice(0, 26), COL.subject.x + 2, y + 4.5);
-    doc.setFontSize(6.5);
-    doc.text(termPeriod, COL.period.x + 2, y + 4.5);
-    doc.setFontSize(8);
-    doc.text(scoreStr, COL.score.x + 2, y + 4.5);
+    doc.text((c.subject_name || '').slice(0, 26), COL.subject.x + 2, y + 4.3);
+    doc.text(c.period_label || periodLabel, COL.period.x + 2, y + 4.3);
+    doc.text(scoreStr, COL.score.x + 2, y + 4.3);
 
     // Grade badge
     if (grade) {
       const [r, g, b] = GRADE_HEX[grade] || [100, 100, 100];
       doc.setFillColor(r, g, b);
-      doc.roundedRect(COL.grade.x + 1, y + 0.5, 14, 6, 1, 1, 'F');
-      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
-      doc.text(grade, COL.grade.x + 8, y + 4.5, { align: 'center' });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+      doc.roundedRect(COL.grade.x + 1, y + 0.6, 14, 5.3, 1, 1, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+      doc.text(grade, COL.grade.x + 8, y + 4.3, { align: 'center' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
     } else {
-      doc.text('—', COL.grade.x + 2, y + 4.5);
+      doc.text('—', COL.grade.x + 2, y + 4.3);
     }
 
-    doc.text(pts, COL.points.x + 2, y + 4.5);
-    doc.setFontSize(7.5);
-    doc.text((c.teacher_name || '—').slice(0, 28), COL.facilitator.x + 2, y + 4.5);
-    doc.setFontSize(8);
+    doc.text(pts, COL.points.x + 2, y + 4.3);
+    doc.text((c.teacher_name || '—').slice(0, 30), COL.facilitator.x + 2, y + 4.3);
     y += rowH;
   });
-  y += 3;
+  y += 2;
 
-  // ── 5. REMARKS (2 columns) ────────────────────────────────────────────────
-  if (y + 36 > 272) { doc.addPage(); y = 10; }
-  const remW = (CW - 4) / 2;
-  const remH = 30;
-  const remY = y;
-
-  // Class Facilitator box
-  doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
-  doc.rect(M, remY, remW, remH, 'FD');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
-  doc.text('CLASS FACILITATOR', M + 3, remY + 5.5);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(21, 101, 192);
-  doc.text(detail.class_teacher_name || '—', M + 3, remY + 12);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
-  doc.text('Signature:', M + 3, remY + remH - 4);
-  doc.setDrawColor(0, 0, 0);
-  doc.line(M + 26, remY + remH - 4, M + remW - 3, remY + remH - 4);
-
-  // Head Teacher / Principal box
-  const prX = M + remW + 4;
-  doc.setDrawColor(160, 160, 160); doc.setFillColor(255, 255, 255);
-  doc.rect(prX, remY, remW, remH, 'FD');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
-  doc.text('HEAD TEACHER / PRINCIPAL', prX + 3, remY + 5.5);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(21, 101, 192);
-  doc.text(detail.head_teacher_name || '—', prX + 3, remY + 12);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
-  doc.text('Signature:', prX + 3, remY + remH - 4);
-  doc.setDrawColor(0, 0, 0);
-  doc.line(prX + 26, remY + remH - 4, prX + remW - 3, remY + remH - 4);
-
-  y += remH + 4;
-
-  // ── 6. GRADE DESCRIPTORS TABLE ────────────────────────────────────────────
-  if (y + 25 > 280) { doc.addPage(); y = 10; }
+  // ── 4. TOTALS ──────────────────────────────────────────────────────────────
+  doc.setFillColor(238, 238, 238); doc.rect(M, y, CW, 6, 'F');
+  doc.setDrawColor(210, 210, 210); doc.rect(M, y, CW, 6, 'D');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-  doc.text('GRADE DESCRIPTORS', M, y + 4);
-  y += 5;
+  doc.text('TOTAL POINTS', M + 3, y + 4.2);
+  doc.text(`${totalPts} / ${maxPts}`, M + CW - 3, y + 4.2, { align: 'right' });
+  y += 6;
 
-  const dH = 6;
+  doc.setFillColor(250, 250, 250); doc.rect(M, y, CW, 6, 'F');
+  doc.setDrawColor(220, 220, 220); doc.rect(M, y, CW, 6, 'D');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(40, 40, 40);
+  doc.text('Average Points per Subject', M + 3, y + 4.2);
+  doc.setFont('helvetica', 'bold');
+  doc.text(meanPts.toFixed(1), M + CW - 3, y + 4.2, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+  y += 6 + 3;
 
-  if (isJSS) {
-    // JSS 8-level grade descriptor
-    const jssGrades = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2'];
-    const jssPoints = ['8', '7', '6', '5', '4', '3', '2', '1'];
-    const jssRanges = ['90-100', '75-89', '58-74', '41-57', '31-40', '21-30', '11-20', '0-10'];
-    const labelW = 28;
-    const colW = (CW - labelW) / 8;
-    const jssGradeCols = [M, ...jssGrades.map((_, i) => M + labelW + i * colW)];
+  // ── 5. FACILITATOR'S COMMENT ──────────────────────────────────────────────
+  if (y + 16 > 280) { doc.addPage(); y = 10; }
+  doc.setFillColor(21, 101, 192);
+  doc.rect(M, y, CW, 6, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${meanPts.toFixed(1)} pts/subject)`, M + 3, y + 4.2);
+  y += 6; doc.setTextColor(0, 0, 0);
 
-    // Header row
-    doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
-    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
-    doc.text('Level', M + 2, y + 4);
-    jssGrades.forEach((g, i) => {
-      const cx = jssGradeCols[i + 1];
-      doc.setDrawColor(160, 160, 160); doc.line(cx, y, cx, y + dH);
-      const [r, g2, b] = GRADE_HEX[g] || [100, 100, 100];
-      doc.setFillColor(r, g2, b);
-      doc.rect(cx + 1, y + 0.5, colW - 2, dH - 1, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.text(g, cx + colW / 2, y + 4, { align: 'center' });
-      doc.setTextColor(0, 0, 0);
-    });
-    y += dH;
+  doc.setDrawColor(210, 210, 210); doc.setFillColor(255, 255, 255);
+  const commentH = 10;
+  doc.rect(M, y, CW, commentH, 'FD');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.text(buildFacilitatorComment(meanPts, isJSS), M + 3, y + 6, { maxWidth: CW - 6 });
+  y += commentH + 4;
 
-    // Points row
-    doc.setFillColor(255, 255, 255); doc.rect(M, y, CW, dH, 'F');
-    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
-    doc.text('Points', M + 2, y + 4);
-    jssPoints.forEach((v, i) => {
-      const cx = jssGradeCols[i + 1];
-      doc.setDrawColor(160, 160, 160); doc.line(cx, y, cx, y + dH);
-      doc.text(v, cx + colW / 2, y + 4, { align: 'center' });
-    });
-    y += dH;
-
-    // Range row
-    doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
-    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
-    doc.text('Range (%)', M + 2, y + 4);
-    jssRanges.forEach((v, i) => {
-      const cx = jssGradeCols[i + 1];
-      doc.setDrawColor(160, 160, 160); doc.line(cx, y, cx, y + dH);
-      doc.text(v, cx + colW / 2, y + 4, { align: 'center' });
-    });
-    y += dH + 3;
-  } else {
-    // Standard 4-level grade descriptor
-    const dCols = [M, M + 38, M + 38 + 38, M + 38 + 38 + 38, M + 38 + 38 + 38 + 38];
-    const dWidths = [38, 38, 38, 38, CW - 38 * 4];
-
-    // Header row
-    doc.setFillColor(240, 240, 240);
-    doc.rect(M, y, CW, dH, 'F');
-    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-    ['Performance Level', 'Exceeding Expectations', 'Meeting Expectations', 'Approaching Expectations', 'Below Expectations'].forEach((h, i) => {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
-      doc.text(h.slice(0, 20), dCols[i] + 2, y + 4);
-      doc.setDrawColor(160, 160, 160); doc.line(dCols[i], y, dCols[i], y + dH);
-    });
-    y += dH;
-
-    // Points row
-    doc.setFillColor(255, 255, 255); doc.rect(M, y, CW, dH, 'F');
-    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-    doc.text('Points', dCols[0] + 2, y + 4);
-    ['4', '3', '2', '1'].forEach((v, i) => {
-      doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
-      doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 4, { align: 'center' });
-    });
-    y += dH;
-
-    // Range row
-    doc.setFillColor(240, 240, 240); doc.rect(M, y, CW, dH, 'F');
-    doc.setDrawColor(160, 160, 160); doc.rect(M, y, CW, dH, 'D');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-    doc.text('Range (%)', dCols[0] + 2, y + 4);
-    ['75-100', '50-74', '25-49', '0-24'].forEach((v, i) => {
-      doc.line(dCols[i + 1], y, dCols[i + 1], y + dH);
-      doc.text(v, dCols[i + 1] + dWidths[i + 1] / 2, y + 4, { align: 'center' });
-    });
-    y += dH + 3;
-  }
-
-  // ── 7. TERM DATES ─────────────────────────────────────────────────────────
-  if (y + 22 > 284) { doc.addPage(); y = 10; }
-
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-  doc.text('TERM DATES', M, y + 5);
-  y += 7;
-
-  const dColW = CW / 2;
-  ['TERM ENDS', 'NEXT TERM BEGINS'].forEach((h, i) => {
-    cell(doc, M + i * dColW, y, dColW, 7, [235, 235, 235]);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
-    doc.text(h, M + i * dColW + dColW / 2, y + 4.5, { align: 'center' });
+  // ── 6. TERM DATES ─────────────────────────────────────────────────────────
+  if (y + 16 > 282) { doc.addPage(); y = 10; }
+  const dColW = (CW - 4) / 2;
+  ['TERM CLOSES', 'NEXT TERM OPENS'].forEach((h, i) => {
+    const bx = M + i * (dColW + 4);
+    doc.setFillColor(235, 235, 235); doc.setDrawColor(210, 210, 210);
+    doc.rect(bx, y, dColW, 5.5, 'FD');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(80, 80, 80);
+    doc.text(h, bx + dColW / 2, y + 3.8, { align: 'center' });
   });
+  const dValY = y + 5.5;
   const termEndStr = detail.term_end_date || '—';
   const nextTermStr = detail.next_term_start_date || '—';
   [termEndStr, nextTermStr].forEach((v, i) => {
-    cell(doc, M + i * dColW, y + 7, dColW, 8);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
-    doc.text(v, M + i * dColW + dColW / 2, y + 13, { align: 'center' });
+    const bx = M + i * (dColW + 4);
+    doc.setDrawColor(210, 210, 210); doc.setFillColor(255, 255, 255);
+    doc.rect(bx, dValY, dColW, 7, 'FD');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+    doc.text(v, bx + dColW / 2, dValY + 4.8, { align: 'center' });
   });
-  y += 15;
+  y = dValY + 7 + 4;
 
-  // ── 8. FOOTER ─────────────────────────────────────────────────────────────
-  const footerY = 287;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(120, 120, 120);
-  doc.text(`Verification Code: ${detail.admission_number || ''}${detail.term || ''}`, M, footerY);
-  doc.text('Generated by SkulManager', W / 2, footerY, { align: 'center' });
-  if (school?.motto) {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(21, 101, 192);
-    doc.text(`School Motto: ${school.motto}`, W - M, footerY, { align: 'right' });
-  }
+  // ── 7. FOOTER ─────────────────────────────────────────────────────────────
+  const footerY = 290;
+  const genDate = new Date().toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(140, 140, 140);
+  doc.text(
+    `Generated: ${genDate}  |  ${(school?.school_name || '').toUpperCase()}  |  Confidential`,
+    W / 2, footerY, { align: 'center' }
+  );
 }
 
 // ── Build and save PDF (one or many students) ────────────────────────────────

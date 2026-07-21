@@ -140,6 +140,7 @@ export function StudentReportPage() {
         admission_number: selectedStudent.admission_number,
         class_name: selectedStudent.class_name,
         profile_photo_url: selectedStudent.profile_photo_url,
+        student_type: selectedStudent.student_type,
         education_level: level,
         period: selectedExam?.name || 'Exam',
         competencies,
@@ -300,10 +301,11 @@ export function StudentReportPage() {
 
           {/* Info note */}
           <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
-            <p>Generates the same official CBE Report Card format used elsewhere in the system, for this one exam:</p>
+            <p>Generates the same official Student Report Form format used elsewhere in the system, for this one exam:</p>
             <p>• School logo, name, address, contact and student photo</p>
-            <p>• Learning areas performance table with grades and points</p>
-            <p>• Performance level, total marks/points and grade descriptors</p>
+            <p>• Student information (name, admission no., class, category)</p>
+            <p>• CBE assessment results table with grades and points</p>
+            <p>• Total points, average points per subject and facilitator's comment</p>
             <p>• Term closing and next term opening dates (if set)</p>
           </div>
 

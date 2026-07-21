@@ -694,7 +694,7 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
       `SELECT rc.*,
        s.first_name||' '||s.last_name AS student_name,
        s.admission_number, s.date_of_birth, s.nemis_number,
-       s.profile_photo_url,
+       s.profile_photo_url, s.student_type,
        c.name AS class_name, c.education_level,
        p.first_name||' '||p.last_name AS guardian_name,
        p.relationship AS guardian_relationship,

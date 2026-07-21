@@ -820,7 +820,15 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
         `SELECT
            a.subject_id,
            sub.name AS subject_name,
-           UPPER(t.first_name || ' ' || t.last_name) AS teacher_name,
+           COALESCE(
+             (SELECT UPPER(t3.first_name || ' ' || t3.last_name) FROM cbc_assessments a3
+                JOIN teachers t3 ON t3.user_id = a3.teacher_id
+                WHERE a3.student_id = $1 AND a3.subject_id = a.subject_id
+                  AND a3.term = $2 AND a3.academic_year = $3 AND a3.tenant_id = $5
+                  ${examPeriodFilter ? 'AND a3.exam_period = $6' : ''}
+                ORDER BY a3.assessment_date DESC LIMIT 1),
+             UPPER(t.first_name || ' ' || t.last_name)
+           ) AS teacher_name,
            SUM(COALESCE(a.score, 0))::numeric        AS total_score,
            SUM(COALESCE(a.max_score, 0))::numeric     AS max_score,
            CASE WHEN SUM(COALESCE(a.max_score, 0)) > 0

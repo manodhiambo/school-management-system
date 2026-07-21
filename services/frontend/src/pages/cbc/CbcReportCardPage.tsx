@@ -46,8 +46,12 @@ function formatPeriodLabel(period: string | null | undefined, term: string): str
 }
 
 // Friendly performance summary shown under FACILITATOR'S COMMENT, scaled to the
-// grading system in use (4-level standard vs 8-level JSS points).
-function buildFacilitatorComment(meanPts: number, isJSS: boolean): string {
+// grading system in use (4-level standard vs 8-level JSS points). A zero-subject
+// report means no assessment was recorded for this period — that must never be
+// worded as "needs improvement", which would misrepresent an absent record as a
+// poor result.
+function buildFacilitatorComment(meanPts: number, isJSS: boolean, subjectCount: number): string {
+  if (subjectCount === 0) return 'No assessment records found for this period yet — please contact the school if this is unexpected.';
   const norm = meanPts / (isJSS ? 8 : 4);
   if (norm >= 0.875) return 'Excellent work! Keep up the outstanding performance.';
   if (norm >= 0.7) return 'Good job! You are doing great, keep putting in the effort.';
@@ -295,14 +299,17 @@ export async function renderReportCardPage(
   doc.setFillColor(21, 101, 192);
   doc.rect(M, y, CW, 6, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-  doc.text(`FACILITATOR'S COMMENT:  (Total: ${totalPts}/${maxPts}  |  Avg: ${meanPts.toFixed(1)} pts/subject)`, M + 3, y + 4.2);
+  const commentHeaderSuffix = comps.length > 0
+    ? `(Total: ${totalPts}/${maxPts}  |  Avg: ${meanPts.toFixed(1)} pts/subject)`
+    : '(No results recorded yet)';
+  doc.text(`FACILITATOR'S COMMENT:  ${commentHeaderSuffix}`, M + 3, y + 4.2);
   y += 6; doc.setTextColor(0, 0, 0);
 
   doc.setDrawColor(210, 210, 210); doc.setFillColor(255, 255, 255);
   const commentH = 10;
   doc.rect(M, y, CW, commentH, 'FD');
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  doc.text(buildFacilitatorComment(meanPts, isJSS), M + 3, y + 6, { maxWidth: CW - 6 });
+  doc.text(buildFacilitatorComment(meanPts, isJSS, comps.length), M + 3, y + 6, { maxWidth: CW - 6 });
   y += commentH + 4;
 
   // ── 6. TERM DATES ─────────────────────────────────────────────────────────

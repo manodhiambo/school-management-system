@@ -49,14 +49,16 @@ export function CbcAnalyticsPage() {
   }, []);
 
   const loadBaseData = async () => {
-    try {
-      const [classesRes, subjectsRes, studentsRes]: any[] = await Promise.all([
-        api.getClasses(), api.getSubjects(), api.getStudents()
-      ]);
-      setClasses(classesRes.data || classesRes || []);
-      setSubjects(subjectsRes.data || subjectsRes || []);
-      setStudents(studentsRes.data || studentsRes || []);
-    } catch { /* silent */ }
+    // Independent calls (not Promise.all) so a slow/failing students fetch —
+    // the heaviest of the three on a school with hundreds of students — can't
+    // blank out the class/subject dropdowns used by the Class View and
+    // Broadsheet tabs, which don't need the student list at all.
+    const [classesRes, subjectsRes, studentsRes] = await Promise.allSettled([
+      api.getClasses(), api.getSubjects(), api.getStudents()
+    ]);
+    if (classesRes.status === 'fulfilled') setClasses((classesRes.value as any).data || classesRes.value || []);
+    if (subjectsRes.status === 'fulfilled') setSubjects((subjectsRes.value as any).data || subjectsRes.value || []);
+    if (studentsRes.status === 'fulfilled') setStudents((studentsRes.value as any).data || studentsRes.value || []);
   };
 
   const loadOverview = async () => {

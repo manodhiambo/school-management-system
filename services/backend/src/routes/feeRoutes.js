@@ -21,8 +21,13 @@ router.use(requireActiveTenant);
 // silently breaks "Defaulters"/"Fee Collection" once a finance officer narrows
 // by term.
 async function resolveCurrentTerm(tenantId) {
+  // ORDER BY is a defensive tie-breaker only — start_date DESC picks the most
+  // forward-dated term if more than one row is ever marked is_current at once
+  // (shouldn't happen after the set-current/create-term atomicity fixes, but
+  // an unordered LIMIT 1 previously let Postgres return either row arbitrarily,
+  // which could silently resolve to a stale previous term).
   const rows = await query(
-    `SELECT term, academic_year FROM academic_terms WHERE tenant_id = $1 AND is_current = true LIMIT 1`,
+    `SELECT term, academic_year FROM academic_terms WHERE tenant_id = $1 AND is_current = true ORDER BY start_date DESC LIMIT 1`,
     [tenantId]
   );
   return rows[0] || { term: null, academic_year: new Date().getFullYear().toString() };

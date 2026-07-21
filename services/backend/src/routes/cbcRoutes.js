@@ -1289,7 +1289,7 @@ router.get('/terms/current', authenticate, requireModule('academics'), async (re
   try {
     const tid = req.user.tenant_id;
     const rows = await query(
-      `SELECT * FROM academic_terms WHERE tenant_id = $1 AND is_current = TRUE LIMIT 1`,
+      `SELECT * FROM academic_terms WHERE tenant_id = $1 AND is_current = TRUE ORDER BY start_date DESC LIMIT 1`,
       [tid]
     );
     res.json({ success: true, data: rows[0] || null });
@@ -1307,12 +1307,21 @@ router.post('/terms', authenticate, requireModule('academics'), async (req, res)
       end_term_exams_start, end_term_exams_end, reopening_date, is_current
     } = req.body;
     const tid = req.user.tenant_id;
-    // If setting as current, unset others first
-    if (is_current) {
-      await query('UPDATE academic_terms SET is_current=FALSE WHERE tenant_id=$1', [tid]);
-    }
+    // Deactivating other terms and the upsert happen in one statement (a
+    // data-modifying CTE runs inside one implicit transaction) instead of two
+    // separate round trips, closing the same race the set-current endpoint
+    // had — the "$11 AND" guard means the deactivate CTE only touches other
+    // rows when this call actually requests is_current:true.
+    // On conflict (editing an existing term's dates), only ever flip
+    // is_current to TRUE when explicitly requested — never silently demote
+    // whichever term is currently marked current just because a routine edit
+    // didn't re-send is_current:true.
     const rows = await query(
-      `INSERT INTO academic_terms
+      `WITH deactivate AS (
+         UPDATE academic_terms SET is_current = FALSE
+         WHERE tenant_id = $12 AND $11 AND NOT (academic_year = $1 AND term = $2)
+       )
+       INSERT INTO academic_terms
        (academic_year, term, term_name, start_date, end_date,
         midterm_break_start, midterm_break_end,
         end_term_exams_start, end_term_exams_end, reopening_date, is_current, tenant_id)
@@ -1321,7 +1330,8 @@ router.post('/terms', authenticate, requireModule('academics'), async (req, res)
        SET term_name=$3, start_date=$4, end_date=$5,
        midterm_break_start=$6, midterm_break_end=$7,
        end_term_exams_start=$8, end_term_exams_end=$9,
-       reopening_date=$10, is_current=$11
+       reopening_date=$10,
+       is_current=CASE WHEN $11 THEN TRUE ELSE academic_terms.is_current END
        RETURNING *`,
       [academic_year, term, term_name, start_date, end_date,
        midterm_break_start || null, midterm_break_end || null,
@@ -1339,9 +1349,21 @@ router.post('/terms', authenticate, requireModule('academics'), async (req, res)
 router.put('/terms/:id/set-current', authenticate, requireModule('academics'), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    await query('UPDATE academic_terms SET is_current=FALSE WHERE tenant_id=$1', [tid]);
+    // Single statement (a data-modifying CTE runs inside one implicit
+    // transaction) instead of two separate UPDATEs — two interleaved
+    // set-current calls could otherwise leave two rows both is_current=true,
+    // and the unordered `is_current=true LIMIT 1` reads elsewhere (invoice
+    // generation, GET /terms/current) would then non-deterministically pick
+    // either one, including the term that was just supposed to be replaced.
     const rows = await query(
-      'UPDATE academic_terms SET is_current=TRUE WHERE id=$1 AND tenant_id=$2 RETURNING *', [req.params.id, tid]
+      `WITH deactivate AS (
+         UPDATE academic_terms SET is_current = FALSE
+         WHERE tenant_id = $2 AND id <> $1
+       )
+       UPDATE academic_terms SET is_current = TRUE
+       WHERE id = $1 AND tenant_id = $2
+       RETURNING *`,
+      [req.params.id, tid]
     );
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Term not found' });

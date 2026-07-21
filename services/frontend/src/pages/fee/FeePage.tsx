@@ -15,6 +15,8 @@ import { jsPDF } from 'jspdf';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguageStore } from '@/store/languageStore';
 
+const TERM_LABELS: Record<string, string> = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface StudentSummary {
   id: string; first_name: string; last_name: string; admission_number: string;
@@ -280,16 +282,20 @@ function FeeStatementModal({
   const [deletingPmt, setDeletingPmt] = useState<string | null>(null);
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [currentTerm, setCurrentTerm] = useState<{ term: string; academic_year: string; term_name?: string } | null>(null);
+  const [genTerm, setGenTerm] = useState('');
+  const [genYear, setGenYear] = useState('');
 
   const totalExpected = [...expected, ...extraFees].reduce((s, f) => s + Number(f.amount), 0);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [feeRes, expectedRes, settingsRes]: any[] = await Promise.all([
+      const [feeRes, expectedRes, settingsRes, currentTermRes]: any[] = await Promise.all([
         api.getStudentFeeAccount(student.id),
         api.getExpectedFees(student.id),
         api.getSettings().catch(() => ({ data: { school_name: 'School' } })),
+        api.getCurrentTerm().catch(() => ({ data: null })),
       ]);
       const feeData = feeRes?.data || {};
       setInvoices(feeData.invoices || []);
@@ -297,6 +303,7 @@ function FeeStatementModal({
       setExpected(expectedRes?.data?.structures || []);
       setExtraFees(expectedRes?.data?.extra_fees || []);
       setSchoolName(settingsRes?.data?.school_name || 'School');
+      setCurrentTerm(currentTermRes?.data || null);
     } finally {
       setLoading(false);
     }
@@ -304,10 +311,24 @@ function FeeStatementModal({
 
   useEffect(() => { load(); }, [load]);
 
+  // The school's configured "current" academic term (academic_terms.is_current)
+  // is what a blank Term/Year below resolves to server-side — shown here so an
+  // admin isn't guessing which term an invoice will be generated for, and can
+  // override it explicitly if the school hasn't updated which term is current.
+  const resolvedTermLabel = genTerm
+    ? `${TERM_LABELS[genTerm] || genTerm} ${genYear || currentTerm?.academic_year || ''}`
+    : currentTerm
+      ? `${currentTerm.term_name || TERM_LABELS[currentTerm.term] || currentTerm.term} ${currentTerm.academic_year} (school's current term)`
+      : 'No current term configured — set one in CBE Academics';
+
   const handleGenerateInvoice = async () => {
     setGenLoading(true);
     try {
-      await api.generateInvoiceForStudent({ student_id: student.id });
+      await api.generateInvoiceForStudent({
+        student_id: student.id,
+        term: genTerm || undefined,
+        academic_year: genYear || undefined,
+      });
       await load();
     } catch (e: any) {
       alert(e?.response?.data?.message || 'Failed to generate invoice');
@@ -379,6 +400,23 @@ function FeeStatementModal({
             </div>
           ) : (
             <div className="space-y-5 pt-1">
+
+              {/* Generate-invoice term control — shown so an admin can see and
+                  override which term "Generate Invoice" (above) will use,
+                  instead of it silently applying the school's current term. */}
+              <div className="flex items-center gap-2 flex-wrap bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs">
+                <span className="text-gray-600">Next invoice will be for:</span>
+                <span className="font-semibold text-gray-800">{resolvedTermLabel}</span>
+                <select className="border rounded px-2 py-1 ml-auto"
+                  value={genTerm} onChange={e => setGenTerm(e.target.value)}>
+                  <option value="">Use school's current term</option>
+                  <option value="term1">Term 1</option>
+                  <option value="term2">Term 2</option>
+                  <option value="term3">Term 3</option>
+                </select>
+                <Input className="w-20 h-8 text-xs" placeholder={currentTerm?.academic_year || 'Year'}
+                  value={genYear} onChange={e => setGenYear(e.target.value)} />
+              </div>
 
               {/* Summary row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

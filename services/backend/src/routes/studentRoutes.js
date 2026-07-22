@@ -189,8 +189,12 @@ router.get('/next-admission-number', requireRole(['admin']), async (req, res) =>
 router.get('/:id', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
+    // class_education_level is aliased separately (not "education_level") because
+    // students.education_level is a separate, independently-editable admission-form
+    // field (see EditStudentModal) — the class's level is the authoritative one for
+    // any CBE grade-scale decision and must not silently overwrite the raw field here.
     const students = await query(
-      `SELECT s.*, u.email, c.name as class_name
+      `SELECT s.*, u.email, c.name as class_name, c.education_level AS class_education_level
        FROM students s
        JOIN users u ON s.user_id = u.id
        LEFT JOIN classes c ON s.class_id = c.id

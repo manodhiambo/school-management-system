@@ -165,6 +165,12 @@ export function CbcAssessmentPage() {
   // Compute auto-comment when score/max_score changes
   const handleFormChange = (field: string, value: string) => {
     const updated = { ...form, [field]: value };
+    // Auto-derive the CBE level from the selected class so the on-screen preview always
+    // matches what the backend will actually save (the backend derives it authoritatively
+    // from the class too — this just keeps the preview from momentarily disagreeing).
+    if (field === 'class_id') {
+      updated.education_level = classes.find((c: any) => c.id === value)?.education_level || '';
+    }
     if ((field === 'score' || field === 'max_score' || field === 'result_code') && !updated.teacher_comments_manual) {
       if (updated.result_code) {
         updated.teacher_comments = '';

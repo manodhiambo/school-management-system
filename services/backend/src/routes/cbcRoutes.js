@@ -245,9 +245,16 @@ router.post('/assessments', authenticate, requireModule('academics'), async (req
     const {
       student_id, subject_id, strand_id, sub_strand_id, class_id,
       assessment_type, assessment_date, term, academic_year,
-      score, max_score, teacher_comments, education_level,
+      score, max_score, teacher_comments,
       exam_period, result_code
     } = req.body;
+
+    const tid = req.user.tenant_id;
+    // Derive the grading scale from the class's actual CBE level rather than trusting
+    // a client-supplied education_level — a teacher forgetting to switch a form dropdown
+    // must never silently grade a Junior Secondary student on the wrong (non-JSS) scale.
+    const classRows = await query('SELECT education_level FROM classes WHERE id=$1 AND tenant_id=$2', [class_id, tid]);
+    const education_level = classRows[0]?.education_level || 'lower_primary';
 
     let cbc_grade = null;
     let pre_primary_grade = null;
@@ -258,7 +265,7 @@ router.post('/assessments', authenticate, requireModule('academics'), async (req
       if (['playgroup', 'pre_primary'].includes(education_level)) {
         pre_primary_grade = computeCBEGrade(pct, education_level);
       } else {
-        cbc_grade = computeCBEGrade(pct, education_level || 'lower_primary');
+        cbc_grade = computeCBEGrade(pct, education_level);
         grade_pts = gradePoints(cbc_grade);
       }
     }
@@ -267,7 +274,6 @@ router.post('/assessments', authenticate, requireModule('academics'), async (req
     const finalGrade = cbc_grade || pre_primary_grade;
     const finalComment = teacher_comments || (finalGrade ? autoComment(finalGrade) : null);
 
-    const tid = req.user.tenant_id;
     const rows = await query(
       `INSERT INTO cbc_assessments
        (student_id, subject_id, strand_id, sub_strand_id, class_id, assessment_type,
@@ -291,15 +297,26 @@ router.put('/assessments/:id', authenticate, requireModule('academics'), async (
   if (!['admin', 'superadmin', 'teacher'].includes(req.user.role)) {
     return res.status(403).json({ success: false, message: 'Access denied' });
   }
-  // Teachers can only edit their own assessments
-  if (req.user.role === 'teacher') {
-    const existing = await query('SELECT teacher_id FROM cbc_assessments WHERE id=$1 AND tenant_id=$2', [req.params.id, req.user.tenant_id]);
-    if (!existing.length || existing[0].teacher_id !== req.user.id) {
+  try {
+    const existing = await query(
+      `SELECT a.teacher_id, c.education_level
+       FROM cbc_assessments a
+       LEFT JOIN classes c ON c.id = a.class_id
+       WHERE a.id=$1 AND a.tenant_id=$2`,
+      [req.params.id, req.user.tenant_id]
+    );
+    if (!existing.length) {
+      return res.status(404).json({ success: false, message: 'Assessment not found' });
+    }
+    // Teachers can only edit their own assessments
+    if (req.user.role === 'teacher' && existing[0].teacher_id !== req.user.id) {
       return res.status(403).json({ success: false, message: 'You can only edit your own assessments' });
     }
-  }
-  try {
-    const { score, max_score, cbc_grade, pre_primary_grade, teacher_comments, education_level, exam_period, result_code } = req.body;
+    // Derive the grading scale from the class's actual CBE level rather than trusting
+    // a client-supplied education_level — see POST /assessments for the same fix.
+    const education_level = existing[0].education_level || 'lower_primary';
+
+    const { score, max_score, cbc_grade, pre_primary_grade, teacher_comments, exam_period, result_code } = req.body;
     let grade = cbc_grade;
     let ppGrade = pre_primary_grade;
     let grade_pts = null;
@@ -308,7 +325,7 @@ router.put('/assessments/:id', authenticate, requireModule('academics'), async (
       if (['playgroup', 'pre_primary'].includes(education_level)) {
         ppGrade = computeCBEGrade(pct, education_level);
       } else {
-        grade = computeCBEGrade(pct, education_level || 'lower_primary');
+        grade = computeCBEGrade(pct, education_level);
       }
     }
     if (!result_code && grade) grade_pts = gradePoints(grade);

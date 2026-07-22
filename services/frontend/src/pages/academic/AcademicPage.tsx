@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { computeCBEGrade } from '@/utils/cbeGrades';
 
 // ── Helper: CBE grade badge ──────────────────────────────────
 const GRADE_COLORS: Record<string, string> = {
@@ -879,7 +880,7 @@ function SbaMarksModal({ sba, onClose, onSaved }: any) {
       updated[idx] = { ...updated[idx], [field]: val };
       if (field === 'score' && val !== '') {
         const pct = (parseFloat(val) / parseFloat(sba.max_score)) * 100;
-        updated[idx].cbc_grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
+        updated[idx].cbc_grade = computeCBEGrade(pct, sba.education_level || 'lower_primary');
       }
       return updated;
     });

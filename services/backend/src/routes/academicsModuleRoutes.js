@@ -539,6 +539,7 @@ router.get('/sba', requireRole(['admin','teacher']), async (req, res) => {
       SELECT s.*,
         sub.name AS subject_name,
         c.name AS class_name,
+        c.education_level,
         u.first_name || ' ' || u.last_name AS teacher_name,
         COUNT(sr.id) AS submissions_count,
         COUNT(st.id) AS total_students
@@ -549,7 +550,7 @@ router.get('/sba', requireRole(['admin','teacher']), async (req, res) => {
       LEFT JOIN sba_student_records sr ON sr.sba_setup_id = s.id
       LEFT JOIN students st ON st.class_id = s.class_id AND st.status = 'active'
       WHERE ${where.join(' AND ')}
-      GROUP BY s.id, sub.name, c.name, u.first_name, u.last_name
+      GROUP BY s.id, sub.name, c.name, c.education_level, u.first_name, u.last_name
       ORDER BY s.created_at DESC
     `, params);
     res.json({ data: result });
@@ -790,11 +791,16 @@ router.post('/projects/:id/submissions', requireRole(['admin','teacher','student
 router.put('/projects/:projectId/submissions/:subId/grade', requireRole(['admin','teacher']), async (req, res) => {
   try {
     const { score, teacher_remarks } = req.body;
-    const project = await query('SELECT max_score FROM projects WHERE id=$1 AND tenant_id=$2', [req.params.projectId, tid(req)]);
+    const project = await query(
+      `SELECT p.max_score, c.education_level
+       FROM projects p
+       LEFT JOIN classes c ON c.id = p.class_id
+       WHERE p.id=$1 AND p.tenant_id=$2`, [req.params.projectId, tid(req)]
+    );
     if (!project[0]) return res.status(404).json({ error: 'Project not found' });
     const maxScore = parseFloat(project[0].max_score || 100);
     const pct = (parseFloat(score) / maxScore) * 100;
-    const cbc_grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
+    const cbc_grade = computeCBEGrade(pct, project[0].education_level || 'lower_primary');
     const result = await query(`
       UPDATE project_submissions SET score=$1, cbc_grade=$2, teacher_remarks=$3, graded_at=NOW(), graded_by=$4
       WHERE id=$5 AND tenant_id=$6 RETURNING *

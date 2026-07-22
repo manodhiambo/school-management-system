@@ -188,9 +188,14 @@ export async function renderReportCardPage(
   const comps: any[] = detail.competencies || [];
   const gradePointLookup = (grade: string) =>
     isJSS ? (GRADE_POINTS_JSS[grade] ?? GRADE_POINTS[grade] ?? 0) : (GRADE_POINTS[grade] ?? 0);
-  const totalPts = comps.reduce((s: number, c: any) => s + gradePointLookup(c.overall_cbc_grade || c.pre_primary_grade || ''), 0);
-  const maxPts = comps.length * (isJSS ? 8 : 4);
-  const meanPts = comps.length ? totalPts / comps.length : 0;
+  // Subjects with no recorded grade (missed exam, withheld, or not yet marked) must be
+  // excluded from the average — counting them as 0 points makes an absent/ungraded
+  // subject indistinguishable from a genuine fail and drags the facilitator's comment
+  // down for students who simply have incomplete records.
+  const gradedComps = comps.filter((c: any) => c.overall_cbc_grade || c.pre_primary_grade);
+  const totalPts = gradedComps.reduce((s: number, c: any) => s + gradePointLookup(c.overall_cbc_grade || c.pre_primary_grade || ''), 0);
+  const maxPts = gradedComps.length * (isJSS ? 8 : 4);
+  const meanPts = gradedComps.length ? totalPts / gradedComps.length : 0;
 
   doc.setFillColor(21, 101, 192);
   doc.rect(M, y, CW, 7, 'F');
@@ -299,7 +304,7 @@ export async function renderReportCardPage(
   doc.setFillColor(21, 101, 192);
   doc.rect(M, y, CW, 6, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-  const commentHeaderSuffix = comps.length > 0
+  const commentHeaderSuffix = gradedComps.length > 0
     ? `(Total: ${totalPts}/${maxPts}  |  Avg: ${meanPts.toFixed(1)} pts/subject)`
     : '(No results recorded yet)';
   doc.text(`FACILITATOR'S COMMENT:  ${commentHeaderSuffix}`, M + 3, y + 4.2);
@@ -309,7 +314,7 @@ export async function renderReportCardPage(
   const commentH = 10;
   doc.rect(M, y, CW, commentH, 'FD');
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  doc.text(buildFacilitatorComment(meanPts, isJSS, comps.length), M + 3, y + 6, { maxWidth: CW - 6 });
+  doc.text(buildFacilitatorComment(meanPts, isJSS, gradedComps.length), M + 3, y + 6, { maxWidth: CW - 6 });
   y += commentH + 4;
 
   // ── 6. TERM DATES ─────────────────────────────────────────────────────────
@@ -1018,11 +1023,9 @@ export function CbcReportCardPage() {
                             const scoreStr = c.total_score != null && c.max_score != null
                               ? `${Math.round(Number(c.total_score))}/${Math.round(Number(c.max_score))}`
                               : c.percentage ? `${Math.round(Number(c.percentage))}%` : '—';
-                            const pts = c.grade_points != null ? c.grade_points :
-                              grade === 'EE' || grade === 'WD' ? 4 :
-                              grade === 'ME' ? 3 :
-                              grade === 'AE' || grade === 'D' ? 2 :
-                              grade === 'BE' || grade === 'B' ? 1 : '—';
+                            const isJSSRow = detail.education_level === 'junior_secondary';
+                            const fallbackPts = isJSSRow ? GRADE_POINTS_JSS[grade] : GRADE_POINTS[grade];
+                            const pts = c.grade_points != null ? c.grade_points : (fallbackPts ?? '—');
                             const period = detail.period || (detail.term === 'term1' ? 'End Term 1' : detail.term === 'term2' ? 'End Term 2' : 'End Term 3');
                             return (
                               <tr key={c.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>

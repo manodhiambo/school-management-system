@@ -13,6 +13,36 @@ router.use(requireModule('exams'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
+// Matches the canonical CBE scale used across cbcRoutes.js / offlineResults.routes.js /
+// onlineExam.routes.js — junior_secondary uses the 8-level KJSEA scale, not plain A-F.
+function computeCBEGrade(percentage, educationLevel) {
+  if (['playgroup', 'pre_primary'].includes(educationLevel)) {
+    if (percentage >= 75) return 'WD';
+    if (percentage >= 40) return 'D';
+    return 'B';
+  }
+  if (educationLevel === 'junior_secondary') {
+    if (percentage >= 90) return 'EE1';
+    if (percentage >= 75) return 'EE2';
+    if (percentage >= 58) return 'ME1';
+    if (percentage >= 41) return 'ME2';
+    if (percentage >= 31) return 'AE1';
+    if (percentage >= 21) return 'AE2';
+    if (percentage >= 11) return 'BE1';
+    return 'BE2';
+  }
+  if (percentage >= 80) return 'EE';
+  if (percentage >= 60) return 'ME';
+  if (percentage >= 40) return 'AE';
+  return 'BE';
+}
+
+async function getClassEducationLevel(classId, tenantId) {
+  if (!classId) return 'lower_primary';
+  const rows = await query('SELECT education_level FROM classes WHERE id=$1 AND tenant_id=$2', [classId, tenantId]);
+  return rows[0]?.education_level || 'lower_primary';
+}
+
 // Get gradebook entries
 router.get('/', async (req, res) => {
   try {
@@ -98,11 +128,8 @@ router.post('/', requireRole(['admin', 'teacher']), async (req, res) => {
     let calculatedGrade = grade;
     if (!calculatedGrade && marks !== undefined && actualMaxMarks) {
       const percentage = (marks / actualMaxMarks) * 100;
-      if (percentage >= 80) calculatedGrade = 'A';
-      else if (percentage >= 70) calculatedGrade = 'B';
-      else if (percentage >= 60) calculatedGrade = 'C';
-      else if (percentage >= 50) calculatedGrade = 'D';
-      else calculatedGrade = 'F';
+      const educationLevel = await getClassEducationLevel(actualClassId, tid);
+      calculatedGrade = computeCBEGrade(percentage, educationLevel);
     }
 
     await query(
@@ -142,6 +169,7 @@ router.post('/bulk', requireRole(['admin', 'teacher']), async (req, res) => {
 
     const created = [];
     const errors = [];
+    const educationLevel = await getClassEducationLevel(classId, tid);
 
     for (const gradeEntry of grades) {
       try {
@@ -150,12 +178,7 @@ router.post('/bulk', requireRole(['admin', 'teacher']), async (req, res) => {
         const max = maxMarks || gradeEntry.maxMarks || 100;
 
         const percentage = (marks / max) * 100;
-        let grade;
-        if (percentage >= 80) grade = 'A';
-        else if (percentage >= 70) grade = 'B';
-        else if (percentage >= 60) grade = 'C';
-        else if (percentage >= 50) grade = 'D';
-        else grade = 'F';
+        const grade = computeCBEGrade(percentage, educationLevel);
 
         await query(
           `INSERT INTO gradebook (
@@ -195,11 +218,9 @@ router.put('/:id', requireRole(['admin', 'teacher']), async (req, res) => {
     let calculatedGrade = grade;
     if (!calculatedGrade && marks !== undefined && maxMarks) {
       const percentage = (marks / maxMarks) * 100;
-      if (percentage >= 80) calculatedGrade = 'A';
-      else if (percentage >= 70) calculatedGrade = 'B';
-      else if (percentage >= 60) calculatedGrade = 'C';
-      else if (percentage >= 50) calculatedGrade = 'D';
-      else calculatedGrade = 'F';
+      const existing = await query('SELECT class_id FROM gradebook WHERE id=$1 AND tenant_id=$2', [req.params.id, tid]);
+      const educationLevel = await getClassEducationLevel(existing[0]?.class_id, tid);
+      calculatedGrade = computeCBEGrade(percentage, educationLevel);
     }
 
     await query(

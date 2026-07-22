@@ -3,34 +3,38 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { BarChart2, TrendingUp, Users, Award } from 'lucide-react';
 import api from '@/services/api';
+import { computeCBEGrade } from '@/utils/cbeGrades';
 
 type Tab = 'exam' | 'student' | 'class';
 
 // ---------- helpers ----------
 
-function gradeFromMark(mark: number, maxMark = 100): string {
+// Grade bands in top-to-bottom display order for each CBE education level (matches
+// the scale computeCBEGrade() returns for that level — junior_secondary uses the
+// 8-level KJSEA scale, everything else the standard 4-level EE/ME/AE/BE).
+function gradeBandsFor(educationLevel?: string): string[] {
+  if (educationLevel === 'junior_secondary') return ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2'];
+  if (['playgroup', 'pre_primary'].includes(educationLevel || '')) return ['WD', 'D', 'B'];
+  return ['EE', 'ME', 'AE', 'BE'];
+}
+
+function gradeFromMark(mark: number, maxMark = 100, educationLevel?: string): string {
   const pct = (mark / maxMark) * 100;
-  if (pct >= 75) return 'A';
-  if (pct >= 60) return 'B';
-  if (pct >= 50) return 'C';
-  if (pct >= 40) return 'D';
-  return 'E';
+  return computeCBEGrade(pct, educationLevel || 'lower_primary');
 }
 
 const GRADE_COLOR: Record<string, string> = {
-  A: 'bg-green-500',
-  B: 'bg-blue-500',
-  C: 'bg-amber-500',
-  D: 'bg-orange-500',
-  E: 'bg-red-500',
+  EE: 'bg-green-500', EE1: 'bg-green-600', EE2: 'bg-green-500', WD: 'bg-green-500',
+  ME: 'bg-blue-500', ME1: 'bg-blue-600', ME2: 'bg-blue-500',
+  AE: 'bg-amber-500', AE1: 'bg-amber-600', AE2: 'bg-amber-500', D: 'bg-amber-500',
+  BE: 'bg-red-500', BE1: 'bg-red-600', BE2: 'bg-red-500', B: 'bg-red-500',
 };
 
 const GRADE_TEXT: Record<string, string> = {
-  A: 'text-green-700',
-  B: 'text-blue-700',
-  C: 'text-amber-700',
-  D: 'text-orange-700',
-  E: 'text-red-700',
+  EE: 'text-green-700', EE1: 'text-green-700', EE2: 'text-green-700', WD: 'text-green-700',
+  ME: 'text-blue-700', ME1: 'text-blue-700', ME2: 'text-blue-700',
+  AE: 'text-amber-700', AE1: 'text-amber-700', AE2: 'text-amber-700', D: 'text-amber-700',
+  BE: 'text-red-700', BE1: 'text-red-700', BE2: 'text-red-700', B: 'text-red-700',
 };
 
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
@@ -87,15 +91,14 @@ function ExamAnalysisTab() {
       .finally(() => setLoading(false));
   }, [examId]);
 
-  // Build grade distribution
+  // Grade distribution comes pre-computed (and education-level aware) from the backend
+  const educationLevel: string | undefined = summary?.exam?.education_level;
   const students: any[] = summary?.students || [];
-  const gradeBands = ['A', 'B', 'C', 'D', 'E'];
-  const bandCounts = Object.fromEntries(gradeBands.map((g) => [g, 0]));
-  students.forEach((s) => {
-    const g = s.grade || gradeFromMark(s.marks ?? 0, s.max_mark ?? 100);
-    if (bandCounts[g] !== undefined) bandCounts[g]++;
-  });
-  const total = students.length || 1;
+  const gradeBands = gradeBandsFor(educationLevel);
+  const bandCounts: Record<string, number> = summary?.grade_distribution
+    ? { ...summary.grade_distribution }
+    : Object.fromEntries(gradeBands.map((g) => [g, 0]));
+  const total = summary?.total_students || students.length || 1;
 
   return (
     <div className="space-y-6">
@@ -152,8 +155,8 @@ function ExamAnalysisTab() {
                   </thead>
                   <tbody className="divide-y">
                     {students.map((s, i) => {
-                      const grade = s.grade || gradeFromMark(s.marks ?? 0, s.max_mark ?? 100);
-                      const passed = !['D', 'E'].includes(grade);
+                      const grade = s.grade || gradeFromMark(s.marks ?? 0, s.max_mark ?? 100, educationLevel);
+                      const passed = ((s.marks ?? 0) / (s.max_mark ?? 100)) * 100 >= 50;
                       return (
                         <tr key={s.id ?? i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium text-gray-900">{s.student_name || s.name}</td>
@@ -212,6 +215,7 @@ function StudentPerformanceTab() {
       .finally(() => setLoading(false));
   }, [studentId]);
 
+  const educationLevel: string | undefined = perf?.student?.education_level;
   const subjects: any[] = perf?.subjects || [];
   const exams: any[] = perf?.exams || [];
   const sortedSubjects = [...subjects].sort((a, b) => (b.avg_marks ?? 0) - (a.avg_marks ?? 0));
@@ -276,7 +280,7 @@ function StudentPerformanceTab() {
                   </thead>
                   <tbody className="divide-y">
                     {subjects.map((s, i) => {
-                      const grade = gradeFromMark(s.avg_marks ?? 0);
+                      const grade = gradeFromMark(s.avg_marks ?? 0, 100, educationLevel);
                       const isStrongest = s === strongest;
                       const isWeakest = s === weakest && s !== strongest;
                       return (
@@ -358,6 +362,8 @@ function ClassReportTab() {
       .finally(() => setLoading(false));
   }, [classId]);
 
+  const educationLevel: string | undefined = classes.find((c) => c.id === classId)?.education_level;
+
   return (
     <div className="space-y-6">
       <div className="max-w-xs">
@@ -392,7 +398,7 @@ function ClassReportTab() {
                 <tbody className="divide-y">
                   {report.map((row, i) => {
                     const avg = Number(row.average ?? row.avg_marks ?? 0);
-                    const grade = gradeFromMark(avg);
+                    const grade = gradeFromMark(avg, 100, educationLevel);
                     const rank = row.rank ?? i + 1;
                     return (
                       <tr key={row.student_id ?? i} className={`hover:bg-gray-50 ${rank <= 3 ? 'bg-amber-50' : ''}`}>

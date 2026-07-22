@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import { computeCBEGrade, getCBEGradeBadgeClass } from '@/utils/cbeGrades';
 
 export function GradeBookPage() {
   const { user } = useAuthStore();
@@ -188,22 +189,10 @@ export function GradeBookPage() {
 
   const calculateGrade = (score: number, max: number = 100): string => {
     const pct = (score / max) * 100;
-    if (pct >= 80) return 'A';
-    if (pct >= 70) return 'B';
-    if (pct >= 60) return 'C';
-    if (pct >= 50) return 'D';
-    return 'F';
+    return computeCBEGrade(pct, selectedClass?.education_level || 'lower_primary');
   };
 
-  const getGradeBadgeClass = (grade: string) => {
-    switch (grade) {
-      case 'A': return 'bg-green-100 text-green-800';
-      case 'B': return 'bg-blue-100 text-blue-800';
-      case 'C': return 'bg-yellow-100 text-yellow-800';
-      case 'D': return 'bg-orange-100 text-orange-800';
-      default:  return 'bg-red-100 text-red-800';
-    }
-  };
+  const getGradeBadgeClass = (grade: string) => getCBEGradeBadgeClass(grade);
 
   const getStudentAverage = (studentId: string) => {
     const entries = gradebookEntries.filter(e => e.student_id === studentId);

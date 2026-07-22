@@ -8,12 +8,34 @@ router.use(authenticate);
 router.use(requireModule('exams'));
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
-function letterGrade(percentage) {
-  if (percentage >= 80) return 'A';
-  if (percentage >= 60) return 'B';
-  if (percentage >= 50) return 'C';
-  if (percentage >= 40) return 'D';
-  return 'E';
+// Matches the canonical CBE scale used across cbcRoutes.js / offlineResults.routes.js /
+// onlineExam.routes.js — junior_secondary uses the 8-level KJSEA scale, not plain A-E.
+function letterGrade(percentage, educationLevel) {
+  if (['playgroup', 'pre_primary'].includes(educationLevel)) {
+    if (percentage >= 75) return 'WD';
+    if (percentage >= 40) return 'D';
+    return 'B';
+  }
+  if (educationLevel === 'junior_secondary') {
+    if (percentage >= 90) return 'EE1';
+    if (percentage >= 75) return 'EE2';
+    if (percentage >= 58) return 'ME1';
+    if (percentage >= 41) return 'ME2';
+    if (percentage >= 31) return 'AE1';
+    if (percentage >= 21) return 'AE2';
+    if (percentage >= 11) return 'BE1';
+    return 'BE2';
+  }
+  if (percentage >= 80) return 'EE';
+  if (percentage >= 60) return 'ME';
+  if (percentage >= 40) return 'AE';
+  return 'BE';
+}
+
+function gradeKeysFor(educationLevel) {
+  if (['playgroup', 'pre_primary'].includes(educationLevel)) return ['WD', 'D', 'B'];
+  if (educationLevel === 'junior_secondary') return ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2'];
+  return ['EE', 'ME', 'AE', 'BE'];
 }
 
 function isAdminOrTeacher(role) {
@@ -69,7 +91,7 @@ router.get('/exam/:examId/summary', async (req, res) => {
           highest: null,
           lowest: null,
           pass_rate: null,
-          grade_distribution: { A: 0, B: 0, C: 0, D: 0, E: 0 },
+          grade_distribution: Object.fromEntries(gradeKeysFor(exam.education_level).map(k => [k, 0])),
         },
       });
     }
@@ -84,9 +106,9 @@ router.get('/exam/:examId/summary', async (req, res) => {
     const passCount = percentages.filter(p => p >= 50).length;
     const passRate = (passCount / percentages.length) * 100;
 
-    const gradeDistribution = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+    const gradeDistribution = Object.fromEntries(gradeKeysFor(exam.education_level).map(k => [k, 0]));
     for (const p of percentages) {
-      const g = letterGrade(p);
+      const g = letterGrade(p, exam.education_level);
       gradeDistribution[g]++;
     }
 
@@ -180,7 +202,7 @@ router.get('/student/:studentId/performance', async (req, res) => {
 
     // Verify student belongs to tenant
     const studentRows = await query(
-      `SELECT s.*, c.name AS class_name
+      `SELECT s.*, c.name AS class_name, c.education_level
        FROM students s
        LEFT JOIN classes c ON c.id = s.class_id
        WHERE s.id = $1 AND s.tenant_id = $2`,
@@ -267,7 +289,7 @@ router.get('/class/:classId/report', async (req, res) => {
     const { classId } = req.params;
 
     const classRows = await query(
-      'SELECT id, name FROM classes WHERE id = $1 AND tenant_id = $2',
+      'SELECT id, name, education_level FROM classes WHERE id = $1 AND tenant_id = $2',
       [classId, tid]
     );
     if (classRows.length === 0) {

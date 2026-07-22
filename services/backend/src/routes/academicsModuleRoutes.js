@@ -19,6 +19,32 @@ router.use(requireActiveTenant);
 const tid = (req) => req.user.tenant_id;
 const uid = (req) => req.user.id;
 
+// CBE grade from percentage, matching the scale used across cbcRoutes.js /
+// offlineResults.routes.js / onlineExam.routes.js
+function computeCBEGrade(percentage, educationLevel) {
+  if (['playgroup', 'pre_primary'].includes(educationLevel)) {
+    if (percentage >= 75) return 'WD'; // Well Developed
+    if (percentage >= 40) return 'D';  // Developing
+    return 'B';                         // Beginning
+  }
+  // Kenya 2025 KJSEA 8-level grading for Junior Secondary (Grade 7–9)
+  if (educationLevel === 'junior_secondary') {
+    if (percentage >= 90) return 'EE1'; // Exceeding Expectations Level 1
+    if (percentage >= 75) return 'EE2'; // Exceeding Expectations Level 2
+    if (percentage >= 58) return 'ME1'; // Meeting Expectations Level 1
+    if (percentage >= 41) return 'ME2'; // Meeting Expectations Level 2
+    if (percentage >= 31) return 'AE1'; // Approaching Expectations Level 1
+    if (percentage >= 21) return 'AE2'; // Approaching Expectations Level 2
+    if (percentage >= 11) return 'BE1'; // Below Expectations Level 1
+    return 'BE2';                        // Below Expectations Level 2
+  }
+  // Standard CBE for lower_primary, upper_primary, senior_secondary
+  if (percentage >= 80) return 'EE'; // Exceeding Expectations
+  if (percentage >= 60) return 'ME'; // Meeting Expectations
+  if (percentage >= 40) return 'AE'; // Approaching Expectations
+  return 'BE';                        // Below Expectations
+}
+
 // Ensure all CBE Academics tables + required columns exist at startup
 (async () => {
   const q = async (sql) => { try { await query(sql, []); } catch (_) {} };
@@ -575,17 +601,21 @@ router.post('/sba/:id/records', requireRole(['admin','teacher']), async (req, re
   try {
     const { records } = req.body; // [{ student_id, score, is_absent, teacher_remarks }]
     const sba = await query(
-      'SELECT * FROM sba_setups WHERE id=$1 AND tenant_id=$2', [req.params.id, tid(req)]
+      `SELECT sba.*, c.education_level
+       FROM sba_setups sba
+       LEFT JOIN classes c ON c.id = sba.class_id
+       WHERE sba.id=$1 AND sba.tenant_id=$2`, [req.params.id, tid(req)]
     );
     if (!sba[0]) return res.status(404).json({ error: 'SBA not found' });
     const maxScore = parseFloat(sba[0].max_score);
+    const educationLevel = sba[0].education_level || 'lower_primary';
 
     for (const r of records) {
       const score = r.is_absent ? null : parseFloat(r.score);
       let cbc_grade = null;
       if (score !== null && !isNaN(score)) {
         const pct = (score / maxScore) * 100;
-        cbc_grade = pct >= 80 ? 'EE' : pct >= 60 ? 'ME' : pct >= 40 ? 'AE' : 'BE';
+        cbc_grade = computeCBEGrade(pct, educationLevel);
       }
       await query(`
         INSERT INTO sba_student_records (sba_setup_id, student_id, teacher_id, score, cbc_grade, is_absent, teacher_remarks, tenant_id)

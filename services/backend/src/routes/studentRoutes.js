@@ -22,7 +22,7 @@ router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer', 's
     // Students can only retrieve their own record
     if (role === 'student') {
       const rows = await query(
-        `SELECT s.*, u.email, u.is_active, c.name as class_name
+        `SELECT s.*, u.email, u.is_active, c.name as class_name, c.education_level
          FROM students s
          JOIN users u ON s.user_id = u.id
          LEFT JOIN classes c ON s.class_id = c.id
@@ -39,6 +39,7 @@ router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer', 's
         u.email,
         u.is_active,
         c.name as class_name,
+        c.education_level,
         p.first_name as parent_first_name,
         p.last_name as parent_last_name
       FROM students s

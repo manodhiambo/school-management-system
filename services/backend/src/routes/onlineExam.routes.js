@@ -12,25 +12,27 @@ router.use(tenantContext);
 router.use(requireActiveTenant);
 
 function computeCBEGrade(percentage, educationLevel) {
-  if (['playgroup','pre_primary','lower_primary','upper_primary'].includes(educationLevel)) {
-    if (percentage >= 75) return 'EE';
-    if (percentage >= 50) return 'ME';
-    if (percentage >= 25) return 'AE';
-    return 'BE';
+  if (['playgroup', 'pre_primary'].includes(educationLevel)) {
+    if (percentage >= 75) return 'WD'; // Well Developed
+    if (percentage >= 40) return 'D';  // Developing
+    return 'B';                         // Beginning
   }
-  if (['junior_secondary','senior_secondary'].includes(educationLevel)) {
-    if (percentage >= 75) return 'A';
-    if (percentage >= 60) return 'B';
-    if (percentage >= 50) return 'C';
-    if (percentage >= 35) return 'D';
-    return 'E';
+  // Kenya 2025 KJSEA 8-level grading for Junior Secondary (Grade 7–9)
+  if (educationLevel === 'junior_secondary') {
+    if (percentage >= 90) return 'EE1'; // Exceeding Expectations Level 1
+    if (percentage >= 75) return 'EE2'; // Exceeding Expectations Level 2
+    if (percentage >= 58) return 'ME1'; // Meeting Expectations Level 1
+    if (percentage >= 41) return 'ME2'; // Meeting Expectations Level 2
+    if (percentage >= 31) return 'AE1'; // Approaching Expectations Level 1
+    if (percentage >= 21) return 'AE2'; // Approaching Expectations Level 2
+    if (percentage >= 11) return 'BE1'; // Below Expectations Level 1
+    return 'BE2';                        // Below Expectations Level 2
   }
-  // university
-  if (percentage >= 70) return 'First Class';
-  if (percentage >= 60) return 'Second Upper';
-  if (percentage >= 50) return 'Second Lower';
-  if (percentage >= 40) return 'Pass';
-  return 'Fail';
+  // Standard CBE for lower_primary, upper_primary, senior_secondary
+  if (percentage >= 80) return 'EE'; // Exceeding Expectations
+  if (percentage >= 60) return 'ME'; // Meeting Expectations
+  if (percentage >= 40) return 'AE'; // Approaching Expectations
+  return 'BE';                        // Below Expectations
 }
 
 // POST /online-exams/:examId/start  [student]

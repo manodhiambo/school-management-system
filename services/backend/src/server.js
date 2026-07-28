@@ -84,6 +84,7 @@ import portfolioRoutes from './routes/portfolioRoutes.js';
 import termReportsRoutes from './routes/termReportsRoutes.js';
 import preferencesRoutes from './routes/preferencesRoutes.js';
 import procurementRoutes from './routes/procurementRoutes.js';
+import studentCategoryRoutes from './routes/studentCategoryRoutes.js';
 import { autoAuditMiddleware } from './middleware/autoAuditMiddleware.js';
 
 dotenv.config();
@@ -245,6 +246,8 @@ app.use('/api/v1/preferences', preferencesRoutes);
 
 // Procurement Module
 app.use('/api/v1/procurement', procurementRoutes);
+
+app.use('/api/v1/student-categories', studentCategoryRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', registrationLimiter, schoolRegistrationRoutes);

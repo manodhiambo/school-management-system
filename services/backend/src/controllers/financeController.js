@@ -866,17 +866,22 @@ class FinanceController {
   async getIncomeByCategory(req, res) {
     try {
       const tenantId = req.tenantId;
-      const result = await pool.query(`
+      const { dateFrom, dateTo } = req.query;
+      const params = [tenantId];
+      let sql = `
         SELECT
-          coa.account_name as category,
+          COALESCE(coa.account_name, ir.income_category) as category,
           COALESCE(SUM(ir.total_amount), 0) as total
         FROM income_records ir
-        JOIN chart_of_accounts coa ON ir.account_id = coa.id
+        LEFT JOIN chart_of_accounts coa ON ir.account_id = coa.id AND coa.tenant_id = ir.tenant_id
         WHERE ir.status = 'completed' AND ir.tenant_id = $1
-        GROUP BY coa.account_name
-        ORDER BY total DESC
-      `, [tenantId]);
+      `;
+      let paramCount = 2;
+      if (dateFrom) { sql += ` AND ir.income_date >= $${paramCount}`; params.push(dateFrom); paramCount++; }
+      if (dateTo)   { sql += ` AND ir.income_date <= $${paramCount}`; params.push(dateTo);   paramCount++; }
+      sql += ` GROUP BY COALESCE(coa.account_name, ir.income_category) ORDER BY total DESC`;
 
+      const result = await pool.query(sql, params);
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching income by category:', error);
@@ -887,17 +892,22 @@ class FinanceController {
   async getExpensesByCategory(req, res) {
     try {
       const tenantId = req.tenantId;
-      const result = await pool.query(`
+      const { dateFrom, dateTo } = req.query;
+      const params = [tenantId];
+      let sql = `
         SELECT
-          coa.account_name as category,
+          COALESCE(coa.account_name, er.expense_category) as category,
           COALESCE(SUM(er.total_amount), 0) as total
         FROM expense_records er
-        JOIN chart_of_accounts coa ON er.account_id = coa.id
+        LEFT JOIN chart_of_accounts coa ON er.account_id = coa.id AND coa.tenant_id = er.tenant_id
         WHERE er.status IN ('approved', 'paid') AND er.tenant_id = $1
-        GROUP BY coa.account_name
-        ORDER BY total DESC
-      `, [tenantId]);
+      `;
+      let paramCount = 2;
+      if (dateFrom) { sql += ` AND er.expense_date >= $${paramCount}`; params.push(dateFrom); paramCount++; }
+      if (dateTo)   { sql += ` AND er.expense_date <= $${paramCount}`; params.push(dateTo);   paramCount++; }
+      sql += ` GROUP BY COALESCE(coa.account_name, er.expense_category) ORDER BY total DESC`;
 
+      const result = await pool.query(sql, params);
       res.json(result.rows);
     } catch (error) {
       console.error('Error fetching expenses by category:', error);

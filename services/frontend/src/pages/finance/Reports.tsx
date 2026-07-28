@@ -368,6 +368,7 @@ export const Reports: React.FC = () => {
   const [year, setYear] = useState(currentYear);
   const [term, setTerm] = useState('');
   const [classId, setClassId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0];
   });
@@ -380,6 +381,7 @@ export const Reports: React.FC = () => {
   const [trend, setTrend] = useState<TrendRow[]>([]);
   const [defaulters, setDefaulters] = useState<Defaulter[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState('School');
   const [loading, setLoading] = useState(false);
 
@@ -397,21 +399,32 @@ export const Reports: React.FC = () => {
 
   useEffect(() => {
     api.getClasses().then((r: any) => setClasses(r?.data || []));
+    api.getStudentCategories().then((r: any) => setCategories(r?.data || [])).catch(() => {});
     api.getSettings().then((r: any) => setSchoolName(r?.data?.school_name || 'School')).catch(() => {});
   }, []);
 
   // ── Fee collection load ──
+  // date_from/date_to now flow into every sub-report (summary, by-class,
+  // monthly trend, payment methods) so "Total Collected" and the trend
+  // chart actually reflect the chosen Payment Date range — previously only
+  // Payment Methods honored it and Monthly Trend ignored it entirely.
   const loadFeeReport = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { academic_year: year, term: term || undefined };
-      const methodParams = { date_from: dateFrom, date_to: dateTo };
+      const params = {
+        academic_year: year,
+        term: term || undefined,
+        class_id: classId || undefined,
+        category_id: categoryId || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      };
       const [sumRes, classRes, methodRes, trendRes, defRes]: any[] = await Promise.all([
-        api.getFeeReportSummary({ ...params, class_id: classId || undefined }),
+        api.getFeeReportSummary(params),
         api.getFeeReportByClass(params),
-        api.getFeeReportPaymentMethods(methodParams),
-        api.getFeeReportMonthlyTrend({ months: 12 }),
-        api.getFeeReportDefaulters({ ...params, class_id: classId || undefined }),
+        api.getFeeReportPaymentMethods({ date_from: dateFrom, date_to: dateTo }),
+        api.getFeeReportMonthlyTrend({ date_from: dateFrom, date_to: dateTo }),
+        api.getFeeReportDefaulters({ academic_year: year, term: term || undefined, class_id: classId || undefined, category_id: categoryId || undefined }),
       ]);
       setSummary(sumRes?.data || null);
       setByClass(classRes?.data || []);
@@ -421,7 +434,7 @@ export const Reports: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [year, term, classId, dateFrom, dateTo]);
+  }, [year, term, classId, categoryId, dateFrom, dateTo]);
 
   // ── Finance module load ──
   const loadFinanceReport = useCallback(async () => {
@@ -459,12 +472,13 @@ export const Reports: React.FC = () => {
     try {
       const params: any = {};
       if (classId) params.classId = classId;
+      if (categoryId) params.categoryId = categoryId;
       const res: any = await api.getStudentsSummary(params);
       setStudentPayments(res?.data || []);
     } finally {
       setSpLoading(false);
     }
-  }, [classId]);
+  }, [classId, categoryId]);
 
   useEffect(() => {
     if (tab === 'fee-collection' || tab === 'defaulters') loadFeeReport();
@@ -599,6 +613,13 @@ export const Reports: React.FC = () => {
               <select value={classId} onChange={e => setClassId(e.target.value)} className="border rounded-md px-3 py-1.5 text-sm">
                 <option value="">All Classes</option>
                 {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+              <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="border rounded-md px-3 py-1.5 text-sm">
+                <option value="">All Students</option>
+                {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>

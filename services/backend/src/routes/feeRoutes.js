@@ -6,6 +6,7 @@ import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+import { getCategoryStudentIds } from '../utils/studentCategories.js';
 
 const router = express.Router();
 
@@ -1348,7 +1349,13 @@ router.get('/expected/:studentId', async (req, res) => {
 router.get('/students-summary', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { search, classId } = req.query;
+    const { search, classId, categoryId } = req.query;
+
+    let categoryIds = null;
+    if (categoryId) {
+      categoryIds = await getCategoryStudentIds(tid, categoryId);
+      if (categoryIds === null) return res.status(404).json({ success: false, message: 'Category not found' });
+    }
 
     let sql = `
       SELECT s.id, s.first_name, s.last_name, s.admission_number,
@@ -1375,6 +1382,10 @@ router.get('/students-summary', async (req, res) => {
     if (classId) {
       sql += ` AND s.class_id = $${pi++}`;
       params.push(classId);
+    }
+    if (categoryIds !== null) {
+      sql += ` AND s.id = ANY($${pi++}::uuid[])`;
+      params.push(categoryIds);
     }
 
     sql += ` GROUP BY s.id, s.first_name, s.last_name, s.admission_number,
@@ -1521,33 +1532,67 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
 // FINANCIAL REPORT ENDPOINTS
 // ============================================================
 
-// Filtered fee summary (academic_year + optional term + optional class_id)
+// Filtered fee summary (academic_year + optional term + class_id + category_id + date range)
+// "Total Collected" is always computed from actual fee_payments rows within
+// the given date_from/date_to window (defaulting to all-time when the
+// caller doesn't supply a range) — never from the invoice's all-time
+// cumulative paid_amount, so a chosen date range now genuinely changes this
+// number instead of being silently ignored. Invoiced/outstanding stay
+// structural (as of now), matched against the same academic_year/term/
+// class/category filters via a CTE, computed once with no join fan-out.
 router.get('/report/summary', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { academic_year, term, class_id } = req.query;
+    const { academic_year, term, class_id, category_id, date_from, date_to } = req.query;
     const year = academic_year || new Date().getFullYear().toString();
 
-    let sql = `
-      SELECT
-        COALESCE(SUM(fi.net_amount),     0)::numeric AS total_invoiced,
-        COALESCE(SUM(fi.paid_amount),    0)::numeric AS total_collected,
-        COALESCE(SUM(fi.balance_amount), 0)::numeric AS total_outstanding,
-        COUNT(fi.id)::int                            AS total_invoices,
-        COUNT(DISTINCT fi.student_id)::int           AS students_invoiced,
-        COUNT(CASE WHEN fi.status = 'paid'    THEN 1 END)::int AS paid_count,
-        COUNT(CASE WHEN fi.status = 'pending' THEN 1 END)::int AS pending_count,
-        COUNT(CASE WHEN fi.status = 'partial' THEN 1 END)::int AS partial_count,
-        COUNT(CASE WHEN fi.status = 'overdue' THEN 1 END)::int AS overdue_count
-      FROM fee_invoices fi
-      JOIN students s ON s.id = fi.student_id AND s.tenant_id = $1
-      WHERE fi.tenant_id = $1 AND fi.status NOT IN ('cancelled')
-        AND (fi.academic_year = $2 OR fi.academic_year IS NULL)`;
+    let categoryIds = null;
+    if (category_id) {
+      categoryIds = await getCategoryStudentIds(tid, category_id);
+      if (categoryIds === null) return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+
+    const filters = [
+      'fi.tenant_id = $1',
+      "fi.status NOT IN ('cancelled')",
+      '(fi.academic_year = $2 OR fi.academic_year IS NULL)',
+    ];
     const params = [tid, year];
     let pi = 3;
 
-    if (term)     { sql += ` AND (fi.term = $${pi} OR fi.term IS NULL)`;      params.push(term);     pi++; }
-    if (class_id) { sql += ` AND s.class_id = $${pi}`;  params.push(class_id); pi++; }
+    if (term)     { filters.push(`(fi.term = $${pi} OR fi.term IS NULL)`); params.push(term); pi++; }
+    if (class_id) { filters.push(`s.class_id = $${pi}`); params.push(class_id); pi++; }
+    if (categoryIds !== null) { filters.push(`s.id = ANY($${pi}::uuid[])`); params.push(categoryIds); pi++; }
+
+    const collectedFrom = date_from || '2000-01-01';
+    const collectedTo = date_to || new Date().toISOString().split('T')[0];
+    params.push(collectedFrom, collectedTo);
+    const fromIdx = pi++; const toIdx = pi++;
+
+    const sql = `
+      WITH filtered_invoices AS (
+        SELECT fi.*
+        FROM fee_invoices fi
+        JOIN students s ON s.id = fi.student_id AND s.tenant_id = $1
+        WHERE ${filters.join(' AND ')}
+      )
+      SELECT
+        COALESCE(SUM(fiv.net_amount),     0)::numeric AS total_invoiced,
+        COALESCE(SUM(fiv.balance_amount), 0)::numeric AS total_outstanding,
+        COUNT(*)::int                                 AS total_invoices,
+        COUNT(DISTINCT fiv.student_id)::int           AS students_invoiced,
+        COUNT(CASE WHEN fiv.status = 'paid'    THEN 1 END)::int AS paid_count,
+        COUNT(CASE WHEN fiv.status = 'pending' THEN 1 END)::int AS pending_count,
+        COUNT(CASE WHEN fiv.status = 'partial' THEN 1 END)::int AS partial_count,
+        COUNT(CASE WHEN fiv.status = 'overdue' THEN 1 END)::int AS overdue_count,
+        (
+          SELECT COALESCE(SUM(fp.amount), 0)::numeric
+          FROM fee_payments fp
+          WHERE fp.tenant_id = $1 AND fp.status = 'success'
+            AND fp.payment_date BETWEEN $${fromIdx} AND $${toIdx}
+            AND fp.invoice_id IN (SELECT id FROM filtered_invoices)
+        ) AS total_collected
+      FROM filtered_invoices fiv`;
 
     const rows = await query(sql, params);
     res.json({ success: true, data: rows[0] || {} });
@@ -1557,14 +1602,52 @@ router.get('/report/summary', async (req, res) => {
   }
 });
 
-// Fee collection breakdown by class
+// Fee collection breakdown by class (+ optional category_id, date range)
+// "collected" is a per-class correlated subquery over actual fee_payments
+// within the given date window (same semantics as /report/summary) rather
+// than the invoices' all-time paid_amount — invoiced/outstanding stay
+// structural via the existing LEFT JOIN aggregate (no fan-out risk since
+// that join never touches fee_payments).
 router.get('/report/collection-by-class', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { academic_year, term } = req.query;
+    const { academic_year, term, category_id, date_from, date_to } = req.query;
     const year = academic_year || new Date().getFullYear().toString();
 
-    let sql = `
+    let categoryIds = null;
+    if (category_id) {
+      categoryIds = await getCategoryStudentIds(tid, category_id);
+      if (categoryIds === null) return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+
+    const collectedFrom = date_from || '2000-01-01';
+    const collectedTo = date_to || new Date().toISOString().split('T')[0];
+
+    let studentJoin = `LEFT JOIN students s ON s.class_id = c.id AND s.tenant_id = $1 AND s.status = 'active'`;
+    let invoiceJoin = `LEFT JOIN fee_invoices fi
+             ON fi.student_id = s.id AND fi.tenant_id = $1
+            AND fi.status NOT IN ('cancelled')
+            AND (fi.academic_year = $2 OR fi.academic_year IS NULL)`;
+    const params = [tid, year];
+    let pi = 3;
+    let termCondForSub = '';
+    let categoryCondForSub = '';
+
+    if (term) {
+      invoiceJoin += ` AND (fi.term = $${pi} OR fi.term IS NULL)`;
+      termCondForSub = ` AND (fi2.term = $${pi} OR fi2.term IS NULL)`;
+      params.push(term); pi++;
+    }
+    if (categoryIds !== null) {
+      studentJoin += ` AND s.id = ANY($${pi}::uuid[])`;
+      categoryCondForSub = ` AND s2.id = ANY($${pi}::uuid[])`;
+      params.push(categoryIds); pi++;
+    }
+
+    params.push(collectedFrom, collectedTo);
+    const fromIdx = pi++; const toIdx = pi++;
+
+    const sql = `
       SELECT
         c.id          AS class_id,
         c.name        AS class_name,
@@ -1572,21 +1655,24 @@ router.get('/report/collection-by-class', async (req, res) => {
         COUNT(DISTINCT s.id)::int                    AS total_students,
         COUNT(fi.id)::int                            AS invoice_count,
         COALESCE(SUM(fi.net_amount),     0)::numeric AS invoiced,
-        COALESCE(SUM(fi.paid_amount),    0)::numeric AS collected,
         COALESCE(SUM(fi.balance_amount), 0)::numeric AS outstanding,
-        COUNT(CASE WHEN fi.status = 'paid' THEN 1 END)::int AS paid_count
+        COUNT(CASE WHEN fi.status = 'paid' THEN 1 END)::int AS paid_count,
+        (
+          SELECT COALESCE(SUM(fp.amount), 0)::numeric
+          FROM fee_payments fp
+          JOIN fee_invoices fi2 ON fi2.id = fp.invoice_id AND fi2.tenant_id = $1
+                                AND fi2.status NOT IN ('cancelled')
+                                AND (fi2.academic_year = $2 OR fi2.academic_year IS NULL)
+                                ${termCondForSub}
+          JOIN students s2 ON s2.id = fi2.student_id AND s2.tenant_id = $1
+                            AND s2.class_id = c.id AND s2.status = 'active'
+                            ${categoryCondForSub}
+          WHERE fp.tenant_id = $1 AND fp.status = 'success'
+            AND fp.payment_date BETWEEN $${fromIdx} AND $${toIdx}
+        ) AS collected
       FROM classes c
-      LEFT JOIN students s ON s.class_id = c.id AND s.tenant_id = $1 AND s.status = 'active'
-      LEFT JOIN fee_invoices fi
-             ON fi.student_id = s.id AND fi.tenant_id = $1
-            AND fi.status NOT IN ('cancelled')
-            AND (fi.academic_year = $2 OR fi.academic_year IS NULL)`;
-    const params = [tid, year];
-    let pi = 3;
-
-    if (term) { sql += ` AND (fi.term = $${pi} OR fi.term IS NULL)`; params.push(term); pi++; }
-
-    sql += `
+      ${studentJoin}
+      ${invoiceJoin}
       WHERE c.tenant_id = $1
       GROUP BY c.id, c.name, c.education_level
       ORDER BY c.name`;
@@ -1628,11 +1714,20 @@ router.get('/report/payment-methods', async (req, res) => {
   }
 });
 
-// Monthly collection trend (last N months)
+// Monthly collection trend — now honors the same date_from/date_to the
+// Fee Collection tab's date pickers show, instead of an always-last-12-
+// months window that silently ignored whatever range the user chose.
 router.get('/report/monthly-trend', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const months = Math.min(parseInt(req.query.months || '12'), 36);
+    const { date_from, date_to } = req.query;
+    const to = date_to || new Date().toISOString().split('T')[0];
+    let from = date_from;
+    if (!from) {
+      const d = new Date(to);
+      d.setMonth(d.getMonth() - 12);
+      from = d.toISOString().split('T')[0];
+    }
 
     const rows = await query(`
       SELECT
@@ -1643,10 +1738,10 @@ router.get('/report/monthly-trend', async (req, res) => {
       FROM fee_payments fp
       WHERE fp.tenant_id = $1
         AND fp.status = 'success'
-        AND fp.payment_date >= (CURRENT_DATE - ($2 || ' months')::INTERVAL)
+        AND fp.payment_date BETWEEN $2 AND $3
       GROUP BY TO_CHAR(fp.payment_date, 'YYYY-MM'), TO_CHAR(fp.payment_date, 'Mon YYYY')
       ORDER BY month
-    `, [tid, months]);
+    `, [tid, from, to]);
 
     res.json({ success: true, data: rows });
   } catch (error) {
@@ -1656,11 +1751,19 @@ router.get('/report/monthly-trend', async (req, res) => {
 });
 
 // Detailed defaulters list with class info (more fields than /defaulters)
+// Intentionally NOT date-windowed — outstanding balance is a current-state
+// figure, not something that gets historically replayed. Gains category_id.
 router.get('/report/defaulters', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { class_id, academic_year, term } = req.query;
+    const { class_id, academic_year, term, category_id } = req.query;
     const year = academic_year || new Date().getFullYear().toString();
+
+    let categoryIds = null;
+    if (category_id) {
+      categoryIds = await getCategoryStudentIds(tid, category_id);
+      if (categoryIds === null) return res.status(404).json({ success: false, message: 'Category not found' });
+    }
 
     let sql = `
       SELECT s.id, s.first_name, s.last_name, s.admission_number,
@@ -1681,6 +1784,7 @@ router.get('/report/defaulters', async (req, res) => {
 
     if (term)     { sql += ` AND (fi.term = $${pi} OR fi.term IS NULL)`;    params.push(term);     pi++; }
     if (class_id) { sql += ` AND s.class_id = $${pi}`; params.push(class_id); pi++; }
+    if (categoryIds !== null) { sql += ` AND s.id = ANY($${pi}::uuid[])`; params.push(categoryIds); pi++; }
 
     sql += `
       GROUP BY s.id, s.first_name, s.last_name, s.admission_number, c.name, s.student_type

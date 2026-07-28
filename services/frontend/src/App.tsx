@@ -78,6 +78,7 @@ import { PayrollPage } from './pages/payroll/PayrollPage';
 import { AppraisalPage } from './pages/staff/AppraisalPage';
 import { SubstitutePage } from './pages/staff/SubstitutePage';
 import { BursaryPage } from './pages/finance/BursaryPage';
+import { StudentCategoriesPage } from './pages/finance/StudentCategoriesPage';
 import { CanteenPage } from './pages/welfare/CanteenPage';
 import { MenuPlanningPage } from './pages/welfare/MenuPlanningPage';
 import { MealAttendancePage } from './pages/welfare/MealAttendancePage';
@@ -275,6 +276,7 @@ function App() {
               <Route path="finance/reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Reports /></RoleRoute>} />
               <Route path="finance/financial-years" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FinancialYears /></RoleRoute>} />
               <Route path="finance/advanced-reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><AdvancedReports /></RoleRoute>} />
+              <Route path="student-categories" element={<RoleRoute allowedRoles={['admin']}><StudentCategoriesPage /></RoleRoute>} />
 
               {/* Student Routes */}
               <Route path="my-courses" element={<MyCoursesPage />} />

@@ -440,6 +440,32 @@ class ApiService {
     return this.api.get('/fee/report/defaulters', { params });
   }
 
+  // Student Categories
+  getStudentCategories() {
+    return this.api.get('/student-categories');
+  }
+  previewStudentCategory(criteria: any) {
+    return this.api.post('/student-categories/preview', { criteria });
+  }
+  createStudentCategory(data: any) {
+    return this.api.post('/student-categories', data);
+  }
+  updateStudentCategory(id: string, data: any) {
+    return this.api.put('/student-categories/' + id, data);
+  }
+  deleteStudentCategory(id: string) {
+    return this.api.delete('/student-categories/' + id);
+  }
+  getStudentCategoryMembers(id: string) {
+    return this.api.get('/student-categories/' + id + '/members');
+  }
+  addStudentCategoryMembers(id: string, studentIds: string[]) {
+    return this.api.post('/student-categories/' + id + '/members', { student_ids: studentIds });
+  }
+  removeStudentCategoryMember(id: string, studentId: string) {
+    return this.api.delete('/student-categories/' + id + '/members/' + studentId);
+  }
+
   // M-Pesa Payments
   initiateMpesaPayment(invoiceId: string, phoneNumber: string, amount: number) {
     return this.api.post('/fee/mpesa/pay', { invoiceId, phoneNumber, amount });

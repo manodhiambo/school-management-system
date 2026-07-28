@@ -302,9 +302,9 @@ router.get('/reports/general-ledger', async (req, res) => {
              'journal' AS txn_type, jel.debit_amount AS debit, jel.credit_amount AS credit, je.status
       FROM journal_entry_lines jel
       JOIN journal_entries je ON je.id = jel.journal_entry_id
-      WHERE jel.account_id = $1 AND je.entry_date BETWEEN $2 AND $3
+      WHERE je.tenant_id = $4 AND jel.account_id = $1 AND je.entry_date BETWEEN $2 AND $3
       ORDER BY je.entry_date
-    `, [accountId, from, to]);
+    `, [accountId, from, to, tid]);
 
     const allEntries = [...incEntries, ...expEntries, ...jlEntries]
       .sort((a, b) => new Date(a.txn_date).getTime() - new Date(b.txn_date).getTime());
@@ -340,7 +340,7 @@ router.get('/journals', async (req, res) => {
     const from = dateFrom || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
     const to   = dateTo   || new Date().toISOString().split('T')[0];
 
-    const conditions = ['je.entry_date BETWEEN $2 AND $3'];
+    const conditions = ['je.tenant_id = $1', 'je.entry_date BETWEEN $2 AND $3'];
     const params     = [tid, from, to];
 
     if (status) {
@@ -348,13 +348,12 @@ router.get('/journals', async (req, res) => {
       conditions.push(`je.status = $${params.length}`);
     }
 
-    // For multi-tenant journals we filter by created_by user's tenant
     const rows = await query(`
       SELECT je.*,
              u.first_name || ' ' || u.last_name AS created_by_name,
              COUNT(jel.id) AS line_count
       FROM journal_entries je
-      LEFT JOIN users u ON u.id = je.created_by AND u.tenant_id = $1
+      LEFT JOIN users u ON u.id = je.created_by
       LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
       WHERE ${conditions.join(' AND ')}
       GROUP BY je.id, u.first_name, u.last_name
@@ -371,13 +370,14 @@ router.get('/journals', async (req, res) => {
 // GET /api/v1/finance/journals/:id — journal entry detail with lines
 router.get('/journals/:id', async (req, res) => {
   try {
+    const tid = req.tenantId;
     const rows = await query(`
       SELECT je.*,
              u.first_name || ' ' || u.last_name AS created_by_name
       FROM journal_entries je
       LEFT JOIN users u ON u.id = je.created_by
-      WHERE je.id = $1
-    `, [req.params.id]);
+      WHERE je.id = $1 AND je.tenant_id = $2
+    `, [req.params.id, tid]);
     if (!rows.length) return res.status(404).json({ success: false, message: 'Journal entry not found' });
 
     const lines = await query(`
@@ -409,22 +409,29 @@ router.post('/journals', async (req, res) => {
       return res.status(400).json({ success: false, message: `Journal entry must balance: debits (${totalDebit}) ≠ credits (${totalCredit})` });
     }
 
-    // Generate entry number
-    const countRes = await query(`SELECT COUNT(*) AS cnt FROM journal_entries`, []);
-    const entryNumber = `JNL-${String(Number(countRes[0].cnt) + 1).padStart(5, '0')}`;
+    // Generate entry number — scoped per tenant (mirrors the tenant-scoped
+    // ORDER BY ... DESC LIMIT 1 pattern used for INC-/EXP- numbers in
+    // financeController.js's generateNumber helper) instead of counting
+    // across every tenant's journals.
+    const lastRows = await query(
+      `SELECT entry_number FROM journal_entries WHERE tenant_id = $1 AND entry_number LIKE 'JNL-%' ORDER BY entry_number DESC LIMIT 1`,
+      [tid]
+    );
+    const lastNum = lastRows.length ? parseInt(lastRows[0].entry_number.replace('JNL-', ''), 10) || 0 : 0;
+    const entryNumber = `JNL-${String(lastNum + 1).padStart(5, '0')}`;
 
     const jeRows = await query(`
-      INSERT INTO journal_entries (entry_number, entry_date, description, total_debit, total_credit, status, created_by)
-      VALUES ($1, $2, $3, $4, $5, 'posted', $6)
+      INSERT INTO journal_entries (entry_number, entry_date, description, total_debit, total_credit, status, created_by, tenant_id)
+      VALUES ($1, $2, $3, $4, $5, 'posted', $6, $7)
       RETURNING *
-    `, [entryNumber, entry_date, description, totalDebit, totalCredit, req.user?.id]);
+    `, [entryNumber, entry_date, description, totalDebit, totalCredit, req.user?.id, tid]);
 
     const je = jeRows[0];
     for (const l of lines) {
       await query(`
-        INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit_amount, credit_amount, description)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [je.id, l.account_id, l.debit_amount || 0, l.credit_amount || 0, l.description || '']);
+        INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit_amount, credit_amount, description, tenant_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [je.id, l.account_id, l.debit_amount || 0, l.credit_amount || 0, l.description || '', tid]);
     }
 
     res.status(201).json({ success: true, data: je });

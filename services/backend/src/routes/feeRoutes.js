@@ -7,6 +7,7 @@ import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { getCategoryStudentIds } from '../utils/studentCategories.js';
+import { syncInvoiceTermsToStructure } from '../utils/feeInvoiceTermSync.js';
 
 const router = express.Router();
 
@@ -356,6 +357,13 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
     );
 
     const updated = await query('SELECT * FROM fee_structure WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
+
+    // Keep already-issued invoices for this structure in sync with its
+    // (possibly just-corrected) term, so a future invoice run for that
+    // term recognizes them as already billed instead of duplicating.
+    if (termProvided && updated.length) {
+      await syncInvoiceTermsToStructure(tid, req.params.id, updated[0].term);
+    }
 
     res.json({
       success: true,

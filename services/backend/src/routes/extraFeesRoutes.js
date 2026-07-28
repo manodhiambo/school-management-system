@@ -4,6 +4,7 @@ import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddlewa
 import requireRole from '../middleware/roleMiddleware.js';
 import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { syncInvoiceTermsToStructure } from '../utils/feeInvoiceTermSync.js';
 
 const router = express.Router();
 router.use(authenticate);
@@ -153,6 +154,11 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
          WHERE extra_fee_id=$6 AND tenant_id=$7`,
         [ef.name, ef.amount, ef.class_id, ef.is_active, ef.term || null, req.params.id, tid]
       );
+      // Keep already-issued invoices for this structure in sync with its
+      // (possibly just-corrected) term, so a future invoice run for that
+      // term recognizes them as already billed instead of duplicating —
+      // see feeInvoiceTermSync.js for why this matters.
+      await syncInvoiceTermsToStructure(tid, existing[0].id, ef.term || null);
     } else {
       // Create if missing (e.g. pre-existing extra fees)
       await query(

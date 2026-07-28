@@ -100,7 +100,7 @@ async function carryForwardPreviousBalance(tenantId, studentId, term, academicYe
   for (const inv of sourceInvoices) {
     await query(
       `UPDATE fee_invoices SET status = 'cancelled', updated_at = NOW(),
-         metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('carried_forward_to_term', $1, 'carried_forward_to_year', $2)
+         metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('carried_forward_to_term', $1::text, 'carried_forward_to_year', $2::text)
        WHERE id = $3`,
       [term, academicYear, inv.id]
     );

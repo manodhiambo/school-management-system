@@ -86,6 +86,10 @@ export function FeeStructurePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.is_transport_fee && !formData.term) {
+      alert('Transport fees vary by term — please select a specific term (not "All Terms").');
+      return;
+    }
     try {
       const payload = {
         name: formData.name,
@@ -195,6 +199,10 @@ export function FeeStructurePage() {
       setBulkGenerating(false);
     }
   };
+
+  // The bulk-generate tab must never offer an inactive structure, regardless
+  // of whether "Show inactive" is toggled on for the main list above.
+  const activeStructures = structures.filter((s: any) => s.is_active);
 
   const fmt = (n: number) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(n);
   const freqLabel: Record<string, string> = {
@@ -378,9 +386,10 @@ export function FeeStructurePage() {
 
             <Card>
               <CardHeader><CardTitle className="text-base">{t('2. Select Fee Structures')}</CardTitle></CardHeader>
+              <p className="text-xs text-gray-400 px-6 -mt-2 mb-2">{t('Only active fee structures can be used to generate invoices.')}</p>
               <CardContent className="space-y-2 max-h-72 overflow-y-auto">
-                {structures.length === 0 && <p className="text-sm text-gray-400">{t('No fee structure found')}</p>}
-                {structures.map((s: any) => (
+                {activeStructures.length === 0 && <p className="text-sm text-gray-400">{t('No active fee structure found')}</p>}
+                {activeStructures.map((s: any) => (
                   <label key={s.id} className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
                     <input type="checkbox" checked={bulkForm.fee_structure_ids.includes(s.id)} onChange={() => toggleBulkStructure(s.id)} className="rounded mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -581,16 +590,23 @@ export function FeeStructurePage() {
 
               {/* Term */}
               <div>
-                <Label>{t('Term')}</Label>
+                <Label>{t('Term')}{formData.is_transport_fee ? ' *' : ''}</Label>
                 <Select value={formData.term} onChange={e => handleChange('term', e.target.value)}>
-                  <option value="">{t('All Terms (same amount every term)')}</option>
+                  {formData.is_transport_fee
+                    ? <option value="" disabled>{t('Select a term…')}</option>
+                    : <option value="">{t('All Terms (same amount every term)')}</option>}
                   <option value="term1">{t('Term 1 only')}</option>
                   <option value="term2">{t('Term 2 only')}</option>
                   <option value="term3">{t('Term 3 only')}</option>
                 </Select>
                 <p className="text-xs text-gray-400 mt-1">
-                  {t('Set this when a fee amount differs by term (e.g. tuition). Create one entry per term with its own amount. Leave as "All Terms" for fees like transport or lunch that don\'t change by term.')}
+                  {t('Set this when a fee amount differs by term (e.g. tuition). Create one entry per term with its own amount. Leave as "All Terms" for fees like lunch that don\'t change by term.')}
                 </p>
+                {formData.is_transport_fee && !formData.term && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {t('Required for transport fees — routes/costs are set per term, so this can\'t be "All Terms".')}
+                  </p>
+                )}
               </div>
 
               {/* Transport Fee */}

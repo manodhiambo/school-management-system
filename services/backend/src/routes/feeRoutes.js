@@ -230,6 +230,12 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
     if (term && !['term1', 'term2', 'term3'].includes(term)) {
       return res.status(400).json({ success: false, message: 'term must be term1, term2, term3, or omitted for all terms' });
     }
+    // Transport fees vary per term (routes/costs get re-set termly), so
+    // "All Terms" isn't a meaningful option for them the way it is for a
+    // flat lunch/activity fee — require an explicit term.
+    if ((is_transport_fee === true || is_transport_fee === 'true') && !term) {
+      return res.status(400).json({ success: false, message: 'A specific term (term1, term2, or term3) is required for transport fees' });
+    }
 
     const structureId = uuidv4();
 
@@ -301,6 +307,20 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
     // transport driver_user_id fix — omitting a field must never be treated
     // the same as explicitly clearing it).
     const termProvided = Object.prototype.hasOwnProperty.call(req.body, 'term');
+
+    // Transport fees always need a specific term (their route/cost is set
+    // per term) — validate against the EFFECTIVE post-update state, not
+    // just whatever this particular request happened to include, so an
+    // existing transport fee can't have its term cleared to "All Terms"
+    // in an update call that doesn't touch is_transport_fee, and toggling
+    // is_transport_fee on without also setting a term is caught too.
+    const existingRows = await query('SELECT is_transport_fee, term FROM fee_structure WHERE id = $1 AND tenant_id = $2', [req.params.id, tid]);
+    if (!existingRows.length) return res.status(404).json({ success: false, message: 'Fee structure not found' });
+    const effectiveIsTransportFee = is_transport_fee !== undefined ? (is_transport_fee === true || is_transport_fee === 'true') : existingRows[0].is_transport_fee;
+    const effectiveTerm = termProvided ? term : existingRows[0].term;
+    if (effectiveIsTransportFee && !effectiveTerm) {
+      return res.status(400).json({ success: false, message: 'A specific term (term1, term2, or term3) is required for transport fees' });
+    }
 
     await query(
       `UPDATE fee_structure SET
@@ -1120,16 +1140,29 @@ router.post('/payment-request', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
 
-    // Verify invoice exists and parent owns it (via parent-student link)
-    const invRows = await query(
-      `SELECT fi.*, s.tenant_id AS student_tenant_id, p.tenant_id AS parent_tenant_id
-       FROM fee_invoices fi
-       JOIN students s ON s.id = fi.student_id
-       JOIN parent_students ps ON ps.student_id = s.id
-       JOIN parents p ON p.id = ps.parent_id
-       WHERE fi.id = $1 AND p.user_id = $2 AND fi.status != 'paid'`,
-      [invoiceId, callerId]
-    );
+    // Verify invoice exists and the caller owns it — a parent via the
+    // parent_students link, or a student paying their own invoice directly.
+    // (Previously this only ever checked the parent_students/parents join,
+    // so even though 'student' passed the role check above, a student
+    // caller's own user_id never matched a parents.user_id and this always
+    // 404'd — students could never actually submit a payment request.)
+    const invRows = role === 'student'
+      ? await query(
+          `SELECT fi.*, s.tenant_id AS student_tenant_id
+           FROM fee_invoices fi
+           JOIN students s ON s.id = fi.student_id
+           WHERE fi.id = $1 AND s.user_id = $2 AND fi.status != 'paid'`,
+          [invoiceId, callerId]
+        )
+      : await query(
+          `SELECT fi.*, s.tenant_id AS student_tenant_id, p.tenant_id AS parent_tenant_id
+           FROM fee_invoices fi
+           JOIN students s ON s.id = fi.student_id
+           JOIN parent_students ps ON ps.student_id = s.id
+           JOIN parents p ON p.id = ps.parent_id
+           WHERE fi.id = $1 AND p.user_id = $2 AND fi.status != 'paid'`,
+          [invoiceId, callerId]
+        );
     if (!invRows.length) {
       return res.status(404).json({ success: false, message: 'Invoice not found or already paid' });
     }
@@ -1289,15 +1322,18 @@ router.put('/payment-requests/:id/reject', requireRole(['admin', 'finance_office
 router.get('/my-payment-requests/:studentId', async (req, res) => {
   try {
     const { role, id: callerId } = req.user;
-    if (role !== 'parent') {
+    if (!['parent', 'student'].includes(role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    // Verify parent owns this student
-    const access = await query(
-      `SELECT p.tenant_id FROM parent_students ps JOIN parents p ON p.id = ps.parent_id
-       WHERE ps.student_id = $1 AND p.user_id = $2`,
-      [req.params.studentId, callerId]
-    );
+    // Verify the caller owns this student — a parent via parent_students,
+    // or the student viewing their own requests directly.
+    const access = role === 'student'
+      ? await query(`SELECT tenant_id FROM students WHERE id = $1 AND user_id = $2`, [req.params.studentId, callerId])
+      : await query(
+          `SELECT p.tenant_id FROM parent_students ps JOIN parents p ON p.id = ps.parent_id
+           WHERE ps.student_id = $1 AND p.user_id = $2`,
+          [req.params.studentId, callerId]
+        );
     if (!access.length) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
@@ -1970,7 +2006,7 @@ function normalizeMpesaPhone(raw) {
 // POST /api/v1/fee/mpesa/pay — initiate STK push for a fee invoice
 router.post('/mpesa/pay', blockDemoSideEffects('an M-Pesa payment'), async (req, res) => {
   try {
-    if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
+    if (!['parent', 'student', 'admin', 'finance_officer'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
     const { invoiceId, phoneNumber, amount } = req.body;
@@ -2003,12 +2039,21 @@ router.post('/mpesa/pay', blockDemoSideEffects('an M-Pesa payment'), async (req,
       return res.status(404).json({ success: false, message: 'Invoice not found or already paid' });
     }
 
-    // Parents may only pay for their own children's invoices
+    // Parents may only pay for their own children's invoices; students may
+    // only pay their own.
     if (req.user.role === 'parent') {
       const access = await query(
         `SELECT 1 FROM parent_students ps
          JOIN parents p ON p.id = ps.parent_id
          WHERE ps.student_id = $1 AND p.user_id = $2`,
+        [invoiceRows[0].student_id, req.user.id]
+      );
+      if (!access.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    } else if (req.user.role === 'student') {
+      const access = await query(
+        `SELECT 1 FROM students WHERE id = $1 AND user_id = $2`,
         [invoiceRows[0].student_id, req.user.id]
       );
       if (!access.length) {
@@ -2128,7 +2173,7 @@ router.get('/mpesa/student/:studentId', async (req, res) => {
 // POST /api/v1/fee/intasend/checkout — initiate a bank/card collection via IntaSend
 router.post('/intasend/checkout', blockDemoSideEffects('an IntaSend payment'), async (req, res) => {
   try {
-    if (!['parent', 'admin', 'finance_officer'].includes(req.user.role)) {
+    if (!['parent', 'student', 'admin', 'finance_officer'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
     const { invoiceId } = req.body;
@@ -2161,6 +2206,11 @@ router.post('/intasend/checkout', blockDemoSideEffects('an IntaSend payment'), a
          WHERE ps.student_id = $1 AND p.user_id = $2`,
         [invoice.student_id, req.user.id]
       );
+      if (!access.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    } else if (req.user.role === 'student') {
+      const access = await query(`SELECT 1 FROM students WHERE id = $1 AND user_id = $2`, [invoice.student_id, req.user.id]);
       if (!access.length) {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }

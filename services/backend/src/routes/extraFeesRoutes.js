@@ -92,14 +92,18 @@ router.post('/', requireRole(['admin']), async (req, res) => {
     );
     const ef = rows[0];
 
-    // Auto-create linked fee_structure so it appears in fee management
+    // Auto-create linked fee_structure so it appears in fee management.
+    // term MUST mirror the extra fee's own term — leaving it NULL here (as
+    // this used to) means "all terms" to the invoice-generation matching
+    // logic, so a Term-2-only extra fee would get invoiced even when
+    // generating Term 1 or Term 3 invoices.
     const fsDescription = description ? `Extra Fee: ${description}` : `Extra Fee: ${name}`;
     await query(
       `INSERT INTO fee_structure (id, name, amount, frequency, class_id, extra_fee_id,
-        tenant_id, is_mandatory, student_type, academic_year, due_day, description)
-       VALUES ($1,$2,$3,'one_time',$4,$5,$6,FALSE,'all',$7,15,$8)`,
+        tenant_id, is_mandatory, student_type, academic_year, due_day, description, term)
+       VALUES ($1,$2,$3,'one_time',$4,$5,$6,FALSE,'all',$7,15,$8,$9)`,
       [uuidv4(), name, Number(amount), class_id || null, ef.id, tid,
-       academic_year || new Date().getFullYear().toString(), fsDescription]
+       academic_year || new Date().getFullYear().toString(), fsDescription, ef.term || null]
     );
 
     res.status(201).json({ success: true, data: ef });
@@ -145,18 +149,18 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
     if (existing.length) {
       await query(
         `UPDATE fee_structure SET name=COALESCE($1,name), amount=COALESCE($2,amount),
-         class_id=$3, is_active=COALESCE($4,is_active), updated_at=NOW()
-         WHERE extra_fee_id=$5 AND tenant_id=$6`,
-        [ef.name, ef.amount, ef.class_id, ef.is_active, req.params.id, tid]
+         class_id=$3, is_active=COALESCE($4,is_active), term=$5, updated_at=NOW()
+         WHERE extra_fee_id=$6 AND tenant_id=$7`,
+        [ef.name, ef.amount, ef.class_id, ef.is_active, ef.term || null, req.params.id, tid]
       );
     } else {
       // Create if missing (e.g. pre-existing extra fees)
       await query(
         `INSERT INTO fee_structure (id, name, amount, frequency, class_id, extra_fee_id,
-          tenant_id, is_mandatory, student_type, academic_year, due_day)
-         VALUES ($1,$2,$3,'one_time',$4,$5,$6,FALSE,'all',$7,15)`,
+          tenant_id, is_mandatory, student_type, academic_year, due_day, term)
+         VALUES ($1,$2,$3,'one_time',$4,$5,$6,FALSE,'all',$7,15,$8)`,
         [uuidv4(), ef.name, ef.amount, ef.class_id, req.params.id, tid,
-         ef.academic_year || new Date().getFullYear().toString()]
+         ef.academic_year || new Date().getFullYear().toString(), ef.term || null]
       );
     }
 

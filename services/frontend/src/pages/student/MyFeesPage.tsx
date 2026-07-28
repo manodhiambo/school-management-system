@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, CheckCircle, AlertCircle, Clock, CreditCard, FileText, Printer } from 'lucide-react';
+import { DollarSign, CheckCircle, AlertCircle, Clock, CreditCard, FileText, Printer, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
+import { PayFeeModal } from '@/components/modals/PayFeeModal';
 
 function printPaymentReceipt(payment: any, studentName: string, schoolName = 'School') {
   const doc = new jsPDF({ unit: 'mm', format: 'a5' });
@@ -67,13 +68,29 @@ export function MyFeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState('School');
+  const [settings, setSettings] = useState<any>(null);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [activeInvoice, setActiveInvoice] = useState<any>(null);
 
   useEffect(() => {
     if (user?.id) {
       loadFees();
-      api.getSettings().then((r: any) => { if (r?.data?.school_name) setSchoolName(r.data.school_name); }).catch(() => {});
+      api.getSettings().then((r: any) => {
+        const s = r?.data || r;
+        setSettings(s);
+        if (s?.school_name) setSchoolName(s.school_name);
+      }).catch(() => {});
     }
   }, [user?.id]);
+
+  // Pending/rejected payment requests — needs the resolved student.id from
+  // the fee account response (user.id is the login/users.id, not students.id).
+  useEffect(() => {
+    const sid = fees?.student?.id;
+    if (!sid) return;
+    api.getMyPaymentRequests(sid).then((r: any) => setPendingRequests(r?.data || r || [])).catch(() => setPendingRequests([]));
+  }, [fees?.student?.id]);
 
   const loadFees = async () => {
     try {
@@ -89,6 +106,11 @@ export function MyFeesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openPayModal = (invoice: any) => {
+    setActiveInvoice(invoice);
+    setPayModalOpen(true);
   };
 
   const formatCurrency = (amount: any) => {
@@ -126,6 +148,8 @@ export function MyFeesPage() {
   const pendingAmount = parseFloat(summary.total_balance || fees?.pending || '0');
   const invoices = fees?.invoices || [];
   const payments = (fees?.payments || []).filter((p: any) => p.status === 'success');
+  const pendingByInvoice: Record<string, any> = {};
+  for (const r of pendingRequests) if (r.invoice_id) pendingByInvoice[r.invoice_id] = r;
 
   return (
     <div className="space-y-6">
@@ -199,9 +223,14 @@ export function MyFeesPage() {
         <CardContent>
           {invoices.length > 0 ? (
             <div className="space-y-4">
-              {invoices.map((invoice: any) => (
-                <div 
-                  key={invoice.id} 
+              {invoices.map((invoice: any) => {
+                const pending = pendingByInvoice[invoice.id];
+                const isPending = pending?.status === 'pending_confirmation';
+                const isRejected = pending?.status === 'rejected';
+                const hasBalance = invoice.status !== 'paid' && parseFloat(invoice.balance_amount || 0) > 0;
+                return (
+                <div
+                  key={invoice.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div>
@@ -215,6 +244,12 @@ export function MyFeesPage() {
                         day: 'numeric'
                       })}
                     </p>
+                    {isPending && (
+                      <p className="text-xs text-orange-600 mt-1">Payment submitted — awaiting admin confirmation</p>
+                    )}
+                    {isRejected && (
+                      <p className="text-xs text-red-500 mt-1">Previous payment submission was rejected — please resubmit</p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-bold">{formatCurrency(invoice.net_amount || invoice.amount)}</p>
@@ -227,7 +262,7 @@ export function MyFeesPage() {
                       </p>
                     )}
                     <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${
-                      invoice.status === 'paid' 
+                      invoice.status === 'paid'
                         ? 'bg-green-100 text-green-700'
                         : invoice.status === 'partial'
                         ? 'bg-yellow-100 text-yellow-700'
@@ -237,9 +272,18 @@ export function MyFeesPage() {
                     }`}>
                       {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
                     </span>
+                    {hasBalance && !isPending && (
+                      <div>
+                        <Button size="sm" onClick={() => openPayModal(invoice)} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white">
+                          {isRejected ? 'Resubmit' : 'Pay Fee'}
+                          <ChevronRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -301,6 +345,15 @@ export function MyFeesPage() {
           </CardContent>
         </Card>
       )}
+
+      <PayFeeModal
+        open={payModalOpen}
+        invoice={activeInvoice}
+        studentName={fees?.student ? `${fees.student.first_name} ${fees.student.last_name}` : (user?.name || 'Student')}
+        settings={settings}
+        onClose={() => setPayModalOpen(false)}
+        onSuccess={loadFees}
+      />
     </div>
   );
 }

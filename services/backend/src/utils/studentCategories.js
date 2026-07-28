@@ -117,4 +117,34 @@ export async function previewCriteriaStudentIds(tenantId, criteria) {
   return resolveCriteriaStudentIds(tenantId, criteria || {});
 }
 
+// Sets the exact manual-membership category list for one student (used by
+// student admission/edit forms so an admin can optionally tag a student
+// into an existing category, e.g. "Bursary recipients"). Only ever touches
+// student_category_members rows for THIS student - it never edits a
+// category's dynamic criteria, so a student's automatic membership in a
+// rule-based category (e.g. "Boarders") is unaffected either way.
+// categoryIds=[] clears every manual assignment for this student.
+export async function syncStudentCategoryMemberships(tenantId, studentId, categoryIds) {
+  if (!Array.isArray(categoryIds)) return;
+
+  await query(
+    `DELETE FROM student_category_members
+     WHERE student_id = $1 AND tenant_id = $2 AND NOT (category_id = ANY($3::uuid[]))`,
+    [studentId, tenantId, categoryIds]
+  );
+
+  if (!categoryIds.length) return;
+
+  // The join to student_categories (scoped to tenantId) is what prevents a
+  // request from assigning a student into another tenant's category id.
+  await query(
+    `INSERT INTO student_category_members (id, category_id, student_id, tenant_id)
+     SELECT gen_random_uuid(), sc.id, $1, $2
+     FROM student_categories sc
+     WHERE sc.id = ANY($3::uuid[]) AND sc.tenant_id = $2
+     ON CONFLICT (category_id, student_id) DO NOTHING`,
+    [studentId, tenantId, categoryIds]
+  );
+}
+
 export const STUDENT_CATEGORY_CRITERIA_KEYS = [...Object.keys(CRITERIA_FIELDS), 'grade_number'];

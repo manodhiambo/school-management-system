@@ -5,6 +5,7 @@ import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import logger from '../utils/logger.js';
+import { syncStudentCategoryMemberships } from '../utils/studentCategories.js';
 
 const router = express.Router();
 
@@ -206,9 +207,18 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
+    // Manually-assigned category ids (e.g. a hand-tagged "Bursary recipients"
+    // membership) - a student's automatic membership in a dynamic/rule-based
+    // category (e.g. "Boarders") isn't stored here and doesn't need to be;
+    // it's derived live from the student's own fields whenever a report is run.
+    const categoryRows = await query(
+      'SELECT category_id FROM student_category_members WHERE student_id = $1 AND tenant_id = $2',
+      [req.params.id, tid]
+    );
+
     res.json({
       success: true,
-      data: students[0]
+      data: { ...students[0], category_ids: categoryRows.map(r => r.category_id) }
     });
   } catch (error) {
     logger.error('Get student error:', error);
@@ -237,6 +247,8 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       is_new_admission, religion,
       // Inline parent creation
       newParent,
+      // Optional manual assignment into admin-defined student categories
+      category_ids,
     } = req.body;
 
     const actualFirstName = firstName || first_name;
@@ -394,6 +406,13 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       ).catch(() => {});
     }
 
+    // Optional: tag the student into any admin-defined student categories
+    // chosen during admission (e.g. "Bursary recipients") - most schools
+    // never set this, so an absent/empty category_ids is a no-op.
+    if (Array.isArray(category_ids) && category_ids.length) {
+      await syncStudentCategoryMemberships(tid, studentId, category_ids);
+    }
+
     const newStudent = await query(
       `SELECT s.*, u.email FROM students s JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
       [studentId]
@@ -425,6 +444,7 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
       county, sub_county, special_needs, special_needs_details,
       previous_school, medical_conditions,
       emergency_contact_name, emergency_contact_phone,
+      category_ids,
     } = req.body;
 
     // Convert empty strings to null for UUID fields
@@ -496,6 +516,13 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
         emergency_contact_name || null, emergency_contact_phone || null,
       ]
     );
+
+    // Only touch category assignments when the field was actually sent -
+    // an edit form that doesn't know about categories (or a school that
+    // never uses them) must not silently wipe existing assignments.
+    if (Array.isArray(category_ids)) {
+      await syncStudentCategoryMemberships(tid, req.params.id, category_ids);
+    }
 
     const updated = await query(
       `SELECT s.*, u.email, c.name as class_name

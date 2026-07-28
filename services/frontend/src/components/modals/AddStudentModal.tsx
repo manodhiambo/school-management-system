@@ -59,6 +59,8 @@ interface FormData {
   // Step 4
   email: string; password: string; phone: string;
   address: string; city: string; state: string; pincode: string;
+  // Optional — admin-defined student categories (only shown if any exist)
+  categoryIds: string[];
 }
 
 const BLANK_PARENT: NewParentForm = {
@@ -78,6 +80,7 @@ const INITIAL: FormData = {
   parentMode: 'existing', parentId: '', newParent: { ...BLANK_PARENT },
   email: '', password: 'student123', phone: '',
   address: '', city: '', state: '', pincode: '',
+  categoryIds: [],
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -161,6 +164,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [classes, setClasses] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [parents, setParents] = useState<any[]>([]);
   const [parentSearch, setParentSearch] = useState('');
   const [photoPreview, setPhotoPreview] = useState('');
@@ -179,14 +183,23 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
     Promise.allSettled([
       api.getClasses(),
       (api as any).getNextAdmissionNumber(),
-    ]).then(([classRes, numRes]) => {
+      (api as any).getStudentCategories(),
+    ]).then(([classRes, numRes, catRes]) => {
       if (classRes.status === 'fulfilled') setClasses((classRes.value as any).data || []);
       if (numRes.status === 'fulfilled') {
         const num = (numRes.value as any).data?.admission_number || '';
         setForm(p => ({ ...p, admissionNumber: num }));
       }
+      if (catRes.status === 'fulfilled') setCategories((catRes.value as any).data || []);
     });
   }, [open]);
+
+  const toggleCategory = (id: string) => {
+    setForm(p => ({
+      ...p,
+      categoryIds: p.categoryIds.includes(id) ? p.categoryIds.filter(c => c !== id) : [...p.categoryIds, id],
+    }));
+  };
 
   // Load parents when entering step 3
   // Note: axios interceptor already unwraps response.data, so res = { statusCode, data: [...], message }
@@ -280,6 +293,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
         city:     form.city || undefined,
         state:    form.state || undefined,
         pincode:  form.pincode || undefined,
+        category_ids: form.categoryIds.length ? form.categoryIds : undefined,
       };
 
       if (form.parentMode === 'existing' && form.parentId) {
@@ -360,7 +374,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
       </div>
 
       <div className="md:col-span-2">
-        <Label>Student Category *</Label>
+        <Label>Boarding Type *</Label>
         <SegmentedToggle
           value={form.student_type}
           onChange={v => set('student_type', v)}
@@ -370,6 +384,31 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
           ]}
         />
       </div>
+
+      {categories.length > 0 && (
+        <div className="md:col-span-2 border-t pt-3">
+          <Label>Student Categories (optional)</Label>
+          <p className="text-xs text-gray-400 mb-2">
+            Tag this student into any admin-defined categories used for fee reporting (e.g. bursary recipients). Leave unchecked if not applicable.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c: any) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggleCategory(c.id)}
+                className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+                  form.categoryIds.includes(c.id)
+                    ? 'bg-teal-600 text-white border-teal-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="md:col-span-2">
         <Label className="flex items-center gap-1"><Bus className="h-4 w-4 text-orange-500" /> School Transport</Label>
@@ -705,6 +744,9 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
         })()}
         {form.parentMode === 'skip' && <p className="text-yellow-700"><span className="text-gray-500">Parent:</span> To be added later</p>}
         {form.specialNeeds && <p className="text-orange-700">⚠ Special needs flagged</p>}
+        {form.categoryIds.length > 0 && (
+          <p><span className="text-gray-500">Categories:</span> {categories.filter(c => form.categoryIds.includes(c.id)).map(c => c.name).join(', ')}</p>
+        )}
       </div>
     </div>
   );

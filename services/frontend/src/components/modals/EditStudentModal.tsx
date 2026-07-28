@@ -39,6 +39,8 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [classes, setClasses] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
@@ -77,6 +79,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
     if (open && studentId) {
       loadStudent();
       loadClasses();
+      loadCategories();
     }
   }, [open, studentId]);
 
@@ -87,6 +90,19 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
     } catch (error) {
       console.error('Error loading classes:', error);
     }
+  };
+
+  const loadCategories = async () => {
+    try {
+      const response: any = await api.getStudentCategories();
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Error loading student categories:', error);
+    }
+  };
+
+  const toggleCategory = (id: string) => {
+    setCategoryIds(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
   };
 
   const loadStudent = async () => {
@@ -126,6 +142,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
         emergency_contact_phone: student.emergency_contact_phone || '',
         previous_school: student.previous_school || '',
       });
+      setCategoryIds(student.category_ids || []);
     } catch (error) {
       console.error('Error loading student:', error);
       alert('Failed to load student data');
@@ -154,7 +171,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
     e.preventDefault();
     setLoading(true);
     try {
-      await api.updateStudent(studentId, formData);
+      await api.updateStudent(studentId, { ...formData, category_ids: categoryIds });
       alert('Student updated successfully!');
       onSuccess();
       onOpenChange(false);
@@ -326,7 +343,7 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                     </Select>
                   </div>
                   <div className="md:col-span-2">
-                    <Label>Student Category *</Label>
+                    <Label>Boarding Type *</Label>
                     <div className="flex gap-2 mt-1">
                       {[
                         { value: 'day_scholar', label: 'Day Scholar' },
@@ -372,6 +389,30 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                       </p>
                     )}
                   </div>
+                  {categories.length > 0 && (
+                    <div className="md:col-span-2">
+                      <Label>Student Categories (optional)</Label>
+                      <p className="text-xs text-gray-400 mb-2">
+                        Admin-defined categories used for fee reporting (e.g. bursary recipients).
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {categories.map((c: any) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => toggleCategory(c.id)}
+                            className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+                              categoryIds.includes(c.id)
+                                ? 'bg-teal-600 text-white border-teal-600'
+                                : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

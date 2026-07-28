@@ -50,6 +50,79 @@ async function resolveCurrentTerm(tenantId) {
   return rows[0] || { term: null, academic_year: new Date().getFullYear().toString() };
 }
 
+const TERM_LABELS = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
+
+// term1 -> term3 of the prior academic year; term2 -> term1 same year; term3 -> term2 same year.
+function resolvePreviousTerm(term, academicYear) {
+  const year = parseInt(academicYear, 10) || new Date().getFullYear();
+  if (term === 'term1') return { term: 'term3', academic_year: String(year - 1) };
+  if (term === 'term2') return { term: 'term1', academic_year: String(year) };
+  if (term === 'term3') return { term: 'term2', academic_year: String(year) };
+  return null;
+}
+
+// Sums a student's still-outstanding balance from their previous term's
+// invoices (non-cancelled, balance_amount > 0). Read-only — does not mutate
+// anything, used to show the admin/finance officer the amount BEFORE they
+// decide whether to include it.
+async function getPreviousTermBalance(tenantId, studentId, term, academicYear) {
+  const prev = resolvePreviousTerm(term, academicYear);
+  if (!prev) return { previous_term: null, previous_academic_year: null, balance: 0 };
+  const rows = await query(
+    `SELECT COALESCE(SUM(balance_amount), 0)::numeric AS balance
+     FROM fee_invoices
+     WHERE tenant_id = $1 AND student_id = $2 AND term = $3 AND academic_year = $4
+       AND status NOT IN ('cancelled') AND balance_amount > 0`,
+    [tenantId, studentId, prev.term, prev.academic_year]
+  );
+  return { previous_term: prev.term, previous_academic_year: prev.academic_year, balance: Number(rows[0]?.balance || 0) };
+}
+
+// Rolls a student's outstanding previous-term balance into a single new
+// invoice attached to the term/year being generated for now, and closes out
+// the source invoice(s) so the same debt isn't counted twice in reports —
+// their payment history in fee_payments is untouched, only their own
+// balance/status is cleared since it has been moved onto the new invoice.
+// Returns the created invoice summary, or null if there was nothing to carry.
+async function carryForwardPreviousBalance(tenantId, studentId, term, academicYear) {
+  const prev = resolvePreviousTerm(term, academicYear);
+  if (!prev) return null;
+
+  const sourceInvoices = await query(
+    `SELECT id, balance_amount FROM fee_invoices
+     WHERE tenant_id = $1 AND student_id = $2 AND term = $3 AND academic_year = $4
+       AND status NOT IN ('cancelled') AND balance_amount > 0`,
+    [tenantId, studentId, prev.term, prev.academic_year]
+  );
+  const totalBalance = sourceInvoices.reduce((s, r) => s + Number(r.balance_amount), 0);
+  if (totalBalance <= 0) return null;
+
+  for (const inv of sourceInvoices) {
+    await query(
+      `UPDATE fee_invoices SET status = 'cancelled', updated_at = NOW(),
+         metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('carried_forward_to_term', $1, 'carried_forward_to_year', $2)
+       WHERE id = $3`,
+      [term, academicYear, inv.id]
+    );
+  }
+
+  const invoiceId = uuidv4();
+  const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  const description = `Carried Forward Balance – ${TERM_LABELS[prev.term] || prev.term} ${prev.academic_year}`;
+  await query(
+    `INSERT INTO fee_invoices (
+       id, invoice_number, student_id, total_amount, net_amount, balance_amount,
+       status, tenant_id, description, term, academic_year, metadata
+     ) VALUES ($1,$2,$3,$4,$4,$4,'pending',$5,$6,$7,$8,$9)`,
+    [
+      invoiceId, invoiceNumber, studentId, totalBalance, tenantId, description, term, academicYear,
+      JSON.stringify({ carried_forward_from_term: prev.term, carried_forward_from_year: prev.academic_year, source_invoice_ids: sourceInvoices.map(r => r.id) }),
+    ]
+  );
+
+  return { invoice_id: invoiceId, invoice_number: invoiceNumber, amount: totalBalance, description };
+}
+
 // ============== FEE STRUCTURE ROUTES ==============
 
 // Get all fee structures
@@ -500,7 +573,7 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
 router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { class_ids, fee_structure_ids, due_date, term, academic_year, dry_run } = req.body;
+    const { class_ids, fee_structure_ids, due_date, term, academic_year, dry_run, include_previous_balance } = req.body;
     // term and academic_year are now saved to fee_invoices for proper report-card filtering
 
     if (!fee_structure_ids?.length) {
@@ -670,11 +743,38 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
     if (inactiveSkipped.length) {
       summary.skipped.push(...inactiveSkipped.map(name => ({ fee: name, reason: 'inactive_structure' })));
     }
+
+    // Optionally roll each invoiced student's previous-term outstanding
+    // balance onto a new invoice for this term. Done once per student
+    // (not per fee structure) — only for students actually invoiced this
+    // run. dry_run only previews the amount, it never mutates anything.
+    const carriedForward = [];
+    if (include_previous_balance === true || include_previous_balance === 'true') {
+      const studentIdsThisRun = [...new Set(summary.created.map(c => c.student_id))];
+      for (const sid of studentIdsThisRun) {
+        const studentInfo = summary.created.find(c => c.student_id === sid);
+        if (dry_run) {
+          const preview = await getPreviousTermBalance(tid, sid, term, academic_year);
+          if (preview.balance > 0) {
+            carriedForward.push({
+              student_id: sid, name: studentInfo?.name, amount: preview.balance,
+              previous_term: preview.previous_term, previous_academic_year: preview.previous_academic_year,
+            });
+          }
+        } else {
+          const result = await carryForwardPreviousBalance(tid, sid, term, academic_year);
+          if (result) {
+            carriedForward.push({ student_id: sid, name: studentInfo?.name, amount: result.amount, invoice_number: result.invoice_number });
+          }
+        }
+      }
+    }
+
     res.json({
       success: true,
       dry_run: !!dry_run,
       message: dry_run ? `Preview: ${summary.created.length} invoices would be created` : `${summary.created.length} invoices created, ${summary.errors.length} errors`,
-      data: summary,
+      data: { ...summary, carried_forward: carriedForward },
       inactive_skipped: inactiveSkipped,
     });
   } catch (error) {
@@ -1280,6 +1380,25 @@ router.delete('/payment/:id', requireRole(['admin']), async (req, res) => {
   }
 });
 
+// ============== PREVIOUS TERM BALANCE PREVIEW ==============
+// Lets the admin/finance officer see a student's outstanding balance from
+// their previous term BEFORE deciding whether to include it on a new
+// invoice — read-only, does not carry anything forward by itself.
+router.get('/previous-term-balance/:studentId', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { term, academic_year } = req.query;
+    if (!term || !VALID_TERMS.includes(term) || !academic_year) {
+      return res.status(400).json({ success: false, message: 'A valid term and academic_year are required' });
+    }
+    const result = await getPreviousTermBalance(tid, req.params.studentId, term, academic_year);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Previous term balance error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching previous term balance' });
+  }
+});
+
 // ============== EXPECTED FEES FOR A STUDENT ==============
 // Returns the fee structures that apply to the student's class + any student-level extra fees
 
@@ -1424,7 +1543,7 @@ router.get('/students-summary', async (req, res) => {
 router.post('/invoice/generate-for-student', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { student_id, academic_year, due_date, term } = req.body;
+    const { student_id, academic_year, due_date, term, include_previous_balance } = req.body;
     if (!student_id) return res.status(400).json({ success: false, message: 'student_id required' });
     if (!requireValidTerm(res, term)) return;
 
@@ -1534,11 +1653,19 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
       created.push({ invoice_number: invoiceNumber, description: struct.name, amount });
     }
 
+    let carriedForward = null;
+    if (include_previous_balance === true || include_previous_balance === 'true') {
+      carriedForward = await carryForwardPreviousBalance(tid, std.id, term, year);
+      if (carriedForward) {
+        created.push({ invoice_number: carriedForward.invoice_number, description: carriedForward.description, amount: carriedForward.amount });
+      }
+    }
+
     const totalAmount = created.reduce((s, r) => s + r.amount, 0);
     res.status(201).json({
       success: true,
       message: `${created.length} invoice(s) generated${skipped.length ? `, ${skipped.length} skipped (already invoiced)` : ''}`,
-      data: { created, skipped, total_amount: totalAmount }
+      data: { created, skipped, total_amount: totalAmount, carried_forward: carriedForward }
     });
   } catch (error) {
     logger.error('Generate invoice for student error:', error);

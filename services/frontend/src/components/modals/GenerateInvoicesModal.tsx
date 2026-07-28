@@ -29,8 +29,9 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
   const [dueDate, setDueDate] = useState('');
   const [term, setTerm] = useState('');
   const [academicYear, setAcademicYear] = useState(currentYear);
-  const [preview, setPreview] = useState<{ created: any[]; skipped: any[]; errors: any[] } | null>(null);
-  const [result, setResult] = useState<{ created: any[]; errors: any[] } | null>(null);
+  const [includePrevBalance, setIncludePrevBalance] = useState(false);
+  const [preview, setPreview] = useState<{ created: any[]; skipped: any[]; errors: any[]; carried_forward?: any[] } | null>(null);
+  const [result, setResult] = useState<{ created: any[]; errors: any[]; carried_forward?: any[] } | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -44,6 +45,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
       setDueDate('');
       setTerm('');
       setAcademicYear(currentYear);
+      setIncludePrevBalance(false);
     }
   }, [open]);
 
@@ -100,6 +102,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
         due_date: dueDate || undefined,
         term,
         academic_year: academicYear || undefined,
+        include_previous_balance: includePrevBalance,
         dry_run: true,
       });
       setPreview(res.data || { created: [], skipped: [], errors: [] });
@@ -120,6 +123,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
         due_date: dueDate || undefined,
         term,
         academic_year: academicYear || undefined,
+        include_previous_balance: includePrevBalance,
         dry_run: false,
       });
       setResult(res.data || { created: [], errors: [] });
@@ -338,6 +342,15 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
               </div>
             </div>
 
+            <label className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-md p-3 text-xs text-orange-800 cursor-pointer">
+              <input type="checkbox" className="mt-0.5" checked={includePrevBalance}
+                onChange={e => setIncludePrevBalance(e.target.checked)} />
+              <span>
+                <strong>Include each student's previous term outstanding balance</strong> as an extra line on their new invoice
+                (e.g. Term 1 balance rolled onto their Term 2 invoice). Only applies to students who are actually being invoiced in this run.
+              </span>
+            </label>
+
             {selectedInactiveCount > 0 && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-md p-3 text-xs text-red-800">
                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -418,6 +431,19 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
               </div>
             )}
 
+            {(preview.carried_forward?.length ?? 0) > 0 && (
+              <div className="border rounded-md bg-orange-50 border-orange-200 p-3 text-xs">
+                <p className="font-medium text-orange-800 mb-1">
+                  Previous term balances that will also be carried forward ({preview.carried_forward!.length} student(s)):
+                </p>
+                {preview.carried_forward!.map((c: any, i: number) => (
+                  <p key={i} className="text-orange-700">
+                    · {c.name || c.student_id} — KES {Number(c.amount).toLocaleString()}
+                  </p>
+                ))}
+              </div>
+            )}
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setStep('config')}>Back</Button>
               <Button onClick={handleGenerate} disabled={loading || preview.created.length === 0}>
@@ -440,6 +466,11 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
               </p>
               {result.errors.length > 0 && (
                 <p className="text-xs text-red-500 mt-2">{result.errors.length} error(s) occurred — check logs.</p>
+              )}
+              {(result.carried_forward?.length ?? 0) > 0 && (
+                <p className="text-xs text-orange-700 mt-2">
+                  Previous term balances carried forward for {result.carried_forward!.length} student(s).
+                </p>
               )}
             </div>
             <DialogFooter>

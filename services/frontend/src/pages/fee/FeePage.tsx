@@ -285,6 +285,8 @@ function FeeStatementModal({
   const [currentTerm, setCurrentTerm] = useState<{ term: string; academic_year: string; term_name?: string } | null>(null);
   const [genTerm, setGenTerm] = useState('');
   const [genYear, setGenYear] = useState('');
+  const [prevBalance, setPrevBalance] = useState<{ amount: number; previous_term: string; previous_academic_year: string } | null>(null);
+  const [includePrevBalance, setIncludePrevBalance] = useState(false);
 
   const totalExpected = [...expected, ...extraFees].reduce((s, f) => s + Number(f.amount), 0);
 
@@ -321,6 +323,21 @@ function FeeStatementModal({
 
   useEffect(() => { load(); }, [load]);
 
+  // Look up the student's outstanding balance from their previous term so
+  // the admin/finance officer can see it and opt in to rolling it onto the
+  // new invoice, instead of it being silently left behind or double-billed.
+  useEffect(() => {
+    setIncludePrevBalance(false);
+    if (!genTerm || !genYear) { setPrevBalance(null); return; }
+    let cancelled = false;
+    api.getPreviousTermBalance(student.id, genTerm, genYear).then((res: any) => {
+      if (cancelled) return;
+      const d = res?.data;
+      setPrevBalance(d && d.balance > 0 ? { amount: d.balance, previous_term: d.previous_term, previous_academic_year: d.previous_academic_year } : null);
+    }).catch(() => setPrevBalance(null));
+    return () => { cancelled = true; };
+  }, [student.id, genTerm, genYear]);
+
   const resolvedTermLabel = genTerm
     ? `${TERM_LABELS[genTerm] || genTerm} ${genYear || currentTerm?.academic_year || ''}`
     : 'Select a term before generating an invoice';
@@ -336,6 +353,7 @@ function FeeStatementModal({
         student_id: student.id,
         term: genTerm,
         academic_year: genYear || undefined,
+        include_previous_balance: includePrevBalance,
       });
       await load();
     } catch (e: any) {
@@ -425,6 +443,19 @@ function FeeStatementModal({
                 <Input className="w-20 h-8 text-xs" placeholder={currentTerm?.academic_year || 'Year'}
                   value={genYear} onChange={e => setGenYear(e.target.value)} />
               </div>
+
+              {prevBalance && (
+                <label className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs cursor-pointer">
+                  <input type="checkbox" className="mt-0.5" checked={includePrevBalance}
+                    onChange={e => setIncludePrevBalance(e.target.checked)} />
+                  <span>
+                    This student has an outstanding balance of{' '}
+                    <span className="font-semibold text-orange-800">{fmt(prevBalance.amount)}</span>{' '}
+                    from {TERM_LABELS[prevBalance.previous_term] || prevBalance.previous_term} {prevBalance.previous_academic_year}.
+                    Include it as an extra line on this new invoice?
+                  </span>
+                </label>
+              )}
 
               {/* Summary row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

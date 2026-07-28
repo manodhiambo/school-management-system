@@ -423,6 +423,10 @@ class ApiService {
     return this.api.post('/fee/invoice/generate-for-student', data);
   }
 
+  getPreviousTermBalance(studentId: string, term: string, academicYear: string) {
+    return this.api.get('/fee/previous-term-balance/' + studentId, { params: { term, academic_year: academicYear } });
+  }
+
   // Financial Reports
   getFeeReportSummary(params?: any) {
     return this.api.get('/fee/report/summary', { params });

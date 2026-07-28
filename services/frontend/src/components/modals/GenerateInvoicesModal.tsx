@@ -91,13 +91,14 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
 
   const handlePreview = async () => {
     if (!selectedStructures.length) return;
+    if (!term) { alert('Please select a term first.'); return; }
     setLoading(true);
     try {
       const res: any = await api.generateSmartBulkInvoices({
         fee_structure_ids: selectedStructures,
         class_ids: selectedClasses.length ? selectedClasses : undefined,
         due_date: dueDate || undefined,
-        term: term || undefined,
+        term,
         academic_year: academicYear || undefined,
         dry_run: true,
       });
@@ -117,7 +118,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
         fee_structure_ids: selectedStructures,
         class_ids: selectedClasses.length ? selectedClasses : undefined,
         due_date: dueDate || undefined,
-        term: term || undefined,
+        term,
         academic_year: academicYear || undefined,
         dry_run: false,
       });
@@ -300,17 +301,22 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
             {/* Term / Year / Due Date */}
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label className="text-sm">Term</Label>
+                <Label className="text-sm">Term *</Label>
                 <select
                   className="w-full border rounded-md px-3 py-2 text-sm mt-1"
                   value={term}
                   onChange={e => setTerm(e.target.value)}
                 >
-                  <option value="">All Terms</option>
+                  <option value="" disabled>Select a term…</option>
                   <option value="term1">Term 1</option>
                   <option value="term2">Term 2</option>
                   <option value="term3">Term 3</option>
                 </select>
+                {!term && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Required — invoices generated without an explicit term can end up duplicated.
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="text-sm">Academic Year</Label>
@@ -351,7 +357,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
 
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={handlePreview} disabled={loading || selectedStructures.length === 0}>
+              <Button onClick={handlePreview} disabled={loading || selectedStructures.length === 0 || !term}>
                 {loading
                   ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading preview...</>
                   : <><Eye className="h-4 w-4 mr-2" /> Preview ({selectedStructures.length} selected)</>}

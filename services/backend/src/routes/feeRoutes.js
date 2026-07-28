@@ -15,6 +15,22 @@ router.use(requireModule('finance'));
 router.use(tenantContext);
 router.use(requireActiveTenant);
 
+// term is mandatory on every invoice-creation endpoint below — never silently
+// defaulted to the tenant's "current" term. Two calls made at different times
+// (e.g. before/after an admin explicitly picks a term, or after the school's
+// current term changes) previously could resolve to different term values
+// for the SAME fee structure, so the duplicate-invoice check (keyed on
+// student+fee_structure+term+year) missed the match and created a second,
+// duplicate invoice instead of recognizing the fee was already invoiced.
+const VALID_TERMS = ['term1', 'term2', 'term3'];
+function requireValidTerm(res, term) {
+  if (!term || !VALID_TERMS.includes(term)) {
+    res.status(400).json({ success: false, message: 'A term (term1, term2, or term3) must be selected before generating an invoice' });
+    return false;
+  }
+  return true;
+}
+
 // Resolves a term/academic_year default from the tenant's current academic_terms
 // row when an invoice-creation call doesn't specify one — invoices created with
 // term left NULL are invisible to any report filtered by a specific term (the
@@ -381,6 +397,7 @@ router.post('/invoice', requireRole(['admin']), async (req, res) => {
         message: 'Student ID and amount are required'
       });
     }
+    if (!requireValidTerm(res, term)) return;
 
     const invoiceId = uuidv4();
     const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
@@ -429,6 +446,7 @@ router.post('/invoice/bulk', requireRole(['admin']), async (req, res) => {
     if (!actualFeeStructureId) {
       return res.status(400).json({ success: false, message: 'Fee structure ID is required' });
     }
+    if (!requireValidTerm(res, term)) return;
 
     const structures = await query(
       'SELECT * FROM fee_structure WHERE id = $1 AND tenant_id = $2',
@@ -488,6 +506,7 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
     if (!fee_structure_ids?.length) {
       return res.status(400).json({ success: false, message: 'Select at least one fee structure' });
     }
+    if (!requireValidTerm(res, term)) return;
 
     // Load fee structures — only active ones for this tenant
     // Inactive structures are shown in the modal for reference but must not generate invoices
@@ -1405,13 +1424,12 @@ router.get('/students-summary', async (req, res) => {
 router.post('/invoice/generate-for-student', requireRole(['admin']), async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { student_id, academic_year, due_date } = req.body;
-    let { term } = req.body;
+    const { student_id, academic_year, due_date, term } = req.body;
     if (!student_id) return res.status(400).json({ success: false, message: 'student_id required' });
+    if (!requireValidTerm(res, term)) return;
 
     const currentTerm = await resolveCurrentTerm(tid);
     const year = academic_year || currentTerm.academic_year;
-    term = term || currentTerm.term;
 
     // Get student
     const stdRows = await query(

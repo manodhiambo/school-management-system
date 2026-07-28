@@ -303,7 +303,17 @@ function FeeStatementModal({
       setExpected(expectedRes?.data?.structures || []);
       setExtraFees(expectedRes?.data?.extra_fees || []);
       setSchoolName(settingsRes?.data?.school_name || 'School');
-      setCurrentTerm(currentTermRes?.data || null);
+      const ct = currentTermRes?.data || null;
+      setCurrentTerm(ct);
+      // Pre-fill from the school's current term as a starting point, but the
+      // admin must still see and can change an explicit value below - a
+      // blank term used to resolve silently server-side, and if that silent
+      // resolution differed between two "Generate Invoice" clicks (e.g. the
+      // school's current term changed, or the admin picked one explicitly
+      // the second time), the same fee got invoiced twice instead of being
+      // recognized as already invoiced.
+      setGenTerm(prev => prev || ct?.term || '');
+      setGenYear(prev => prev || ct?.academic_year || '');
     } finally {
       setLoading(false);
     }
@@ -311,22 +321,20 @@ function FeeStatementModal({
 
   useEffect(() => { load(); }, [load]);
 
-  // The school's configured "current" academic term (academic_terms.is_current)
-  // is what a blank Term/Year below resolves to server-side — shown here so an
-  // admin isn't guessing which term an invoice will be generated for, and can
-  // override it explicitly if the school hasn't updated which term is current.
   const resolvedTermLabel = genTerm
     ? `${TERM_LABELS[genTerm] || genTerm} ${genYear || currentTerm?.academic_year || ''}`
-    : currentTerm
-      ? `${currentTerm.term_name || TERM_LABELS[currentTerm.term] || currentTerm.term} ${currentTerm.academic_year} (school's current term)`
-      : 'No current term configured — set one in CBE Academics';
+    : 'Select a term before generating an invoice';
 
   const handleGenerateInvoice = async () => {
+    if (!genTerm) {
+      alert('Please select a term before generating an invoice.');
+      return;
+    }
     setGenLoading(true);
     try {
       await api.generateInvoiceForStudent({
         student_id: student.id,
-        term: genTerm || undefined,
+        term: genTerm,
         academic_year: genYear || undefined,
       });
       await load();
@@ -386,7 +394,7 @@ function FeeStatementModal({
                 }>
                   <Download className="h-3.5 w-3.5 mr-1" /> Download PDF
                 </Button>
-                <Button size="sm" onClick={handleGenerateInvoice} disabled={genLoading}>
+                <Button size="sm" onClick={handleGenerateInvoice} disabled={genLoading || !genTerm} title={!genTerm ? 'Select a term below first' : undefined}>
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   {genLoading ? 'Generating...' : 'Generate Invoice'}
                 </Button>
@@ -401,15 +409,15 @@ function FeeStatementModal({
           ) : (
             <div className="space-y-5 pt-1">
 
-              {/* Generate-invoice term control — shown so an admin can see and
-                  override which term "Generate Invoice" (above) will use,
-                  instead of it silently applying the school's current term. */}
+              {/* Generate-invoice term control — a term must always be explicitly
+                  selected (pre-filled from the school's current term, but never
+                  left blank) before "Generate Invoice" can be used. */}
               <div className="flex items-center gap-2 flex-wrap bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs">
                 <span className="text-gray-600">Next invoice will be for:</span>
                 <span className="font-semibold text-gray-800">{resolvedTermLabel}</span>
                 <select className="border rounded px-2 py-1 ml-auto"
                   value={genTerm} onChange={e => setGenTerm(e.target.value)}>
-                  <option value="">Use school's current term</option>
+                  <option value="" disabled>Select a term…</option>
                   <option value="term1">Term 1</option>
                   <option value="term2">Term 2</option>
                   <option value="term3">Term 3</option>

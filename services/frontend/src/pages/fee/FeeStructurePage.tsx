@@ -42,6 +42,7 @@ export function FeeStructurePage() {
   const [structures, setStructures] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingStructure, setEditingStructure] = useState<any>(null);
@@ -59,13 +60,13 @@ export function FeeStructurePage() {
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkPreviewing, setBulkPreviewing] = useState(false);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [showInactive]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       const [structuresRes, classesRes, routesRes]: any = await Promise.all([
-        api.getFeeStructures(),
+        api.getFeeStructures(showInactive ? { isActive: 'all' } : undefined),
         api.getClasses(),
         api.getTransportRoutes(),
       ]);
@@ -137,12 +138,21 @@ export function FeeStructurePage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this fee structure permanently? This cannot be undone.')) return;
+    if (!confirm('Delete this fee structure permanently? This cannot be undone. To just hide it from students/invoices while keeping the record, use the Active/Inactive toggle instead.')) return;
     try {
       await api.deleteFeeStructure(id);
       loadData();
     } catch (error: any) {
       alert(error.message || 'Failed to delete fee structure');
+    }
+  };
+
+  const handleToggleActive = async (structure: any) => {
+    try {
+      await api.updateFeeStructure(structure.id, { is_active: !structure.is_active });
+      loadData();
+    } catch (error: any) {
+      alert(error.message || 'Failed to update fee structure');
     }
   };
 
@@ -204,10 +214,18 @@ export function FeeStructurePage() {
           <h2 className="text-3xl font-bold">{t('Fee Structures')}</h2>
           <p className="text-gray-500">{t('Manage fee structures and bulk invoice generation')}</p>
         </div>
-        {activeTab === 'structures' && !isFinanceOfficer && (
-          <Button onClick={() => { resetForm(); setShowModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> {t('Add Fee Structure')}
-          </Button>
+        {activeTab === 'structures' && (
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} className="rounded" />
+              {t('Show inactive')}
+            </label>
+            {!isFinanceOfficer && (
+              <Button onClick={() => { resetForm(); setShowModal(true); }}>
+                <Plus className="mr-2 h-4 w-4" /> {t('Add Fee Structure')}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -226,7 +244,7 @@ export function FeeStructurePage() {
           {/* Stats */}
           <div className="grid gap-4 md:grid-cols-4">
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Total Active')}</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold">{structures.length}</div></CardContent></Card>
+              <CardContent><div className="text-2xl font-bold">{structures.filter(s => s.is_active).length}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Boarder Fees')}</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold text-purple-600">{structures.filter(s => s.student_type === 'boarder').length}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Day Scholar Fees')}</CardTitle></CardHeader>
@@ -255,12 +273,13 @@ export function FeeStructurePage() {
                         <th className="text-left px-4 py-3 font-medium">{t('Applies To')}</th>
                         <th className="text-left px-4 py-3 font-medium">{t('Class')}</th>
                         <th className="text-left px-4 py-3 font-medium">{t('Type')}</th>
+                        <th className="text-center px-4 py-3 font-medium">{t('Status')}</th>
                         <th className="text-center px-4 py-3 font-medium">{t('Actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {structures.map(s => (
-                        <tr key={s.id} className="hover:bg-gray-50">
+                        <tr key={s.id} className={`hover:bg-gray-50 ${!s.is_active ? 'opacity-60' : ''}`}>
                           <td className="px-4 py-3">
                             <p className="font-medium">{s.name}</p>
                             {s.description && <p className="text-xs text-gray-400">{s.description}</p>}
@@ -295,6 +314,19 @@ export function FeeStructurePage() {
                               <Badge className="bg-indigo-100 text-indigo-700">
                                 <Link2 className="h-3 w-3 mr-1" />Extra Fee
                               </Badge>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {(s.is_transport_fee || s.extra_fee_id) || isFinanceOfficer ? (
+                              <Badge variant={s.is_active ? 'default' : 'secondary'}>
+                                {s.is_active ? t('Active') : t('Inactive')}
+                              </Badge>
+                            ) : (
+                              <button onClick={() => handleToggleActive(s)} title={t('Click to toggle active/inactive')}>
+                                <Badge variant={s.is_active ? 'default' : 'secondary'}>
+                                  {s.is_active ? t('Active') : t('Inactive')}
+                                </Badge>
+                              </button>
                             )}
                           </td>
                           <td className="px-4 py-3">

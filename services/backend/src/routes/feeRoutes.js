@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { getCategoryStudentIds } from '../utils/studentCategories.js';
 import { syncInvoiceTermsToStructure } from '../utils/feeInvoiceTermSync.js';
+import { FEE_STRUCTURE_STUDENT_TYPES, feeAppliesToStudentType, sqlFeeTypeMatch } from '../utils/studentType.js';
 
 const router = express.Router();
 
@@ -158,7 +159,7 @@ router.get('/structure', async (req, res) => {
     }
 
     if (student_type) {
-      sql += ` AND (fs.student_type = $${paramIndex} OR fs.student_type = 'all')`;
+      sql += ` AND ${sqlFeeTypeMatch('fs', paramIndex)}`;
       params.push(student_type); paramIndex++;
     }
     if (is_transport_fee !== undefined) {
@@ -231,6 +232,9 @@ router.post('/structure', requireRole(['admin']), async (req, res) => {
     if (term && !['term1', 'term2', 'term3'].includes(term)) {
       return res.status(400).json({ success: false, message: 'term must be term1, term2, term3, or omitted for all terms' });
     }
+    if (student_type && !FEE_STRUCTURE_STUDENT_TYPES.includes(student_type)) {
+      return res.status(400).json({ success: false, message: `student_type must be one of: ${FEE_STRUCTURE_STUDENT_TYPES.join(', ')}` });
+    }
     // Transport fees vary per term (routes/costs get re-set termly), so
     // "All Terms" isn't a meaningful option for them the way it is for a
     // flat lunch/activity fee — require an explicit term.
@@ -300,6 +304,9 @@ router.put('/structure/:id', requireRole(['admin']), async (req, res) => {
     }
     if (term && !['term1', 'term2', 'term3'].includes(term)) {
       return res.status(400).json({ success: false, message: 'term must be term1, term2, term3, or omitted for all terms' });
+    }
+    if (student_type && !FEE_STRUCTURE_STUDENT_TYPES.includes(student_type)) {
+      return res.status(400).json({ success: false, message: `student_type must be one of: ${FEE_STRUCTURE_STUDENT_TYPES.join(', ')}` });
     }
     // term can't use COALESCE like the rest of these fields — an admin must
     // be able to explicitly clear it back to "applies every term" by picking
@@ -698,7 +705,7 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
           }
         }
         // Filter by student_type
-        if (struct.student_type !== 'all' && student.student_type !== struct.student_type) {
+        if (!feeAppliesToStudentType(struct.student_type, student.student_type)) {
           summary.skipped.push({ student_id: student.id, fee: struct.name, reason: 'student_type_mismatch' });
           continue;
         }
@@ -730,13 +737,14 @@ router.post('/invoice/bulk-smart', requireRole(['admin']), async (req, res) => {
         }
 
         // If this student has a pending invoice for the same fee name/term/year but from a
-        // structure for the OTHER student_type (boarder vs day_scholar), it's a leftover from
-        // before their status changed — cancel it so they aren't billed for both.
+        // structure that no longer applies to their current student_type (day_scholar /
+        // full_time_boarder / weekly_boarder), it's a leftover from before their status
+        // changed — cancel it so they aren't billed for both.
         const staleKey = `${student.id}|${struct.name.trim().toLowerCase()}|${term || ''}|${academic_year || ''}`;
         const staleMatches = (staleByKey[staleKey] || []).filter(
           r => r.fee_structure_id !== struct.id
-            && r.fee_student_type && r.fee_student_type !== 'all'
-            && r.fee_student_type !== struct.student_type
+            && r.fee_student_type
+            && !feeAppliesToStudentType(r.fee_student_type, student.student_type)
         );
         if (staleMatches.length && !dry_run) {
           for (const stale of staleMatches) {
@@ -1050,7 +1058,7 @@ router.get('/student/:studentId', async (req, res) => {
       LEFT JOIN classes c ON c.id = fs.class_id
       WHERE fs.tenant_id = $1 AND fs.is_active = true
         AND (fs.class_id = $2 OR fs.class_id IS NULL)
-        AND (fs.student_type = 'all' OR fs.student_type = $3)
+        AND (fs.student_type = 'all' OR fs.student_type = $3 OR (fs.student_type = 'boarder' AND $3 = ANY(ARRAY['full_time_boarder','weekly_boarder'])))
         AND fs.academic_year = $4
         AND (fs.term IS NULL OR fs.term = $6)
         AND fs.extra_fee_id IS NULL
@@ -1475,7 +1483,7 @@ router.get('/expected/:studentId', async (req, res) => {
        LEFT JOIN classes c ON c.id = fs.class_id
        WHERE fs.tenant_id = $1 AND fs.is_active = true
          AND (fs.class_id = $2 OR fs.class_id IS NULL)
-         AND (fs.student_type = 'all' OR fs.student_type = $3)
+         AND (fs.student_type = 'all' OR fs.student_type = $3 OR (fs.student_type = 'boarder' AND $3 = ANY(ARRAY['full_time_boarder','weekly_boarder'])))
          AND fs.academic_year = $4
          AND (fs.term IS NULL OR fs.term = $6)
          AND fs.extra_fee_id IS NULL
@@ -1623,7 +1631,7 @@ router.post('/invoice/generate-for-student', requireRole(['admin']), async (req,
        LEFT JOIN extra_fees ef ON ef.id = fs.extra_fee_id AND ef.tenant_id = $1
        WHERE fs.tenant_id = $1 AND fs.is_active = true
          AND (fs.class_id = $2 OR fs.class_id IS NULL)
-         AND (fs.student_type = 'all' OR fs.student_type = $3)
+         AND (fs.student_type = 'all' OR fs.student_type = $3 OR (fs.student_type = 'boarder' AND $3 = ANY(ARRAY['full_time_boarder','weekly_boarder'])))
          AND fs.academic_year = $4
          AND (fs.term IS NULL OR fs.term = $6)
          AND (

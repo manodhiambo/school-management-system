@@ -10,12 +10,22 @@ import { Plus, Edit, Trash2, DollarSign, Bus, Users, Loader2, Eye, CheckCircle2,
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguageStore } from '@/store/languageStore';
+import { studentTypeLabel, isBoarder } from '@/utils/studentType';
 
 const STUDENT_TYPE_LABEL: Record<string, string> = {
   all: 'All Students',
   boarder: 'Boarders Only',
+  full_time_boarder: 'Full-Time Boarders',
+  weekly_boarder: 'Weekly Boarders',
   day_scholar: 'Day Scholars Only',
 };
+
+function feeTypeBadgeClass(type: string | undefined, shade: '700' | '800' = '800'): string {
+  if (type === 'weekly_boarder') return shade === '800' ? 'bg-indigo-100 text-indigo-800' : 'bg-indigo-100 text-indigo-700';
+  if (type === 'boarder' || type === 'full_time_boarder') return shade === '800' ? 'bg-purple-100 text-purple-800' : 'bg-purple-100 text-purple-700';
+  if (type === 'day_scholar') return shade === '800' ? 'bg-blue-100 text-blue-800' : 'bg-blue-100 text-blue-700';
+  return shade === '800' ? 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-600';
+}
 
 const EMPTY_FORM = {
   name: '',
@@ -254,7 +264,7 @@ export function FeeStructurePage() {
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Total Active')}</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{structures.filter(s => s.is_active).length}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Boarder Fees')}</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-purple-600">{structures.filter(s => s.student_type === 'boarder').length}</div></CardContent></Card>
+              <CardContent><div className="text-2xl font-bold text-purple-600">{structures.filter(s => isBoarder(s.student_type)).length}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Day Scholar Fees')}</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold text-blue-600">{structures.filter(s => s.student_type === 'day_scholar').length}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t('Transport Fees')}</CardTitle></CardHeader>
@@ -307,7 +317,7 @@ export function FeeStructurePage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge className={s.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : s.student_type === 'day_scholar' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}>
+                            <Badge className={feeTypeBadgeClass(s.student_type, '800')}>
                               {STUDENT_TYPE_LABEL[s.student_type] || 'All Students'}
                             </Badge>
                           </td>
@@ -396,7 +406,7 @@ export function FeeStructurePage() {
                       <p className="text-sm font-medium">{s.name}</p>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         <span className="text-xs text-gray-500">{fmt(s.amount)}</span>
-                        <Badge className={`text-xs px-1 py-0 ${s.student_type === 'boarder' ? 'bg-purple-100 text-purple-700' : s.student_type === 'day_scholar' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        <Badge className={`text-xs px-1 py-0 ${feeTypeBadgeClass(s.student_type, '700')}`}>
                           {STUDENT_TYPE_LABEL[s.student_type]}
                         </Badge>
                         {s.is_transport_fee && <Badge className="text-xs px-1 py-0 bg-orange-100 text-orange-700"><Bus className="h-2.5 w-2.5 mr-0.5" />Transport</Badge>}
@@ -488,8 +498,8 @@ export function FeeStructurePage() {
                             <div>
                               <span className="font-medium">{row.name}</span>
                               <span className="text-xs text-gray-400 ml-2">{row.class_name}</span>
-                              <Badge className={`ml-2 text-xs ${row.student_type === 'boarder' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                {row.student_type || 'day_scholar'}
+                              <Badge className={`ml-2 text-xs ${feeTypeBadgeClass(row.student_type, '700')}`}>
+                                {studentTypeLabel(row.student_type)}
                               </Badge>
                             </div>
                             <div className="text-right">
@@ -549,25 +559,28 @@ export function FeeStructurePage() {
               {/* Student Type */}
               <div>
                 <Label>{t('Student Type')}</Label>
-                <div className="flex gap-2 mt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
                   {[
-                    { value: 'all', label: 'All Students' },
-                    { value: 'day_scholar', label: 'Day Scholar' },
-                    { value: 'boarder', label: 'Boarder' },
+                    { value: 'all', label: 'All Students', color: 'bg-gray-700 text-white border-gray-700' },
+                    { value: 'day_scholar', label: 'Day Scholar', color: 'bg-blue-600 text-white border-blue-600' },
+                    { value: 'boarder', label: 'Boarder (Both)', color: 'bg-purple-600 text-white border-purple-600' },
+                    { value: 'full_time_boarder', label: 'Full-Time Boarder', color: 'bg-purple-600 text-white border-purple-600' },
+                    { value: 'weekly_boarder', label: 'Weekly Boarder', color: 'bg-indigo-600 text-white border-indigo-600' },
                   ].map(opt => (
                     <button key={opt.value} type="button"
                       onClick={() => handleChange('student_type', opt.value)}
-                      className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                      className={`py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
                         formData.student_type === opt.value
-                          ? opt.value === 'boarder' ? 'bg-purple-600 text-white border-purple-600'
-                            : opt.value === 'day_scholar' ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-gray-700 text-white border-gray-700'
+                          ? opt.color
                           : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
                       }`}>
                       {opt.label}
                     </button>
                   ))}
                 </div>
+                {formData.student_type === 'boarder' && (
+                  <p className="text-xs text-gray-400 mt-1">Applies to both full-time and weekly boarders. Use the specific options instead if the fee amount differs between them.</p>
+                )}
               </div>
 
               {/* Frequency */}

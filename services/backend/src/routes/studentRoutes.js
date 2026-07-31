@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import logger from '../utils/logger.js';
 import { syncStudentCategoryMemberships } from '../utils/studentCategories.js';
+import { STUDENT_TYPES } from '../utils/studentType.js';
 
 const router = express.Router();
 
@@ -271,6 +272,13 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       });
     }
 
+    if (!STUDENT_TYPES.includes(actualStudentType)) {
+      return res.status(400).json({
+        success: false,
+        message: `student_type must be one of: ${STUDENT_TYPES.join(', ')}`
+      });
+    }
+
     // Check if email exists
     const existing = await query('SELECT id FROM users WHERE email = $1', [actualEmail]);
     if (existing.length > 0) {
@@ -447,6 +455,13 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
       category_ids,
     } = req.body;
 
+    if (student_type && !STUDENT_TYPES.includes(student_type)) {
+      return res.status(400).json({
+        success: false,
+        message: `student_type must be one of: ${STUDENT_TYPES.join(', ')}`
+      });
+    }
+
     // Convert empty strings to null for UUID fields
     const actualClassId = (classId || class_id) || null;
     const actualParentId = (parentId || parent_id) || null;
@@ -533,10 +548,13 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
       [req.params.id, tid]
     );
 
-    // If boarder/day-scholar status changed, any still-unpaid invoice generated under the
-    // old status no longer applies (e.g. day-scholar fee left pending after becoming a boarder)
-    // — cancel it so the student isn't billed for both. Paid/partial invoices are left alone
-    // since real money has already moved and needs manual review.
+    // If boarding status changed (day-scholar / full-time boarder / weekly boarder), any
+    // still-unpaid invoice generated under the old status no longer applies (e.g. a
+    // day-scholar fee left pending after becoming a boarder) — cancel it so the student
+    // isn't billed for both. Paid/partial invoices are left alone since real money has
+    // already moved and needs manual review. 'boarder'-tagged fee structures are generic
+    // (apply to both boarder subtypes, see studentType.js) and must NOT be cancelled just
+    // because the student switched between full-time and weekly boarding.
     if (updated[0]?.student_type) {
       await query(
         `UPDATE fee_invoices fi SET status = 'cancelled', updated_at = NOW()
@@ -544,7 +562,8 @@ router.put('/:id', requireRole(['admin']), async (req, res) => {
          WHERE fi.fee_structure_id = fs.id
            AND fi.student_id = $1 AND fi.tenant_id = $2
            AND fi.status = 'pending'
-           AND fs.student_type NOT IN ('all', $3)`,
+           AND NOT (fs.student_type = 'all' OR fs.student_type = $3
+                     OR (fs.student_type = 'boarder' AND $3 = ANY(ARRAY['full_time_boarder','weekly_boarder'])))`,
         [req.params.id, tid, updated[0].student_type]
       );
     }

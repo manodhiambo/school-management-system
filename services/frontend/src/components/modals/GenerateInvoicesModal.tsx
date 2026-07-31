@@ -9,6 +9,7 @@ import {
   Loader2, Eye, Zap, Search, X,
 } from 'lucide-react';
 import api from '@/services/api';
+import { studentTypeLabel } from '@/utils/studentType';
 
 interface GenerateInvoicesModalProps {
   open: boolean;
@@ -248,7 +249,7 @@ export function GenerateInvoicesModal({ open, onOpenChange, onSuccess }: Generat
                           KES {Number(fs.amount).toLocaleString()}
                           {fs.class_name && <span className="ml-2 text-purple-600">· {fs.class_name}</span>}
                           {fs.student_type && fs.student_type !== 'all' && (
-                            <span className="ml-2 text-blue-500 capitalize">· {fs.student_type}</span>
+                            <span className="ml-2 text-blue-500">· {studentTypeLabel(fs.student_type)}</span>
                           )}
                           {fs.is_transport_fee && <span className="ml-2 text-orange-500">· Transport</span>}
                           {fs.frequency && <span className="ml-2 text-gray-300 capitalize">· {fs.frequency}</span>}

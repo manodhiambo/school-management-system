@@ -346,22 +346,24 @@ export function EditStudentModal({ open, onOpenChange, onSuccess, studentId }: E
                     <Label>Boarding Type *</Label>
                     <div className="flex gap-2 mt-1">
                       {[
-                        { value: 'day_scholar', label: 'Day Scholar' },
-                        { value: 'boarder', label: 'Boarder' },
+                        { value: 'day_scholar', label: 'Day Scholar', color: 'bg-blue-600 text-white border-blue-600' },
+                        { value: 'full_time_boarder', label: 'Full-Time Boarder', color: 'bg-purple-600 text-white border-purple-600' },
+                        { value: 'weekly_boarder', label: 'Weekly Boarder', color: 'bg-indigo-600 text-white border-indigo-600' },
                       ].map(opt => (
                         <button key={opt.value} type="button"
                           onClick={() => handleChange('student_type', opt.value)}
                           className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
                             formData.student_type === opt.value
-                              ? opt.value === 'boarder'
-                                ? 'bg-purple-600 text-white border-purple-600'
-                                : 'bg-blue-600 text-white border-blue-600'
+                              ? opt.color
                               : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
                           }`}>
                           {opt.label}
                         </button>
                       ))}
                     </div>
+                    {formData.student_type === 'weekly_boarder' && (
+                      <p className="text-xs text-gray-400 mt-1">Boards Monday to Friday, goes home for the weekend.</p>
+                    )}
                   </div>
                   <div className="md:col-span-2">
                     <Label className="flex items-center gap-1"><Bus className="h-4 w-4 text-orange-500" /> School Transport</Label>

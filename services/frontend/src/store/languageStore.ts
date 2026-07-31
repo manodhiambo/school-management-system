@@ -135,6 +135,8 @@ const translations: Record<string, Record<Lang, string>> = {
   'Admission Number':   { en: 'Admission Number',       sw: 'Nambari ya Usajili' },
   'Student Type':       { en: 'Student Type',           sw: 'Aina ya Mwanafunzi' },
   'Boarder':            { en: 'Boarder',                sw: 'Mwanafunzi wa Bweni' },
+  'Full-Time Boarder':  { en: 'Full-Time Boarder',      sw: 'Mwanafunzi wa Bweni (Wiki Nzima)' },
+  'Weekly Boarder':     { en: 'Weekly Boarder',         sw: 'Mwanafunzi wa Bweni (Wikiani)' },
   'Day Scholar':        { en: 'Day Scholar',            sw: 'Mwanafunzi wa Nje' },
   'Uses Transport':     { en: 'Uses Transport',         sw: 'Anatumia Usafiri' },
   'All Students':       { en: 'All Students',           sw: 'Wanafunzi Wote' },

@@ -68,6 +68,81 @@ async function findOrCreateDemoTenant() {
   return created[0];
 }
 
+// Discovers every table that (directly or transitively) has a foreign key
+// pointing at one of `rootTables`, and deletes its tenant-scoped rows in
+// dependency order (deepest descendants first) BEFORE the caller deletes
+// the root tables themselves. This is what actually failed before: the
+// explicit DELETE FROM teachers below has no idea an `assignments` table
+// (or any of the ~30 other tables that reference students/teachers/
+// classes/subjects) exists, so any FK violation there aborted the whole
+// reset and left the tenant half-wiped (this is the exact bug behind the
+// "My Fees: student not found" report on 2026-07-28 — the reset had
+// silently been failing every night since, so students were deleted but
+// never re-seeded). Reading the FK graph from information_schema instead
+// of hand-listing tables means a newly added table can never reintroduce
+// this failure mode.
+async function wipeTenantRowsReferencing(tenantId, rootTables) {
+  const fkRows = await query(`
+    SELECT tc.table_name AS child_table, kcu.column_name AS child_column, ccu.table_name AS parent_table
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+    JOIN information_schema.constraint_column_usage ccu
+      ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
+    WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
+      AND tc.table_name != ccu.table_name
+  `);
+
+  // Indexed by PARENT table: childrenOf['teachers'] = every FK edge whose
+  // referenced table is 'teachers' (i.e. every table that points AT it).
+  const childrenOf = {};
+  for (const r of fkRows) {
+    (childrenOf[r.parent_table] ||= []).push(r);
+  }
+
+  // Post-order DFS from the root tables: every descendant is visited (and
+  // pushed to `order`) before the table that references it, so `order`
+  // lists deepest descendants first, root tables last.
+  const rootSet = new Set(rootTables);
+  const visited = new Set();
+  const order = [];
+  const scopeOf = {}; // table -> { column, parent } — the FK edge used to reach it
+  function visit(table, viaColumn, viaParent) {
+    if (visited.has(table)) return;
+    visited.add(table);
+    if (viaColumn) scopeOf[table] = { column: viaColumn, parent: viaParent };
+    for (const fk of (childrenOf[table] || [])) {
+      visit(fk.child_table, fk.child_column, table);
+    }
+    order.push(table);
+  }
+  for (const t of rootTables) visit(t);
+
+  // Builds "<table>.<col> IN (SELECT id FROM <parent> WHERE <parent's own
+  // scope>)" recursively, bottoming out at a root table's tenant_id — NOT
+  // at the immediate parent's tenant_id, which most non-root tables don't
+  // have. Memoized since the same parent chain is reused by many siblings.
+  const scopeSqlCache = {};
+  function scopeSql(table) {
+    if (scopeSqlCache[table]) return scopeSqlCache[table];
+    const sql = rootSet.has(table)
+      ? `"${table}".tenant_id = $1`
+      : (() => {
+          const { column, parent } = scopeOf[table];
+          return `"${table}"."${column}" IN (SELECT id FROM "${parent}" WHERE ${scopeSql(parent)})`;
+        })();
+    scopeSqlCache[table] = sql;
+    return sql;
+  }
+
+  for (const table of order) {
+    if (rootSet.has(table)) continue; // caller deletes root tables itself
+    await query(`DELETE FROM "${table}" WHERE ${scopeSql(table)}`, [tenantId]).catch(err => {
+      logger.warn(`Demo wipe: could not clear "${table}" — ${err.message}`);
+    });
+  }
+}
+
 async function wipeDemoTenantData(tenantId) {
   await query('DELETE FROM exam_results WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM exams WHERE tenant_id = $1', [tenantId]);
@@ -85,6 +160,11 @@ async function wipeDemoTenantData(tenantId) {
     'DELETE FROM parent_students WHERE student_id IN (SELECT id FROM students WHERE tenant_id = $1)',
     [tenantId]
   );
+  // Clears every table that references teachers/students/classes/subjects/
+  // parents/users (assignments, timetable, library_members, payroll_entries,
+  // exam_attempts, staff_leave_requests, and everything else the FK graph
+  // turns up) before the explicit deletes below run.
+  await wipeTenantRowsReferencing(tenantId, ['teachers', 'students', 'classes', 'subjects', 'parents', 'users']);
   await query('DELETE FROM students WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM parents WHERE tenant_id = $1', [tenantId]);
   await query('DELETE FROM teachers WHERE tenant_id = $1', [tenantId]);

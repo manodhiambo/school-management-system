@@ -15,6 +15,7 @@ import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguageStore } from '@/store/languageStore';
 import { jsPDF } from 'jspdf';
+import { studentTypeLabel, studentTypeBadgeClass } from '@/utils/studentType';
 
 interface Student {
   id: string;
@@ -52,7 +53,7 @@ function exportToExcel(rows: Student[], filename: string, className?: string) {
     `${s.first_name} ${s.last_name}`,
     s.gender,
     s.class_name || (className ?? '—'),
-    s.student_type === 'boarder' ? 'Boarder' : 'Day Scholar',
+    studentTypeLabel(s.student_type),
     s.uses_transport ? 'Yes' : 'No',
     s.phone || '—',
     s.status,
@@ -123,7 +124,7 @@ async function exportToPDF(rows: Student[], filename: string, title: string) {
       name.length > 20 ? name.slice(0, 20) + '…' : name,
       s.gender || '—',
       (s.class_name || '—').slice(0, 14),
-      s.student_type === 'boarder' ? 'Boarder' : 'Day Scholar',
+      studentTypeLabel(s.student_type),
       s.uses_transport ? 'Yes' : 'No',
       (s.phone || '—').slice(0, 12),
       s.status,
@@ -328,8 +329,8 @@ export function StudentsPage() {
                           <td className="p-4 hidden md:table-cell">{student.class_name || '—'}</td>
                           <td className="p-4 hidden md:table-cell">
                             <div className="flex flex-col gap-1">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${student.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                                {student.student_type === 'boarder' ? t('Boarder') : t('Day Scholar')}
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${studentTypeBadgeClass(student.student_type)}`}>
+                                {t(studentTypeLabel(student.student_type))}
                               </span>
                               {student.uses_transport && (
                                 <span className="flex items-center gap-0.5 text-xs text-orange-600 font-medium">
@@ -435,8 +436,8 @@ export function StudentsPage() {
                             <td className="px-4 py-3 capitalize">{s.gender}</td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col gap-1">
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${s.student_type === 'boarder' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                                  {s.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${studentTypeBadgeClass(s.student_type)}`}>
+                                  {studentTypeLabel(s.student_type)}
                                 </span>
                                 {s.uses_transport && (
                                   <span className="flex items-center gap-0.5 text-xs text-orange-600 font-medium">

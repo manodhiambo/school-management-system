@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import apiService from '../../services/api';
 import financeService from '../../services/financeService';
+import { studentTypeLabel, isBoarder } from '../../utils/studentType';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const api: any = apiService;
@@ -905,8 +906,8 @@ export const Reports: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 text-gray-600">{d.class_name || '—'}</td>
                             <td className="px-4 py-3">
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${d.student_type === 'boarder' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                {d.student_type || 'day scholar'}
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${isBoarder(d.student_type) ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {studentTypeLabel(d.student_type)}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right">{fmt(d.total_invoiced)}</td>
@@ -1011,8 +1012,8 @@ export const Reports: React.FC = () => {
                               </td>
                               <td className="px-4 py-3 text-gray-600">{s.class_name || '—'}</td>
                               <td className="px-4 py-3">
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${s.student_type === 'boarder' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                  {s.student_type || 'day scholar'}
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${isBoarder(s.student_type) ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {studentTypeLabel(s.student_type)}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-right">{fmt(s.total_invoiced)}</td>

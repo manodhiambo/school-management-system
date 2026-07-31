@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, Edit, Trash2, Users, Loader2, Search, CheckSquare, Square, X } from 'lucide-react';
 import api from '@/services/api';
 import { EDUCATION_LEVELS, getEducationLevelLabel } from '@/utils/cbeGrades';
+import { studentTypeLabel } from '@/utils/studentType';
 
 const GRADE_NUMBERS = Array.from({ length: 13 }, (_, i) => i); // 0 (playgroup) .. 12
 
@@ -42,7 +43,7 @@ function criteriaSummary(criteria: Record<string, any> | null | undefined, class
   if (criteria.grade_number !== undefined && criteria.grade_number !== null) {
     chips.push(criteria.grade_number === 0 ? 'Playgroup (grade 0)' : `Grade ${criteria.grade_number}`);
   }
-  if (criteria.student_type) chips.push(criteria.student_type === 'boarder' ? 'Boarders' : 'Day Scholars');
+  if (criteria.student_type) chips.push(studentTypeLabel(criteria.student_type));
   if (criteria.gender) chips.push(criteria.gender === 'male' ? 'Male' : 'Female');
   if (criteria.special_needs !== undefined) chips.push(criteria.special_needs ? 'Special Needs' : 'No Special Needs');
   if (criteria.class_id) {
@@ -380,7 +381,8 @@ export function StudentCategoriesPage() {
                       <Select value={formData.student_type} onChange={e => handleChange('student_type', e.target.value)}>
                         <option value="">Any</option>
                         <option value="day_scholar">Day Scholar</option>
-                        <option value="boarder">Boarder</option>
+                        <option value="full_time_boarder">Full-Time Boarder</option>
+                        <option value="weekly_boarder">Weekly Boarder</option>
                       </Select>
                     </div>
                     <div>

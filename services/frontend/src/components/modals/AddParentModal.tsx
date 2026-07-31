@@ -7,6 +7,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { X, Check, Search } from 'lucide-react';
 import api from '@/services/api';
+import { isBoarder, studentTypeLabel } from '@/utils/studentType';
 
 interface AddParentModalProps {
   open: boolean;
@@ -299,7 +300,7 @@ export function AddParentModal({ open, onOpenChange, onSuccess }: AddParentModal
                                 <p className="text-sm font-medium">{student.first_name} {student.last_name}</p>
                                 <p className="text-xs text-gray-500">
                                   {student.admission_number}{student.class_name ? ` • ${student.class_name}` : ''}
-                                  {student.student_type === 'boarder' ? ' • Boarder' : ''}
+                                  {isBoarder(student.student_type) ? ` • ${studentTypeLabel(student.student_type)}` : ''}
                                 </p>
                               </div>
                               <div className={`h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${

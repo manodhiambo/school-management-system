@@ -7,6 +7,7 @@ import { Search, FileText, Loader2 } from 'lucide-react';
 import api from '@/services/api';
 import { jsPDF } from 'jspdf';
 import { renderReportCardPage } from '@/pages/cbc/CbcReportCardPage';
+import { studentTypeLabel } from '@/utils/studentType';
 
 // Same CBE grading scheme as the backend's computeCBEGrade (cbcRoutes.js) — recomputed
 // here from raw exam marks so results shown on this report always match the school's
@@ -310,7 +311,7 @@ export function StudentReportPage() {
               </div>
               <div>
                 <div className="font-medium text-blue-900">{selectedStudent.first_name} {selectedStudent.last_name}</div>
-                <div className="text-xs text-blue-600">{selectedStudent.admission_number} · {selectedStudent.class_name || 'No class'} · {selectedStudent.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}</div>
+                <div className="text-xs text-blue-600">{selectedStudent.admission_number} · {selectedStudent.class_name || 'No class'} · {studentTypeLabel(selectedStudent.student_type)}</div>
               </div>
             </div>
           )}

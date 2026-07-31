@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { X, Camera, ChevronRight, ChevronLeft, Check, Bus } from 'lucide-react';
 import api from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';
+import { studentTypeLabel } from '@/utils/studentType';
 
 // ── static data ────────────────────────────────────────────────────────────────
 
@@ -379,10 +380,14 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
           value={form.student_type}
           onChange={v => set('student_type', v)}
           options={[
-            { value: 'day_scholar', label: 'Day Scholar', color: 'bg-blue-600 text-white border-blue-600' },
-            { value: 'boarder',     label: 'Boarder',     color: 'bg-purple-600 text-white border-purple-600' },
+            { value: 'day_scholar',       label: 'Day Scholar',        color: 'bg-blue-600 text-white border-blue-600' },
+            { value: 'full_time_boarder', label: 'Full-Time Boarder',  color: 'bg-purple-600 text-white border-purple-600' },
+            { value: 'weekly_boarder',    label: 'Weekly Boarder',     color: 'bg-indigo-600 text-white border-indigo-600' },
           ]}
         />
+        {form.student_type === 'weekly_boarder' && (
+          <p className="text-xs text-gray-400 mt-1">Boards Monday to Friday, goes home for the weekend.</p>
+        )}
       </div>
 
       {categories.length > 0 && (
@@ -733,7 +738,7 @@ export default function AddStudentModal({ open, onOpenChange, onSuccess }: Props
         <p><span className="text-gray-500">Student:</span> {form.firstName} {form.lastName}</p>
         <p><span className="text-gray-500">Admission No:</span> {form.admissionNumber || 'Auto-generated'}</p>
         <p><span className="text-gray-500">Class:</span> {classes.find(c => c.id === form.classId)?.name || '—'}</p>
-        <p><span className="text-gray-500">Type:</span> {form.student_type === 'boarder' ? 'Boarder' : 'Day Scholar'}{form.uses_transport ? ' · Uses Transport' : ''}</p>
+        <p><span className="text-gray-500">Type:</span> {studentTypeLabel(form.student_type)}{form.uses_transport ? ' · Uses Transport' : ''}</p>
         {form.county && <p><span className="text-gray-500">County:</span> {form.county}</p>}
         {form.parentMode === 'new' && form.newParent.firstName && (
           <p><span className="text-gray-500">Parent:</span> {form.newParent.firstName} {form.newParent.lastName} ({form.newParent.phonePrimary})</p>

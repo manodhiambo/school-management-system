@@ -305,6 +305,13 @@ router.get('/rfqs/:id', async (req, res) => {
 router.post('/rfqs', async (req, res) => {
   const { title, description, deadline, pr_id, evaluation_criteria, supplier_ids = [] } = req.body;
   const t = tid(req);
+  if (pr_id) {
+    const { rows: prRows } = await pool.query(`SELECT status FROM proc_purchase_requisitions WHERE id=$1 AND tenant_id=$2`, [pr_id, t]);
+    if (!prRows.length) return res.status(404).json({ error: 'Purchase requisition not found' });
+    if (!['approved', 'converted_to_rfq'].includes(prRows[0].status)) {
+      return res.status(400).json({ error: 'Purchase requisition must be approved before it can be sent out for quotes' });
+    }
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -432,8 +439,19 @@ router.get('/orders/:id', async (req, res) => {
 
 router.post('/orders', async (req, res) => {
   const { supplier_id, pr_id, rfq_id, quotation_id, delivery_date, payment_terms, delivery_terms,
-    currency, notes, items = [] } = req.body;
+    currency, notes, department, items = [] } = req.body;
   const t = tid(req);
+
+  let resolvedDepartment = department || null;
+  if (pr_id) {
+    const { rows: prRows } = await pool.query(`SELECT status, department FROM proc_purchase_requisitions WHERE id=$1 AND tenant_id=$2`, [pr_id, t]);
+    if (!prRows.length) return res.status(404).json({ error: 'Purchase requisition not found' });
+    if (!['approved', 'converted_to_rfq', 'converted_to_po'].includes(prRows[0].status)) {
+      return res.status(400).json({ error: 'Purchase requisition must be approved before a purchase order can be raised against it' });
+    }
+    resolvedDepartment = resolvedDepartment || prRows[0].department;
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -449,10 +467,10 @@ router.post('/orders', async (req, res) => {
     const total = subtotal + vat;
     const { rows } = await client.query(
       `INSERT INTO proc_purchase_orders (tenant_id,po_number,supplier_id,pr_id,rfq_id,quotation_id,
-        delivery_date,subtotal,vat_amount,total_amount,currency,payment_terms,delivery_terms,notes,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        delivery_date,subtotal,vat_amount,total_amount,currency,payment_terms,delivery_terms,notes,department,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [t, poNum, supplier_id, pr_id || null, rfq_id || null, quotation_id || null,
-        delivery_date, subtotal, vat, total, currency || 'KES', payment_terms, delivery_terms, notes, uid(req)]
+        delivery_date, subtotal, vat, total, currency || 'KES', payment_terms, delivery_terms, notes, resolvedDepartment, uid(req)]
     );
     const poId = rows[0].id;
     for (const item of processedItems) {
@@ -570,10 +588,14 @@ router.post('/grn', async (req, res) => {
   try {
     await client.query('BEGIN');
     const num = await nextSeq(client, t, 'proc_grn', 'grn_number', 'GRN');
-    const poRow = await client.query(`SELECT supplier_id FROM proc_purchase_orders WHERE id=$1 AND tenant_id=$2`, [po_id, t]);
+    const poRow = await client.query(`SELECT supplier_id, status FROM proc_purchase_orders WHERE id=$1 AND tenant_id=$2`, [po_id, t]);
     if (!poRow.rows.length) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Purchase order not found' });
+    }
+    if (!['approved', 'sent', 'partially_delivered'].includes(poRow.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Goods can only be received against an approved purchase order' });
     }
     const supplierId = poRow.rows[0].supplier_id;
     const { rows } = await client.query(
@@ -583,11 +605,43 @@ router.post('/grn', async (req, res) => {
     );
     const grnId = rows[0].id;
     for (const item of items) {
+      // Stock the good-condition received quantity into central inventory,
+      // matching an existing item by name (case-insensitive) or creating one,
+      // so goods received via procurement immediately show up in Inventory —
+      // ready to be issued out to a department via Store Requisitions.
+      let matchedItemId = null;
+      const receivedQty = Number(item.received_qty || 0);
+      if (receivedQty > 0 && (item.condition || 'good') === 'good') {
+        const existing = await client.query(
+          `SELECT id, quantity FROM inventory_items WHERE tenant_id=$1 AND LOWER(name)=LOWER($2)`,
+          [t, item.item_name]
+        );
+        if (existing.rows.length) {
+          matchedItemId = existing.rows[0].id;
+          await client.query(
+            `UPDATE inventory_items SET quantity = quantity + $1, updated_at = NOW() WHERE id=$2 AND tenant_id=$3`,
+            [receivedQty, matchedItemId, t]
+          );
+        } else {
+          const created = await client.query(
+            `INSERT INTO inventory_items (tenant_id, name, unit, quantity, unit_cost, condition)
+             VALUES ($1,$2,$3,$4,$5,'good') RETURNING id`,
+            [t, item.item_name, item.unit || 'pieces', receivedQty, 0]
+          );
+          matchedItemId = created.rows[0].id;
+        }
+        await client.query(
+          `INSERT INTO inventory_transactions (tenant_id, item_id, type, quantity, reference, notes, created_by)
+           VALUES ($1,$2,'stock_in',$3,$4,$5,$6)`,
+          [t, matchedItemId, receivedQty, num, `Received via GRN against PO`, uid(req)]
+        );
+      }
+
       await client.query(
-        `INSERT INTO proc_grn_items (grn_id,po_item_id,item_name,ordered_qty,received_qty,rejected_qty,unit,condition,remarks)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO proc_grn_items (grn_id,po_item_id,item_name,ordered_qty,received_qty,rejected_qty,unit,condition,remarks,matched_inventory_item_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [grnId, item.po_item_id || null, item.item_name, item.ordered_qty || 0,
-          item.received_qty, item.rejected_qty || 0, item.unit, item.condition || 'good', item.remarks]
+          item.received_qty, item.rejected_qty || 0, item.unit, item.condition || 'good', item.remarks, matchedItemId]
       );
       if (item.po_item_id) {
         await client.query(

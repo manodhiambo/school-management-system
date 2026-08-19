@@ -12,3 +12,4 @@ export { ProcurementPlanning } from './ProcurementPlanning';
 export { ProcurementReports } from './ProcurementReports';
 export { ProcurementAuditPage } from './ProcurementAuditPage';
 export { AssetManagement } from './AssetManagement';
+export { StoreRequisitions } from './StoreRequisitions';

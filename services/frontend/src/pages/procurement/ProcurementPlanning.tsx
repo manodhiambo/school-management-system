@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import procurementService from '../../services/procurementService';
+import { DEPARTMENTS as BASE_DEPARTMENTS } from '../../constants/departments';
 
-const DEPARTMENTS = ['Administration', 'ICT', 'Science', 'Mathematics', 'Languages', 'Social Studies',
-  'Humanities', 'Technical', 'Sports', 'Library', 'Health', 'Transport', 'Accounts', 'Maintenance', 'All Departments'];
+const DEPARTMENTS = [...BASE_DEPARTMENTS, 'All Departments'];
 
 const statusColor = (s: string) => ({
   draft: 'bg-gray-100 text-gray-700', approved: 'bg-green-100 text-green-800',

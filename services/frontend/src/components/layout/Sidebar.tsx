@@ -52,6 +52,7 @@ import {
   Boxes,
   ClipboardCheck,
   FileSearch,
+  PackageCheck,
   Shirt,
   Utensils,
   Wrench,
@@ -151,6 +152,7 @@ const navigationItems: NavItem[] = [
   // ── Procurement ───────────────────────────────────────────────────────────
   { name: 'Procurement',       href: '/app/procurement',                    icon: ShoppingCart,  roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance', badge: 'New' },
   { name: 'Requisitions',      href: '/app/procurement/requisitions',       icon: ClipboardList, roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
+  { name: 'Store Requisitions', href: '/app/store-requisitions',            icon: PackageCheck,  roles: ['admin', 'finance_officer', 'teacher', 'technician', 'security'], section: 'Procurement', module: 'inventory' },
   { name: 'Suppliers',         href: '/app/procurement/suppliers',          icon: Building2,     roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
   { name: 'RFQs',              href: '/app/procurement/rfqs',              icon: FileSearch,    roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },
   { name: 'Quotations',        href: '/app/procurement/quotations',         icon: FileText,      roles: ['admin', 'finance_officer'], section: 'Procurement', module: 'finance' },

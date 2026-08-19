@@ -164,6 +164,7 @@ import {
   ProcurementReports,
   ProcurementAuditPage,
   AssetManagement,
+  StoreRequisitions,
 } from './pages/procurement';
 
 // Shared Pages
@@ -310,6 +311,7 @@ function App() {
               <Route path="audit-log" element={<RoleRoute allowedRoles={['admin']}><AuditLogPage /></RoleRoute>} />
               <Route path="fee-reminders" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FeeRemindersPage /></RoleRoute>} />
               <Route path="inventory" element={<RoleRoute allowedRoles={['admin']}><InventoryPage /></RoleRoute>} />
+              <Route path="store-requisitions" element={<RoleRoute allowedRoles={['admin', 'finance_officer', 'teacher', 'technician', 'security']}><StoreRequisitions /></RoleRoute>} />
               <Route path="term-reports" element={<RoleRoute allowedRoles={['admin', 'teacher']}><TermReportsPage /></RoleRoute>} />
               <Route path="nemis" element={<RoleRoute allowedRoles={['admin']}><NemisPage /></RoleRoute>} />
               <Route path="exam-analytics" element={<ExamAnalyticsPage />} />

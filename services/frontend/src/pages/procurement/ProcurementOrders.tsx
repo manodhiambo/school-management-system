@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, XMarkIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import procurementService from '../../services/procurementService';
+import { DEPARTMENTS } from '../../constants/departments';
 
 const statusColor = (s: string) => ({
   draft: 'bg-gray-100 text-gray-700', pending_approval: 'bg-yellow-100 text-yellow-800',
@@ -18,7 +19,7 @@ export const ProcurementOrders: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [detail, setDetail] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState('');
-  const [form, setForm] = useState({ supplier_id: '', delivery_date: '', payment_terms: '', delivery_terms: '', currency: 'KES', notes: '' });
+  const [form, setForm] = useState({ supplier_id: '', department: '', delivery_date: '', payment_terms: '', delivery_terms: '', currency: 'KES', notes: '' });
   const [items, setItems] = useState([{ ...emptyItem }]);
 
   const load = () => {
@@ -50,7 +51,7 @@ export const ProcurementOrders: React.FC = () => {
     e.preventDefault();
     try {
       await procurementService.createOrder({ ...form, items });
-      setShowModal(false); setForm({ supplier_id: '', delivery_date: '', payment_terms: '', delivery_terms: '', currency: 'KES', notes: '' }); setItems([{ ...emptyItem }]); load();
+      setShowModal(false); setForm({ supplier_id: '', department: '', delivery_date: '', payment_terms: '', delivery_terms: '', currency: 'KES', notes: '' }); setItems([{ ...emptyItem }]); load();
     } catch (err: any) { alert(err.response?.data?.error || 'Failed'); }
   };
 
@@ -92,17 +93,18 @@ export const ProcurementOrders: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
-            <tr>{['PO #', 'Supplier', 'PO Date', 'Delivery Date', 'Subtotal', 'VAT', 'Total (KES)', 'Status', 'Actions'].map(h => (
+            <tr>{['PO #', 'Supplier', 'Department', 'PO Date', 'Delivery Date', 'Subtotal', 'VAT', 'Total (KES)', 'Status', 'Actions'].map(h => (
               <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
             ))}</tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading ? <tr><td colSpan={9} className="text-center py-8 text-gray-400">Loading...</td></tr> :
-              orders.length === 0 ? <tr><td colSpan={9} className="text-center py-8 text-gray-400">No purchase orders</td></tr> :
+            {loading ? <tr><td colSpan={10} className="text-center py-8 text-gray-400">Loading...</td></tr> :
+              orders.length === 0 ? <tr><td colSpan={10} className="text-center py-8 text-gray-400">No purchase orders</td></tr> :
               orders.map(o => (
                 <tr key={o.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-mono text-blue-600 cursor-pointer hover:underline" onClick={() => openDetail(o.id)}>{o.po_number}</td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{o.supplier_name}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{o.department || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{o.po_date?.slice(0, 10)}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{o.delivery_date?.slice(0, 10) || '—'}</td>
                   <td className="px-4 py-3 text-sm">{Number(o.subtotal).toLocaleString()}</td>
@@ -134,8 +136,9 @@ export const ProcurementOrders: React.FC = () => {
               <button onClick={() => setDetail(null)}><XMarkIcon className="h-5 w-5 text-gray-400" /></button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-4 gap-4 text-sm">
                 <div><span className="text-gray-500">Status:</span> <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(detail.status)}`}>{detail.status.replace(/_/g, ' ')}</span></div>
+                <div><span className="text-gray-500">Department:</span> <span className="ml-1 font-medium">{detail.department || '—'}</span></div>
                 <div><span className="text-gray-500">PO Date:</span> <span className="ml-1 font-medium">{detail.po_date?.slice(0, 10)}</span></div>
                 <div><span className="text-gray-500">Delivery:</span> <span className="ml-1 font-medium">{detail.delivery_date?.slice(0, 10) || '—'}</span></div>
               </div>
@@ -193,6 +196,13 @@ export const ProcurementOrders: React.FC = () => {
                   <select required value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                     <option value="">Select supplier</option>
                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplier_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="">Select department</option>
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div>

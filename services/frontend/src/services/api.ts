@@ -1926,6 +1926,18 @@ class ApiService {
   getLowStockItems() { return this.api.get('/inventory/low-stock'); }
   getInventoryValuation() { return this.api.get('/inventory/valuation'); }
 
+  // ── Store Requisitions & Issues (department stock movement) ─────────────────
+  getDepartmentsList() { return this.api.get('/inventory/departments'); }
+  getStoreRequisitions(params?: any) { return this.api.get('/inventory/store-requisitions', { params }); }
+  getStoreRequisition(id: string) { return this.api.get('/inventory/store-requisitions/' + id); }
+  createStoreRequisition(data: any) { return this.api.post('/inventory/store-requisitions', data); }
+  approveStoreRequisition(id: string) { return this.api.put('/inventory/store-requisitions/' + id + '/approve', {}); }
+  rejectStoreRequisition(id: string, comments?: string) { return this.api.put('/inventory/store-requisitions/' + id + '/reject', { comments }); }
+  issueStoreRequisition(id: string, items: any[]) { return this.api.post('/inventory/store-requisitions/' + id + '/issue', { items }); }
+  getStoreIssues(params?: any) { return this.api.get('/inventory/store-issues', { params }); }
+  createStoreIssue(data: any) { return this.api.post('/inventory/store-issues', data); }
+  confirmStoreIssueReceipt(id: string, data: any) { return this.api.put('/inventory/store-issues/' + id + '/confirm-receipt', data); }
+
   // ── WhatsApp ──────────────────────────────────────────────────────────────
   getWhatsAppConfig() { return this.api.get('/whatsapp/config'); }
   saveWhatsAppConfig(data: any) { return this.api.put('/whatsapp/config', data); }

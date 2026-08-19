@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, XMarkIcon, TrashIcon, CheckIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import procurementService from '../../services/procurementService';
+import { DEPARTMENTS } from '../../constants/departments';
 
 const urgencyColor = (u: string) => ({ low: 'bg-gray-100 text-gray-700', medium: 'bg-blue-100 text-blue-700', high: 'bg-orange-100 text-orange-700', emergency: 'bg-red-100 text-red-800' }[u] || 'bg-gray-100 text-gray-700');
 const statusColor = (s: string) => ({
@@ -9,9 +10,6 @@ const statusColor = (s: string) => ({
   rejected: 'bg-red-100 text-red-800', converted_to_rfq: 'bg-purple-100 text-purple-700',
   converted_to_po: 'bg-indigo-100 text-indigo-700', cancelled: 'bg-gray-100 text-gray-500',
 }[s] || 'bg-gray-100 text-gray-700');
-
-const DEPARTMENTS = ['Administration', 'ICT', 'Science', 'Mathematics', 'Languages', 'Social Studies',
-  'Humanities', 'Technical', 'Sports', 'Library', 'Health', 'Transport', 'Accounts', 'Maintenance'];
 
 const emptyItem = { item_name: '', quantity: 1, unit: '', estimated_unit_cost: 0, specifications: '' };
 

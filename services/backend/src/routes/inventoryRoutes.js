@@ -1,4 +1,5 @@
 import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
 import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { generateQrDataUrl, generateBarcodeValue } from '../utils/codeGenerator.js';
@@ -14,6 +15,57 @@ function adminOnly(req, res, next) {
     return res.status(403).json({ success: false, message: 'Admin only' });
   }
   next();
+}
+
+// Fires a notification to every admin/finance_officer in the tenant the moment
+// an item's quantity crosses from above to at-or-below its reorder level, so
+// stock issued out to any department (or sold, damaged, adjusted down) gets
+// flagged once rather than on every subsequent dip. Non-fatal: a notification
+// failure must never block the stock movement that triggered it.
+async function notifyLowStockIfCrossed(tenantId, item, previousQty, newQty) {
+  const reorderLevel = parseFloat(item.reorder_level) || 0;
+  const justCrossed = previousQty > reorderLevel && newQty <= reorderLevel;
+  if (!justCrossed) return;
+  try {
+    const recipients = await query(
+      `SELECT id FROM users WHERE tenant_id = $1 AND role IN ('admin','finance_officer') AND is_active = TRUE`,
+      [tenantId]
+    );
+    const title = 'Low Stock Alert';
+    const message = `${item.name} is at ${newQty} ${item.unit || 'units'} — at or below its reorder level of ${reorderLevel}.`;
+    for (const r of recipients) {
+      await query(
+        `INSERT INTO notifications (id, tenant_id, user_id, title, message, type, is_read)
+         VALUES ($1,$2,$3,$4,$5,'low_stock',FALSE)`,
+        [uuidv4(), tenantId, r.id, title, message]
+      );
+    }
+  } catch (e) { logger.error('Low stock notification error:', e); }
+}
+
+// Shared department list — kept broad enough to cover a typical Kenyan
+// school's operational departments (mirrors services/frontend's
+// src/constants/departments.ts, which must be kept in sync).
+const DEPARTMENTS = [
+  'Administration', 'ICT', 'Science', 'Mathematics', 'Languages', 'Social Studies',
+  'Humanities', 'Technical', 'Sports', 'Library', 'Health', 'Transport', 'Accounts',
+  'Maintenance', 'Boarding/Hostel', 'Kitchen & Feeding', 'Security', 'Store',
+];
+
+// COUNT(*)+1 numbering collides under concurrent creation (the same bug
+// already hit proc_purchase_requisitions.pr_number and proc_assets.asset_tag
+// before those were fixed with a retry loop) — check-and-retry instead of
+// trusting the count to still be accurate by the time we insert.
+async function nextInventorySeq(tenantId, table, column, prefix) {
+  const rows = await query(`SELECT COUNT(*) AS cnt FROM ${table} WHERE tenant_id = $1`, [tenantId]);
+  let n = Number(rows[0].cnt) + 1;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = `${prefix}-${String(n).padStart(6, '0')}`;
+    const existing = await query(`SELECT 1 FROM ${table} WHERE tenant_id = $1 AND ${column} = $2`, [tenantId, candidate]);
+    if (!existing.length) return candidate;
+    n++;
+  }
+  throw new Error(`Could not generate a unique ${column} after 10 attempts`);
 }
 
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -226,6 +278,8 @@ router.post('/items/:id/transaction', adminOnly, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [tid, req.params.id, type, parseFloat(quantity), reference || null, notes || null, req.user.id]
     );
+
+    await notifyLowStockIfCrossed(tid, item, parseFloat(item.quantity), newQuantity);
 
     res.status(201).json({ success: true, data: { item: updatedItem[0], transaction: txRows[0] } });
   } catch (err) {
@@ -596,6 +650,337 @@ router.get('/issuances/replacement-charges', async (req, res) => {
     res.json({ success: true, data: rows });
   } catch (err) {
     logger.error('Get replacement charges error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── DEPARTMENTS (shared list for dropdowns) ───────────────────────────────────
+
+router.get('/departments', (req, res) => {
+  res.json({ success: true, data: DEPARTMENTS });
+});
+
+// ─── STORE REQUISITIONS (a department requests stock already in the store) ────
+// Distinct from Purchase Requisitions (proc_purchase_requisitions), which buy
+// NEW stock from a supplier. This is for stock that already exists centrally.
+
+// GET /store-requisitions
+router.get('/store-requisitions', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { status, department, mine } = req.query;
+    let sql = `SELECT r.*, CONCAT(u.first_name,' ',u.last_name) AS requester_name,
+                      CONCAT(a.first_name,' ',a.last_name) AS approver_name,
+                      (SELECT COUNT(*) FROM store_requisition_items i WHERE i.requisition_id = r.id) AS item_count
+               FROM store_requisitions r
+               LEFT JOIN users u ON u.id = r.requested_by
+               LEFT JOIN users a ON a.id = r.approved_by
+               WHERE r.tenant_id = $1`;
+    const params = [tid];
+    if (status) { params.push(status); sql += ` AND r.status = $${params.length}`; }
+    if (department) { params.push(department); sql += ` AND r.department = $${params.length}`; }
+    if (mine === 'true') { params.push(req.user.id); sql += ` AND r.requested_by = $${params.length}`; }
+    sql += ' ORDER BY r.created_at DESC';
+    const rows = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('Get store requisitions error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /store-requisitions/:id
+router.get('/store-requisitions/:id', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const [reqRows, items, issues] = await Promise.all([
+      query(
+        `SELECT r.*, CONCAT(u.first_name,' ',u.last_name) AS requester_name,
+                CONCAT(a.first_name,' ',a.last_name) AS approver_name
+         FROM store_requisitions r
+         LEFT JOIN users u ON u.id = r.requested_by
+         LEFT JOIN users a ON a.id = r.approved_by
+         WHERE r.id = $1 AND r.tenant_id = $2`,
+        [req.params.id, tid]
+      ),
+      query(
+        `SELECT i.*, ii.name AS item_name, ii.unit, ii.quantity AS current_stock
+         FROM store_requisition_items i
+         JOIN inventory_items ii ON ii.id = i.item_id
+         WHERE i.requisition_id = $1`,
+        [req.params.id]
+      ),
+      query(
+        `SELECT s.*, CONCAT(iu.first_name,' ',iu.last_name) AS issued_by_name,
+                CONCAT(ru.first_name,' ',ru.last_name) AS received_by_name, ii.name AS item_name
+         FROM store_issues s
+         JOIN inventory_items ii ON ii.id = s.item_id
+         LEFT JOIN users iu ON iu.id = s.issued_by
+         LEFT JOIN users ru ON ru.id = s.received_by
+         WHERE s.requisition_id = $1
+         ORDER BY s.issued_at DESC`,
+        [req.params.id]
+      ),
+    ]);
+    if (!reqRows.length) return res.status(404).json({ success: false, message: 'Requisition not found' });
+    res.json({ success: true, data: { ...reqRows[0], items, issues } });
+  } catch (err) {
+    logger.error('Get store requisition error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /store-requisitions — any authenticated staff member requests stock for their department
+router.post('/store-requisitions', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { department, required_date, urgency, reason, notes, items = [] } = req.body;
+    if (!department) return res.status(400).json({ success: false, message: 'department is required' });
+    if (!items.length) return res.status(400).json({ success: false, message: 'At least one item is required' });
+
+    const reqNumber = await nextInventorySeq(tid, 'store_requisitions', 'requisition_number', 'SR');
+    const rows = await query(
+      `INSERT INTO store_requisitions
+         (tenant_id, requisition_number, department, requested_by, required_date, urgency, reason, notes, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'submitted') RETURNING *`,
+      [tid, reqNumber, department, req.user.id, required_date || null, urgency || 'medium', reason || null, notes || null]
+    );
+    const reqId = rows[0].id;
+    for (const item of items) {
+      if (!item.item_id || !item.quantity_requested) continue;
+      await query(
+        `INSERT INTO store_requisition_items (tenant_id, requisition_id, item_id, quantity_requested, notes)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [tid, reqId, item.item_id, item.quantity_requested, item.notes || null]
+      );
+    }
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    logger.error('Create store requisition error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /store-requisitions/:id/approve
+router.put('/store-requisitions/:id/approve', adminOnly, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const rows = await query(
+      `UPDATE store_requisitions SET status = 'approved', approved_by = $1, approved_at = NOW(), updated_at = NOW()
+       WHERE id = $2 AND tenant_id = $3 AND status = 'submitted' RETURNING *`,
+      [req.user.id, req.params.id, tid]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Requisition not found or not pending approval' });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    logger.error('Approve store requisition error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /store-requisitions/:id/reject
+router.put('/store-requisitions/:id/reject', adminOnly, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { comments } = req.body;
+    const rows = await query(
+      `UPDATE store_requisitions SET status = 'rejected', approved_by = $1, approved_at = NOW(),
+              notes = COALESCE(notes || E'\\n', '') || COALESCE($2, ''), updated_at = NOW()
+       WHERE id = $3 AND tenant_id = $4 AND status = 'submitted' RETURNING *`,
+      [req.user.id, comments ? `Rejected: ${comments}` : null, req.params.id, tid]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Requisition not found or not pending approval' });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    logger.error('Reject store requisition error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /store-requisitions/:id/issue — move approved quantities out of the store to the department
+router.post('/store-requisitions/:id/issue', adminOnly, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { items = [] } = req.body; // [{ requisition_item_id, quantity }]
+    if (!items.length) return res.status(400).json({ success: false, message: 'At least one item to issue is required' });
+
+    const reqRows = await query(
+      `SELECT * FROM store_requisitions WHERE id = $1 AND tenant_id = $2 AND status IN ('approved','partially_issued')`,
+      [req.params.id, tid]
+    );
+    if (!reqRows.length) return res.status(404).json({ success: false, message: 'Requisition not found or not approved' });
+    const requisition = reqRows[0];
+
+    const issued = [];
+    for (const line of items) {
+      const qty = parseFloat(line.quantity);
+      if (!line.requisition_item_id || !qty || qty <= 0) continue;
+
+      const lineRows = await query(
+        `SELECT * FROM store_requisition_items WHERE id = $1 AND requisition_id = $2 AND tenant_id = $3`,
+        [line.requisition_item_id, req.params.id, tid]
+      );
+      if (!lineRows.length) continue;
+      const reqItem = lineRows[0];
+      const remaining = parseFloat(reqItem.quantity_requested) - parseFloat(reqItem.quantity_issued);
+      if (qty > remaining) {
+        return res.status(400).json({ success: false, message: `Cannot issue more than the remaining requested quantity for one of the items` });
+      }
+
+      const itemRows = await query(`SELECT * FROM inventory_items WHERE id = $1 AND tenant_id = $2`, [reqItem.item_id, tid]);
+      if (!itemRows.length) continue;
+      const item = itemRows[0];
+      const previousQty = parseFloat(item.quantity);
+      const newQty = previousQty - qty;
+      if (newQty < 0) {
+        return res.status(400).json({ success: false, message: `Insufficient stock for ${item.name}` });
+      }
+
+      await query(`UPDATE inventory_items SET quantity = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`, [newQty, item.id, tid]);
+      const txRows = await query(
+        `INSERT INTO inventory_transactions (tenant_id, item_id, type, quantity, reference, notes, created_by)
+         VALUES ($1,$2,'transfer',$3,$4,$5,$6) RETURNING *`,
+        [tid, item.id, qty, requisition.requisition_number, `Issued to ${requisition.department}`, req.user.id]
+      );
+      await query(
+        `UPDATE store_requisition_items SET quantity_issued = quantity_issued + $1 WHERE id = $2`,
+        [qty, reqItem.id]
+      );
+
+      const issueNumber = await nextInventorySeq(tid, 'store_issues', 'issue_number', 'SI');
+      const issueRows = await query(
+        `INSERT INTO store_issues
+           (tenant_id, issue_number, requisition_id, item_id, quantity, to_department, issued_by, inventory_transaction_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [tid, issueNumber, req.params.id, item.id, qty, requisition.department, req.user.id, txRows[0].id]
+      );
+      issued.push(issueRows[0]);
+
+      await notifyLowStockIfCrossed(tid, item, previousQty, newQty);
+    }
+
+    const totals = await query(
+      `SELECT COUNT(*) FILTER (WHERE quantity_issued < quantity_requested) AS remaining
+       FROM store_requisition_items WHERE requisition_id = $1`,
+      [req.params.id]
+    );
+    const newStatus = Number(totals[0].remaining) === 0 ? 'issued' : 'partially_issued';
+    await query(`UPDATE store_requisitions SET status = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`, [newStatus, req.params.id, tid]);
+
+    res.status(201).json({ success: true, data: issued });
+  } catch (err) {
+    logger.error('Issue store requisition error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── STORE ISSUES (stock movement out of the store, with receipt signature) ───
+
+// GET /store-issues
+router.get('/store-issues', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { status, department, pending_for_me } = req.query;
+    let sql = `SELECT s.*, ii.name AS item_name, ii.unit,
+                      CONCAT(iu.first_name,' ',iu.last_name) AS issued_by_name,
+                      CONCAT(ru.first_name,' ',ru.last_name) AS received_by_name,
+                      r.requisition_number, r.requested_by
+               FROM store_issues s
+               JOIN inventory_items ii ON ii.id = s.item_id
+               LEFT JOIN users iu ON iu.id = s.issued_by
+               LEFT JOIN users ru ON ru.id = s.received_by
+               LEFT JOIN store_requisitions r ON r.id = s.requisition_id
+               WHERE s.tenant_id = $1`;
+    const params = [tid];
+    if (status) { params.push(status); sql += ` AND s.status = $${params.length}`; }
+    if (department) { params.push(department); sql += ` AND s.to_department = $${params.length}`; }
+    if (pending_for_me === 'true') {
+      sql += ` AND s.status = 'pending_receipt'`;
+      if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+        params.push(req.user.id);
+        sql += ` AND r.requested_by = $${params.length}`;
+      }
+    }
+    sql += ' ORDER BY s.issued_at DESC';
+    const rows = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('Get store issues error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /store-issues — ad-hoc issue direct to a department, without a prior requisition
+router.post('/store-issues', adminOnly, async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { item_id, quantity, to_department, notes } = req.body;
+    const qty = parseFloat(quantity);
+    if (!item_id || !qty || qty <= 0 || !to_department) {
+      return res.status(400).json({ success: false, message: 'item_id, quantity and to_department are required' });
+    }
+
+    const itemRows = await query(`SELECT * FROM inventory_items WHERE id = $1 AND tenant_id = $2`, [item_id, tid]);
+    if (!itemRows.length) return res.status(404).json({ success: false, message: 'Item not found' });
+    const item = itemRows[0];
+    const previousQty = parseFloat(item.quantity);
+    const newQty = previousQty - qty;
+    if (newQty < 0) return res.status(400).json({ success: false, message: 'Insufficient stock' });
+
+    await query(`UPDATE inventory_items SET quantity = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`, [newQty, item_id, tid]);
+    const txRows = await query(
+      `INSERT INTO inventory_transactions (tenant_id, item_id, type, quantity, reference, notes, created_by)
+       VALUES ($1,$2,'transfer',$3,$4,$5,$6) RETURNING *`,
+      [tid, item_id, qty, `Direct issue to ${to_department}`, notes || null, req.user.id]
+    );
+    const issueNumber = await nextInventorySeq(tid, 'store_issues', 'issue_number', 'SI');
+    const rows = await query(
+      `INSERT INTO store_issues (tenant_id, issue_number, item_id, quantity, to_department, issued_by, notes, inventory_transaction_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [tid, issueNumber, item_id, qty, to_department, req.user.id, notes || null, txRows[0].id]
+    );
+
+    await notifyLowStockIfCrossed(tid, item, previousQty, newQty);
+
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    logger.error('Create store issue error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /store-issues/:id/confirm-receipt — the receiving department signs for delivery
+router.put('/store-issues/:id/confirm-receipt', async (req, res) => {
+  try {
+    const tid = req.user.tenant_id;
+    const { condition_on_receipt, notes } = req.body;
+
+    const rows = await query(
+      `SELECT s.*, r.requested_by FROM store_issues s
+       LEFT JOIN store_requisitions r ON r.id = s.requisition_id
+       WHERE s.id = $1 AND s.tenant_id = $2 AND s.status = 'pending_receipt'`,
+      [req.params.id, tid]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Pending delivery not found' });
+    const issueRow = rows[0];
+
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+    const isRequester = issueRow.requested_by && issueRow.requested_by === req.user.id;
+    if (!isAdmin && !isRequester) {
+      return res.status(403).json({ success: false, message: 'Only the original requester or an admin can confirm this delivery' });
+    }
+
+    const condition = ['good', 'damaged', 'short'].includes(condition_on_receipt) ? condition_on_receipt : 'good';
+    const newStatus = condition === 'good' ? 'received' : 'disputed';
+    const updated = await query(
+      `UPDATE store_issues SET received_by = $1, received_at = NOW(), condition_on_receipt = $2, status = $3,
+              notes = COALESCE(notes || E'\\n', '') || COALESCE($4, '')
+       WHERE id = $5 AND tenant_id = $6 RETURNING *`,
+      [req.user.id, condition, newStatus, notes || null, req.params.id, tid]
+    );
+    res.json({ success: true, data: updated[0] });
+  } catch (err) {
+    logger.error('Confirm receipt error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

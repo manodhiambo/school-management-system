@@ -19,13 +19,11 @@ The service is provided on a subscription basis following a one-time setup payme
   },
   {
     title: '3. Subscription & Payment',
-    body: `Setup Fee: KSh 100,000 — a one-time payment required to activate your school after the free trial. This covers your full first year of access.
-
-Annual Renewal: KSh 40,000 per year, payable from Year 2 onwards, to maintain and update your system and database.
+    body: `Pricing: Contact us at info@helvino.org or 0110 421 320 for pricing tailored to your school. This covers setup, activation, and your subscription.
 
 Trial Period: New schools receive a 5-day free trial with full access to all features. No payment is required during the trial.
 
-Payments are accepted via M-Pesa (Paybill 522533, Account 8071524). After payment, contact us at info@helvino.org or 0110 421 320 to activate your subscription.
+Payments are accepted via M-Pesa (Paybill 522533, Account 8071524) once pricing has been agreed. After payment, contact us at info@helvino.org or 0110 421 320 to activate your subscription.
 
 Failure to renew by the renewal date will result in read-only access for 30 days, after which access will be suspended. Data is retained for 12 months after suspension.`,
   },

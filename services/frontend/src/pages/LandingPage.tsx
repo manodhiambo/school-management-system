@@ -529,8 +529,8 @@ export function LandingPage() {
           {/* Module count banner */}
           <div className="mt-12 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 text-white">
             <div>
-              <p className="text-2xl font-extrabold">30 modules. One platform. One price.</p>
-              <p className="text-blue-100 mt-1">All features included — no per-module fees, no hidden charges.</p>
+              <p className="text-2xl font-extrabold">30 modules. One platform.</p>
+              <p className="text-blue-100 mt-1">All features included — no per-module fees, no hidden charges. Contact us for pricing.</p>
             </div>
             <Button className="bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold shrink-0"
               onClick={() => navigate('/register')}>
@@ -667,100 +667,50 @@ export function LandingPage() {
 
       {/* ─────────── PRICING ─────────── */}
       <section id="pricing" className="py-20 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
-            <span className="inline-block bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-full px-4 py-1.5 mb-4">Simple Pricing</span>
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Transparent Pricing. Every Feature Included.</h2>
+            <span className="inline-block bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-full px-4 py-1.5 mb-4">Pricing</span>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Every Feature Included. Contact Us for Pricing.</h2>
             <p className="text-xl text-gray-500">
-              All 24+ modules, unlimited students and teachers — one payment to get started
+              All 30 modules, unlimited students and teachers — get in touch and we'll tailor a plan for your school.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-
-            {/* One-time setup */}
-            <div className="rounded-2xl border-2 border-gray-200 p-8 hover:border-blue-300 hover:shadow-lg transition-all">
-              <div className="inline-block bg-orange-100 text-orange-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
-                One-Time Payment
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Setup & Onboarding</h3>
-              <div className="flex items-end gap-2 mb-2">
-                <span className="text-5xl font-extrabold text-gray-900">100,000</span>
-                <span className="text-gray-500 mb-1">KSH</span>
-              </div>
-              <p className="text-gray-400 text-sm mb-8">Paid once. Covers full system setup, data migration, staff training — and your first full year of access.</p>
-              <Button className="w-full bg-gray-900 hover:bg-gray-800 text-white mb-8"
+          <div className="rounded-2xl border-2 border-blue-600 p-8 sm:p-10 bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl text-center max-w-2xl mx-auto">
+            <h3 className="text-2xl font-bold mb-2">Talk to Our Team</h3>
+            <p className="text-blue-100 mb-8">
+              Reach out and we'll walk you through pricing based on your school's size and needs. Every school also gets a free 5-day trial with full access before committing to anything.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a href="tel:0110421320">
+                <Button className="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold">
+                  <Phone className="mr-2 h-4 w-4" /> Call 0110 421 320
+                </Button>
+              </a>
+              <a href="mailto:info@helvino.org">
+                <Button variant="outline" className="w-full border-white/40 text-white hover:bg-white/10">
+                  <Mail className="mr-2 h-4 w-4" /> Email Us
+                </Button>
+              </a>
+              <Button className="w-full bg-white text-blue-700 hover:bg-gray-100 font-bold"
                 onClick={() => navigate('/register')}>
-                Register Your School
+                Start Free Trial
               </Button>
-              <ul className="space-y-3">
-                {[
-                  'Full system installation & configuration',
-                  'School data setup & migration',
-                  'On-site or remote staff training',
-                  'Student & parent portal setup',
-                  'M-Pesa & SMS integration',
-                  'First year of support included',
-                ].map(f => (
-                  <li key={f} className="flex items-center gap-2.5 text-sm text-gray-700">
-                    <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />{f}
-                  </li>
-                ))}
-              </ul>
             </div>
-
-            {/* Annual renewal — highlighted */}
-            <div className="relative rounded-2xl border-2 border-blue-600 p-8 bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap">
-                ANNUAL SUBSCRIPTION
-              </div>
-              <div className="inline-block bg-white/20 text-blue-100 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
-                Yearly Renewal
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">Annual Licence — From Year 2</h3>
-              <div className="flex items-end gap-2 mb-2">
-                <span className="text-5xl font-extrabold">40,000</span>
-                <span className="text-blue-200 mb-1">KSH / year</span>
-              </div>
-              <p className="text-blue-100 text-sm mb-2">Your first year is already covered by the setup fee — from Year 2 onwards, renew annually for KSh 40,000 to keep your system active, maintained, and updated.</p>
-              <p className="text-blue-200 text-xs mb-8">Pay via M-Pesa Paybill 522533 · A/C 8071524</p>
-              <Button className="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold mb-8"
-                onClick={() => navigate('/register')}>
-                Get Started <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <ul className="space-y-3">
-                {[
-                  'All 24+ modules always active',
-                  'Unlimited students & teachers',
-                  'All future updates & new features',
-                  'Priority technical support',
-                  'Cloud hosting & backups',
-                  'SMS & WhatsApp alerts',
-                ].map(f => (
-                  <li key={f} className="flex items-center gap-2.5 text-sm text-blue-100">
-                    <CheckCircle className="h-4 w-4 text-yellow-400 shrink-0" />{f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Summary & M-Pesa */}
-          <div className="mt-10 max-w-2xl mx-auto grid sm:grid-cols-2 gap-4">
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-center">
-              <p className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-1">Total First Year</p>
-              <p className="text-3xl font-extrabold text-gray-900">KSH 100,000</p>
-              <p className="text-xs text-gray-500 mt-1">One-time setup fee — your first year is fully included. KSh 40,000/year from Year 2.</p>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
-              <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">Pay via M-Pesa</p>
-              <div className="flex justify-center gap-6 text-sm">
-                <div><p className="text-green-600 font-medium text-xs">Paybill</p><p className="text-xl font-extrabold text-gray-900">522533</p></div>
-                <div className="w-px bg-green-200" />
-                <div><p className="text-green-600 font-medium text-xs">Account</p><p className="text-xl font-extrabold text-gray-900">8071524</p></div>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Call 0110 421 320 after payment</p>
-            </div>
+            <ul className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
+              {[
+                'All 30+ modules always active',
+                'Unlimited students & teachers',
+                'M-Pesa & SMS integration',
+                'Staff training & onboarding',
+                'Priority technical support',
+                'Cloud hosting & backups',
+              ].map(f => (
+                <li key={f} className="flex items-center gap-2.5 text-sm text-blue-100">
+                  <CheckCircle className="h-4 w-4 text-yellow-400 shrink-0" />{f}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
@@ -875,13 +825,8 @@ export function LandingPage() {
                     <span className="text-gray-400">Account</span>
                     <span className="text-white font-bold tracking-wider">8071524</span>
                   </div>
-                  <div className="flex items-center justify-between pt-1 border-t border-green-900/50">
-                    <span className="text-gray-400">Setup</span>
-                    <span className="text-green-400 font-bold">KSH 100,000</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Annual</span>
-                    <span className="text-green-400 font-bold">KSH 40,000/yr</span>
+                  <div className="pt-1 border-t border-green-900/50 text-xs text-gray-400">
+                    Contact us for pricing before paying
                   </div>
                 </div>
               </div>

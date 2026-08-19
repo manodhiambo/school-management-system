@@ -46,7 +46,7 @@ interface SuccessData {
 export function SchoolRegistrationPage() {
   useSEO({
     title: 'Register Your School | SkulManager — Free 5-Day Trial',
-    description: 'Register your Kenyan school on SkulManager and get a free 5-day trial. CBE-aligned, M-Pesa integrated, all modules included from KSh 70,000/year.',
+    description: 'Register your Kenyan school on SkulManager and get a free 5-day trial. CBE-aligned, M-Pesa integrated, all modules included. Contact us for pricing.',
     path: '/register',
   });
   const navigate = useNavigate();
@@ -157,7 +157,7 @@ export function SchoolRegistrationPage() {
                   <div>
                     <p className="font-semibold text-green-800 text-sm">5-Day Free Trial — No payment needed to start</p>
                     <p className="text-xs text-gray-600 mt-0.5">
-                      Explore all features free. After your trial: <strong className="text-blue-700">KSh 100,000</strong> one-time activation &nbsp;+&nbsp; <strong className="text-blue-700">KSh 40,000/year</strong> renewal
+                      Explore all features free. <a href="/contact" className="text-blue-700 font-semibold hover:underline">Contact us</a> before your trial ends to discuss pricing and activate your school.
                     </p>
                   </div>
                 </div>
@@ -371,9 +371,9 @@ export function SchoolRegistrationPage() {
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left">
                   <p className="text-xs font-semibold text-amber-800 mb-2">After your trial ends:</p>
                   <ul className="text-sm text-amber-700 space-y-1">
-                    <li>• One-time activation: <strong>KSh 100,000</strong></li>
-                    <li>• Annual renewal: <strong>KSh 40,000/year</strong></li>
-                    <li>• Payment via M-Pesa — available inside your dashboard</li>
+                    <li>• Contact us to discuss pricing for your school</li>
+                    <li>• Call 0110 421 320 or email info@helvino.org</li>
+                    <li>• We'll activate your account once terms are agreed</li>
                   </ul>
                 </div>
 

@@ -77,8 +77,8 @@ export function FeatureLandingPage() {
             <Button onClick={() => navigate('/register')} className="bg-white text-gray-900 hover:bg-gray-100">
               Start Free Trial
             </Button>
-            <Button onClick={() => navigate('/faq')} variant="outline" className="border-white/40 text-white hover:bg-white/10">
-              See Pricing & FAQ
+            <Button onClick={() => navigate('/contact')} variant="outline" className="border-white/40 text-white hover:bg-white/10">
+              Contact Us for Pricing
             </Button>
           </div>
         </div>

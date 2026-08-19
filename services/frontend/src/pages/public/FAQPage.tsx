@@ -8,11 +8,11 @@ const FAQS = [
   {
     category: 'Pricing & Payment',
     items: [
-      { q: 'How much does Skul Manager cost?', a: 'Skul Manager has a one-time setup fee of KSh 100,000, which covers your full first year of access. From Year 2 onwards, an annual renewal of KSh 40,000 per year keeps your system maintained and your database active.' },
+      { q: 'How much does Skul Manager cost?', a: 'Pricing is tailored to your school\'s size and needs. Contact us on 0110 421 320 or email info@helvino.org and our team will give you a quote.' },
       { q: 'Is there a free trial?', a: 'Yes — every school gets a 5-day free trial when they register. No payment is needed to start. You get full access to all modules during the trial so you can explore the system before committing.' },
-      { q: 'How do I pay?', a: 'Payments are made via M-Pesa:\n• Paybill: 522533\n• Account Number: 8071524\n\nAfter paying, call us on 0110 421 320 or email info@helvino.org with your school name and M-Pesa transaction code to activate your account.' },
-      { q: 'What happens when the trial ends?', a: 'At the end of your 5-day trial you will be prompted to activate your account. Your school data is preserved — you do not need to re-enter anything. Pay via M-Pesa and contact us to activate.' },
-      { q: 'Are all modules included in the price?', a: 'Yes. All 24+ modules are included in the price — students, teachers, parents, finance, CBE academics, transport, procurement, library, health records, discipline, hostels, SMS, analytics, and more. There are no per-module fees.' },
+      { q: 'How do I pay?', a: 'Once you\'ve contacted us and agreed on pricing, payments are made via M-Pesa:\n• Paybill: 522533\n• Account Number: 8071524\n\nAfter paying, call us on 0110 421 320 or email info@helvino.org with your school name and M-Pesa transaction code to activate your account.' },
+      { q: 'What happens when the trial ends?', a: 'At the end of your 5-day trial, contact us to discuss pricing and activate your account. Your school data is preserved — you do not need to re-enter anything.' },
+      { q: 'Are all modules included in the price?', a: 'Yes. All 30+ modules are included — students, teachers, parents, finance, CBE academics, transport, procurement, library, health records, discipline, hostels, SMS, analytics, and more. There are no per-module fees. Contact us for a quote.' },
     ],
   },
   {
@@ -60,7 +60,7 @@ const FAQS = [
 export function FAQPage() {
   useSEO({
     title: 'Frequently Asked Questions | SkulManager',
-    description: 'Answers to common questions about SkulManager pricing, M-Pesa payments, CBE curriculum support, data security, and getting started.',
+    description: 'Answers to common questions about SkulManager, M-Pesa payments, CBE curriculum support, data security, and getting started. Contact us for pricing.',
     path: '/faq',
   });
 

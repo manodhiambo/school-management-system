@@ -54,6 +54,21 @@ async function resolveCurrentTerm(tenantId) {
 
 const TERM_LABELS = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
 
+// Invoice numbers were previously built as INV{YY}{MM}{4-random-digits} inline at each call
+// site — only 10,000 possibilities, so bulk-generating a few dozen invoices in one request
+// collided often (verified: 8 of 27 invoice creations failed with a unique-constraint error
+// in one real bulk-smart run). Checking for an existing row and retrying widens the space to
+// 1,000,000 and makes collisions self-heal instead of surfacing as a failed invoice.
+async function generateUniqueInvoiceNumber() {
+  const prefix = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = `${prefix}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+    const existing = await query('SELECT 1 FROM fee_invoices WHERE invoice_number = $1', [candidate]);
+    if (!existing.length) return candidate;
+  }
+  throw new Error('Could not generate a unique invoice number after 10 attempts');
+}
+
 // term1 -> term3 of the prior academic year; term2 -> term1 same year; term3 -> term2 same year.
 function resolvePreviousTerm(term, academicYear) {
   const year = parseInt(academicYear, 10) || new Date().getFullYear();
@@ -109,7 +124,7 @@ async function carryForwardPreviousBalance(tenantId, studentId, term, academicYe
   }
 
   const invoiceId = uuidv4();
-  const invoiceNumber = `INV${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  const invoiceNumber = await generateUniqueInvoiceNumber();
   const description = `Carried Forward Balance – ${TERM_LABELS[prev.term] || prev.term} ${prev.academic_year}`;
   await query(
     `INSERT INTO fee_invoices (

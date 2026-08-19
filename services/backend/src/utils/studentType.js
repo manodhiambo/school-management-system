@@ -9,7 +9,7 @@ export const FEE_STRUCTURE_STUDENT_TYPES = ['all', 'day_scholar', 'boarder', 'fu
 
 // Does a fee structure tagged `feeStudentType` apply to a student of `studentType`?
 export function feeAppliesToStudentType(feeStudentType, studentType) {
-  if (!feeStudentType || feeStudentType === 'all') return true;
+  if (feeStudentType === 'all') return true;
   if (feeStudentType === studentType) return true;
   if (feeStudentType === 'boarder') return BOARDER_STUDENT_TYPES.includes(studentType);
   return false;

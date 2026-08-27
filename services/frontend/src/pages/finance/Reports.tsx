@@ -474,12 +474,14 @@ export const Reports: React.FC = () => {
       const params: any = {};
       if (classId) params.classId = classId;
       if (categoryId) params.categoryId = categoryId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
       const res: any = await api.getStudentsSummary(params);
       setStudentPayments(res?.data || []);
     } finally {
       setSpLoading(false);
     }
-  }, [classId, categoryId]);
+  }, [classId, categoryId, dateFrom, dateTo]);
 
   useEffect(() => {
     if (tab === 'fee-collection' || tab === 'defaulters') loadFeeReport();

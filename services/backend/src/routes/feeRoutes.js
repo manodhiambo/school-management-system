@@ -1554,7 +1554,7 @@ router.get('/expected/:studentId', async (req, res) => {
 router.get('/students-summary', async (req, res) => {
   try {
     const tid = req.user.tenant_id;
-    const { search, classId, categoryId } = req.query;
+    const { search, classId, categoryId, date_from, date_to } = req.query;
 
     let categoryIds = null;
     if (categoryId) {
@@ -1562,12 +1562,32 @@ router.get('/students-summary', async (req, res) => {
       if (categoryIds === null) return res.status(404).json({ success: false, message: 'Category not found' });
     }
 
+    // total_invoiced/total_balance stay structural (as-of-now), but
+    // total_paid reflects only payments actually made within the chosen
+    // date_from/date_to window (via a correlated subquery on fee_payments),
+    // instead of the invoice's all-time cumulative paid_amount — otherwise
+    // picking a period here never changed the numbers.
+    const params = [tid];
+    let pi = 2;
+    let paymentDateFilter = '';
+    if (date_from) { paymentDateFilter += ` AND fp.payment_date >= $${pi++}`; params.push(date_from); }
+    if (date_to)   { paymentDateFilter += ` AND fp.payment_date <= $${pi++}`; params.push(date_to); }
+
     let sql = `
       SELECT s.id, s.first_name, s.last_name, s.admission_number,
              s.class_id, s.student_type,
              c.name AS class_name, c.education_level,
              COALESCE(SUM(fi.net_amount),     0)::numeric AS total_invoiced,
-             COALESCE(SUM(fi.paid_amount),    0)::numeric AS total_paid,
+             COALESCE((
+               SELECT SUM(fp.amount) FROM fee_payments fp
+               WHERE fp.tenant_id = $1 AND fp.status = 'success'
+                 AND fp.invoice_id IN (
+                   SELECT fi2.id FROM fee_invoices fi2
+                   WHERE fi2.student_id = s.id AND fi2.tenant_id = $1
+                     AND fi2.status NOT IN ('cancelled')
+                 )
+                 ${paymentDateFilter}
+             ), 0)::numeric AS total_paid,
              COALESCE(SUM(fi.balance_amount), 0)::numeric AS total_balance,
              COUNT(fi.id)::int                            AS invoice_count
       FROM students s
@@ -1577,8 +1597,6 @@ router.get('/students-summary', async (req, res) => {
              AND fi.status NOT IN ('cancelled')
       WHERE s.tenant_id = $1 AND s.status = 'active'
     `;
-    const params = [tid];
-    let pi = 2;
 
     if (search) {
       sql += ` AND (s.first_name ILIKE $${pi} OR s.last_name ILIKE $${pi} OR s.admission_number ILIKE $${pi})`;

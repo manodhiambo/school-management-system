@@ -407,8 +407,18 @@ router.post('/tenants/:id/suspend', async (req, res) => {
 });
 
 // ============================================================
-// POST /tenants/:id/approve-registration — Approve a pending_review
-// registration: activates the tenant and its admin login.
+// POST /tenants/:id/approve-registration — Approve a registration and
+// activate the tenant + its admin login.
+//
+// Covers two paths:
+//  - status='pending_review': the KSh 50,000 deposit was paid via the M-Pesa
+//    STK push and auto-recorded; superadmin is doing the human verification.
+//  - status='pending_deposit': the school paid manually (Paybill 522533,
+//    Account 8071524) and called/WhatsApped/emailed us instead of using the
+//    STK push. There's no automatic payment record for that, so approving
+//    from this state IS the superadmin's confirmation that payment was
+//    received — it backfills deposit_paid/deposit_paid_at/balance_due_at
+//    exactly as the M-Pesa callback would have.
 // ============================================================
 router.post('/tenants/:id/approve-registration', async (req, res) => {
   try {
@@ -419,12 +429,16 @@ router.post('/tenants/:id/approve-registration', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
     const tenant = existing[0];
-    if (tenant.status !== 'pending_review') {
-      return res.status(409).json({ success: false, message: `Tenant is not pending review (current status: ${tenant.status})` });
+    if (tenant.status !== 'pending_review' && tenant.status !== 'pending_deposit') {
+      return res.status(409).json({ success: false, message: `Tenant is not awaiting approval (current status: ${tenant.status})` });
     }
 
     const oneYearFromNow = new Date();
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+    // If approving straight from pending_deposit, this action itself is the
+    // confirmation that the (manually paid) deposit was received.
+    const backfillDeposit = tenant.status === 'pending_deposit';
 
     const result = await query(`
       UPDATE tenants SET
@@ -432,6 +446,9 @@ router.post('/tenants/:id/approve-registration', async (req, res) => {
         review_status = 'approved',
         reviewed_by = $1,
         reviewed_at = NOW(),
+        deposit_paid = true,
+        deposit_paid_at = COALESCE(deposit_paid_at, NOW()),
+        balance_due_at = COALESCE(balance_due_at, NOW() + INTERVAL '5 days'),
         subscription_starts_at = NOW(),
         subscription_ends_at = $2,
         suspended_at = NULL,
@@ -440,17 +457,22 @@ router.post('/tenants/:id/approve-registration', async (req, res) => {
       RETURNING *
     `, [req.user.id, oneYearFromNow.toISOString(), id]);
 
+    if (backfillDeposit) {
+      logger.info(`Deposit manually confirmed by superadmin on approval for tenant ${id} (was pending_deposit)`);
+    }
+
     if (tenant.admin_user_id) {
       await query('UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1', [tenant.admin_user_id]);
     }
 
+    const approvedTenant = result[0];
     const frontendUrl = config.frontendUrl || process.env.FRONTEND_URL || 'https://skulmanager.org';
     sendEmail(tenant.admin_email, 'tenantApproved', {
       schoolName: tenant.school_name,
       adminEmail: tenant.admin_email,
-      balanceAmount: tenant.balance_amount,
-      balanceDueDays: tenant.balance_due_at
-        ? Math.max(1, Math.ceil((new Date(tenant.balance_due_at) - new Date()) / (1000 * 60 * 60 * 24)))
+      balanceAmount: approvedTenant.balance_amount,
+      balanceDueDays: approvedTenant.balance_due_at
+        ? Math.max(1, Math.ceil((new Date(approvedTenant.balance_due_at) - new Date()) / (1000 * 60 * 60 * 24)))
         : 5,
       loginUrl: `${frontendUrl}/login`,
     }).catch(err => logger.error('Failed to email tenant-approved notice:', err.message));
@@ -464,8 +486,8 @@ router.post('/tenants/:id/approve-registration', async (req, res) => {
 });
 
 // ============================================================
-// POST /tenants/:id/reject-registration — Reject a pending_review
-// registration. The admin account stays inactive.
+// POST /tenants/:id/reject-registration — Reject a pending_review or
+// pending_deposit registration. The admin account stays inactive.
 // ============================================================
 router.post('/tenants/:id/reject-registration', async (req, res) => {
   try {
@@ -477,8 +499,8 @@ router.post('/tenants/:id/reject-registration', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
     const tenant = existing[0];
-    if (tenant.status !== 'pending_review') {
-      return res.status(409).json({ success: false, message: `Tenant is not pending review (current status: ${tenant.status})` });
+    if (tenant.status !== 'pending_review' && tenant.status !== 'pending_deposit') {
+      return res.status(409).json({ success: false, message: `Tenant is not awaiting approval (current status: ${tenant.status})` });
     }
 
     const result = await query(`

@@ -27,7 +27,7 @@ Registration Review: Paying the deposit submits your school for manual review. W
 
 Automatic Suspension: If the KSh 50,000 balance is not paid within 5 days of the deposit being confirmed, the account is automatically suspended until payment is made.
 
-Payments are accepted via M-Pesa, prompted directly on the registration and billing pages (or Paybill 522533, Account 8071524). After the first year, renewal is KSh 40,000/year.
+Payments are accepted via M-Pesa, prompted directly on the registration and billing pages, or paid directly to Paybill 522533, Account 8071524. If you pay directly to the paybill, call or WhatsApp 0110 421 320 or 0703445756, or email info@helvino.org with your school name and M-Pesa transaction code so we can confirm the payment and approve your account. After the first year, renewal is KSh 40,000/year.
 
 Failure to renew by the renewal date will result in read-only access for 30 days, after which access will be suspended. Data is retained for 12 months after suspension.`,
   },

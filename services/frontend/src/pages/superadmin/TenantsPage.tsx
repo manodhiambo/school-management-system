@@ -165,7 +165,10 @@ export function TenantsPage() {
   };
 
   const handleApproveRegistration = async (t: Tenant) => {
-    if (!window.confirm(`Approve ${t.school_name}? Their admin login will be activated immediately.`)) return;
+    const confirmMsg = t.status === 'pending_deposit'
+      ? `Approve ${t.school_name}? This confirms you've verified their KSh 50,000 deposit (e.g. via Paybill 522533 / Account 8071524) and activates their admin login immediately.`
+      : `Approve ${t.school_name}? Their admin login will be activated immediately.`;
+    if (!window.confirm(confirmMsg)) return;
     setActionLoading('approve_' + t.id);
     try { await api.approveTenantRegistration(t.id); await loadTenants(); }
     catch (err: any) { alert(err?.message || 'Failed to approve registration'); }
@@ -418,12 +421,12 @@ export function TenantsPage() {
                           <Clock className="h-4 w-4 mr-2" /> Extend Subscription
                         </button>
                         <hr className="my-1" />
-                        {t.status === 'pending_review' && (
+                        {(t.status === 'pending_review' || t.status === 'pending_deposit') && (
                           <>
                             <button onClick={() => handleApproveRegistration(t)} disabled={!!actionLoading}
                               className="w-full flex items-center px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 disabled:opacity-50">
                               {actionLoading === 'approve_' + t.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                              Approve Registration
+                              {t.status === 'pending_deposit' ? 'Confirm Payment & Approve' : 'Approve Registration'}
                             </button>
                             <button onClick={() => handleRejectRegistration(t)} disabled={!!actionLoading}
                               className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
@@ -433,19 +436,19 @@ export function TenantsPage() {
                             <hr className="my-1" />
                           </>
                         )}
-                        {t.status !== 'active' ? (
+                        {t.status !== 'active' && t.status !== 'pending_review' && t.status !== 'pending_deposit' ? (
                           <button onClick={() => handleActivate(t)} disabled={!!actionLoading}
                             className="w-full flex items-center px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 disabled:opacity-50">
                             {actionLoading === 'activate_' + t.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                             Activate
                           </button>
-                        ) : (
+                        ) : t.status === 'active' ? (
                           <button onClick={() => handleSuspend(t)} disabled={!!actionLoading}
                             className="w-full flex items-center px-4 py-2.5 text-sm text-orange-600 hover:bg-orange-50 disabled:opacity-50">
                             {actionLoading === 'suspend_' + t.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
                             Suspend
                           </button>
-                        )}
+                        ) : null}
                         <button
                           onClick={() => { setSelectedTenant(t); setDeleteConfirmText(''); setConfirmDelete(t.id); setModal('permanent_delete'); setOpenMenu(null); }}
                           disabled={t.status === 'active'}

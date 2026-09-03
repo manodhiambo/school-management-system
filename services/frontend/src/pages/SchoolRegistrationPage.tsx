@@ -466,6 +466,17 @@ export function SchoolRegistrationPage() {
                 <p className="text-xs text-gray-400">
                   We'll automatically detect your payment once you enter your M-Pesa PIN.
                 </p>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-left">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">Prefer to pay directly?</p>
+                  <p className="text-sm text-gray-600">
+                    Send KSh {tenant.depositAmount.toLocaleString()} to <strong className="text-gray-900">Paybill 522533, Account 8071524</strong>.
+                    Then call or WhatsApp <strong className="text-gray-900">0110 421 320</strong> or{' '}
+                    <strong className="text-gray-900">0703445756</strong>, or email{' '}
+                    <strong className="text-gray-900">info@helvino.org</strong> with your school name and M-Pesa code —
+                    we'll confirm the payment and approve your account.
+                  </p>
+                </div>
               </div>
             </div>
           )}

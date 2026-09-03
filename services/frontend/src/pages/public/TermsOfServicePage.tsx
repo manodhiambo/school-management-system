@@ -18,12 +18,16 @@ These Terms are governed by the laws of Kenya.`,
 The service is provided on a subscription basis following a one-time setup payment.`,
   },
   {
-    title: '3. Subscription & Payment',
-    body: `Pricing: Contact us at info@helvino.org or 0110 421 320 for pricing tailored to your school. This covers setup, activation, and your subscription.
+    title: '3. Registration Deposit, Balance & Payment',
+    body: `Registration Fee: A one-time registration fee of KSh 100,000 applies to new schools, paid in two parts: a KSh 50,000 deposit at registration, and a KSh 50,000 balance due within 5 days of the deposit being confirmed.
 
-Trial Period: New schools receive a 5-day free trial with full access to all features. No payment is required during the trial.
+No Free Trial: Self-serve free trial accounts are no longer offered, as they were being abused with dummy schools and fake contact details. Schools wishing to evaluate the platform before registering may use the live demo account (no signup required), available from the Sign In page.
 
-Payments are accepted via M-Pesa (Paybill 522533, Account 8071524) once pricing has been agreed. After payment, contact us at info@helvino.org or 0110 421 320 to activate your subscription.
+Registration Review: Paying the deposit submits your school for manual review. We verify that the school is a real, registered institution (Ministry of Education registration number required) before activating your admin account.
+
+Automatic Suspension: If the KSh 50,000 balance is not paid within 5 days of the deposit being confirmed, the account is automatically suspended until payment is made.
+
+Payments are accepted via M-Pesa, prompted directly on the registration and billing pages (or Paybill 522533, Account 8071524). After the first year, renewal is KSh 40,000/year.
 
 Failure to renew by the renewal date will result in read-only access for 30 days, after which access will be suspended. Data is retained for 12 months after suspension.`,
   },

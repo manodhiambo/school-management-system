@@ -8,17 +8,17 @@ const FAQS = [
   {
     category: 'Pricing & Payment',
     items: [
-      { q: 'How much does Skul Manager cost?', a: 'Pricing is tailored to your school\'s size and needs. Contact us on 0110 421 320 or email info@helvino.org and our team will give you a quote.' },
-      { q: 'Is there a free trial?', a: 'Yes — every school gets a 5-day free trial when they register. No payment is needed to start. You get full access to all modules during the trial so you can explore the system before committing.' },
-      { q: 'How do I pay?', a: 'Once you\'ve contacted us and agreed on pricing, payments are made via M-Pesa:\n• Paybill: 522533\n• Account Number: 8071524\n\nAfter paying, call us on 0110 421 320 or email info@helvino.org with your school name and M-Pesa transaction code to activate your account.' },
-      { q: 'What happens when the trial ends?', a: 'At the end of your 5-day trial, contact us to discuss pricing and activate your account. Your school data is preserved — you do not need to re-enter anything.' },
-      { q: 'Are all modules included in the price?', a: 'Yes. All 30+ modules are included — students, teachers, parents, finance, CBE academics, transport, procurement, library, health records, discipline, hostels, SMS, analytics, and more. There are no per-module fees. Contact us for a quote.' },
+      { q: 'How much does Skul Manager cost?', a: 'Registration is a one-time KSh 100,000 fee (KSh 50,000 deposit to register, KSh 50,000 balance due within 5 days), then KSh 40,000/year to renew. Contact us on 0110 421 320 or email info@helvino.org for details.' },
+      { q: 'Is there a free trial?', a: 'We no longer offer self-serve free trial accounts — dummy sign-ups with fake details were being used to access the system without paying. Instead, try our fully working live demo (no signup needed) from the Sign In page to explore every module with sample data before you register.' },
+      { q: 'How do I pay?', a: 'Registration is via M-Pesa STK Push, prompted directly on the registration page: pay the KSh 50,000 deposit first, then clear the KSh 50,000 balance within 5 days from Settings → Billing once your account is approved. You can also pay to Paybill 522533, Account 8071524, then contact us with your M-Pesa transaction code.' },
+      { q: 'What happens if I don\'t clear the balance in time?', a: 'After your deposit is paid and your school is approved, you have 5 days to clear the remaining KSh 50,000 balance. If it isn\'t paid by then, the account is automatically suspended until payment is made.' },
+      { q: 'Are all modules included in the price?', a: 'Yes. All 30+ modules are included — students, teachers, parents, finance, CBE academics, transport, procurement, library, health records, discipline, hostels, SMS, analytics, and more. There are no per-module fees.' },
     ],
   },
   {
     category: 'Getting Started',
     items: [
-      { q: 'How do I register my school?', a: 'Click "Register Your School" on the homepage. Fill in your school name, county, admin email, and password. Your 5-day trial starts instantly.' },
+      { q: 'How do I register my school?', a: 'Click "Register Your School" on the homepage. Fill in your school name, Ministry of Education registration number, county, admin email, and password, then pay the KSh 50,000 deposit via M-Pesa. Our team reviews and approves real, registered schools before activating the account.' },
       { q: 'Can multiple people use the system at the same time?', a: 'Yes. You can create unlimited user accounts for admins, teachers, finance officers, students, parents, and drivers. Each user logs in with their own credentials and sees only what their role allows.' },
       { q: 'Do parents and students need their own accounts?', a: 'Yes, each parent and student gets their own login. When you admit a student, you can create a portal account for them in the same wizard. Parents can then log in to see their child\'s attendance, results, fees, and transport status in real time.' },
     ],

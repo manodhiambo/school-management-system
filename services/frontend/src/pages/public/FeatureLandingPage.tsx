@@ -75,7 +75,7 @@ export function FeatureLandingPage() {
           <p className="text-white/90 max-w-2xl text-lg">{content.tagline}</p>
           <div className="flex flex-col sm:flex-row gap-3 mt-8">
             <Button onClick={() => navigate('/register')} className="bg-white text-gray-900 hover:bg-gray-100">
-              Start Free Trial
+              Register Your School
             </Button>
             <Button onClick={() => navigate('/contact')} variant="outline" className="border-white/40 text-white hover:bg-white/10">
               Contact Us for Pricing
@@ -118,7 +118,7 @@ export function FeatureLandingPage() {
 
         <div className="bg-gray-900 rounded-2xl p-8 text-center text-white">
           <p className="font-semibold text-lg mb-1">Ready to see it running in your school?</p>
-          <p className="text-gray-300 text-sm mb-5">5-day free trial, full access to every module — no credit card required.</p>
+          <p className="text-gray-300 text-sm mb-5">KSh 50,000 deposit to register, or try the live demo first — no signup needed.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button onClick={() => navigate('/register')} className="bg-white text-gray-900 hover:bg-gray-100">
               Register Your School

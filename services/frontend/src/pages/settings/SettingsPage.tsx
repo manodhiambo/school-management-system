@@ -1,15 +1,17 @@
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard, Volume2, VolumeX, Bell, MessageSquare, DollarSign, Play, Mic, MicOff } from 'lucide-react';
+import { Save, School, Globe, Clock, Upload, X, ImageIcon, UserCheck, Shield, QrCode, CheckCircle, AlertTriangle, Copy, Eye, EyeOff, KeyRound, CreditCard, Volume2, VolumeX, Bell, MessageSquare, DollarSign, Play, Mic, MicOff, Wallet, Loader2, Phone } from 'lucide-react';
 import { useSoundSettings } from '@/components/notifications/SoundNotificationProvider';
 import { voiceService } from '@/services/voiceService';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/languageStore';
+import { useAuthStore } from '@/store/authStore';
 
 // Resize an image file to max 256x256 and return a base64 data URL
 function resizeImageToBase64(file: File): Promise<string> {
@@ -42,7 +44,48 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance' | 'security' | 'payments' | 'sounds'>('general');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'system' | 'attendance' | 'security' | 'payments' | 'billing' | 'sounds'>(
+    searchParams.get('tab') === 'billing' ? 'billing' : 'general'
+  );
+  const { user } = useAuthStore();
+  const [billingInfo, setBillingInfo] = useState<any>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingPhone, setBillingPhone] = useState('');
+  const [billingMessage, setBillingMessage] = useState('');
+  const [billingError, setBillingError] = useState('');
+
+  const loadBillingInfo = async () => {
+    if (!user?.tenant_id) return;
+    try {
+      const res: any = await api.pollRegistrationStatus(user.tenant_id);
+      setBillingInfo(res?.data ?? res);
+    } catch {
+      // ignore — billing tab just won't show details
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'billing') loadBillingInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handlePayBilling = async () => {
+    if (!user?.tenant_id) return;
+    if (!billingPhone.trim()) { setBillingError('Enter the M-Pesa phone number to pay from.'); return; }
+    setBillingError('');
+    setBillingMessage('');
+    setBillingLoading(true);
+    try {
+      const res: any = await api.initiateRegistrationPayment(user.tenant_id, billingPhone);
+      setBillingMessage(res?.message || 'M-Pesa prompt sent. Enter your PIN to complete payment.');
+      setTimeout(loadBillingInfo, 6000);
+    } catch (err: any) {
+      setBillingError(err?.response?.data?.message || err?.data?.message || err?.message || 'Could not start payment. Please try again.');
+    } finally {
+      setBillingLoading(false);
+    }
+  };
   const sound = useSoundSettings();
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -299,6 +342,15 @@ export function SettingsPage() {
         >
           <CreditCard className="h-4 w-4 inline mr-2" />
           Payments
+        </button>
+        <button
+          onClick={() => setActiveTab('billing')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'billing' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Wallet className="h-4 w-4 inline mr-2" />
+          Billing
         </button>
         <button
           onClick={() => setActiveTab('sounds')}
@@ -969,6 +1021,82 @@ export function SettingsPage() {
               </Button>
               <p className="text-xs text-gray-400">
                 Get these keys from your IntaSend dashboard under Settings → API Keys. The webhook challenge must match what you set when adding the webhook URL in IntaSend.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Billing Tab: this school's own subscription with SkulManager ── */}
+      {activeTab === 'billing' && (
+        <div className="space-y-6 max-w-xl">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Your School's Subscription
+              </CardTitle>
+              <p className="text-sm text-gray-500">
+                Registration deposit, balance, and annual renewal payments for your SkulManager account.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {billingError && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-600">{billingError}</p>
+                </div>
+              )}
+              {billingMessage && (
+                <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Phone className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-700">{billingMessage}</p>
+                </div>
+              )}
+
+              {billingInfo?.status === 'active' && !billingInfo?.balancePaid && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-1">
+                  <p className="text-sm font-semibold text-orange-800">
+                    KSh {Number(billingInfo.balanceAmount || 50000).toLocaleString()} balance due
+                  </p>
+                  {billingInfo.balanceDaysLeft !== null && billingInfo.balanceDaysLeft !== undefined && (
+                    <p className="text-xs text-orange-700">
+                      {billingInfo.balanceDaysLeft} day{billingInfo.balanceDaysLeft === 1 ? '' : 's'} left to pay before the account is automatically suspended.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {billingInfo?.status === 'active' && billingInfo?.balancePaid && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-1">
+                  <p className="text-sm font-semibold text-green-800">Registration fully paid</p>
+                  {billingInfo.subscriptionEnd && (
+                    <p className="text-xs text-green-700">
+                      Subscription active until {new Date(billingInfo.subscriptionEnd).toLocaleDateString()}. Renew after that date to keep access.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="billing_phone">M-Pesa Phone Number</Label>
+                <Input
+                  id="billing_phone"
+                  value={billingPhone}
+                  onChange={(e) => setBillingPhone(e.target.value)}
+                  placeholder="07XXXXXXXX"
+                />
+              </div>
+
+              <Button onClick={handlePayBilling} disabled={billingLoading}>
+                {billingLoading
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending M-Pesa prompt...</>
+                  : billingInfo?.balancePaid
+                    ? 'Pay Renewal via M-Pesa'
+                    : 'Pay Balance via M-Pesa'}
+              </Button>
+              <p className="text-xs text-gray-400">
+                We detect payment automatically once you enter your M-Pesa PIN. Refresh this page to see the updated status.
               </p>
             </CardContent>
           </Card>

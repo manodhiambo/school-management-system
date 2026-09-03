@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Clock, X, Phone, Mail, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Clock, X, Phone, Mail, AlertTriangle, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
 
 export function TrialBanner() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const [trialInfo, setTrialInfo] = useState<any>(null);
   const [dismissed, setDismissed] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
@@ -25,13 +27,28 @@ export function TrialBanner() {
 
   if (!canShow || !trialInfo || dismissed) return null;
 
-  const { trialDaysLeft, status } = trialInfo;
+  const { trialDaysLeft, status, balancePaid, balanceDaysLeft, depositPaid } = trialInfo;
 
-  // Only show banner for trial status or expired
-  if (status !== 'trial' && status !== 'expired') return null;
+  // Legacy free-trial tenants (grandfathered / not yet converted)
+  const isLegacyTrial = status === 'trial' || status === 'expired';
+  // New flow: approved and active, but the KSh 50,000 balance isn't paid yet
+  const isBalanceDue = status === 'active' && depositPaid && balancePaid === false;
+
+  if (!isLegacyTrial && !isBalanceDue) return null;
 
   const isExpired = status === 'expired' || trialDaysLeft === 0;
-  const isUrgent = trialDaysLeft <= 2;
+  const isUrgent = isBalanceDue ? (balanceDaysLeft !== null && balanceDaysLeft <= 2) : trialDaysLeft <= 2;
+
+  const label = isBalanceDue
+    ? `KSh 50,000 balance due — ${balanceDaysLeft} day${balanceDaysLeft !== 1 ? 's' : ''} left before automatic suspension.`
+    : isExpired
+      ? 'Your trial has expired. Activate your school to restore access.'
+      : `Trial active — ${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} remaining. Activate to continue after trial.`;
+
+  const handlePrimaryAction = () => {
+    if (isBalanceDue) { navigate('/app/settings?tab=billing'); return; }
+    setShowContactModal(true);
+  };
 
   return (
     <>
@@ -44,28 +61,23 @@ export function TrialBanner() {
           : 'bg-amber-400 text-amber-900'
       }`}>
         <div className="flex items-center space-x-2 min-w-0">
-          {isExpired
+          {isExpired || isBalanceDue
             ? <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             : <Clock className="h-4 w-4 flex-shrink-0" />
           }
-          <span className="font-medium truncate">
-            {isExpired
-              ? 'Your trial has expired. Activate your school to restore access.'
-              : `Trial active — ${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} remaining. Activate to continue after trial.`
-            }
-          </span>
+          <span className="font-medium truncate">{label}</span>
         </div>
 
         <div className="flex items-center space-x-2 flex-shrink-0 ml-3">
           <button
-            onClick={() => setShowContactModal(true)}
+            onClick={handlePrimaryAction}
             className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
               isExpired || isUrgent
                 ? 'bg-white text-red-700 hover:bg-gray-100'
                 : 'bg-amber-800 text-white hover:bg-amber-900'
             }`}
           >
-            Contact Us to Activate
+            {isBalanceDue ? <><Wallet className="h-3 w-3 inline mr-1" />Pay Balance Now</> : 'Contact Us to Activate'}
           </button>
           {!isExpired && (
             <button onClick={() => setDismissed(true)} className="opacity-70 hover:opacity-100">

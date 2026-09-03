@@ -59,6 +59,37 @@ export async function expireEndedTrials() {
 }
 
 /**
+ * Auto-suspends tenants whose KSh 50,000 registration balance wasn't paid
+ * within 5 days of their deposit (balance_due_at, set when the deposit
+ * payment succeeds — see schoolRegistrationRoutes.js POST /mpesa/callback).
+ * They were approved by a superadmin and had live access during that window.
+ */
+export async function expireUnpaidBalances() {
+  try {
+    const expired = await query(
+      `UPDATE tenants
+       SET status = 'suspended', suspended_at = NOW(), updated_at = NOW()
+       WHERE status = 'active'
+         AND deposit_paid = true
+         AND balance_paid = false
+         AND balance_due_at IS NOT NULL
+         AND balance_due_at < NOW()
+       RETURNING id, school_name`
+    );
+
+    for (const tenant of expired) {
+      logger.warn(`Auto-suspended tenant (registration balance unpaid): ${tenant.school_name} (${tenant.id})`);
+      await notifyCompanyOfSuspension(tenant, 'KSh 50,000 registration balance not paid within 5 days of deposit');
+    }
+
+    return expired.length;
+  } catch (err) {
+    logger.error('expireUnpaidBalances job failed:', err.message);
+    return 0;
+  }
+}
+
+/**
  * Auto-suspends tenants whose paid (annual) subscription has ended without
  * renewal — they must stay suspended until payment is confirmed and a
  * superadmin reactivates them.
@@ -86,14 +117,19 @@ export async function expireEndedSubscriptions() {
 
 export function startTenantExpiryJob() {
   // Catch anything that expired while the server was down.
+  // expireEndedTrials() is legacy — free self-serve trials were removed in
+  // favor of the deposit + review flow, but it stays as a safety net for any
+  // stray tenant still in status='trial'.
   expireEndedTrials();
+  expireUnpaidBalances();
   expireEndedSubscriptions();
 
   // Then re-check every 15 minutes.
   cron.schedule('*/15 * * * *', () => {
     expireEndedTrials();
+    expireUnpaidBalances();
     expireEndedSubscriptions();
   });
 
-  logger.info('Tenant expiry job scheduled (trial + subscription, every 15 minutes)');
+  logger.info('Tenant expiry job scheduled (trial + unpaid balance + subscription, every 15 minutes)');
 }

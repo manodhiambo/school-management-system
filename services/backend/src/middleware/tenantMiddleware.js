@@ -48,10 +48,17 @@ export const requireActiveTenant = async (req, res, next) => {
       });
     }
 
-    if (rows[0].status === 'pending') {
+    if (rows[0].status === 'pending' || rows[0].status === 'pending_deposit') {
       return res.status(403).json({
         success: false,
-        message: 'School registration is pending payment. Please complete payment to activate.'
+        message: 'School registration is pending the KSh 50,000 deposit payment. Please complete payment to submit for review.'
+      });
+    }
+
+    if (rows[0].status === 'pending_review') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your deposit was received. Registration is pending review — we will activate your account shortly.'
       });
     }
 

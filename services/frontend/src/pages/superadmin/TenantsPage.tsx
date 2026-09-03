@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2, Search, Plus, CheckCircle, XCircle, LogIn, Trash2, Edit2,
   X, Loader2, AlertCircle, DollarSign, Calendar, Phone, Mail, Clock,
@@ -23,8 +23,16 @@ type Tenant = {
   admin_user_id?: string;
   school_code?: string;
   subdomain?: string;
-  status: 'trial' | 'active' | 'suspended' | 'expired' | 'cancelled';
+  status: 'pending_deposit' | 'pending_review' | 'trial' | 'active' | 'suspended' | 'expired' | 'cancelled';
   is_demo?: boolean;
+  registration_number?: string;
+  deposit_paid?: boolean;
+  deposit_amount?: number;
+  balance_paid?: boolean;
+  balance_amount?: number;
+  balance_due_at?: string;
+  review_status?: 'not_required' | 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string;
   subscription_starts_at?: string;
   subscription_ends_at?: string;
   trial_ends_at?: string;
@@ -38,21 +46,24 @@ type ModalType = 'create' | 'edit' | 'payments' | 'extend' | 'permanent_delete' 
 type TenantModule = { key: string; label: string; enabled: boolean };
 
 const STATUS_COLORS: Record<string, string> = {
-  active:    'bg-green-100 text-green-700 border-green-200',
-  trial:     'bg-blue-100 text-blue-700 border-blue-200',
-  suspended: 'bg-red-100 text-red-700 border-red-200',
-  expired:   'bg-gray-100 text-gray-700 border-gray-200',
-  cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
+  active:           'bg-green-100 text-green-700 border-green-200',
+  trial:            'bg-blue-100 text-blue-700 border-blue-200',
+  pending_deposit:  'bg-orange-100 text-orange-700 border-orange-200',
+  pending_review:   'bg-amber-100 text-amber-700 border-amber-200',
+  suspended:        'bg-red-100 text-red-700 border-red-200',
+  expired:          'bg-gray-100 text-gray-700 border-gray-200',
+  cancelled:        'bg-gray-100 text-gray-500 border-gray-200',
 };
 
 export function TenantsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { setAuth, user: currentUser } = useAuthStore();
+  const [searchParams] = useSearchParams();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [modal, setModal] = useState<ModalType>(null);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [payments, setPayments] = useState<any[]>([]);
@@ -150,6 +161,23 @@ export function TenantsPage() {
     setActionLoading('suspend_' + t.id);
     try { await api.suspendTenant(t.id); await loadTenants(); }
     catch (err: any) { alert(err?.message || 'Failed to suspend'); }
+    finally { setActionLoading(''); setOpenMenu(null); }
+  };
+
+  const handleApproveRegistration = async (t: Tenant) => {
+    if (!window.confirm(`Approve ${t.school_name}? Their admin login will be activated immediately.`)) return;
+    setActionLoading('approve_' + t.id);
+    try { await api.approveTenantRegistration(t.id); await loadTenants(); }
+    catch (err: any) { alert(err?.message || 'Failed to approve registration'); }
+    finally { setActionLoading(''); setOpenMenu(null); }
+  };
+
+  const handleRejectRegistration = async (t: Tenant) => {
+    const reason = window.prompt(`Reject ${t.school_name}? Enter a reason (sent to the school by email):`);
+    if (reason === null) return;
+    setActionLoading('reject_' + t.id);
+    try { await api.rejectTenantRegistration(t.id, reason); await loadTenants(); }
+    catch (err: any) { alert(err?.message || 'Failed to reject registration'); }
     finally { setActionLoading(''); setOpenMenu(null); }
   };
 
@@ -275,8 +303,10 @@ export function TenantsPage() {
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-yellow-400">
           <option value="">All Statuses</option>
+          <option value="pending_deposit">Pending Deposit</option>
+          <option value="pending_review">Pending Review</option>
           <option value="active">Active</option>
-          <option value="trial">Trial</option>
+          <option value="trial">Trial (legacy)</option>
           <option value="suspended">Suspended</option>
           <option value="expired">Expired</option>
           <option value="cancelled">Cancelled</option>
@@ -338,6 +368,16 @@ export function TenantsPage() {
                         </p>
                       )}
                       <p className="text-xs text-gray-400 mt-0.5">Registered: {new Date(t.created_at).toLocaleDateString()}</p>
+                      {t.status === 'pending_review' && (
+                        <p className="text-xs text-amber-600 mt-0.5 font-medium">
+                          Deposit paid — awaiting your approval{t.balance_due_at ? ` (balance due ${new Date(t.balance_due_at).toLocaleDateString()})` : ''}
+                        </p>
+                      )}
+                      {t.status === 'active' && t.deposit_paid && !t.balance_paid && t.balance_due_at && (
+                        <p className="text-xs text-orange-600 mt-0.5 font-medium">
+                          KSh {Number(t.balance_amount || 0).toLocaleString()} balance due {new Date(t.balance_due_at).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -378,6 +418,21 @@ export function TenantsPage() {
                           <Clock className="h-4 w-4 mr-2" /> Extend Subscription
                         </button>
                         <hr className="my-1" />
+                        {t.status === 'pending_review' && (
+                          <>
+                            <button onClick={() => handleApproveRegistration(t)} disabled={!!actionLoading}
+                              className="w-full flex items-center px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 disabled:opacity-50">
+                              {actionLoading === 'approve_' + t.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                              Approve Registration
+                            </button>
+                            <button onClick={() => handleRejectRegistration(t)} disabled={!!actionLoading}
+                              className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
+                              {actionLoading === 'reject_' + t.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
+                              Reject Registration
+                            </button>
+                            <hr className="my-1" />
+                          </>
+                        )}
                         {t.status !== 'active' ? (
                           <button onClick={() => handleActivate(t)} disabled={!!actionLoading}
                             className="w-full flex items-center px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 disabled:opacity-50">

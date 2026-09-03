@@ -534,7 +534,7 @@ export function LandingPage() {
             </div>
             <Button className="bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold shrink-0"
               onClick={() => navigate('/register')}>
-              Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
+              Register Your School <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -679,7 +679,8 @@ export function LandingPage() {
           <div className="rounded-2xl border-2 border-blue-600 p-8 sm:p-10 bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl text-center max-w-2xl mx-auto">
             <h3 className="text-2xl font-bold mb-2">Talk to Our Team</h3>
             <p className="text-blue-100 mb-8">
-              Reach out and we'll walk you through pricing based on your school's size and needs. Every school also gets a free 5-day trial with full access before committing to anything.
+              Reach out and we'll walk you through pricing based on your school's size and needs. Want to see it in
+              action first? Try the live demo above — no signup needed.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a href="tel:0110421320">
@@ -694,7 +695,7 @@ export function LandingPage() {
               </a>
               <Button className="w-full bg-white text-blue-700 hover:bg-gray-100 font-bold"
                 onClick={() => navigate('/register')}>
-                Start Free Trial
+                Register Your School
               </Button>
             </div>
             <ul className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
@@ -759,12 +760,13 @@ export function LandingPage() {
             Ready to Transform<br />Your School?
           </h2>
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-            Join hundreds of Kenyan schools already using Skul Manager — start your 30-day free trial today, no credit card required.
+            Join hundreds of Kenyan schools already using Skul Manager — register with a KSh 50,000 deposit, or try
+            the live demo first with no signup needed.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Button size="lg" className="bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold text-base px-10 group"
               onClick={() => navigate('/register')}>
-              Register Your School Free
+              Register Your School
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <a href="tel:0110421320">
@@ -883,8 +885,8 @@ export function LandingPage() {
                 </div>
               </div>
               <div className="mt-4 p-3 bg-yellow-900/20 rounded-lg border border-yellow-800/30">
-                <p className="text-yellow-300 text-xs font-semibold mb-1">30-Day Free Trial</p>
-                <p className="text-gray-400 text-xs">No credit card required. Full access to all modules.</p>
+                <p className="text-yellow-300 text-xs font-semibold mb-1">Live Demo Available</p>
+                <p className="text-gray-400 text-xs">Explore every module with sample data — no signup needed.</p>
               </div>
             </div>
           </div>

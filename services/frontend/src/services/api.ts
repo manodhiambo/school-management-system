@@ -1387,11 +1387,15 @@ class ApiService {
     contactPerson: string;
     adminEmail: string;
     adminPassword: string;
+    registrationNumber: string;
     schoolAddress?: string;
     county?: string;
-    registrationNumber?: string;
   }) {
     return this.api.post('/registration/register', data);
+  }
+
+  initiateRegistrationDeposit(tenantId: string, phone: string) {
+    return this.api.post('/registration/deposit', { tenantId, phone });
   }
 
   initiateRegistrationPayment(_tenantId: string, phone: string) {
@@ -1484,6 +1488,14 @@ class ApiService {
 
   suspendTenant(id: string) {
     return this.api.post('/superadmin/tenants/' + id + '/suspend');
+  }
+
+  approveTenantRegistration(id: string) {
+    return this.api.post('/superadmin/tenants/' + id + '/approve-registration');
+  }
+
+  rejectTenantRegistration(id: string, reason?: string) {
+    return this.api.post('/superadmin/tenants/' + id + '/reject-registration', { reason });
   }
 
   extendTenantSubscription(id: string, months: number) {

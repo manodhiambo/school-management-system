@@ -358,6 +358,89 @@ const templates = {
     text: `Tenant auto-suspended\n\nSchool: ${data.schoolName}\nTenant ID: ${data.tenantId}\nReason: ${data.reason}\nSuspended at: ${data.suspendedAt}\n\nThey remain suspended until payment is confirmed.`
   }),
 
+  tenantPendingReview: (data) => ({
+    subject: `New registration awaiting review: ${data.schoolName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin:0;">Registration Awaiting Review</h1>
+          </div>
+          <div style="background: #fff; padding: 30px; border: 1px solid #ddd;">
+            <p>A school paid the KSh ${Number(data.depositAmount).toLocaleString()} registration deposit and is waiting for approval:</p>
+            <div style="background: #eff6ff; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <p><strong>School:</strong> ${data.schoolName}</p>
+              <p><strong>Admin email:</strong> ${data.adminEmail}</p>
+              <p><strong>Tenant ID:</strong> ${data.tenantId}</p>
+            </div>
+            <p>Log in to the Superadmin dashboard → Tenant Schools to approve or reject this registration.</p>
+          </div>
+          <div style="background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px;">
+            <p>Automated notice from Skul Manager</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Registration awaiting review\n\nSchool: ${data.schoolName}\nAdmin email: ${data.adminEmail}\nTenant ID: ${data.tenantId}\n\nApprove or reject from the Superadmin dashboard.`
+  }),
+
+  tenantApproved: (data) => ({
+    subject: `Your school is approved: ${data.schoolName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: #16a34a; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin:0;">You're Approved!</h1>
+          </div>
+          <div style="background: #fff; padding: 30px; border: 1px solid #ddd;">
+            <p>Great news — <strong>${data.schoolName}</strong> has been reviewed and approved. Your admin account is now active.</p>
+            <p><strong>Login email:</strong> ${data.adminEmail}</p>
+            <p>You have <strong>${data.balanceDueDays} days</strong> from your deposit payment to clear the remaining KSh ${Number(data.balanceAmount).toLocaleString()} balance from Settings → Billing, or the account will be automatically suspended.</p>
+            <a href="${data.loginUrl}" style="display:inline-block; margin-top:12px; padding:10px 20px; background:#16a34a; color:#fff; text-decoration:none; border-radius:6px;">Log In Now</a>
+          </div>
+          <div style="background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px;">
+            <p>Skul Manager · info@helvino.org · 0110 421 320</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `You're approved!\n\n${data.schoolName} has been reviewed and approved. Login email: ${data.adminEmail}\n\nClear the remaining KSh ${Number(data.balanceAmount).toLocaleString()} balance within ${data.balanceDueDays} days of your deposit payment, or the account will be auto-suspended.\n\nLog in: ${data.loginUrl}`
+  }),
+
+  tenantRejected: (data) => ({
+    subject: `Registration update: ${data.schoolName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin:0;">Registration Not Approved</h1>
+          </div>
+          <div style="background: #fff; padding: 30px; border: 1px solid #ddd;">
+            <p>We were unable to approve the registration for <strong>${data.schoolName}</strong>.</p>
+            ${data.reason ? `<div style="background: #fef2f2; border-radius: 8px; padding: 16px; margin: 16px 0;"><p><strong>Reason:</strong> ${data.reason}</p></div>` : ''}
+            <p>Please contact us at info@helvino.org or 0110 421 320 to resolve this.</p>
+          </div>
+          <div style="background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px;">
+            <p>Skul Manager</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Registration not approved for ${data.schoolName}.\n${data.reason ? `Reason: ${data.reason}\n` : ''}\nContact info@helvino.org or 0110 421 320.`
+  }),
+
   message: (data) => ({
     subject: `New Message: ${data.subject || 'You have a message'}`,
     html: `

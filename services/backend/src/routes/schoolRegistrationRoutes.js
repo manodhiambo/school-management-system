@@ -5,14 +5,41 @@ import { query } from '../config/database.js';
 import { initiateSTKPush, formatPhone } from '../services/mpesaService.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { blockDemoSideEffects } from '../middleware/demoGuard.js';
+import { sendEmail } from '../services/emailService.js';
+import { sendSMSViaProvider, normalisePhone } from './smsRoutes.js';
 import logger from '../utils/logger.js';
 import { seedTenantData } from '../utils/seedTenantData.js';
 
 const router = express.Router();
 
-const REGISTRATION_FEE = 100000; // KES 100,000
-const RENEWAL_FEE = 40000;       // KES 40,000
-const TRIAL_DAYS = 5;
+const DEPOSIT_AMOUNT = 50000; // KES 50,000 — paid at registration to start review
+const BALANCE_AMOUNT = 50000; // KES 50,000 — remaining balance of the 100,000 registration fee
+const BALANCE_DUE_DAYS = 5;   // must be cleared within this many days of the deposit
+const RENEWAL_FEE = 40000;    // KES 40,000 — annual renewal after the first year
+
+const NOTIFY_EMAIL = 'info@helvino.org';
+const NOTIFY_PHONE = normalisePhone('0110421320');
+
+async function notifyCompanyOfPendingReview(tenant) {
+  try {
+    await sendEmail(NOTIFY_EMAIL, 'tenantPendingReview', {
+      schoolName: tenant.school_name,
+      tenantId: tenant.id,
+      adminEmail: tenant.admin_email,
+      depositAmount: DEPOSIT_AMOUNT,
+    });
+  } catch (err) {
+    logger.error('Failed to email pending-review notice:', err.message);
+  }
+  try {
+    await sendSMSViaProvider(
+      NOTIFY_PHONE,
+      `SkulManager: "${tenant.school_name}" paid the KSh ${DEPOSIT_AMOUNT.toLocaleString()} deposit and is awaiting registration review/approval.`
+    );
+  } catch (err) {
+    logger.error('Failed to SMS pending-review notice:', err.message);
+  }
+}
 
 // Helper: generate unique school_code
 function generateSchoolCode(schoolName) {
@@ -27,8 +54,10 @@ function generatePaymentNumber() {
 }
 
 // ============================================================
-// POST /register — Register a new school, start 5-day trial
-// No payment required upfront — admin account created immediately
+// POST /register — Register a new school
+// No account access is granted until the deposit is paid AND a
+// superadmin approves the registration (see /deposit, /mpesa/callback,
+// and superadminRoutes.js POST /tenants/:id/approve-registration).
 // ============================================================
 router.post('/register', async (req, res) => {
   try {
@@ -46,11 +75,12 @@ router.post('/register', async (req, res) => {
 
     // Validate required fields
     const missing = [];
-    if (!schoolName)    missing.push('schoolName');
-    if (!schoolEmail)   missing.push('schoolEmail');
-    if (!schoolPhone)   missing.push('schoolPhone');
-    if (!adminEmail)    missing.push('adminEmail');
-    if (!adminPassword) missing.push('adminPassword');
+    if (!schoolName)          missing.push('schoolName');
+    if (!schoolEmail)         missing.push('schoolEmail');
+    if (!schoolPhone)         missing.push('schoolPhone');
+    if (!registrationNumber)  missing.push('registrationNumber');
+    if (!adminEmail)          missing.push('adminEmail');
+    if (!adminPassword)       missing.push('adminPassword');
 
     if (missing.length > 0) {
       return res.status(400).json({
@@ -104,26 +134,24 @@ router.post('/register', async (req, res) => {
     }
     const schema_name = `tenant_${school_code.toLowerCase()}`;
 
-    // Trial ends TRIAL_DAYS from now
-    const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
-
-    // Create tenant record with 'trial' status
+    // Create tenant record — pending_deposit until the deposit is paid
     const tenantResult = await query(`
       INSERT INTO tenants (
         school_name, email, phone, address, county, country,
         admin_email, school_code, subdomain, schema_name,
-        status, trial_ends_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, 'Kenya', $6, $7, $8, $9, 'trial', $10, NOW())
+        registration_number, status, deposit_amount, balance_amount, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, 'Kenya', $6, $7, $8, $9, $10, 'pending_deposit', $11, $12, NOW())
       RETURNING *
     `, [
       schoolName, schoolEmail, formattedPhone, schoolAddress || null, county || null,
-      adminEmail, school_code, subdomain, schema_name, trialEndsAt.toISOString()
+      adminEmail, school_code, subdomain, schema_name, registrationNumber,
+      DEPOSIT_AMOUNT, BALANCE_AMOUNT
     ]);
 
     const tenant = tenantResult[0];
 
-    // Create admin user immediately (no payment needed for trial)
+    // Create the admin user now, but inactive — it stays inactive until a
+    // superadmin approves the registration after the deposit is confirmed.
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
     const newUserId = uuidv4();
 
@@ -131,7 +159,7 @@ router.post('/register', async (req, res) => {
       INSERT INTO users (
         id, email, password, role, tenant_id,
         is_active, is_verified, created_at, updated_at
-      ) VALUES ($1, $2, $3, 'admin', $4, true, true, NOW(), NOW())
+      ) VALUES ($1, $2, $3, 'admin', $4, false, true, NOW(), NOW())
     `, [newUserId, adminEmail, hashedPassword, tenant.id]);
 
     // Link admin user back to tenant
@@ -152,18 +180,17 @@ router.post('/register', async (req, res) => {
       logger.warn(`Tenant seed failed for ${tenant.id}: ${seedErr.message}`);
     }
 
-    logger.info(`Trial registration complete: tenant=${tenant.id}, admin=${adminEmail}, trial_ends=${trialEndsAt.toISOString()}`);
+    logger.info(`School registered, awaiting deposit: tenant=${tenant.id}, admin=${adminEmail}`);
 
     res.status(201).json({
       success: true,
-      message: `Your ${TRIAL_DAYS}-day free trial has started! Login with your email and password.`,
+      message: `Registration received. Pay a KSh ${DEPOSIT_AMOUNT.toLocaleString()} deposit to submit your school for activation review.`,
       data: {
-        tenantId:   tenant.id,
-        schoolName: tenant.school_name,
+        tenantId:      tenant.id,
+        schoolName:    tenant.school_name,
         adminEmail,
-        status:     'trial',
-        trialEndsAt: trialEndsAt.toISOString(),
-        trialDays:  TRIAL_DAYS
+        status:        'pending_deposit',
+        depositAmount: DEPOSIT_AMOUNT
       }
     });
   } catch (error) {
@@ -173,8 +200,93 @@ router.post('/register', async (req, res) => {
 });
 
 // ============================================================
-// POST /pay — Initiate M-Pesa payment to activate full subscription
-// Can be called during trial or after expiry
+// POST /deposit — Initiate the M-Pesa deposit payment (public, keyed by
+// tenantId — the admin account isn't active yet so there's no JWT to use).
+// ============================================================
+router.post('/deposit', async (req, res) => {
+  try {
+    const { tenantId, phone } = req.body;
+
+    if (!tenantId || !phone) {
+      return res.status(400).json({ success: false, message: 'tenantId and phone are required' });
+    }
+
+    const tenants = await query('SELECT * FROM tenants WHERE id = $1', [tenantId]);
+    if (tenants.length === 0) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+    const tenant = tenants[0];
+
+    if (tenant.status !== 'pending_deposit') {
+      return res.status(409).json({
+        success: false,
+        message: tenant.deposit_paid
+          ? 'The deposit has already been paid for this school.'
+          : `This school's registration is no longer awaiting a deposit (current status: ${tenant.status}).`
+      });
+    }
+
+    let formattedPhone;
+    try {
+      formattedPhone = formatPhone(phone);
+    } catch (phoneErr) {
+      return res.status(400).json({ success: false, message: phoneErr.message });
+    }
+
+    const amount = Number(tenant.deposit_amount) || DEPOSIT_AMOUNT;
+    const paymentNumber = generatePaymentNumber();
+    const paymentResult = await query(`
+      INSERT INTO tenant_payments (
+        tenant_id, payment_number, amount, currency, payment_method,
+        payment_provider, mpesa_phone_number, status, notes, created_at, updated_at
+      ) VALUES ($1, $2, $3, 'KES', 'mpesa', 'safaricom', $4, 'pending', 'deposit', NOW(), NOW())
+      RETURNING *
+    `, [tenantId, paymentNumber, amount, formattedPhone]);
+
+    const payment = paymentResult[0];
+    let checkoutRequestId = null;
+    let stkMessage = '';
+
+    try {
+      const stkResponse = await initiateSTKPush(
+        formattedPhone,
+        amount,
+        `DEPOSIT-${tenant.school_code}`,
+        'SchoolRegistrationDeposit'
+      );
+
+      checkoutRequestId = stkResponse.CheckoutRequestID;
+
+      await query(`
+        UPDATE tenant_payments SET
+          mpesa_checkout_request_id = $1,
+          mpesa_transaction_id = $2,
+          updated_at = NOW()
+        WHERE id = $3
+      `, [checkoutRequestId, stkResponse.MerchantRequestID || null, payment.id]);
+
+      logger.info(`Deposit STK Push sent for tenant ${tenantId}, checkoutRequestId=${checkoutRequestId}`);
+    } catch (stkErr) {
+      logger.warn(`Deposit STK Push failed: ${stkErr.message}`);
+      stkMessage = stkErr.message;
+    }
+
+    res.json({
+      success: true,
+      message: checkoutRequestId
+        ? `M-Pesa prompt sent to ${phone}. Enter your PIN to pay the KSh ${amount.toLocaleString()} deposit.`
+        : `Could not send M-Pesa prompt: ${stkMessage}. Please try again.`,
+      data: { paymentId: payment.id, paymentNumber, checkoutRequestId, amount }
+    });
+  } catch (error) {
+    logger.error('Deposit initiation error:', error);
+    res.status(500).json({ success: false, message: 'Deposit payment failed. Please try again.', error: error.message });
+  }
+});
+
+// ============================================================
+// POST /pay — Initiate M-Pesa payment for the remaining balance
+// (after the deposit + approval) or the annual renewal fee.
 // ============================================================
 router.post('/pay', authenticate, blockDemoSideEffects('an M-Pesa payment'), async (req, res) => {
   try {
@@ -202,10 +314,17 @@ router.post('/pay', authenticate, blockDemoSideEffects('an M-Pesa payment'), asy
       });
     }
 
-    // Determine amount: registration fee (first-time) or renewal
-    const isFirstPayment = !tenant.subscription_starts_at;
-    const amount = isFirstPayment ? REGISTRATION_FEE : RENEWAL_FEE;
-    const paymentType = isFirstPayment ? 'registration' : 'renewal';
+    if (!tenant.deposit_paid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please pay the registration deposit first via the registration page.'
+      });
+    }
+
+    // Determine amount: remaining balance (first year) or annual renewal
+    const isBalanceDue = !tenant.balance_paid;
+    const amount = isBalanceDue ? (Number(tenant.balance_amount) || BALANCE_AMOUNT) : RENEWAL_FEE;
+    const paymentType = isBalanceDue ? 'balance' : 'renewal';
 
     let formattedPhone;
     try {
@@ -232,7 +351,7 @@ router.post('/pay', authenticate, blockDemoSideEffects('an M-Pesa payment'), asy
         formattedPhone,
         amount,
         `${paymentType.toUpperCase()}-${tenant.school_code}`,
-        paymentType === 'registration' ? 'SchoolActivation' : 'Renewal'
+        paymentType === 'balance' ? 'RegistrationBalance' : 'Renewal'
       );
 
       checkoutRequestId = stkResponse.CheckoutRequestID;
@@ -272,6 +391,7 @@ router.post('/pay', authenticate, blockDemoSideEffects('an M-Pesa payment'), asy
 
 // ============================================================
 // POST /mpesa/callback — M-Pesa STK callback (public, called by Safaricom)
+// Handles deposit, balance, and renewal payments based on tenant_payments.notes
 // ============================================================
 router.post('/mpesa/callback', async (req, res) => {
   try {
@@ -307,9 +427,6 @@ router.post('/mpesa/callback', async (req, res) => {
         if (item.Name === 'MpesaReceiptNumber') mpesaReceiptNumber = item.Value;
       });
 
-      const oneYearFromNow = new Date();
-      oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-
       await query(`
         UPDATE tenant_payments SET
           status = 'completed',
@@ -320,17 +437,49 @@ router.post('/mpesa/callback', async (req, res) => {
         WHERE id = $3
       `, [mpesaReceiptNumber, JSON.stringify(req.body), payment.id]);
 
-      // Activate tenant with full subscription
-      await query(`
-        UPDATE tenants SET
-          status = 'active',
-          subscription_starts_at = NOW(),
-          subscription_ends_at = $1,
-          updated_at = NOW()
-        WHERE id = $2
-      `, [oneYearFromNow.toISOString(), payment.tenant_id]);
+      if (payment.notes === 'deposit') {
+        const tenantRows = await query(`
+          UPDATE tenants SET
+            deposit_paid = true,
+            deposit_paid_at = NOW(),
+            balance_due_at = NOW() + INTERVAL '${BALANCE_DUE_DAYS} days',
+            status = 'pending_review',
+            review_status = 'pending',
+            updated_at = NOW()
+          WHERE id = $1
+          RETURNING *
+        `, [payment.tenant_id]);
 
-      logger.info(`Payment successful for tenant ${payment.tenant_id}, receipt: ${mpesaReceiptNumber}`);
+        logger.info(`Deposit paid for tenant ${payment.tenant_id}, receipt: ${mpesaReceiptNumber}, now pending review`);
+        if (tenantRows[0]) {
+          notifyCompanyOfPendingReview(tenantRows[0]).catch(() => {});
+        }
+      } else if (payment.notes === 'balance') {
+        await query(`
+          UPDATE tenants SET
+            balance_paid = true,
+            balance_paid_at = NOW(),
+            updated_at = NOW()
+          WHERE id = $1
+        `, [payment.tenant_id]);
+
+        logger.info(`Balance paid for tenant ${payment.tenant_id}, receipt: ${mpesaReceiptNumber}`);
+      } else {
+        // renewal
+        const oneYearFromNow = new Date();
+        oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+        await query(`
+          UPDATE tenants SET
+            status = 'active',
+            subscription_ends_at = $1,
+            suspended_at = NULL,
+            updated_at = NOW()
+          WHERE id = $2
+        `, [oneYearFromNow.toISOString(), payment.tenant_id]);
+
+        logger.info(`Renewal paid for tenant ${payment.tenant_id}, receipt: ${mpesaReceiptNumber}`);
+      }
     } else {
       await query(`
         UPDATE tenant_payments SET
@@ -367,7 +516,9 @@ router.get('/check-activation/:tenantId', async (req, res) => {
     const { tenantId } = req.params;
 
     const tenants = await query(
-      `SELECT id, status, school_name, trial_ends_at, subscription_starts_at, subscription_ends_at
+      `SELECT id, status, school_name, deposit_paid, deposit_amount, deposit_paid_at,
+              balance_paid, balance_amount, balance_due_at, review_status, rejection_reason,
+              subscription_starts_at, subscription_ends_at
        FROM tenants WHERE id = $1`,
       [tenantId]
     );
@@ -378,10 +529,10 @@ router.get('/check-activation/:tenantId', async (req, res) => {
 
     const tenant = tenants[0];
     const now = new Date();
-    const trialEndsAt = tenant.trial_ends_at ? new Date(tenant.trial_ends_at) : null;
-    const trialDaysLeft = trialEndsAt
-      ? Math.max(0, Math.ceil((trialEndsAt - now) / (1000 * 60 * 60 * 24)))
-      : 0;
+    const balanceDueAt = tenant.balance_due_at ? new Date(tenant.balance_due_at) : null;
+    const balanceDaysLeft = balanceDueAt
+      ? Math.max(0, Math.ceil((balanceDueAt - now) / (1000 * 60 * 60 * 24)))
+      : null;
 
     res.json({
       success: true,
@@ -390,9 +541,15 @@ router.get('/check-activation/:tenantId', async (req, res) => {
         schoolName:        tenant.school_name,
         status:            tenant.status,
         active:            tenant.status === 'active',
-        isTrial:           tenant.status === 'trial',
-        trialEndsAt:       tenant.trial_ends_at,
-        trialDaysLeft,
+        depositPaid:       tenant.deposit_paid,
+        depositAmount:     tenant.deposit_amount,
+        depositPaidAt:     tenant.deposit_paid_at,
+        reviewStatus:      tenant.review_status,
+        rejectionReason:   tenant.rejection_reason,
+        balancePaid:       tenant.balance_paid,
+        balanceAmount:     tenant.balance_amount,
+        balanceDueAt:      tenant.balance_due_at,
+        balanceDaysLeft,
         subscriptionStart: tenant.subscription_starts_at,
         subscriptionEnd:   tenant.subscription_ends_at
       }

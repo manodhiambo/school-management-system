@@ -6,6 +6,7 @@ import { authenticate } from '../middleware/authMiddleware.js';
 import { MODULE_REGISTRY, MODULE_KEYS, isModuleKey } from '../config/moduleRegistry.js';
 import logger from '../utils/logger.js';
 import { config } from '../config/env.js';
+import { sendEmail } from '../services/emailService.js';
 import { logAction } from './auditLogRoutes.js';
 import { isValidIp, isPrivateIp } from '../utils/ipValidation.js';
 import { buildAuditContext } from '../utils/auditContext.js';
@@ -406,6 +407,107 @@ router.post('/tenants/:id/suspend', async (req, res) => {
 });
 
 // ============================================================
+// POST /tenants/:id/approve-registration — Approve a pending_review
+// registration: activates the tenant and its admin login.
+// ============================================================
+router.post('/tenants/:id/approve-registration', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await query('SELECT * FROM tenants WHERE id = $1', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+    const tenant = existing[0];
+    if (tenant.status !== 'pending_review') {
+      return res.status(409).json({ success: false, message: `Tenant is not pending review (current status: ${tenant.status})` });
+    }
+
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+    const result = await query(`
+      UPDATE tenants SET
+        status = 'active',
+        review_status = 'approved',
+        reviewed_by = $1,
+        reviewed_at = NOW(),
+        subscription_starts_at = NOW(),
+        subscription_ends_at = $2,
+        suspended_at = NULL,
+        updated_at = NOW()
+      WHERE id = $3
+      RETURNING *
+    `, [req.user.id, oneYearFromNow.toISOString(), id]);
+
+    if (tenant.admin_user_id) {
+      await query('UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1', [tenant.admin_user_id]);
+    }
+
+    const frontendUrl = config.frontendUrl || process.env.FRONTEND_URL || 'https://skulmanager.org';
+    sendEmail(tenant.admin_email, 'tenantApproved', {
+      schoolName: tenant.school_name,
+      adminEmail: tenant.admin_email,
+      balanceAmount: tenant.balance_amount,
+      balanceDueDays: tenant.balance_due_at
+        ? Math.max(1, Math.ceil((new Date(tenant.balance_due_at) - new Date()) / (1000 * 60 * 60 * 24)))
+        : 5,
+      loginUrl: `${frontendUrl}/login`,
+    }).catch(err => logger.error('Failed to email tenant-approved notice:', err.message));
+
+    logger.info(`Tenant registration approved by superadmin: ${id}`);
+    res.json({ success: true, message: 'Registration approved. Admin login is now active.', data: result[0] });
+  } catch (error) {
+    logger.error('Approve registration error:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve registration', error: error.message });
+  }
+});
+
+// ============================================================
+// POST /tenants/:id/reject-registration — Reject a pending_review
+// registration. The admin account stays inactive.
+// ============================================================
+router.post('/tenants/:id/reject-registration', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const existing = await query('SELECT * FROM tenants WHERE id = $1', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+    const tenant = existing[0];
+    if (tenant.status !== 'pending_review') {
+      return res.status(409).json({ success: false, message: `Tenant is not pending review (current status: ${tenant.status})` });
+    }
+
+    const result = await query(`
+      UPDATE tenants SET
+        status = 'suspended',
+        review_status = 'rejected',
+        reviewed_by = $1,
+        reviewed_at = NOW(),
+        rejection_reason = $2,
+        suspended_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $3
+      RETURNING *
+    `, [req.user.id, reason || null, id]);
+
+    sendEmail(tenant.admin_email, 'tenantRejected', {
+      schoolName: tenant.school_name,
+      reason: reason || null,
+    }).catch(err => logger.error('Failed to email tenant-rejected notice:', err.message));
+
+    logger.warn(`Tenant registration rejected by superadmin: ${id}, reason: ${reason || 'none given'}`);
+    res.json({ success: true, message: 'Registration rejected', data: result[0] });
+  } catch (error) {
+    logger.error('Reject registration error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject registration', error: error.message });
+  }
+});
+
+// ============================================================
 // POST /tenants/:id/extend — Extend subscription
 // ============================================================
 router.post('/tenants/:id/extend', async (req, res) => {
@@ -639,6 +741,8 @@ router.get('/stats', async (req, res) => {
         COUNT(*)                                                   AS total_tenants,
         COUNT(*) FILTER (WHERE status = 'active')                 AS active_tenants,
         COUNT(*) FILTER (WHERE status = 'trial')                  AS trial_tenants,
+        COUNT(*) FILTER (WHERE status = 'pending_deposit')        AS pending_deposit_tenants,
+        COUNT(*) FILTER (WHERE status = 'pending_review')         AS pending_review_tenants,
         COUNT(*) FILTER (WHERE status = 'suspended')              AS suspended,
         COUNT(*) FILTER (WHERE status = 'expired')                AS expired,
         COUNT(*) FILTER (WHERE status = 'cancelled')              AS cancelled,

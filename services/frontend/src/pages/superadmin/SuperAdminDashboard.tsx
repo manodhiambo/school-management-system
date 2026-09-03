@@ -58,12 +58,21 @@ export function SuperAdminDashboard() {
       desc: 'Currently active',
     },
     {
+      title: 'Pending Approval',
+      value: s.pending_review_tenants ?? 0,
+      icon: Clock,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+      desc: 'Deposit paid — awaiting your review',
+      link: '/superadmin/tenants?status=pending_review',
+    },
+    {
       title: 'Trial / Inactive',
-      value: (s.trial_tenants ?? 0) + (s.suspended ?? 0),
+      value: (s.trial_tenants ?? 0) + (s.suspended ?? 0) + (s.pending_deposit_tenants ?? 0),
       icon: XCircle,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      desc: 'On trial or suspended',
+      desc: 'Trial, awaiting deposit, or suspended',
     },
     {
       title: 'Total Revenue (KSh)',
@@ -107,20 +116,25 @@ export function SuperAdminDashboard() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {kpiCards.map(card => (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">{card.title}</CardTitle>
-              <div className={`p-2 rounded-lg ${card.bg}`}>
-                <card.icon className={`h-5 w-5 ${card.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {kpiCards.map(card => {
+          const content = (
+            <Card className={card.link ? 'hover:shadow-md transition-shadow cursor-pointer' : undefined}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">{card.title}</CardTitle>
+                <div className={`p-2 rounded-lg ${card.bg}`}>
+                  <card.icon className={`h-5 w-5 ${card.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
+                <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+              </CardContent>
+            </Card>
+          );
+          return card.link
+            ? <Link key={card.title} to={card.link}>{content}</Link>
+            : <div key={card.title}>{content}</div>;
+        })}
       </div>
 
       {/* Recent Registrations */}

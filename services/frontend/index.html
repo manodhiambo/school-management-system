@@ -8,8 +8,11 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#4f46e5" />
     <!-- CSP set here (not just via a backend header) since the frontend is static-hosted
-         separately from the API — a meta tag applies regardless of what serves this file. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.skulmanager.org https://school-management-api-pk37.onrender.com https://sandbox.safaricom.co.ke https://api.safaricom.co.ke https://payment.intasend.com https://api.intasend.com https://cdn.jsdelivr.net; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" />
+         separately from the API — a meta tag applies regardless of what serves this file.
+         frame-ancestors is omitted here: browsers ignore that directive entirely when
+         delivered via <meta> (spec limitation), so it's set for real as an HTTP response
+         header instead — see the "headers" block in vercel.json. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.skulmanager.org https://school-management-api-pk37.onrender.com https://sandbox.safaricom.co.ke https://api.safaricom.co.ke https://payment.intasend.com https://api.intasend.com https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

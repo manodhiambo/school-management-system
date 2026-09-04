@@ -95,11 +95,19 @@ const app = express();
 // Both Vercel and Render sit the app behind a reverse proxy that sets
 // X-Forwarded-For. Without `trust proxy`, Express's default is not to trust
 // that header, and express-rate-limit throws a ValidationError on every
-// request as a result (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) — trusting
-// exactly one hop (the platform's own edge proxy) is the standard fix and
-// also makes IP-based rate limiting key off the real client IP instead of
-// the proxy's.
-app.set('trust proxy', 1);
+// request as a result (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR).
+//
+// Trusting a fixed hop count (e.g. 1) is wrong here: Vercel's edge network
+// adds more than one hop, so `trust proxy: 1` resolved req.ip to an internal
+// Vercel address shared by many unrelated users, which collapsed everyone
+// into the same rate-limit bucket and caused mass false-positive 429s.
+// `true` trusts the whole chain and takes the left-most (original client)
+// entry, which is also what buildAuditContext.js already does independently
+// for audit-log IPs — this makes the two agree, and is safe because Vercel
+// (like Render) is the sole ingress: nothing can reach this process without
+// passing through the platform's own proxy first, so a client can't spoof
+// its way past it.
+app.set('trust proxy', true);
 
 // CORS configuration — CORS_ORIGIN is a comma-separated list of allowed
 // origins (set in the deploy environment); always allow local dev origins

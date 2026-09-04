@@ -2,6 +2,7 @@ import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { buildAuditContext } from '../utils/auditContext.js';
+import { deferred } from '../utils/deferred.js';
 
 // Routes that handle their own audit logging (skip auto-audit)
 const SKIP_PREFIXES = ['/api/v1/auth', '/api/v1/audit-log'];
@@ -48,7 +49,7 @@ export function autoAuditMiddleware(req, res, next) {
     const resourceId = req.params?.id || req.params?.studentId || null;
     const { ipAddress, userAgent, deviceType, browser, os } = buildAuditContext(req);
 
-    query(
+    deferred(query(
       `INSERT INTO audit_log
          (id, tenant_id, user_id, user_email, user_role, action, resource, resource_id,
           ip_address, user_agent, device_type, browser, os, http_method, request_path, status_code)
@@ -60,7 +61,7 @@ export function autoAuditMiddleware(req, res, next) {
         ipAddress, userAgent, deviceType, browser, os,
         req.method, req.originalUrl.split('?')[0], res.statusCode,
       ]
-    ).catch(err => logger.warn('autoAudit insert failed:', err.message));
+    ).catch(err => logger.warn('autoAudit insert failed:', err.message)));
   });
 
   next();

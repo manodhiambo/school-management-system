@@ -1,0 +1,15 @@
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    { "path": "/api/v1/cron/tenant-expiry", "schedule": "*/15 * * * *" },
+    { "path": "/api/v1/cron/period-reminders", "schedule": "* * * * *" },
+    { "path": "/api/v1/cron/demo-reset", "schedule": "0 0 * * *" }
+  ]
+}

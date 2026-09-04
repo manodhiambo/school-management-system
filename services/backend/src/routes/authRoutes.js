@@ -15,6 +15,7 @@ import { passwordResetLimiter } from '../middleware/rateLimiter.js';
 import { findBlacklistMatch } from '../utils/blacklist.js';
 import { buildAuditContext } from '../utils/auditContext.js';
 import { getDemoTenantId } from '../services/demoTenant.js';
+import { deferred } from '../utils/deferred.js';
 
 const router = express.Router();
 
@@ -31,7 +32,7 @@ async function upsertSession(userId, refreshToken, req) {
        SET refresh_token = $2, expires_at = NOW() + INTERVAL '7 days',
            ip_address = $3, user_agent = $4, updated_at = NOW()`,
     [userId, refreshToken, ipAddress || null, userAgent || null]
-  ).catch(err => logger.warn('Failed to persist session:', err.message));
+  ).catch(err => logger.warn(`Failed to persist session: ${err.message} (code=${err.code})`));
 }
 
 // Login
@@ -121,7 +122,7 @@ router.post('/login', async (req, res) => {
           user.first_name = nameRow.first_name;
           user.last_name  = nameRow.last_name;
           // Persist to users table so future logins skip this lookup
-          query('UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3', [nameRow.first_name, nameRow.last_name, user.id]).catch(() => {});
+          deferred(query('UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3', [nameRow.first_name, nameRow.last_name, user.id]).catch(() => {}));
         }
       } catch { /* non-critical */ }
     }
@@ -184,10 +185,16 @@ router.post('/login', async (req, res) => {
       { expiresIn: config.jwt.refreshExpiresIn }
     );
 
-    // Update last login — fire and forget, don't block the response
-    query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
-      .catch(err => logger.warn('Failed to update last_login:', err.message));
-    upsertSession(user.id, refreshToken, req);
+    // Update last login — fire and forget, don't block the response (purely
+    // cosmetic, losing one occasionally is harmless)
+    deferred(query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
+      .catch(err => logger.warn('Failed to update last_login:', err.message)));
+    // Session row is what makes refresh-token validation work — must be
+    // awaited. deferred()/waitUntil only keeps a serverless invocation alive
+    // when Fluid Compute is enabled for the project; that's a dashboard-only
+    // setting this code can't verify, so don't rely on it for anything a
+    // user's ability to stay logged in depends on.
+    await upsertSession(user.id, refreshToken, req);
 
     // Audit log — fire and forget
     req.user = { id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id };
@@ -295,7 +302,7 @@ router.post('/demo-login', async (req, res) => {
       { expiresIn: config.jwt.refreshExpiresIn }
     );
 
-    upsertSession(user.id, refreshToken, req);
+    await upsertSession(user.id, refreshToken, req);
     logAction(req, 'demo_login', 'user', user.id, {});
 
     res.json({
@@ -712,8 +719,8 @@ router.post('/2fa/validate', async (req, res) => {
       { expiresIn: config.jwt.refreshExpiresIn }
     );
 
-    query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]).catch(() => {});
-    upsertSession(user.id, refreshToken, req);
+    deferred(query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]).catch(() => {}));
+    await upsertSession(user.id, refreshToken, req);
     logger.info(`2FA validated, login successful: ${user.email}`);
 
     res.json({

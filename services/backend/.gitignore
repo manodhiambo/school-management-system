@@ -33,3 +33,4 @@ build/
 # Uploads
 uploads/*
 !uploads/.gitkeep
+.vercel

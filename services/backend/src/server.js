@@ -33,6 +33,7 @@ import libraryRoutes from './routes/libraryRoutes.js';
 import messageRoutes from './routes/simpleMessageRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 import schoolRegistrationRoutes from './routes/schoolRegistrationRoutes.js';
+import cronRoutes from './routes/cronRoutes.js';
 
 // Import routes with different naming
 import classesRoutes from './routes/classes.routes.js';
@@ -91,12 +92,24 @@ dotenv.config();
 
 const app = express();
 
-// CORS configuration - allow production domain
+// Both Vercel and Render sit the app behind a reverse proxy that sets
+// X-Forwarded-For. Without `trust proxy`, Express's default is not to trust
+// that header, and express-rate-limit throws a ValidationError on every
+// request as a result (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) — trusting
+// exactly one hop (the platform's own edge proxy) is the standard fix and
+// also makes IP-based rate limiting key off the real client IP instead of
+// the proxy's.
+app.set('trust proxy', 1);
+
+// CORS configuration — CORS_ORIGIN is a comma-separated list of allowed
+// origins (set in the deploy environment); always allow local dev origins
+// too so `npm run dev` keeps working regardless of what's configured there.
+const DEV_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'];
 const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://skulmanager.org',
-  'https://www.skulmanager.org',
+  ...DEV_ORIGINS,
+  ...(process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+    : ['https://skulmanager.org', 'https://www.skulmanager.org']),
 ];
 
 const corsOptions = {
@@ -252,6 +265,12 @@ app.use('/api/v1/student-categories', studentCategoryRoutes);
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/registration', registrationLimiter, schoolRegistrationRoutes);
 
+// Cron-triggered jobs (Vercel Cron in production; node-cron drives the same
+// exported job functions directly when running as a persistent process —
+// see startBackgroundJobs() below). Not behind the JWT auth middleware —
+// requireCronSecret inside cronRoutes.js is what protects these.
+app.use('/api/v1/cron', cronRoutes);
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   const status = err.statusCode || err.status || 500;
@@ -266,6 +285,15 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Running on Vercel: no persistent process, so none of this belongs at
+// module load. Migrations run as a deliberate, one-off `npm run migrate`
+// step (see services/backend/README) rather than on every cold start —
+// running DDL against Neon's direct endpoint on every cold start would slow
+// every cold invocation and risks exhausting Neon's direct-connection limit
+// under a burst of simultaneous cold starts. The three node-cron jobs are
+// likewise replaced by Vercel Cron hitting /api/v1/cron/* (see vercel.json
+// and cronRoutes.js) since there's no long-lived process for node-cron to
+// schedule inside.
 async function startServer() {
   try {
     await testConnection();
@@ -281,6 +309,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 export default app;

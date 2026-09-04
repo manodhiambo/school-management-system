@@ -5,6 +5,7 @@ import requireRole from '../middleware/roleMiddleware.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { buildAuditContext } from '../utils/auditContext.js';
+import { deferred } from '../utils/deferred.js';
 
 const router = express.Router();
 router.use(authenticate);
@@ -18,8 +19,8 @@ export async function logAction(req, action, resource, resourceId, details) {
     const userRole = req.user?.role || null;
     const { ipAddress, userAgent, deviceType, browser, os } = buildAuditContext(req);
 
-    // Fire-and-forget — do not await
-    query(
+    // Fire-and-forget — do not await, but keep alive via waitUntil on Vercel
+    deferred(query(
       `INSERT INTO audit_log
          (id, tenant_id, user_id, user_email, user_role, action, resource, resource_id, details,
           ip_address, user_agent, device_type, browser, os, http_method, request_path)
@@ -32,7 +33,7 @@ export async function logAction(req, action, resource, resourceId, details) {
         ipAddress, userAgent, deviceType, browser, os,
         req.method || null, req.originalUrl ? req.originalUrl.split('?')[0] : null,
       ]
-    ).catch(err => logger.warn('logAction insert failed:', err.message));
+    ).catch(err => logger.warn('logAction insert failed:', err.message)));
   } catch (err) {
     // Never throw — audit log failure must not break the primary request
     logger.warn('logAction error:', err.message);

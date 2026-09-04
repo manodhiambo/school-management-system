@@ -15,14 +15,20 @@ const connectionString = rawUrl
   .replace('sslmode=prefer', 'sslmode=require')
   .replace('sslmode=disable', 'sslmode=require');
 
+// On Vercel, every concurrent function invocation can spin up its own pool —
+// a single instance keeping 10 idle connections open multiplies fast under
+// serverless concurrency and can exhaust Neon's connection ceiling (it's
+// already going through Neon's pooler endpoint, which does the real
+// multiplexing). Render/local runs one persistent process, so it can afford
+// to hold a bigger pool.
 const pool = new Pool({
   connectionString,
   ssl: {
     rejectUnauthorized: true
   },
-  max: 10,
+  max: process.env.VERCEL ? 3 : 10,
   connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
+  idleTimeoutMillis: process.env.VERCEL ? 10000 : 30000,
   statement_timeout: 15000,
 });
 

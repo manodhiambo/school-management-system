@@ -1,7 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import { tenantContext, requireActiveTenant } from '../middleware/tenantMiddleware.js';
 import { requireRole } from '../middleware/roleMiddleware.js';
 import logger from '../utils/logger.js';
@@ -16,6 +16,10 @@ const router = express.Router();
 router.use(authenticate);
 router.use(tenantContext);
 router.use(requireActiveTenant);
+// Sidebar tags Student Categories under the 'finance' module (see Sidebar.tsx) —
+// this was missing the matching backend enforcement, so disabling 'finance'
+// only hid the nav link and didn't actually block direct API access to it.
+router.use(requireModule('finance'));
 
 function sanitizeCriteria(input) {
   const out = {};

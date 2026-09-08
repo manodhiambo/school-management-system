@@ -216,16 +216,16 @@ const navigationItems: NavItem[] = [
   { name: 'Alumni Portal',      href: '/app/alumni-portal',      icon: GraduationCap, roles: ['alumni'],                             section: 'Welfare', module: 'alumni' },
 
   // ── Gate Management / Security ───────────────────────────────────────────
-  { name: 'Gate Manager',   href: '/app/gate-manager', icon: ShieldCheck, roles: ['admin'],    section: 'Security' },
-  { name: 'Gate Dashboard', href: '/app/dashboard',    icon: ShieldCheck, roles: ['security'], section: 'Security' },
-  { name: 'Visitor Log',    href: '/app/gate-manager', icon: UserCog,     roles: ['security'], section: 'Security' },
+  { name: 'Gate Manager',   href: '/app/gate-manager', icon: ShieldCheck, roles: ['admin'],    section: 'Security', module: 'gate_management' },
+  { name: 'Gate Dashboard', href: '/app/dashboard',    icon: ShieldCheck, roles: ['security'], section: 'Security', module: 'gate_management' },
+  { name: 'Visitor Log',    href: '/app/gate-manager', icon: UserCog,     roles: ['security'], section: 'Security', module: 'gate_management' },
 
   // ── Library ───────────────────────────────────────────────────────────────
-  { name: 'Library Catalog',    href: '/app/library',            icon: Library,  roles: ['admin', 'teacher', 'student', 'parent'], section: 'Library' },
-  { name: 'My Borrowed Books',  href: '/app/my-books',           icon: BookOpen, roles: ['teacher', 'student'],                    section: 'Library' },
-  { name: 'Issue / Return',     href: '/app/library-borrowings', icon: BookOpen, roles: ['admin', 'teacher'],                      section: 'Library' },
-  { name: 'Library Management', href: '/app/library-management', icon: Library,  roles: ['admin'],                                 section: 'Library' },
-  { name: 'Library Members',    href: '/app/library-members',    icon: Users,    roles: ['admin'],                                 section: 'Library' },
+  { name: 'Library Catalog',    href: '/app/library',            icon: Library,  roles: ['admin', 'teacher', 'student', 'parent'], section: 'Library', module: 'library' },
+  { name: 'My Borrowed Books',  href: '/app/my-books',           icon: BookOpen, roles: ['teacher', 'student'],                    section: 'Library', module: 'library' },
+  { name: 'Issue / Return',     href: '/app/library-borrowings', icon: BookOpen, roles: ['admin', 'teacher'],                      section: 'Library', module: 'library' },
+  { name: 'Library Management', href: '/app/library-management', icon: Library,  roles: ['admin'],                                 section: 'Library', module: 'library' },
+  { name: 'Library Members',    href: '/app/library-members',    icon: Users,    roles: ['admin'],                                 section: 'Library', module: 'library' },
 
   // ── Account ───────────────────────────────────────────────────────────────
   { name: 'Settings',     href: '/app/settings', icon: Settings, roles: ['admin'],  section: 'Account' },

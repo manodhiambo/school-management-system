@@ -1,10 +1,14 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, requireModule } from '../middleware/authMiddleware.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 router.use(authenticate);
+// Sidebar tags Payroll under the 'staff' module (see Sidebar.tsx) — this was
+// missing the matching backend enforcement, so disabling 'staff' only hid the
+// nav link and didn't actually block direct API access to it.
+router.use(requireModule('staff'));
 
 // ── Kenya PAYE 2024 helper ──────────────────────────────────────────────────
 function computePAYE(grossMonthly) {

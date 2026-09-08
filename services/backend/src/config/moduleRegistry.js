@@ -21,7 +21,8 @@ export const MODULE_REGISTRY = [
   { key: 'nemis', label: 'NEMIS Integration' },
   { key: 'admissions', label: 'Online Admission' },
   { key: 'crm', label: 'School CRM' },
-  { key: 'alumni', label: 'Alumni Management' }
+  { key: 'alumni', label: 'Alumni Management' },
+  { key: 'gate_management', label: 'Gate Management (Visitor Log, Student Pickup)' }
 ];
 
 export const MODULE_KEYS = MODULE_REGISTRY.map((m) => m.key);

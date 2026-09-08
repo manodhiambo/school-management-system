@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { testConnection } from './config/database.js';
 import { runMigrations } from './database/runMigrations.js';
-import { authLimiter, apiLimiter, registrationLimiter } from './middleware/rateLimiter.js';
+import { authLimiter, apiLimiter } from './middleware/rateLimiter.js';
 import { startTenantExpiryJob } from './jobs/tenantExpiryJob.js';
 import { startDemoResetJob } from './jobs/demoResetJob.js';
 import { startPeriodReminderJob } from './jobs/periodReminderJob.js';
@@ -271,7 +271,12 @@ app.use('/api/v1/procurement', procurementRoutes);
 app.use('/api/v1/student-categories', studentCategoryRoutes);
 
 app.use('/api/v1/superadmin', superadminRoutes);
-app.use('/api/v1/registration', registrationLimiter, schoolRegistrationRoutes);
+// registrationLimiter is applied per-route inside schoolRegistrationRoutes.js (only to
+// /register, /deposit, /renew) rather than to the whole router here — /check-activation
+// is polled routinely by logged-in dashboards (TrialBanner) and /mpesa/callback is an
+// inbound Safaricom webhook shared across every tenant's payments; neither should share a
+// 3-req/hour budget meant for actual registration attempts.
+app.use('/api/v1/registration', schoolRegistrationRoutes);
 
 // Cron-triggered jobs (Vercel Cron in production; node-cron drives the same
 // exported job functions directly when running as a persistent process —

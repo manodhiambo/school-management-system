@@ -31,6 +31,11 @@ interface SoundCtx extends SoundSettings {
   preview(type: SoundType): void;
   previewVoice(text: string): void;
   voiceSupported: boolean;
+  // Shared unread-notification count — polled here every 30s and consumed by Header's
+  // bell badge too, so there's a single poller instead of two components hitting the
+  // same /notifications/unread-count endpoint independently (see Header.tsx).
+  unreadCount: number;
+  setUnreadCount: React.Dispatch<React.SetStateAction<number>>;
 }
 
 interface Toast {
@@ -49,6 +54,7 @@ const Ctx = createContext<SoundCtx>({
   setEnabled: () => {}, setMessagesEnabled: () => {}, setFeeEnabled: () => {},
   setAlertsEnabled: () => {}, setVolume: () => {}, preview: () => {},
   setVoiceEnabled: () => {}, setVoiceURI: () => {}, setVoiceRate: () => {}, previewVoice: () => {},
+  unreadCount: 0, setUnreadCount: () => {},
 });
 
 export function useSoundSettings() { return useContext(Ctx); }
@@ -130,6 +136,9 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
   const prevNotifCount  = useRef(-1);
   const prevAlertCount  = useRef(-1);
 
+  // unread-notification count — shared with Header's bell badge (see SoundCtx above)
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const addToast = useCallback((type: SoundType, title: string, body: string, href?: string) => {
     const id = ++nextId.current;
     setToasts(t => [...t, { id, type, title, body, href }]);
@@ -175,21 +184,23 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
   // ── notifications + parent-alerts polling (every 30 s) ──────────────────
 
   const pollOther = useCallback(async () => {
-    if (!user?.id || !enabled) return;
+    if (!user?.id) return;
 
-    // General notifications
+    // General notifications — count is kept fresh regardless of the mute toggle (Header's
+    // bell badge depends on it); only the toast+sound alert is gated on `enabled`.
     try {
       const res: any = await (api as any).getUnreadNotificationCount().catch(() => null);
       const count = res?.data?.count ?? 0;
-      if (prevNotifCount.current >= 0 && count > prevNotifCount.current && alertsEnabled) {
+      if (enabled && prevNotifCount.current >= 0 && count > prevNotifCount.current && alertsEnabled) {
         const diff = count - prevNotifCount.current;
         addToast('alert', 'New Notification', `You have ${diff} new notification${diff > 1 ? 's' : ''}`, '/app/notifications');
       }
       prevNotifCount.current = count;
+      setUnreadCount(count);
     } catch { /* poll failure — retried on next interval */ }
 
     // Parent-only: fee / school alerts
-    if (user.role === 'parent' && feeEnabled) {
+    if (enabled && user.role === 'parent' && feeEnabled) {
       try {
         const res: any = await (api as any).getParentAlertsCount().catch(() => null);
         const count = res?.data?.count ?? 0;
@@ -212,6 +223,7 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
     msgBaselined.current = false;
     prevNotifCount.current  = -1;
     prevAlertCount.current  = -1;
+    setUnreadCount(0);
 
     // Baseline both immediately (first call to pollMessages records IDs silently;
     // first call to pollOther sets counts without triggering toasts)
@@ -254,6 +266,8 @@ export function SoundNotificationProvider({ children }: { children: React.ReactN
     setVoiceRate,
     preview,
     previewVoice,
+    unreadCount,
+    setUnreadCount,
   };
 
   return (

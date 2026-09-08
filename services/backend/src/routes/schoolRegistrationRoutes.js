@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database.js';
 import { initiateSTKPush, formatPhone } from '../services/mpesaService.js';
 import { authenticate } from '../middleware/authMiddleware.js';
+import { registrationLimiter } from '../middleware/rateLimiter.js';
 import { blockDemoSideEffects } from '../middleware/demoGuard.js';
 import { sendEmail } from '../services/emailService.js';
 import { sendSMSViaProvider, normalisePhone } from './smsRoutes.js';
@@ -59,7 +60,7 @@ function generatePaymentNumber() {
 // superadmin approves the registration (see /deposit, /mpesa/callback,
 // and superadminRoutes.js POST /tenants/:id/approve-registration).
 // ============================================================
-router.post('/register', async (req, res) => {
+router.post('/register', registrationLimiter, async (req, res) => {
   try {
     const {
       schoolName,
@@ -203,7 +204,7 @@ router.post('/register', async (req, res) => {
 // POST /deposit — Initiate the M-Pesa deposit payment (public, keyed by
 // tenantId — the admin account isn't active yet so there's no JWT to use).
 // ============================================================
-router.post('/deposit', async (req, res) => {
+router.post('/deposit', registrationLimiter, async (req, res) => {
   try {
     const { tenantId, phone } = req.body;
 
@@ -288,7 +289,7 @@ router.post('/deposit', async (req, res) => {
 // POST /pay — Initiate M-Pesa payment for the remaining balance
 // (after the deposit + approval) or the annual renewal fee.
 // ============================================================
-router.post('/pay', authenticate, blockDemoSideEffects('an M-Pesa payment'), async (req, res) => {
+router.post('/pay', registrationLimiter, authenticate, blockDemoSideEffects('an M-Pesa payment'), async (req, res) => {
   try {
     const { phone } = req.body;
 

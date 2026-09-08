@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import api from '@/services/api';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { useSoundSettings } from '@/components/notifications/SoundNotificationProvider';
 
 const pageTitles: Record<string, string> = {
   '/app/dashboard':               'Dashboard',
@@ -85,10 +86,13 @@ export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
   const pageTitle = getPageTitle(location.pathname);
 
-  /* ── Notification state ── */
+  /* ── Notification state ──
+     unreadCount comes from SoundNotificationProvider's shared 30s poll instead of a
+     second independent poll here — two components hitting /notifications/unread-count
+     on their own schedules was needlessly doubling API load for the same data. */
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount, setUnreadCount } = useSoundSettings();
   const [notifsLoading, setNotifsLoading] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -109,20 +113,6 @@ export function Header({ onMenuClick }: HeaderProps) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  /* ── Poll unread count every 60 s ── */
-  useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchUnreadCount = async () => {
-    try {
-      const res: any = await api.getUnreadNotificationCount();
-      setUnreadCount(Number(res?.data?.count ?? res?.count ?? 0));
-    } catch { /* silent */ }
-  };
 
   const handleBellClick = async () => {
     setShowUserMenu(false);

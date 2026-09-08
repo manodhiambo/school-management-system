@@ -758,20 +758,25 @@ router.get('/tenants/:id/payments', async (req, res) => {
 // ============================================================
 router.get('/stats', async (req, res) => {
   try {
+    // Every COUNT(*) below is cast to ::int — Postgres returns COUNT as bigint, which
+    // node-postgres deserializes as a *string* to avoid silent precision loss. The
+    // superadmin dashboard adds several of these together (trial + suspended +
+    // pending_deposit) to get one KPI card; left as strings, `+` concatenates instead of
+    // summing ("1" + "1" + "1" => "111" instead of 3).
     const statsRows = await query(`
       SELECT
-        COUNT(*)                                                   AS total_tenants,
-        COUNT(*) FILTER (WHERE status = 'active')                 AS active_tenants,
-        COUNT(*) FILTER (WHERE status = 'trial')                  AS trial_tenants,
-        COUNT(*) FILTER (WHERE status = 'pending_deposit')        AS pending_deposit_tenants,
-        COUNT(*) FILTER (WHERE status = 'pending_review')         AS pending_review_tenants,
-        COUNT(*) FILTER (WHERE status = 'suspended')              AS suspended,
-        COUNT(*) FILTER (WHERE status = 'expired')                AS expired,
-        COUNT(*) FILTER (WHERE status = 'cancelled')              AS cancelled,
+        COUNT(*)::int                                              AS total_tenants,
+        COUNT(*) FILTER (WHERE status = 'active')::int             AS active_tenants,
+        COUNT(*) FILTER (WHERE status = 'trial')::int              AS trial_tenants,
+        COUNT(*) FILTER (WHERE status = 'pending_deposit')::int    AS pending_deposit_tenants,
+        COUNT(*) FILTER (WHERE status = 'pending_review')::int     AS pending_review_tenants,
+        COUNT(*) FILTER (WHERE status = 'suspended')::int          AS suspended,
+        COUNT(*) FILTER (WHERE status = 'expired')::int            AS expired,
+        COUNT(*) FILTER (WHERE status = 'cancelled')::int          AS cancelled,
         COUNT(*) FILTER (WHERE
           subscription_ends_at BETWEEN NOW() AND NOW() + INTERVAL '30 days'
           AND status = 'active'
-        ) AS expiring_soon
+        )::int AS expiring_soon
       FROM tenants
       WHERE is_demo = FALSE
     `);

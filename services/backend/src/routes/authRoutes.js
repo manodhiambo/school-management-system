@@ -12,7 +12,7 @@ import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { logAction } from './auditLogRoutes.js';
 import { passwordResetLimiter } from '../middleware/rateLimiter.js';
-import { findBlacklistMatch } from '../utils/blacklist.js';
+import { findBlacklistMatch, maybeAutoBlacklistIp } from '../utils/blacklist.js';
 import { buildAuditContext } from '../utils/auditContext.js';
 import { getDemoTenantId } from '../services/demoTenant.js';
 import { deferred } from '../utils/deferred.js';
@@ -60,6 +60,7 @@ router.post('/login', async (req, res) => {
       logger.warn(`User not found: ${email}`);
       req.user = { email };
       logAction(req, 'login_failed', 'user', null, { email, reason: 'user_not_found' });
+      await maybeAutoBlacklistIp(ipAddress);
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
@@ -87,6 +88,7 @@ router.post('/login', async (req, res) => {
     if (!isPasswordValid) {
       logger.warn(`Invalid password for: ${email}`);
       logAction(req, 'login_failed', 'user', user.id, { email, reason: 'invalid_password' });
+      await maybeAutoBlacklistIp(ipAddress);
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 

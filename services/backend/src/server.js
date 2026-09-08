@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { testConnection } from './config/database.js';
 import { runMigrations } from './database/runMigrations.js';
 import { authLimiter, apiLimiter } from './middleware/rateLimiter.js';
+import { blockBlacklisted } from './middleware/blacklistMiddleware.js';
 import { startTenantExpiryJob } from './jobs/tenantExpiryJob.js';
 import { startDemoResetJob } from './jobs/demoResetJob.js';
 import { startPeriodReminderJob } from './jobs/periodReminderJob.js';
@@ -161,6 +162,10 @@ app.use(helmet({
 // 5 base64-encoded document uploads (3MB raw each, larger once base64-inflated).
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
+
+// Reject blacklisted devices before they even spend rate-limit budget (see
+// blacklistMiddleware.js for why this needs to be global, not just on /login).
+app.use('/api/', blockBlacklisted);
 
 // Global API rate limiter
 app.use('/api/', apiLimiter);

@@ -136,7 +136,7 @@ export const SupplierPayments: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date *</label>
-                  <input type="date" required value={form.payment_date} onChange={e => setForm({ ...form, payment_date: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  <input type="date" required max={new Date().toISOString().slice(0, 10)} value={form.payment_date} onChange={e => setForm({ ...form, payment_date: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (KES) *</label>

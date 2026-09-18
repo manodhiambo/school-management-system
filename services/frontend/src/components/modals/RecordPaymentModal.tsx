@@ -29,13 +29,21 @@ interface RecordPaymentModalProps {
   preselectedInvoiceId?: string;
 }
 
+// Local calendar date (not toISOString, which converts to UTC and can land on the wrong day
+// depending on the user's timezone/time of day) — used both as the default and as the date
+// input's max, so staff can't select a not-yet-happened payment date by mistake.
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const EMPTY_FORM = {
   student_id: '',
   invoice_id: '',
   amount: '',
   payment_method: 'mpesa',
   transaction_id: '',
-  payment_date: new Date().toISOString().split('T')[0],
+  payment_date: todayStr(),
   remarks: '',
 };
 
@@ -454,6 +462,7 @@ export function RecordPaymentModal({
                   id="payment_date"
                   type="date"
                   value={form.payment_date}
+                  max={todayStr()}
                   onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))}
                   required
                   className="mt-1"

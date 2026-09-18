@@ -739,6 +739,13 @@ router.get('/payments', async (req, res) => {
 router.post('/payments', async (req, res) => {
   const { invoice_id, supplier_id, payment_date, amount, payment_method, reference_number, bank_name, notes } = req.body;
   const t = tid(req);
+  if (payment_date) {
+    const parsed = new Date(payment_date);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    if (isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid payment date' });
+    if (parsed.getTime() > endOfToday.getTime()) return res.status(400).json({ error: 'Payment date cannot be in the future' });
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

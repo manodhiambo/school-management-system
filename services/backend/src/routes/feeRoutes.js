@@ -898,6 +898,21 @@ router.post('/payment', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid amount is required' });
     }
 
+    // Guard against a mis-picked/mis-typed future date silently becoming a real transaction
+    // record (e.g. showing up as an already-completed payment in Recent Activity before it's
+    // even due). The date picker itself has no upper bound, so this must be enforced here too.
+    if (actualPaymentDate) {
+      const parsedPaymentDate = new Date(actualPaymentDate);
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+      if (isNaN(parsedPaymentDate.getTime())) {
+        return res.status(400).json({ success: false, message: 'Invalid payment date' });
+      }
+      if (parsedPaymentDate.getTime() > endOfToday.getTime()) {
+        return res.status(400).json({ success: false, message: 'Payment date cannot be in the future' });
+      }
+    }
+
     if (!actualInvoiceId && !actualStudentId) {
       return res.status(400).json({ success: false, message: 'Invoice ID or Student ID is required' });
     }

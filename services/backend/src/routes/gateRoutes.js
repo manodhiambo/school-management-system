@@ -596,7 +596,12 @@ router.post('/pickup/otp/request', requireRole(GATE_ROLES), async (req, res) => 
     // Find parent user to notify
     const parentRows = await query(
       `SELECT u.id, p.phone_primary FROM students s
-       JOIN parents p ON p.id=s.parent_id
+       JOIN parents p ON p.id = COALESCE(
+         s.parent_id,
+         (SELECT ps.parent_id FROM parent_students ps
+          WHERE ps.student_id = s.id
+          ORDER BY ps.is_primary_contact DESC, ps.created_at ASC LIMIT 1)
+       )
        JOIN users u ON u.id=p.user_id
        WHERE s.id=$1 AND s.tenant_id=$2 LIMIT 1`,
       [student_id, tenant_id]

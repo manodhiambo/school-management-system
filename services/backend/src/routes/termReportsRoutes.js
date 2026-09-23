@@ -128,7 +128,10 @@ router.get('/student/:studentId', async (req, res) => {
       if (!check.length) return res.status(403).json({ success: false, message: 'Access denied' });
     } else if (role === 'parent') {
       const check = await query(
-        `SELECT s.id FROM students s WHERE s.parent_id = $1 AND s.id = $2 AND s.tenant_id = $3`,
+        `SELECT s.id FROM students s
+         JOIN parents p ON p.user_id = $1
+         LEFT JOIN parent_students ps ON ps.student_id = s.id AND ps.parent_id = p.id
+         WHERE s.id = $2 AND s.tenant_id = $3 AND (s.parent_id = p.id OR ps.student_id IS NOT NULL)`,
         [userId, studentId, tid]
       );
       if (!check.length) return res.status(403).json({ success: false, message: 'Access denied' });

@@ -537,6 +537,14 @@ router.put('/applications/:id/enroll', officeOnly, async (req, res) => {
       ]
     );
 
+    // Link parent → student in junction table (mirrors studentRoutes.js POST / handler)
+    if (resolvedParentId) {
+      await query(
+        `INSERT INTO parent_students (parent_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+        [resolvedParentId, studentId]
+      ).catch((e) => logger.error('Failed to link parent to student in parent_students:', e));
+    }
+
     const updated = await query(
       `UPDATE admission_applications SET status = 'enrolled', enrolled_student_id = $1, updated_at = NOW()
        WHERE id = $2 RETURNING *`,

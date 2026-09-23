@@ -713,15 +713,18 @@ router.get('/report-cards/:id', authenticate, requireModule('academics'), async 
        s.admission_number, s.date_of_birth, s.nemis_number,
        s.profile_photo_url, s.student_type,
        c.name AS class_name, c.education_level,
-       p.first_name||' '||p.last_name AS guardian_name,
-       p.relationship AS guardian_relationship,
-       p.phone_primary AS guardian_phone,
-       pu.email AS guardian_email
+       COALESCE(p.first_name||' '||p.last_name, p2.first_name||' '||p2.last_name) AS guardian_name,
+       COALESCE(p.relationship, p2.relationship) AS guardian_relationship,
+       COALESCE(p.phone_primary, p2.phone_primary) AS guardian_phone,
+       COALESCE(pu.email, pu2.email) AS guardian_email
        FROM cbc_report_cards rc
        JOIN students s ON s.id = rc.student_id
        JOIN classes c ON c.id = rc.class_id
        LEFT JOIN parents p ON p.id = s.parent_id
        LEFT JOIN users pu ON pu.id = p.user_id
+       LEFT JOIN parent_students ps ON ps.student_id = s.id
+       LEFT JOIN parents p2 ON p2.id = ps.parent_id AND p2.id != COALESCE(s.parent_id, '00000000-0000-0000-0000-000000000000'::uuid)
+       LEFT JOIN users pu2 ON pu2.id = p2.user_id
        WHERE rc.id = $1 AND rc.tenant_id = $2`, [req.params.id, req.user.tenant_id]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });

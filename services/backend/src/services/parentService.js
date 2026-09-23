@@ -102,7 +102,12 @@ class ParentService {
       throw new ApiError(404, 'Parent not found');
     }
 
-    return results[0];
+    const children = await this.getChildren(results[0].id);
+
+    return {
+      ...results[0],
+      children
+    };
   }
 
   async getParentByUserId(userId, tenantId) {
@@ -118,20 +123,7 @@ class ParentService {
       throw new ApiError(404, 'Parent not found');
     }
 
-    const children = await query(
-      `SELECT s.*, c.name as class_name, c.education_level,
-          (SELECT a.status FROM attendance a
-           WHERE a.student_id = s.id AND DATE(a.date) = CURRENT_DATE
-           ORDER BY a.id DESC LIMIT 1) AS today_status,
-          (SELECT ROUND((COUNT(*) FILTER (WHERE a2.status = 'present') * 100.0 /
-                NULLIF(COUNT(*), 0))::numeric, 1)
-           FROM attendance a2 WHERE a2.student_id = s.id) AS attendance_percentage
-       FROM students s
-       LEFT JOIN classes c ON s.class_id = c.id
-       JOIN parent_students ps ON s.id = ps.student_id
-       WHERE ps.parent_id = $1`,
-      [results[0].id]
-    );
+    const children = await this.getChildren(results[0].id);
 
     return {
       ...results[0],

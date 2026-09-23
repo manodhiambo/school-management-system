@@ -47,7 +47,12 @@ router.get('/', requireRole(['admin', 'teacher', 'parent', 'finance_officer', 's
       FROM students s
       LEFT JOIN users u ON s.user_id = u.id
       LEFT JOIN classes c ON s.class_id = c.id
-      LEFT JOIN parents p ON s.parent_id = p.id
+      LEFT JOIN parents p ON p.id = COALESCE(
+        s.parent_id,
+        (SELECT ps.parent_id FROM parent_students ps
+         WHERE ps.student_id = s.id
+         ORDER BY ps.is_primary_contact DESC, ps.created_at ASC LIMIT 1)
+      )
       WHERE s.tenant_id = $1
     `;
     const params = [tid];
@@ -411,7 +416,7 @@ router.post('/', requireRole(['admin']), async (req, res) => {
       await query(
         `INSERT INTO parent_students (parent_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
         [resolvedParentId, studentId]
-      ).catch(() => {});
+      ).catch((e) => logger.error('Failed to link parent to student in parent_students:', e));
     }
 
     // Optional: tag the student into any admin-defined student categories

@@ -184,9 +184,14 @@ router.post('/send', adminOnly, blockDemoSideEffects('sending a WhatsApp message
       // Parents of students in the class
       const parentRows = await query(
         `SELECT DISTINCT u.phone FROM users u
-         JOIN students s ON s.parent_id = u.id
-         WHERE s.class_id = $1 AND s.tenant_id = $2
-           AND u.phone IS NOT NULL AND u.phone != ''`,
+         JOIN parents p ON p.user_id = u.id
+         WHERE u.phone IS NOT NULL AND u.phone != ''
+           AND EXISTS (
+             SELECT 1 FROM students s
+             LEFT JOIN parent_students ps ON ps.student_id = s.id
+             WHERE s.class_id = $1 AND s.tenant_id = $2
+               AND (s.parent_id = p.id OR ps.parent_id = p.id)
+           )`,
         [class_id, tid]
       );
       phones = parentRows.map(r => r.phone);

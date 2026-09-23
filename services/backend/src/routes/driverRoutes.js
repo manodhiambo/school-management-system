@@ -313,8 +313,7 @@ router.post('/pickup', async (req, res) => {
              UNION
              SELECT DISTINCT u.id
              FROM users u
-             JOIN teacher_subjects ts ON ts.teacher_id = u.id
-             JOIN subjects s ON s.id = ts.subject_id AND s.class_id = $1
+             JOIN class_subjects cs ON cs.teacher_id = u.id AND cs.class_id = $1
              WHERE u.tenant_id = $2 AND u.is_active = TRUE`,
             [info.class_id, tid]
           );

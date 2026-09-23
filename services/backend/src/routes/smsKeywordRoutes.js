@@ -95,11 +95,21 @@ async function findParentByPhone(phone) {
     );
     if (rows.length) {
       const parent = rows[0];
-      const studentRows = await query(
-        `SELECT id FROM students WHERE parent_id = $1 AND tenant_id = $2`,
+      const parentRows = await query(
+        `SELECT id FROM parents WHERE user_id = $1 AND tenant_id = $2`,
         [parent.id, parent.tenant_id]
       );
-      return { tenant_id: parent.tenant_id, parent_id: parent.id, studentIds: studentRows.map(r => r.id) };
+      if (!parentRows.length) {
+        return { tenant_id: parent.tenant_id, parent_id: null, studentIds: [] };
+      }
+      const parentRecordId = parentRows[0].id;
+      const studentRows = await query(
+        `SELECT DISTINCT s.id FROM students s
+         LEFT JOIN parent_students ps ON ps.student_id = s.id
+         WHERE (s.parent_id = $1 OR ps.parent_id = $1) AND s.tenant_id = $2`,
+        [parentRecordId, parent.tenant_id]
+      );
+      return { tenant_id: parent.tenant_id, parent_id: parentRecordId, studentIds: studentRows.map(r => r.id) };
     }
   }
   return null;

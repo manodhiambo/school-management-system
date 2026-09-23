@@ -291,6 +291,11 @@ router.post('/students', authenticate, requireModule('transport'), async (req, r
   try {
     const { student_id, route_id, pickup_stop, dropoff_stop } = req.body;
     const tid = req.user.tenant_id;
+    await query(
+      `UPDATE student_transport SET is_active=FALSE
+       WHERE student_id=$1 AND route_id!=$2 AND tenant_id=$3 AND is_active=TRUE`,
+      [student_id, route_id, tid]
+    );
     const rows = await query(
       `INSERT INTO student_transport (student_id, route_id, pickup_stop, dropoff_stop, tenant_id)
        VALUES ($1,$2,$3,$4,$5)
@@ -315,6 +320,11 @@ router.post('/students/bulk', authenticate, requireModule('transport'), async (r
     const tid = req.user.tenant_id;
     const inserted = [];
     for (const student_id of student_ids) {
+      await query(
+        `UPDATE student_transport SET is_active=FALSE
+         WHERE student_id=$1 AND route_id!=$2 AND tenant_id=$3 AND is_active=TRUE`,
+        [student_id, route_id, tid]
+      );
       const rows = await query(
         `INSERT INTO student_transport (student_id, route_id, pickup_stop, dropoff_stop, tenant_id)
          VALUES ($1,$2,$3,$4,$5)

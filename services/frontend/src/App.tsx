@@ -254,37 +254,37 @@ function App() {
               {/* Admin & Teacher Routes */}
               <Route path="students" element={<StudentsPage />} />
               <Route path="student-report" element={<StudentReportPage />} />
-              <Route path="teachers" element={<RoleRoute allowedRoles={['admin']}><TeachersPage /></RoleRoute>} />
+              <Route path="teachers" element={<RoleRoute><TeachersPage /></RoleRoute>} />
               <Route path="parents" element={<ParentsPage />} />
               <Route path="academic" element={<AcademicPage />} />
               <Route path="attendance" element={<AttendancePage />} />
-              <Route path="fee" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FeePage /></RoleRoute>} />
-              <Route path="fee-structure" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FeeStructurePage /></RoleRoute>} />
-              <Route path="extra-fees" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ExtraFeesPage /></RoleRoute>} />
+              <Route path="fee" element={<RoleRoute><FeePage /></RoleRoute>} />
+              <Route path="fee-structure" element={<RoleRoute><FeeStructurePage /></RoleRoute>} />
+              <Route path="extra-fees" element={<RoleRoute><ExtraFeesPage /></RoleRoute>} />
               <Route path="timetable" element={<TimetablePage />} />
-              <Route path="communication" element={<RoleRoute allowedRoles={['admin']}><CommunicationPage /></RoleRoute>} />
-              <Route path="users" element={<RoleRoute allowedRoles={['admin']}><UsersPage /></RoleRoute>} />
-              <Route path="settings" element={<RoleRoute allowedRoles={['admin']}><SettingsPage /></RoleRoute>} />
+              <Route path="communication" element={<RoleRoute><CommunicationPage /></RoleRoute>} />
+              <Route path="users" element={<RoleRoute><UsersPage /></RoleRoute>} />
+              <Route path="settings" element={<RoleRoute><SettingsPage /></RoleRoute>} />
 
               {/* Finance Routes - Admin & Finance Officer */}
-              <Route path="finance" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FinanceDashboard /></RoleRoute>} />
-              <Route path="finance/transactions" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Transactions /></RoleRoute>} />
-              <Route path="finance/budgets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Budgets /></RoleRoute>} />
-              <Route path="finance/vendors" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Vendors /></RoleRoute>} />
-              <Route path="finance/bank-accounts" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><BankAccounts /></RoleRoute>} />
-              <Route path="finance/petty-cash" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><PettyCash /></RoleRoute>} />
-              <Route path="finance/assets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Assets /></RoleRoute>} />
-              <Route path="finance/reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><Reports /></RoleRoute>} />
-              <Route path="finance/financial-years" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FinancialYears /></RoleRoute>} />
-              <Route path="finance/advanced-reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><AdvancedReports /></RoleRoute>} />
-              <Route path="student-categories" element={<RoleRoute allowedRoles={['admin']}><StudentCategoriesPage /></RoleRoute>} />
+              <Route path="finance" element={<RoleRoute><FinanceDashboard /></RoleRoute>} />
+              <Route path="finance/transactions" element={<RoleRoute><Transactions /></RoleRoute>} />
+              <Route path="finance/budgets" element={<RoleRoute><Budgets /></RoleRoute>} />
+              <Route path="finance/vendors" element={<RoleRoute><Vendors /></RoleRoute>} />
+              <Route path="finance/bank-accounts" element={<RoleRoute><BankAccounts /></RoleRoute>} />
+              <Route path="finance/petty-cash" element={<RoleRoute><PettyCash /></RoleRoute>} />
+              <Route path="finance/assets" element={<RoleRoute><Assets /></RoleRoute>} />
+              <Route path="finance/reports" element={<RoleRoute><Reports /></RoleRoute>} />
+              <Route path="finance/financial-years" element={<RoleRoute><FinancialYears /></RoleRoute>} />
+              <Route path="finance/advanced-reports" element={<RoleRoute><AdvancedReports /></RoleRoute>} />
+              <Route path="student-categories" element={<RoleRoute><StudentCategoriesPage /></RoleRoute>} />
 
               {/* Student Routes */}
               <Route path="my-courses" element={<MyCoursesPage />} />
               <Route path="my-attendance" element={<MyAttendancePage />} />
               <Route path="my-results" element={<MyResultsPage />} />
               <Route path="my-fees" element={<MyFeesPage />} />
-              <Route path="my-report-card" element={<RoleRoute allowedRoles={['student']}><MyReportCardPage /></RoleRoute>} />
+              <Route path="my-report-card" element={<RoleRoute><MyReportCardPage /></RoleRoute>} />
               <Route path="my-timetable" element={<MyTimetablePage />} />
               <Route path="assignments" element={<AssignmentsPage />} />
               <Route path="messages" element={<MessagesPage />} />
@@ -294,11 +294,11 @@ function App() {
               <Route path="learning-materials" element={<LearningMaterialsPage />} />
 
               {/* Parent Routes */}
-              <Route path="my-children" element={<RoleRoute allowedRoles={['parent']}><MyChildrenPage /></RoleRoute>} />
-              <Route path="children-progress" element={<RoleRoute allowedRoles={['parent']}><ChildrenProgressPage /></RoleRoute>} />
-              <Route path="report-cards" element={<RoleRoute allowedRoles={['parent']}><ParentReportCardsPage /></RoleRoute>} />
-              <Route path="fee-payments" element={<RoleRoute allowedRoles={['parent']}><FeePaymentsPage /></RoleRoute>} />
-              <Route path="my-transport" element={<RoleRoute allowedRoles={['parent']}><MyTransportPage /></RoleRoute>} />
+              <Route path="my-children" element={<RoleRoute><MyChildrenPage /></RoleRoute>} />
+              <Route path="children-progress" element={<RoleRoute><ChildrenProgressPage /></RoleRoute>} />
+              <Route path="report-cards" element={<RoleRoute><ParentReportCardsPage /></RoleRoute>} />
+              <Route path="fee-payments" element={<RoleRoute><FeePaymentsPage /></RoleRoute>} />
+              <Route path="my-transport" element={<RoleRoute><MyTransportPage /></RoleRoute>} />
 
               {/* Teacher Routes */}
               <Route path="my-classes" element={<MyClassesPage />} />
@@ -308,44 +308,44 @@ function App() {
 
               {/* Shared & role-filtered feature routes */}
               <Route path="announcements" element={<AnnouncementsPage />} />
-              <Route path="audit-log" element={<RoleRoute allowedRoles={['admin']}><AuditLogPage /></RoleRoute>} />
-              <Route path="fee-reminders" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><FeeRemindersPage /></RoleRoute>} />
-              <Route path="inventory" element={<RoleRoute allowedRoles={['admin']}><InventoryPage /></RoleRoute>} />
-              <Route path="store-requisitions" element={<RoleRoute allowedRoles={['admin', 'finance_officer', 'teacher', 'technician', 'security']}><StoreRequisitions /></RoleRoute>} />
-              <Route path="term-reports" element={<RoleRoute allowedRoles={['admin', 'teacher']}><TermReportsPage /></RoleRoute>} />
-              <Route path="nemis" element={<RoleRoute allowedRoles={['admin']}><NemisPage /></RoleRoute>} />
+              <Route path="audit-log" element={<RoleRoute><AuditLogPage /></RoleRoute>} />
+              <Route path="fee-reminders" element={<RoleRoute><FeeRemindersPage /></RoleRoute>} />
+              <Route path="inventory" element={<RoleRoute><InventoryPage /></RoleRoute>} />
+              <Route path="store-requisitions" element={<RoleRoute><StoreRequisitions /></RoleRoute>} />
+              <Route path="term-reports" element={<RoleRoute><TermReportsPage /></RoleRoute>} />
+              <Route path="nemis" element={<RoleRoute><NemisPage /></RoleRoute>} />
               <Route path="exam-analytics" element={<ExamAnalyticsPage />} />
               <Route path="meetings" element={<MeetingsPage />} />
-              <Route path="payroll" element={<RoleRoute allowedRoles={['admin', 'finance_officer', 'teacher']}><PayrollPage /></RoleRoute>} />
+              <Route path="payroll" element={<RoleRoute><PayrollPage /></RoleRoute>} />
               <Route path="appraisals" element={<AppraisalPage />} />
-              <Route path="substitutes" element={<RoleRoute allowedRoles={['admin']}><SubstitutePage /></RoleRoute>} />
-              <Route path="bursary" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><BursaryPage /></RoleRoute>} />
+              <Route path="substitutes" element={<RoleRoute><SubstitutePage /></RoleRoute>} />
+              <Route path="bursary" element={<RoleRoute><BursaryPage /></RoleRoute>} />
               <Route path="canteen" element={<CanteenPage />} />
-              <Route path="canteen-menu-planning" element={<RoleRoute allowedRoles={['admin']}><MenuPlanningPage /></RoleRoute>} />
-              <Route path="canteen-attendance" element={<RoleRoute allowedRoles={['admin']}><MealAttendancePage /></RoleRoute>} />
-              <Route path="canteen-requisitions" element={<RoleRoute allowedRoles={['admin']}><KitchenRequisitionsPage /></RoleRoute>} />
-              <Route path="school-store" element={<RoleRoute allowedRoles={['admin']}><SchoolStorePage /></RoleRoute>} />
+              <Route path="canteen-menu-planning" element={<RoleRoute><MenuPlanningPage /></RoleRoute>} />
+              <Route path="canteen-attendance" element={<RoleRoute><MealAttendancePage /></RoleRoute>} />
+              <Route path="canteen-requisitions" element={<RoleRoute><KitchenRequisitionsPage /></RoleRoute>} />
+              <Route path="school-store" element={<RoleRoute><SchoolStorePage /></RoleRoute>} />
               <Route path="counseling" element={<CounselingPage />} />
-              <Route path="hostel-management" element={<RoleRoute allowedRoles={['admin']}><HostelManagementPage /></RoleRoute>} />
-              <Route path="hostel-roll-call" element={<RoleRoute allowedRoles={['admin']}><RollCallPage /></RoleRoute>} />
-              <Route path="hostel-laundry" element={<RoleRoute allowedRoles={['admin']}><LaundryPage /></RoleRoute>} />
-              <Route path="hostel-inspections" element={<RoleRoute allowedRoles={['admin']}><DormitoryInspectionPage /></RoleRoute>} />
-              <Route path="hostel-inventory" element={<RoleRoute allowedRoles={['admin']}><HostelInventoryPage /></RoleRoute>} />
-              <Route path="maintenance-requests" element={<RoleRoute allowedRoles={['admin', 'teacher']}><MaintenanceRequestsPage /></RoleRoute>} />
-              <Route path="admissions" element={<RoleRoute allowedRoles={['admin']}><AdmissionsPage /></RoleRoute>} />
-              <Route path="crm" element={<RoleRoute allowedRoles={['admin']}><CRMPage /></RoleRoute>} />
-              <Route path="alumni" element={<RoleRoute allowedRoles={['admin']}><AlumniPage /></RoleRoute>} />
-              <Route path="alumni-portal" element={<RoleRoute allowedRoles={['alumni']}><AlumniPortalPage /></RoleRoute>} />
-              <Route path="whatsapp" element={<RoleRoute allowedRoles={['admin']}><WhatsAppPage /></RoleRoute>} />
-              <Route path="sms-keywords" element={<RoleRoute allowedRoles={['admin']}><SmsKeywordsPage /></RoleRoute>} />
+              <Route path="hostel-management" element={<RoleRoute><HostelManagementPage /></RoleRoute>} />
+              <Route path="hostel-roll-call" element={<RoleRoute><RollCallPage /></RoleRoute>} />
+              <Route path="hostel-laundry" element={<RoleRoute><LaundryPage /></RoleRoute>} />
+              <Route path="hostel-inspections" element={<RoleRoute><DormitoryInspectionPage /></RoleRoute>} />
+              <Route path="hostel-inventory" element={<RoleRoute><HostelInventoryPage /></RoleRoute>} />
+              <Route path="maintenance-requests" element={<RoleRoute><MaintenanceRequestsPage /></RoleRoute>} />
+              <Route path="admissions" element={<RoleRoute><AdmissionsPage /></RoleRoute>} />
+              <Route path="crm" element={<RoleRoute><CRMPage /></RoleRoute>} />
+              <Route path="alumni" element={<RoleRoute><AlumniPage /></RoleRoute>} />
+              <Route path="alumni-portal" element={<RoleRoute><AlumniPortalPage /></RoleRoute>} />
+              <Route path="whatsapp" element={<RoleRoute><WhatsAppPage /></RoleRoute>} />
+              <Route path="sms-keywords" element={<RoleRoute><SmsKeywordsPage /></RoleRoute>} />
               <Route path="portfolio" element={<PortfolioPage />} />
 
               {/* Library Routes */}
               <Route path="library" element={<LibraryCatalogPage />} />
               <Route path="my-books" element={<MyBorrowingsPage />} />
-              <Route path="library-management" element={<RoleRoute allowedRoles={['admin']}><LibraryManagementPage /></RoleRoute>} />
-              <Route path="library-borrowings" element={<RoleRoute allowedRoles={['admin']}><BorrowingsPage /></RoleRoute>} />
-              <Route path="library-members" element={<RoleRoute allowedRoles={['admin']}><LibraryMembersPage /></RoleRoute>} />
+              <Route path="library-management" element={<RoleRoute><LibraryManagementPage /></RoleRoute>} />
+              <Route path="library-borrowings" element={<RoleRoute><BorrowingsPage /></RoleRoute>} />
+              <Route path="library-members" element={<RoleRoute><LibraryMembersPage /></RoleRoute>} />
 
               {/* IGCSE Module */}
               <Route path="igcse" element={<IgcsePage />} />
@@ -360,38 +360,38 @@ function App() {
 
               {/* Discipline / Transport / Health */}
               <Route path="discipline" element={<DisciplinePage />} />
-              <Route path="transport" element={<RoleRoute allowedRoles={['admin']}><TransportPage /></RoleRoute>} />
-              <Route path="transport-tracking" element={<RoleRoute allowedRoles={['admin']}><TransportTrackingPage /></RoleRoute>} />
+              <Route path="transport" element={<RoleRoute><TransportPage /></RoleRoute>} />
+              <Route path="transport-tracking" element={<RoleRoute><TransportTrackingPage /></RoleRoute>} />
               <Route path="health" element={<HealthPage />} />
               <Route path="staff-leave" element={<StaffLeavePage />} />
 
               {/* Teacher Check-in Admin */}
-              <Route path="teacher-checkin" element={<RoleRoute allowedRoles={['admin']}><TeacherCheckinAdminPage /></RoleRoute>} />
+              <Route path="teacher-checkin" element={<RoleRoute><TeacherCheckinAdminPage /></RoleRoute>} />
 
               {/* SMS Messaging */}
-              <Route path="sms" element={<RoleRoute allowedRoles={['admin', 'teacher']}><SMSPage /></RoleRoute>} />
+              <Route path="sms" element={<RoleRoute><SMSPage /></RoleRoute>} />
 
               {/* Gate Management */}
-              <Route path="gate-manager" element={<RoleRoute allowedRoles={['admin', 'security']}><GateManagerPage /></RoleRoute>} />
+              <Route path="gate-manager" element={<RoleRoute><GateManagerPage /></RoleRoute>} />
 
               {/* Procurement Module */}
-              <Route path="procurement" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementDashboard /></RoleRoute>} />
-              <Route path="procurement/suppliers" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><SupplierManagement /></RoleRoute>} />
-              <Route path="procurement/requisitions" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><PurchaseRequisitions /></RoleRoute>} />
-              <Route path="procurement/rfqs" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><RFQManagement /></RoleRoute>} />
-              <Route path="procurement/quotations" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><QuotationManagement /></RoleRoute>} />
-              <Route path="procurement/orders" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementOrders /></RoleRoute>} />
-              <Route path="procurement/contracts" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ContractManagement /></RoleRoute>} />
-              <Route path="procurement/grn" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><GoodsReceiptManagement /></RoleRoute>} />
-              <Route path="procurement/invoices" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><InvoiceManagement /></RoleRoute>} />
-              <Route path="procurement/payments" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><SupplierPayments /></RoleRoute>} />
-              <Route path="procurement/planning" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementPlanning /></RoleRoute>} />
-              <Route path="procurement/reports" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementReports /></RoleRoute>} />
-              <Route path="procurement/audit" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><ProcurementAuditPage /></RoleRoute>} />
-              <Route path="procurement/assets" element={<RoleRoute allowedRoles={['admin', 'finance_officer']}><AssetManagement /></RoleRoute>} />
+              <Route path="procurement" element={<RoleRoute><ProcurementDashboard /></RoleRoute>} />
+              <Route path="procurement/suppliers" element={<RoleRoute><SupplierManagement /></RoleRoute>} />
+              <Route path="procurement/requisitions" element={<RoleRoute><PurchaseRequisitions /></RoleRoute>} />
+              <Route path="procurement/rfqs" element={<RoleRoute><RFQManagement /></RoleRoute>} />
+              <Route path="procurement/quotations" element={<RoleRoute><QuotationManagement /></RoleRoute>} />
+              <Route path="procurement/orders" element={<RoleRoute><ProcurementOrders /></RoleRoute>} />
+              <Route path="procurement/contracts" element={<RoleRoute><ContractManagement /></RoleRoute>} />
+              <Route path="procurement/grn" element={<RoleRoute><GoodsReceiptManagement /></RoleRoute>} />
+              <Route path="procurement/invoices" element={<RoleRoute><InvoiceManagement /></RoleRoute>} />
+              <Route path="procurement/payments" element={<RoleRoute><SupplierPayments /></RoleRoute>} />
+              <Route path="procurement/planning" element={<RoleRoute><ProcurementPlanning /></RoleRoute>} />
+              <Route path="procurement/reports" element={<RoleRoute><ProcurementReports /></RoleRoute>} />
+              <Route path="procurement/audit" element={<RoleRoute><ProcurementAuditPage /></RoleRoute>} />
+              <Route path="procurement/assets" element={<RoleRoute><AssetManagement /></RoleRoute>} />
 
               {/* Parent Alerts */}
-              <Route path="my-alerts" element={<RoleRoute allowedRoles={['parent']}><ParentAlertsPage /></RoleRoute>} />
+              <Route path="my-alerts" element={<RoleRoute><ParentAlertsPage /></RoleRoute>} />
 
               {/* Shared Routes */}
               <Route path="profile" element={<ProfilePage />} />

@@ -118,10 +118,15 @@ router.put('/:id/status', requireAdminOrTeacher, async (req, res) => {
       return res.status(400).json({ success: false, message: `status must be one of: ${allowed.join(', ')}` });
     }
 
-    const rows = await query(
-      `UPDATE substitute_assignments SET status = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *`,
-      [status, req.params.id, tid]
-    );
+    let sql = `UPDATE substitute_assignments SET status = $1 WHERE id = $2 AND tenant_id = $3`;
+    const params = [status, req.params.id, tid];
+    if (req.user.role === 'teacher') {
+      sql += ` AND (absent_teacher = $${params.length + 1} OR substitute = $${params.length + 1})`;
+      params.push(req.user.id);
+    }
+    sql += ' RETURNING *';
+
+    const rows = await query(sql, params);
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'Substitution not found' });
     res.json({ success: true, data: rows[0] });
   } catch (err) {

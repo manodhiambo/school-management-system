@@ -8,6 +8,7 @@ import { EditParentModal } from '@/components/modals/EditParentModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/languageStore';
+import { useAuthStore } from '@/store/authStore';
 
 interface Parent {
   id: string;
@@ -23,6 +24,8 @@ interface Parent {
 
 export function ParentsPage() {
   const { t } = useLanguageStore();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -111,10 +114,12 @@ export function ParentsPage() {
           <h2 className="text-3xl font-bold">{t('Parents')}</h2>
           <p className="text-gray-500">{t('Manage parent accounts and link them to students')}</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('Add Parent')}
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('Add Parent')}
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -175,10 +180,12 @@ export function ParentsPage() {
             <div className="text-center py-12">
               <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 mb-4">{t('No parents found')}</p>
-              <Button onClick={() => setShowAddModal(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('Add Your First Parent')}
-              </Button>
+              {isAdmin && (
+                <Button onClick={() => setShowAddModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('Add Your First Parent')}
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -223,26 +230,30 @@ export function ParentsPage() {
                           >
                             <Eye className="h-4 w-4 text-gray-500" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            title="Edit & Link Students"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleEditParent(parent);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 text-blue-500" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Delete"
-                            onClick={() => handleDelete(parent.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Edit & Link Students"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleEditParent(parent);
+                              }}
+                            >
+                              <Edit className="h-4 w-4 text-blue-500" />
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Delete"
+                              onClick={() => handleDelete(parent.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -333,20 +344,22 @@ export function ParentsPage() {
                 ) : (
                   <div className="text-center py-6 bg-gray-50 rounded-lg">
                     <p className="text-gray-500">No children linked</p>
-                    <Button 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => {
-                        setShowViewModal(false);
-                        setTimeout(() => {
-                          setSelectedParent(parentDetails);
-                          setShowEditModal(true);
-                        }, 100);
-                      }}
-                    >
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Link Students
-                    </Button>
+                    {isAdmin && (
+                      <Button
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => {
+                          setShowViewModal(false);
+                          setTimeout(() => {
+                            setSelectedParent(parentDetails);
+                            setShowEditModal(true);
+                          }, 100);
+                        }}
+                      >
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Link Students
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

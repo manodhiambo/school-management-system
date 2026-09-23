@@ -15,6 +15,7 @@ import { passwordResetLimiter } from '../middleware/rateLimiter.js';
 import { findBlacklistMatch, maybeAutoBlacklistIp } from '../utils/blacklist.js';
 import { buildAuditContext } from '../utils/auditContext.js';
 import { getDemoTenantId } from '../services/demoTenant.js';
+import { DEMO_SHOWCASE_EMAILS } from '../database/seedDemoTenant.js';
 import { deferred } from '../utils/deferred.js';
 
 const router = express.Router();
@@ -243,13 +244,17 @@ router.get('/demo-users', async (req, res) => {
       return res.status(503).json({ success: false, message: 'The live demo is not available right now — please try again shortly.' });
     }
 
+    // seedDemoTenant.js also creates dozens of background students/parents/
+    // teachers to make the tenant's lists look realistic - filtering to the
+    // curated showcase emails keeps this picker at one tile per role instead
+    // of dumping the whole roster into a single dropdown.
     const users = await query(
       `SELECT email, role, first_name, last_name
-       FROM users WHERE tenant_id = $1 AND is_active = true
+       FROM users WHERE tenant_id = $1 AND is_active = true AND email = ANY($2)
        ORDER BY CASE role
          WHEN 'admin' THEN 1 WHEN 'teacher' THEN 2 WHEN 'parent' THEN 3 WHEN 'student' THEN 4
          ELSE 5 END, first_name`,
-      [demoTenantId]
+      [demoTenantId, DEMO_SHOWCASE_EMAILS]
     );
     res.json({ success: true, data: users });
   } catch (error) {

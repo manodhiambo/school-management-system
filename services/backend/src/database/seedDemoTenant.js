@@ -32,6 +32,36 @@ const DEMO_SECURITY_EMAIL = 'security@demo.skulmanager.org';
 const DEMO_TECHNICIAN_EMAIL = 'technician@demo.skulmanager.org';
 const DEMO_ALUMNI_EMAIL = 'alumni@demo.skulmanager.org';
 
+// The showcase accounts offered on the login page's "log in as" picker (see
+// GET /auth/demo-users in authRoutes.js). seedShowcaseData() below also
+// creates many more background people (extra students/parents/teachers) to
+// make the tenant's lists/reports look realistic - those must NOT show up
+// in the picker, so authRoutes.js filters to exactly this set rather than
+// querying "every user in the demo tenant".
+export const DEMO_SHOWCASE_EMAILS = [
+  DEMO_ADMIN_EMAIL, DEMO_TEACHER_EMAIL, DEMO_PARENT_EMAIL,
+  DEMO_STUDENT1_EMAIL, DEMO_STUDENT2_EMAIL, DEMO_FINANCE_EMAIL,
+  DEMO_DRIVER_EMAIL, DEMO_SECURITY_EMAIL, DEMO_TECHNICIAN_EMAIL, DEMO_ALUMNI_EMAIL,
+];
+
+// Builds one multi-row INSERT from an array of value-tuples. The demo reset
+// runs inside a Vercel function with a 30s hard timeout (vercel.json), and
+// this seeder creates several hundred rows - issuing one round-trip per row
+// (as the rest of this codebase's query() call sites normally do) would
+// burn most of that budget on network latency alone. Batching per table
+// keeps the whole reset to a couple dozen round-trips regardless of how
+// much showcase data it creates. `table`/`columns` must be static trusted
+// strings (never request input) since they're interpolated directly.
+async function insertRows(table, columns, rows) {
+  if (!rows.length) return;
+  const values = [];
+  const tuples = rows.map((row) => {
+    const placeholders = row.map((v) => { values.push(v); return `$${values.length}`; });
+    return `(${placeholders.join(',')})`;
+  });
+  await query(`INSERT INTO ${table} (${columns.join(',')}) VALUES ${tuples.join(',')}`, values);
+}
+
 function cbeGrade(percentage) {
   if (percentage >= 75) return 'EE';
   if (percentage >= 50) return 'ME';
@@ -160,6 +190,16 @@ async function wipeDemoTenantData(tenantId) {
     'DELETE FROM parent_students WHERE student_id IN (SELECT id FROM students WHERE tenant_id = $1)',
     [tenantId]
   );
+  // transport_routes.driver_user_id and visitors.blacklisted_by are both
+  // nullable/no-FK-constraint columns (see migration 048's deliberate
+  // "nofk" choice for the former) — neither table is reachable by the
+  // generic FK-graph walker below, nor cascades from any root table's
+  // deletion, so without this they'd silently accumulate across every
+  // nightly reset instead of being cleared. student_transport/visitor_visits
+  // both cascade off these via ON DELETE CASCADE, so deleting the parent
+  // row here is sufficient for both pairs.
+  await query('DELETE FROM transport_routes WHERE tenant_id = $1', [tenantId]);
+  await query('DELETE FROM visitors WHERE tenant_id = $1', [tenantId]);
   // Clears every table that references teachers/students/classes/subjects/
   // parents/users (assignments, timetable, library_members, payroll_entries,
   // exam_attempts, staff_leave_requests, and everything else the FK graph
@@ -193,107 +233,194 @@ async function randomPasswordHash() {
   return bcrypt.hash(crypto.randomBytes(24).toString('hex'), 12);
 }
 
-async function createUser({ email, role, tenantId, firstName, lastName }) {
-  const id = uuidv4();
-  const hash = await randomPasswordHash();
-  await query(
-    `INSERT INTO users (id, email, password, role, tenant_id, first_name, last_name, is_active, is_verified, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,true,true,NOW(),NOW())`,
-    [id, email, hash, role, tenantId, firstName, lastName]
-  );
-  return id;
+function addDays(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d;
 }
+
+function randomScore(base) {
+  const val = Math.round(base + (Math.random() * 30 - 15));
+  return Math.min(98, Math.max(20, val));
+}
+
+// Class/subject/teacher layout ─────────────────────────────────────────────
+// classIndex order below is reused throughout (students, transport, exams).
+const CLASS_DEFS = [
+  ['Grade 3', 'Red', 'lower_primary', 3],
+  ['Grade 5', 'Blue', 'lower_primary', 5],
+  ['Grade 8', 'Gold', 'junior_secondary', 8],
+  ['Grade 10', 'Green', 'senior_secondary', 10],
+];
+const SUBJECT_DEFS = [
+  ['English', 'ENG'], ['Mathematics', 'MAT'], ['Kiswahili', 'KIS'],
+  ['Integrated Science', 'SCI'], ['Social Studies', 'SST'],
+];
+// [firstName, lastName, email|null (null = auto-generated), subjectIndex, classTeacherOfClassIndex|null, qualification]
+const TEACHER_DEFS = [
+  ['Jane', 'Wanjiru', DEMO_TEACHER_EMAIL, 1, 1, 'B.Ed Mathematics'],
+  ['Peter', 'Mwangi', null, 0, 0, 'B.Ed English'],
+  ['Grace', 'Achieng', null, 3, 2, 'B.Ed Science'],
+  ['Samuel', 'Kiprotich', null, 4, 3, 'B.Ed Social Studies'],
+  ['Mary', 'Njeri', null, 2, null, 'B.Ed Kiswahili'],
+];
+// [firstName, lastName, gender, classIndex, email|null]
+const STUDENT_DEFS = [
+  ['Faith', 'Wambui', 'female', 0, null],
+  ['Kevin', 'Mutiso', 'male', 0, null],
+  ['Rebecca', 'Nyambura', 'female', 0, null],
+  ['Victor', 'Omondi', 'male', 0, null],
+  ['Gladys', 'Cherono', 'female', 0, null],
+  ['Amina', 'Otieno', 'female', 1, DEMO_STUDENT1_EMAIL],
+  ['Diana', 'Chebet', 'female', 1, null],
+  ['Joseph', 'Kariuki', 'male', 1, null],
+  ['Esther', 'Chepkoech', 'female', 1, null],
+  ['Anthony', 'Mbugua', 'male', 1, null],
+  ['Brian', 'Otieno', 'male', 2, DEMO_STUDENT2_EMAIL],
+  ['Lucy', 'Naliaka', 'female', 2, null],
+  ['Dennis', 'Mbugua', 'male', 2, null],
+  ['Winnie', 'Auma', 'female', 2, null],
+  ['Collins', 'Rotich', 'male', 2, null],
+  ['Sharon', 'Kiptoo', 'female', 3, null],
+  ['Michael', 'Wafula', 'male', 3, null],
+  ['Purity', 'Wanjiku', 'female', 3, null],
+  ['Emmanuel', 'Kiplangat', 'male', 3, null],
+  ['Felix', 'Barasa', 'male', 3, null],
+];
+// Families group students under one or more guardians (indices into
+// STUDENT_DEFS) — covers single-parent, multi-child, and multi-guardian
+// (both father and mother linked to the same child) demo scenarios, all
+// via the parent_students junction table.
+const FAMILY_DEFS = [
+  { studentIndices: [5, 10], parents: [
+    ['Peter', 'Otieno', 'father', DEMO_PARENT_EMAIL, '+254711000000', 'Engineer'],
+    ['Grace', 'Otieno', 'mother', null, '+254711000001', 'Nurse'],
+  ] },
+  { studentIndices: [9, 12], parents: [['Francis', 'Mbugua', 'father', null, '+254711000002', 'Businessman']] },
+  { studentIndices: [0], parents: [['Mary', 'Wambui', 'mother', null, '+254711000010', 'Teacher']] },
+  { studentIndices: [1], parents: [['John', 'Mutiso', 'father', null, '+254711000011', 'Farmer']] },
+  { studentIndices: [2], parents: [['Alice', 'Nyambura', 'mother', null, '+254711000012', 'Accountant']] },
+  { studentIndices: [3], parents: [['George', 'Omondi', 'father', null, '+254711000013', 'Bus Driver']] },
+  { studentIndices: [4], parents: [['Ruth', 'Cherono', 'mother', null, '+254711000014', 'Nurse']] },
+  { studentIndices: [6], parents: [['Daniel', 'Chebet', 'father', null, '+254711000015', 'Mechanic']] },
+  { studentIndices: [7], parents: [['Elizabeth', 'Kariuki', 'mother', null, '+254711000016', 'Shopkeeper']] },
+  { studentIndices: [8], parents: [['Simon', 'Chepkoech', 'father', null, '+254711000017', 'Clergy']] },
+  { studentIndices: [11], parents: [['Agnes', 'Naliaka', 'mother', null, '+254711000018', 'Trader']] },
+  { studentIndices: [13], parents: [['Tom', 'Auma', 'father', null, '+254711000019', 'Electrician']] },
+  { studentIndices: [14], parents: [['Nancy', 'Rotich', 'mother', null, '+254711000020', 'Nurse']] },
+  { studentIndices: [15], parents: [['Paul', 'Kiptoo', 'father', null, '+254711000021', 'Police Officer']] },
+  { studentIndices: [16], parents: [['Catherine', 'Wafula', 'mother', null, '+254711000022', 'Doctor']] },
+  { studentIndices: [17], parents: [['Stephen', 'Wanjiku', 'father', null, '+254711000023', 'Lawyer']] },
+  { studentIndices: [18], parents: [['Josephine', 'Kiplangat', 'mother', null, '+254711000024', 'Banker']] },
+  { studentIndices: [19], parents: [['Robert', 'Barasa', 'father', null, '+254711000025', 'Pilot']] },
+];
+const EDUCATION_LEVEL_FEES = { lower_primary: 12000, upper_primary: 13000, junior_secondary: 15000, senior_secondary: 18000 };
 
 async function seedShowcaseData(tenant) {
   const tenantId = tenant.id;
   const currentYear = new Date().getFullYear().toString();
+  const today = new Date();
+  // Reused for every generated user's password hash — it's never checked
+  // anywhere (the demo is only ever entered via the passwordless one-click
+  // /auth/demo-login endpoint), so hashing once instead of once-per-user
+  // saves ~50 bcrypt calls (~150ms each) against the 30s serverless budget.
+  const passwordHash = await randomPasswordHash();
 
-  // ── People ──────────────────────────────────────────────────────────────
-  await createUser({ email: DEMO_ADMIN_EMAIL, role: 'admin', tenantId, firstName: 'Demo', lastName: 'Admin' });
-
-  const teacherUserId = await createUser({ email: DEMO_TEACHER_EMAIL, role: 'teacher', tenantId, firstName: 'Jane', lastName: 'Wanjiru' });
-  const teacherId = uuidv4();
-  await query(
-    `INSERT INTO teachers (id, user_id, tenant_id, first_name, last_name, employee_id, qualification, specialization, status)
-     VALUES ($1,$2,$3,'Jane','Wanjiru',$4,'B.Ed Mathematics','Mathematics','active')`,
-    [teacherId, teacherUserId, tenantId, 'DEMO-T001']
-  );
-
-  const parentUserId = await createUser({ email: DEMO_PARENT_EMAIL, role: 'parent', tenantId, firstName: 'Peter', lastName: 'Otieno' });
-  const parentId = uuidv4();
-  await query(
-    `INSERT INTO parents (id, user_id, first_name, last_name, relationship, phone_primary, occupation, tenant_id)
-     VALUES ($1,$2,'Peter','Otieno','father','+254711000000','Engineer',$3)`,
-    [parentId, parentUserId, tenantId]
-  );
-
-  // These 4 roles have no dedicated profile table (matches driverRoutes.js /
-  // gateRoutes.js / financeRoutes.js / maintenanceRoutes.js, which all key
-  // off users.role directly) — a plain login-capable user is the whole demo.
-  await createUser({ email: DEMO_FINANCE_EMAIL, role: 'finance_officer', tenantId, firstName: 'Susan', lastName: 'Kamau' });
-  await createUser({ email: DEMO_DRIVER_EMAIL, role: 'driver', tenantId, firstName: 'Moses', lastName: 'Kiptoo' });
-  await createUser({ email: DEMO_SECURITY_EMAIL, role: 'security', tenantId, firstName: 'James', lastName: 'Mwangi' });
-  await createUser({ email: DEMO_TECHNICIAN_EMAIL, role: 'technician', tenantId, firstName: 'David', lastName: 'Mutua' });
-
-  const alumniUserId = await createUser({ email: DEMO_ALUMNI_EMAIL, role: 'alumni', tenantId, firstName: 'Esther', lastName: 'Wambui' });
-  await query(
-    `INSERT INTO alumni_profiles (id, tenant_id, user_id, first_name, last_name, graduation_year, current_occupation, employer, university, is_mentor, is_public)
-     VALUES ($1,$2,$3,'Esther','Wambui',2020,'Software Engineer','Acme Kenya Ltd','University of Nairobi',true,true)`,
-    [uuidv4(), tenantId, alumniUserId]
-  );
-
-  // ── Academics: classes + subjects ──────────────────────────────────────
-  const classLowerId = uuidv4();
-  await query(
-    `INSERT INTO classes (id, name, section, capacity, academic_year, education_level, grade_number, tenant_id, is_active)
-     VALUES ($1,'Grade 5','Blue',40,$2,'lower_primary',5,$3,true)`,
-    [classLowerId, currentYear, tenantId]
-  );
-  const classJuniorId = uuidv4();
-  await query(
-    `INSERT INTO classes (id, name, section, capacity, academic_year, education_level, grade_number, tenant_id, is_active)
-     VALUES ($1,'Grade 8','Gold',40,$2,'junior_secondary',8,$3,true)`,
-    [classJuniorId, currentYear, tenantId]
-  );
-
-  const subjectDefs = [
-    ['English', 'ENG'], ['Mathematics', 'MAT'], ['Kiswahili', 'KIS'],
-    ['Integrated Science', 'SCI'], ['Social Studies', 'SST'],
-  ];
-  const subjectIds = [];
-  for (const [name, code] of subjectDefs) {
+  // ── People: build every user row up front, then insert in one batch ─────
+  const userRows = []; // [id, email, password, role, tenantId, firstName, lastName, is_active, is_verified]
+  const addUser = (email, role, firstName, lastName) => {
     const id = uuidv4();
-    subjectIds.push(id);
-    await query(
-      `INSERT INTO subjects (id, name, code, credits, is_active, category, tenant_id)
-       VALUES ($1,$2,$3,1,true,'core',$4)`,
-      [id, name, code, tenantId]
-    );
+    userRows.push([id, email, passwordHash, role, tenantId, firstName, lastName, true, true]);
+    return id;
+  };
+
+  const adminUserId = addUser(DEMO_ADMIN_EMAIL, 'admin', 'Demo', 'Admin');
+  addUser(DEMO_FINANCE_EMAIL, 'finance_officer', 'Susan', 'Kamau');
+  const driverUserId = addUser(DEMO_DRIVER_EMAIL, 'driver', 'Moses', 'Kiptoo');
+  const securityUserId = addUser(DEMO_SECURITY_EMAIL, 'security', 'James', 'Mwangi');
+  const technicianUserId = addUser(DEMO_TECHNICIAN_EMAIL, 'technician', 'David', 'Mutua');
+  const alumniUserId = addUser(DEMO_ALUMNI_EMAIL, 'alumni', 'Esther', 'Wambui');
+
+  const teacherUserIds = TEACHER_DEFS.map(([firstName, lastName, email]) =>
+    addUser(email || `teacher.${firstName}${lastName}`.toLowerCase() + '@demo.skulmanager.org', 'teacher', firstName, lastName));
+
+  const familyParents = []; // flattened [{userId, firstName, lastName, relationship, phone, occupation}]
+  const familyByStudentIndex = new Map(); // studentIndex -> array of parent entries
+  for (const family of FAMILY_DEFS) {
+    const entries = family.parents.map(([firstName, lastName, relationship, email, phone, occupation]) => {
+      const id = addUser(email || `parent.${firstName}${lastName}`.toLowerCase() + '@demo.skulmanager.org', 'parent', firstName, lastName);
+      const entry = { userId: id, firstName, lastName, relationship, phone, occupation };
+      familyParents.push(entry);
+      return entry;
+    });
+    for (const studentIndex of family.studentIndices) familyByStudentIndex.set(studentIndex, entries);
   }
 
-  // ── Students ────────────────────────────────────────────────────────────
-  const student1UserId = await createUser({ email: DEMO_STUDENT1_EMAIL, role: 'student', tenantId, firstName: 'Amina', lastName: 'Otieno' });
-  const student1Id = uuidv4();
-  await query(
-    `INSERT INTO students (id, user_id, admission_number, first_name, last_name, gender, class_id, parent_id, admission_date, tenant_id, status, education_level)
-     VALUES ($1,$2,$3,'Amina','Otieno','female',$4,$5,CURRENT_DATE,$6,'active','lower_primary')`,
-    [student1Id, student1UserId, `DEMO${currentYear}0001`, classLowerId, parentId, tenantId]
-  );
+  const studentUserIds = STUDENT_DEFS.map(([firstName, lastName, , , email]) =>
+    addUser(email || `student.${firstName}${lastName}`.toLowerCase() + '@demo.skulmanager.org', 'student', firstName, lastName));
 
-  const student2UserId = await createUser({ email: DEMO_STUDENT2_EMAIL, role: 'student', tenantId, firstName: 'Brian', lastName: 'Otieno' });
-  const student2Id = uuidv4();
-  await query(
-    `INSERT INTO students (id, user_id, admission_number, first_name, last_name, gender, class_id, parent_id, admission_date, tenant_id, status, education_level)
-     VALUES ($1,$2,$3,'Brian','Otieno','male',$4,$5,CURRENT_DATE,$6,'active','junior_secondary')`,
-    [student2Id, student2UserId, `DEMO${currentYear}0002`, classJuniorId, parentId, tenantId]
-  );
+  await insertRows('users',
+    ['id', 'email', 'password', 'role', 'tenant_id', 'first_name', 'last_name', 'is_active', 'is_verified'],
+    userRows);
 
-  for (const studentId of [student1Id, student2Id]) {
-    await query(
-      'INSERT INTO parent_students (parent_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-      [parentId, studentId]
-    );
+  await insertRows('alumni_profiles',
+    ['id', 'tenant_id', 'user_id', 'first_name', 'last_name', 'graduation_year', 'current_occupation', 'employer', 'university', 'is_mentor', 'is_public'],
+    [[uuidv4(), tenantId, alumniUserId, 'Esther', 'Wambui', 2020, 'Software Engineer', 'Acme Kenya Ltd', 'University of Nairobi', true, true]]);
+
+  // ── Academics: classes + subjects + teachers ─────────────────────────────
+  const subjectIds = SUBJECT_DEFS.map(() => uuidv4());
+  await insertRows('subjects', ['id', 'name', 'code', 'credits', 'is_active', 'category', 'tenant_id'],
+    SUBJECT_DEFS.map(([name, code], i) => [subjectIds[i], name, code, 1, true, 'core', tenantId]));
+
+  const teacherIds = TEACHER_DEFS.map(() => uuidv4());
+  await insertRows('teachers',
+    ['id', 'user_id', 'tenant_id', 'first_name', 'last_name', 'employee_id', 'qualification', 'specialization', 'status'],
+    TEACHER_DEFS.map(([firstName, lastName, , subjectIndex, , qualification], i) =>
+      [teacherIds[i], teacherUserIds[i], tenantId, firstName, lastName, `DEMO-T${String(i + 1).padStart(3, '0')}`, qualification, SUBJECT_DEFS[subjectIndex][0], 'active']));
+
+  await insertRows('parents',
+    ['id', 'user_id', 'first_name', 'last_name', 'relationship', 'phone_primary', 'occupation', 'tenant_id'],
+    familyParents.map((p) => {
+      p.id = uuidv4();
+      return [p.id, p.userId, p.firstName, p.lastName, p.relationship, p.phone, p.occupation, tenantId];
+    }));
+
+  const classIds = CLASS_DEFS.map(() => uuidv4());
+  await insertRows('classes',
+    ['id', 'name', 'section', 'capacity', 'academic_year', 'education_level', 'grade_number', 'tenant_id', 'is_active', 'class_teacher_id'],
+    CLASS_DEFS.map(([name, section, level, grade], classIndex) => {
+      const homeroomTeacher = TEACHER_DEFS.findIndex(([, , , , classTeacherOf]) => classTeacherOf === classIndex);
+      return [classIds[classIndex], name, section, 40, currentYear, level, grade, tenantId, true,
+        homeroomTeacher >= 0 ? teacherUserIds[homeroomTeacher] : null];
+    }));
+
+  // Every subject taught by its one specialist teacher, across all 4 classes.
+  const classSubjectRows = [];
+  for (const classId of classIds) {
+    TEACHER_DEFS.forEach(([, , , subjectIndex], teacherIndex) => {
+      classSubjectRows.push([uuidv4(), classId, subjectIds[subjectIndex], teacherUserIds[teacherIndex], tenantId]);
+    });
   }
+  await insertRows('class_subjects', ['id', 'class_id', 'subject_id', 'teacher_id', 'tenant_id'], classSubjectRows);
+
+  // ── Students ──────────────────────────────────────────────────────────
+  const studentIds = STUDENT_DEFS.map(() => uuidv4());
+  const admissionDate = today.toISOString().slice(0, 10);
+  await insertRows('students',
+    ['id', 'user_id', 'admission_number', 'first_name', 'last_name', 'gender', 'class_id', 'parent_id', 'admission_date', 'tenant_id', 'status', 'education_level'],
+    STUDENT_DEFS.map(([firstName, lastName, gender, classIndex], i) => {
+      const primaryParent = familyByStudentIndex.get(i)[0];
+      return [studentIds[i], studentUserIds[i], `DEMO${currentYear}${String(i + 1).padStart(4, '0')}`,
+        firstName, lastName, gender, classIds[classIndex], primaryParent.id, admissionDate, tenantId, 'active', CLASS_DEFS[classIndex][2]];
+    }));
+
+  const parentStudentRows = [];
+  STUDENT_DEFS.forEach((_, i) => {
+    for (const parent of familyByStudentIndex.get(i)) {
+      parentStudentRows.push([parent.id, studentIds[i]]);
+    }
+  });
+  await insertRows('parent_students', ['parent_id', 'student_id'], parentStudentRows);
 
   // ── Finance: baseline (chart of accounts, settings, academic/financial year) ──
   // Must run after wipeDemoTenantData() has fully removed the old rows, since
@@ -306,61 +433,107 @@ async function seedShowcaseData(tenant) {
     schoolCode: tenant.school_code,
   });
 
-  // ── Finance: a paid invoice and a partially-paid invoice ─────────────────
-  const invoice1Id = uuidv4();
-  await query(
-    `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, paid_amount, balance_amount, due_date, status, tenant_id)
-     VALUES ($1,'DEMO-INV-0001',$2,15000,15000,15000,0,CURRENT_DATE + INTERVAL '30 days','paid',$3)`,
-    [invoice1Id, student1Id, tenantId]
-  );
-  await query(
-    `INSERT INTO fee_payments (id, invoice_id, student_id, amount, payment_method, receipt_number, status, payment_date, tenant_id)
-     VALUES ($1,$2,$3,15000,'mpesa','DEMO-RCT-0001','success',NOW(),$4)`,
-    [uuidv4(), invoice1Id, student1Id, tenantId]
-  );
-
-  const invoice2Id = uuidv4();
-  await query(
-    `INSERT INTO fee_invoices (id, invoice_number, student_id, total_amount, net_amount, paid_amount, balance_amount, due_date, status, tenant_id)
-     VALUES ($1,'DEMO-INV-0002',$2,18000,18000,8000,10000,CURRENT_DATE + INTERVAL '30 days','partial',$3)`,
-    [invoice2Id, student2Id, tenantId]
-  );
-  await query(
-    `INSERT INTO fee_payments (id, invoice_id, student_id, amount, payment_method, receipt_number, status, payment_date, tenant_id)
-     VALUES ($1,$2,$3,8000,'cash','DEMO-RCT-0002','success',NOW(),$4)`,
-    [uuidv4(), invoice2Id, student2Id, tenantId]
-  );
-
-  // ── Exams + published results, one per class ─────────────────────────────
-  const examScores = [82, 68, 55, 91, 38]; // one per subject, drives a spread of CBE grades
-  for (const [classId, studentId] of [[classLowerId, student1Id], [classJuniorId, student2Id]]) {
-    const examId = uuidv4();
-    await query(
-      `INSERT INTO exams (id, name, description, exam_type, academic_year, term, start_date, end_date, class_id, mode, tenant_id, is_active, is_results_published)
-       VALUES ($1,'Term 2 Opener Exam','Opener assessment for Term 2','opener',$2,'term2',CURRENT_DATE - INTERVAL '10 days',CURRENT_DATE - INTERVAL '8 days',$3,'offline',$4,true,true)`,
-      [examId, currentYear, classId, tenantId]
-    );
-    for (let i = 0; i < subjectIds.length; i++) {
-      const marks = examScores[i];
-      await query(
-        `INSERT INTO exam_results (id, tenant_id, exam_id, student_id, subject_id, marks_obtained, max_marks, cbc_grade, is_absent)
-         VALUES ($1,$2,$3,$4,$5,$6,100,$7,false)`,
-        [uuidv4(), tenantId, examId, studentId, subjectIds[i], marks, cbeGrade(marks)]
-      );
+  // ── Finance: one invoice per student, a realistic spread of payment states ──
+  const invoiceRows = [];
+  const paymentRows = [];
+  STUDENT_DEFS.forEach(([, , , classIndex], i) => {
+    const total = EDUCATION_LEVEL_FEES[CLASS_DEFS[classIndex][2]];
+    const invoiceId = uuidv4();
+    const state = i % 3; // 0=paid, 1=partial, 2=pending (unpaid)
+    const paid = state === 0 ? total : state === 1 ? Math.round(total * 0.55) : 0;
+    const status = state === 0 ? 'paid' : state === 1 ? 'partial' : 'pending';
+    invoiceRows.push([invoiceId, `DEMO-INV-${String(i + 1).padStart(4, '0')}`, studentIds[i], total, total, paid, total - paid, addDays(30), status, tenantId]);
+    if (paid > 0) {
+      paymentRows.push([uuidv4(), invoiceId, studentIds[i], paid, i % 2 === 0 ? 'mpesa' : 'cash', `DEMO-RCT-${String(i + 1).padStart(4, '0')}`, 'success', today, tenantId]);
     }
-  }
+  });
+  await insertRows('fee_invoices',
+    ['id', 'invoice_number', 'student_id', 'total_amount', 'net_amount', 'paid_amount', 'balance_amount', 'due_date', 'status', 'tenant_id'],
+    invoiceRows);
+  await insertRows('fee_payments',
+    ['id', 'invoice_id', 'student_id', 'amount', 'payment_method', 'receipt_number', 'status', 'payment_date', 'tenant_id'],
+    paymentRows);
 
-  // ── Attendance: last 5 weekdays, mostly present ──────────────────────────
-  for (const studentId of [student1Id, student2Id]) {
-    for (let dayOffset = 1; dayOffset <= 5; dayOffset++) {
-      const status = dayOffset === 3 ? 'late' : 'present';
-      await query(
-        `INSERT INTO attendance (id, student_id, date, status, tenant_id)
-         VALUES ($1,$2, CURRENT_DATE - $3::int, $4, $5)`,
-        [uuidv4(), studentId, dayOffset, status, tenantId]
-      );
+  // ── Exams: all 3 terms per class, term1+term2 published, term3 pending ───
+  const TERM_DEFS = [
+    { term: 'term1', label: 'Term 1', startOffset: -150, endOffset: -148, published: true },
+    { term: 'term2', label: 'Term 2', startOffset: -60, endOffset: -58, published: true },
+    { term: 'term3', label: 'Term 3', startOffset: -5, endOffset: -3, published: false },
+  ];
+  const examRows = [];
+  const examResultRows = [];
+  const studentAbility = studentIds.map(() => 45 + Math.random() * 40); // per-student baseline, kept across terms/subjects for realism
+  classIds.forEach((classId, classIndex) => {
+    const studentIndicesInClass = STUDENT_DEFS.map((s, i) => (s[3] === classIndex ? i : -1)).filter((i) => i >= 0);
+    TERM_DEFS.forEach(({ term, label, startOffset, endOffset, published }, termIndex) => {
+      const examId = uuidv4();
+      examRows.push([examId, `${label} Exam`, `${label} end-of-term assessment`, 'endterm', currentYear, term,
+        addDays(startOffset), addDays(endOffset), classId, 'offline', tenantId, true, published]);
+      for (const studentIndex of studentIndicesInClass) {
+        for (let subjectIndex = 0; subjectIndex < subjectIds.length; subjectIndex++) {
+          const marks = randomScore(studentAbility[studentIndex] + termIndex * 3);
+          examResultRows.push([uuidv4(), tenantId, examId, studentIds[studentIndex], subjectIds[subjectIndex], marks, 100, cbeGrade(marks), false]);
+        }
+      }
+    });
+  });
+  await insertRows('exams',
+    ['id', 'name', 'description', 'exam_type', 'academic_year', 'term', 'start_date', 'end_date', 'class_id', 'mode', 'tenant_id', 'is_active', 'is_results_published'],
+    examRows);
+  await insertRows('exam_results',
+    ['id', 'tenant_id', 'exam_id', 'student_id', 'subject_id', 'marks_obtained', 'max_marks', 'cbc_grade', 'is_absent'],
+    examResultRows);
+
+  // ── Attendance: last 8 school weekdays, mostly present with a little variety ──
+  const attendanceRows = [];
+  studentIds.forEach((studentId) => {
+    for (let dayOffset = 1; dayOffset <= 8; dayOffset++) {
+      const roll = Math.random();
+      const status = roll < 0.05 ? 'absent' : roll < 0.12 ? 'late' : 'present';
+      attendanceRows.push([uuidv4(), studentId, addDays(-dayOffset), status, tenantId]);
     }
-  }
+  });
+  await insertRows('attendance', ['id', 'student_id', 'date', 'status', 'tenant_id'], attendanceRows);
+
+  // ── Transport: one route with a real driver + vehicle, 8 students on it ──
+  const routeId = uuidv4();
+  await insertRows('transport_routes',
+    ['id', 'route_name', 'route_code', 'vehicle_registration', 'vehicle_capacity', 'driver_name', 'driver_phone', 'driver_user_id',
+     'morning_pickup_time', 'afternoon_dropoff_time', 'stops', 'monthly_fee', 'term_fee', 'tenant_id', 'is_active'],
+    [[routeId, 'Route A - Town Loop', 'RT-A', 'KDA 123A', 33, 'Moses Kiptoo', '+254712000000', driverUserId,
+      '06:30', '16:30', JSON.stringify(['Town Center', 'Riverside', 'Greenfield Estate', 'School Gate']), 3500, 9000, tenantId, true]]);
+
+  const transportStudentIndices = [0, 2, 5, 7, 10, 13, 15, 18]; // 2 per class
+  const stopNames = ['Town Center', 'Riverside', 'Greenfield Estate'];
+  await insertRows('student_transport', ['id', 'student_id', 'route_id', 'pickup_stop', 'dropoff_stop', 'assigned_date', 'is_active', 'tenant_id'],
+    transportStudentIndices.map((studentIndex, i) => {
+      const stop = stopNames[i % stopNames.length];
+      return [uuidv4(), studentIds[studentIndex], routeId, stop, stop, admissionDate, true, tenantId];
+    }));
+
+  // ── Gate security: a visitor currently on campus + one already checked out ──
+  const visitorIds = [uuidv4(), uuidv4()];
+  await insertRows('visitors', ['id', 'tenant_id', 'full_name', 'phone', 'email', 'gender', 'organization', 'notes'],
+    [
+      [visitorIds[0], tenantId, 'Susan Achieng', '+254722000001', null, 'female', null, 'Visiting to discuss child\'s progress'],
+      [visitorIds[1], tenantId, 'David Kimani', '+254722000002', 'david@buildright.co.ke', 'male', 'BuildRight Contractors', 'Termly maintenance contractor'],
+    ]);
+  await insertRows('visitor_visits',
+    ['id', 'tenant_id', 'visitor_id', 'purpose', 'purpose_details', 'host_user_id', 'host_name', 'pass_number', 'status', 'check_in_time', 'check_out_time', 'registered_by', 'gate'],
+    [
+      [uuidv4(), tenantId, visitorIds[0], 'parent', 'Meeting with class teacher', adminUserId, 'Demo Admin', 'PASS-DEMO-0001', 'checked_in', new Date(), null, securityUserId, 'Main Gate'],
+      [uuidv4(), tenantId, visitorIds[1], 'contractor', 'Quarterly plumbing inspection', adminUserId, 'Demo Admin', 'PASS-DEMO-0002', 'checked_out', addDays(-2), addDays(-2), securityUserId, 'Main Gate'],
+    ]);
+
+  // ── Maintenance: one job in progress, one completed ──────────────────────
+  await insertRows('maintenance_requests',
+    ['id', 'tenant_id', 'request_number', 'category', 'priority', 'title', 'description', 'location', 'requested_by', 'status', 'assigned_technician_id', 'assigned_at', 'started_at', 'completed_at'],
+    [
+      [uuidv4(), tenantId, 'DEMO-MR-0001', 'electrical', 'high', 'Flickering lights in Grade 8 classroom',
+        'Lights flicker intermittently, may be a wiring issue', 'Grade 8 classroom', teacherUserIds[2], 'in_progress', technicianUserId, addDays(-2), addDays(-1), null],
+      [uuidv4(), tenantId, 'DEMO-MR-0002', 'plumbing', 'medium', 'Leaking tap in staff washroom',
+        'Tap has been dripping constantly for a few days', 'Staff washroom', adminUserId, 'completed', technicianUserId, addDays(-6), addDays(-5), addDays(-4)],
+    ]);
 }
 
 // force=true always wipes and reseeds (the nightly 03:00 cron — "fresh every

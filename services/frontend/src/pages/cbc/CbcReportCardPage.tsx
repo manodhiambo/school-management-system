@@ -399,6 +399,7 @@ export function CbcReportCardPage() {
   const [shareContact, setShareContact] = useState({ name: '', phone: '', email: '' });
   const [downloading, setDownloading] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [autoPublish, setAutoPublish] = useState(true);
 
   // Teachers only ever see/generate report cards for the classes they actually teach
   // (homeroom or subject) — mirrors the same scoping used in CbcAssessmentPage.tsx.
@@ -453,6 +454,7 @@ export function CbcReportCardPage() {
       opening_date: termDates.opening_date || undefined,
       period: period.trim() || undefined,
       exam_id: examId || undefined,
+      auto_publish: autoPublish,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cbc-report-cards'] });
@@ -787,29 +789,48 @@ export function CbcReportCardPage() {
 
           {/* Generate button — shown when a class is selected; requires an exam to be picked */}
           {filters.class_id && (
-            <div className="mt-4 flex items-center gap-3">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => generateMutation.mutate()}
-                disabled={generateMutation.isPending || !examId}
-                className="flex items-center gap-2"
-              >
-                <PlusCircle className="h-4 w-4" />
-                {generateMutation.isPending ? 'Generating…' : 'Generate Report Cards for All Students'}
-              </Button>
-              {generateMutation.isSuccess && (
-                <span className="text-xs text-green-600">
-                  {(generateMutation.data as any)?.data?.created === 0
-                    ? 'All students already have report cards.'
-                    : `Created ${(generateMutation.data as any)?.data?.created} new report card(s).`}
-                </span>
-              )}
-              {generateMutation.isError && (
-                <span className="text-xs text-red-600">
-                  {(generateMutation.error as any)?.response?.data?.message || (generateMutation.error as any)?.message || 'Failed to generate report cards.'}
-                </span>
-              )}
+            <div className="mt-4 space-y-2">
+              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer w-fit">
+                <input
+                  type="checkbox"
+                  checked={autoPublish}
+                  onChange={e => setAutoPublish(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Publish immediately (recommended) — students and parents can see it right away.
+                {!autoPublish && (
+                  <span className="text-amber-600 font-medium">
+                    Off: cards stay hidden as drafts until you publish them separately below.
+                  </span>
+                )}
+              </label>
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => generateMutation.mutate()}
+                  disabled={generateMutation.isPending || !examId}
+                  className="flex items-center gap-2"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  {generateMutation.isPending ? 'Generating…' : 'Generate Report Cards for All Students'}
+                </Button>
+                {generateMutation.isSuccess && (
+                  <span className="text-xs text-green-600">
+                    {(generateMutation.data as any)?.data?.created === 0 && (generateMutation.data as any)?.data?.published === 0
+                      ? 'All students already have report cards.'
+                      : `Created ${(generateMutation.data as any)?.data?.created} new report card(s).` +
+                        ((generateMutation.data as any)?.data?.published
+                          ? ` ${(generateMutation.data as any)?.data?.published} published — visible to students/parents now.`
+                          : ' Still in draft — use "Publish All Drafts" below to make them visible.')}
+                  </span>
+                )}
+                {generateMutation.isError && (
+                  <span className="text-xs text-red-600">
+                    {(generateMutation.error as any)?.response?.data?.message || (generateMutation.error as any)?.message || 'Failed to generate report cards.'}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </CardContent>

@@ -613,7 +613,7 @@ router.get('/report-cards', authenticate, requireModule('academics'), async (req
 // POST /api/v1/cbe/report-cards/generate — bulk-create draft report cards for all students in a class
 router.post('/report-cards/generate', authenticate, requireModule('academics'), async (req, res) => {
   try {
-    const { class_id, term, academic_year, closing_date, opening_date, period, exam_id } = req.body;
+    const { class_id, term, academic_year, closing_date, opening_date, period, exam_id, auto_publish } = req.body;
     if (!class_id || !term || !academic_year) {
       return res.status(400).json({ success: false, message: 'class_id, term and academic_year are required' });
     }
@@ -637,6 +637,7 @@ router.post('/report-cards/generate', authenticate, requireModule('academics'), 
 
     let created = 0;
     let updated = 0;
+    let published = 0;
     for (const s of students) {
       // Skip if report card already exists for this student/term/year
       const existing = await query(
@@ -644,25 +645,34 @@ router.post('/report-cards/generate', authenticate, requireModule('academics'), 
         [s.id, class_id, term, academic_year, tid]
       );
       if (existing.length) {
-        // Update closing/opening dates, period and exam link if provided
-        if (closing_date || opening_date || period || exam_id) {
-          await query(
+        // Update closing/opening dates, period and exam link if provided, and publish
+        // an existing draft if auto_publish was requested this time round.
+        if (closing_date || opening_date || period || exam_id || auto_publish) {
+          const publishClause = auto_publish
+            ? `, status = CASE WHEN status = 'draft' THEN 'published' ELSE status END,
+               published_at = CASE WHEN status = 'draft' THEN NOW() ELSE published_at END`
+            : '';
+          const result = await query(
             `UPDATE cbc_report_cards SET closing_date=COALESCE($1, closing_date), opening_date=COALESCE($2, opening_date),
-             period=COALESCE($8, period), exam_id=COALESCE($9, exam_id), updated_at=NOW()
-             WHERE student_id=$3 AND class_id=$4 AND term=$5 AND academic_year=$6 AND tenant_id=$7`,
+             period=COALESCE($8, period), exam_id=COALESCE($9, exam_id), updated_at=NOW()${publishClause}
+             WHERE student_id=$3 AND class_id=$4 AND term=$5 AND academic_year=$6 AND tenant_id=$7
+             RETURNING status`,
             [closing_date || null, opening_date || null, s.id, class_id, term, academic_year, tid, period || null, exam_id || null]
           );
           updated++;
+          if (auto_publish && result[0]?.status === 'published') published++;
         }
         continue;
       }
 
       await query(
-        `INSERT INTO cbc_report_cards (id, tenant_id, student_id, class_id, term, academic_year, closing_date, opening_date, period, exam_id, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',NOW(),NOW())`,
-        [uuidv4(), tid, s.id, class_id, term, academic_year, closing_date || null, opening_date || null, period || null, exam_id || null]
+        `INSERT INTO cbc_report_cards (id, tenant_id, student_id, class_id, term, academic_year, closing_date, opening_date, period, exam_id, status, published_at, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())`,
+        [uuidv4(), tid, s.id, class_id, term, academic_year, closing_date || null, opening_date || null, period || null, exam_id || null,
+         auto_publish ? 'published' : 'draft', auto_publish ? new Date() : null]
       );
       created++;
+      if (auto_publish) published++;
     }
 
     // Log this generation run so admins can see report card generation history later
@@ -674,7 +684,7 @@ router.post('/report-cards/generate', authenticate, requireModule('academics'), 
       [tid, class_id, term, academic_year, period || null, exam_id || null, students.length, created, updated, req.user.id]
     ).catch(err => logger.error('Failed to log report card batch:', err));
 
-    res.json({ success: true, created, updated, total: students.length });
+    res.json({ success: true, created, updated, published, total: students.length });
   } catch (err) {
     logger.error('Generate report cards error:', err);
     res.status(500).json({ success: false, message: err.message });

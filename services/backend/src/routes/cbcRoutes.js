@@ -555,6 +555,14 @@ router.get('/report-cards', authenticate, requireModule('academics'), async (req
     if (class_id) {
       // Start from students so all class members are visible even without a report card
       params = [tid, class_id];
+      // Built separately and spliced into the cbc_report_cards ON clause below —
+      // appending these after the exams LEFT JOIN would silently attach them to
+      // that join's ON condition instead of scoping which report card matches,
+      // causing the rc join to fan out across every term/year a student has ever
+      // had a card in this class (breaking bulk-publish-by-term/year downstream).
+      let rcJoinExtra = '';
+      if (term)          { rcJoinExtra += ` AND rc.term = $${params.length+1}`;          params.push(term); }
+      if (academic_year) { rcJoinExtra += ` AND rc.academic_year = $${params.length+1}`; params.push(academic_year); }
       sql = `SELECT
                s.id AS student_id,
                s.first_name||' '||s.last_name AS student_name,
@@ -579,10 +587,9 @@ router.get('/report-cards', authenticate, requireModule('academics'), async (req
                ON rc.student_id = s.id
                AND rc.class_id = s.class_id
                AND rc.tenant_id = $1
-             LEFT JOIN exams e ON e.id = rc.exam_id`;
-      if (term)          { sql += ` AND rc.term = $${params.length+1}`;          params.push(term); }
-      if (academic_year) { sql += ` AND rc.academic_year = $${params.length+1}`; params.push(academic_year); }
-      sql += ` WHERE s.class_id = $2 AND s.tenant_id = $1 AND s.status = 'active'`;
+               ${rcJoinExtra}
+             LEFT JOIN exams e ON e.id = rc.exam_id
+             WHERE s.class_id = $2 AND s.tenant_id = $1 AND s.status = 'active'`;
       if (status) { sql += ` AND (rc.status = $${params.length+1} OR rc.status IS NULL)`; params.push(status); }
       sql += ' ORDER BY s.first_name, s.last_name';
     } else {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 import {
   LayoutDashboard,
   Building2,
@@ -26,6 +27,7 @@ export function SuperAdminLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, clearAuth } = useAuthStore();
+  useIdleLogout('/login');
 
   const handleLogout = () => {
     clearAuth();

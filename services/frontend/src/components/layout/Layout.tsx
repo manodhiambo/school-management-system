@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { TrialBanner } from './TrialBanner';
 import { useAuthStore } from '@/store/authStore';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, Wallet, Settings, BookOpen,
@@ -88,6 +89,7 @@ function MobileBottomNav() {
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useIdleLogout('/login');
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">

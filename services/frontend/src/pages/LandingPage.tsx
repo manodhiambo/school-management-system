@@ -258,9 +258,7 @@ export function LandingPage() {
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-            </div>
+            <img src="/logo-mark.png" alt="SkulManager logo" className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0" />
             <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent whitespace-nowrap">
               Skul Manager
             </span>
@@ -787,9 +785,7 @@ export function LandingPage() {
             {/* Brand */}
             <div className="lg:col-span-2">
               <div className="flex items-center gap-2 mb-4">
-                <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <GraduationCap className="h-5 w-5 text-white" />
-                </div>
+                <img src="/logo-mark.png" alt="SkulManager logo" className="h-9 w-9" />
                 <span className="text-xl font-bold">Skul Manager</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6 max-w-sm">

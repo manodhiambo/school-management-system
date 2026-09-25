@@ -274,9 +274,7 @@ export function LoginPage() {
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-6">
-          <div className="h-16 w-16 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200 mb-3">
-            <GraduationCap className="h-9 w-9 text-white" />
-          </div>
+          <img src="/logo-mark.png" alt="SkulManager logo" className="h-16 w-16 mb-3" />
           <h1 className="text-xl font-bold text-gray-900">SkulManager</h1>
           <p className="text-sm text-gray-500">Kenya School Management System</p>
         </div>
